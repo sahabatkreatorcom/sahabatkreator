@@ -4,6 +4,7 @@ export const platformEnum = pgEnum("platform", [
   "INSTAGRAM",
   "INSTAGRAM_PAGE",
   "FACEBOOK",
+  "META",
   "TIKTOK",
   "YOUTUBE",
   "PINTEREST",

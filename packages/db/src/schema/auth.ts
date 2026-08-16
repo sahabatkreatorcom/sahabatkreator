@@ -1,4 +1,5 @@
 import { boolean, index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { orgTierEnum } from "./enum";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -105,6 +106,19 @@ export const organization = pgTable("organization", {
   logo: text("logo"),
   createdAt: timestamp("created_at").notNull(),
   metadata: text("metadata"),
+  tier: orgTierEnum("tier").default("FREE").notNull(),
+  maxMembers: integer("max_members").default(5).notNull(),
+  timezone: text("timezone").default("UTC").notNull(),
+  accentColor: text("accent_color").default("#D4A574").notNull(),
+  accentColorAlt: text("accent_color_alt").default("#E8B4B8").notNull(),
+  darkMode: boolean("dark_mode").default(false).notNull(),
+  aiDraftsEnabled: boolean("ai_drafts_enabled").default(true).notNull(),
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  stripePriceId: text("stripe_price_id"),
+  subscriptionStatus: text("subscription_status"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
 });
 
 export const member = pgTable(

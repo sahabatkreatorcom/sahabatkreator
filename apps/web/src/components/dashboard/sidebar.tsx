@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Logo } from "@/components/ui/logo";
 import { navItems, type NavItem } from "@/lib/nav-config";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,11 @@ export function Sidebar({ isPlatformAdmin }: { isPlatformAdmin?: boolean }) {
 
     return (
         <nav className="flex h-full flex-col gap-6 overflow-y-auto p-3">
+            <Link href="/dashboard" className="flex items-center gap-2 px-2 py-1">
+                <Logo size={28} className="rounded-md" />
+                <span className="text-sm font-semibold leading-tight">Sahabat Kreator</span>
+            </Link>
+
             <div>
                 <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Konten

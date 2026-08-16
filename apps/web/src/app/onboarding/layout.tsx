@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@sahabat-kreator/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Logo } from "@/components/ui/logo";
 
 export default async function OnboardingLayout({ children }: { children: React.ReactNode }) {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -11,10 +12,7 @@ export default async function OnboardingLayout({ children }: { children: React.R
         <div className="flex min-h-screen flex-col">
             <header className="flex items-center justify-between p-6">
                 <span className="flex items-center gap-2 text-sm font-semibold">
-                    <span className="relative flex h-2.5 w-2.5">
-                        <span className="signal-dot-live absolute inline-flex h-full w-full rounded-full bg-primary/60" />
-                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
-                    </span>
+                    <Logo size={24} className="rounded-md" />
                     Sahabat Kreator
                 </span>
                 <ThemeToggle />
