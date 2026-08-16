@@ -14,6 +14,7 @@ const links = [
     { href: "/dashboard/settings/members" as any, label: "Anggota" },
     { href: "/dashboard/settings/teams" as any, label: "Tim" },
     { href: "/dashboard/settings/sessions" as any, label: "Sesi aktif" },
+    { href: "/dashboard/settings/connections" as any, label: "Koneksi akun" },
 ];
 
 export default async function SettingsLayout({ children }: SettingsLayoutProps) {
