@@ -1,0 +1,39 @@
+{
+  "name": "sahabat-kreator",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "dev:web": "turbo -F web dev",
+    "db:push": "turbo -F @sahabat-kreator/db db:push",
+    "db:studio": "turbo -F @sahabat-kreator/db db:studio",
+    "db:generate": "turbo -F @sahabat-kreator/db db:generate",
+    "db:migrate": "turbo -F @sahabat-kreator/db db:migrate",
+    "test": "pnpm --filter web test",
+    "check": "biome check --write ."
+  },
+  "dependencies": {
+    "@sahabat-kreator/env": "workspace:*",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.7",
+    "@sahabat-kreator/config": "workspace:*",
+    "@types/node": "catalog:",
+    "turbo": "^2.10.0",
+    "typescript": "^6.0.3"
+  },
+  "packageManager": "pnpm@10.14.0",
+  "pnpm": {
+    "overrides": {
+      "kysely": "0.28.17"
+    }
+  }
+}
