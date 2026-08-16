@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@sahabat-kreator/db";
 import { env } from "@sahabat-kreator/env/server";
 import { eq } from "drizzle-orm";
-import { exchangeCodeForToken, getCredentialsForPlatform, fetchPlatformProfile, CONNECTABLE_PLATFORMS, credentialPlatform, type Platform } from "@/lib/platforms";
+import { exchangeCodeForToken, getCredentialsForPlatform, fetchPlatformProfile, CONNECTABLE_PLATFORMS, type Platform } from "@/lib/platforms";
 import { encryptToken } from "@/lib/token-encryption";
 
 export const dynamic = "force-dynamic";
@@ -86,9 +86,8 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
         return NextResponse.redirect(accountsUrl);
     }
 
-    const platformEnum = credentialPlatform(platform);
     const effectiveToken =
-        (platform === "FACEBOOK" || platform === "INSTAGRAM") && profile.metadata?.pageAccessToken
+        (platform === "FACEBOOK" || platform === "INSTAGRAM_PAGE") && profile.metadata?.pageAccessToken
             ? String(profile.metadata.pageAccessToken)
             : tokens.accessToken;
     const tokenExpiry = new Date(Date.now() + tokens.expiresIn * 1000);
@@ -97,7 +96,7 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
         where: (t, { and: _and, eq: _eq }) =>
             _and(
                 _eq(t.organizationId, stateData.organizationId),
-                _eq(t.platform, platformEnum),
+                _eq(t.platform, platform),
                 _eq(t.platformId, profile.platformId),
             ),
         columns: { id: true },
@@ -124,7 +123,7 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
                 .values({
                     id: randomUUID(),
                     organizationId: stateData.organizationId,
-                    platform: platformEnum,
+                    platform,
                     platformId: profile.platformId,
                     name: profile.name,
                     username: profile.username,

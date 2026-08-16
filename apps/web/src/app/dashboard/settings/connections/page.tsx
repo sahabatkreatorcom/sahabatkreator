@@ -167,7 +167,7 @@ export default function ConnectionsPage() {
                             Hubungkan platform
                         </p>
                         <div className="grid gap-3 md:grid-cols-2">
-                            {(["INSTAGRAM", "FACEBOOK", "TIKTOK", "YOUTUBE", "THREADS", "PINTEREST", "LINKEDIN", "GOOGLE_BUSINESS"] as Platform[]).map((platform) => (
+                            {(["INSTAGRAM", "INSTAGRAM_PAGE", "FACEBOOK", "TIKTOK", "YOUTUBE", "THREADS", "PINTEREST", "LINKEDIN", "GOOGLE_BUSINESS"] as Platform[]).map((platform) => (
                                 <div
                                     key={platform}
                                     className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-4"

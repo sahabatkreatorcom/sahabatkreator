@@ -1,4 +1,4 @@
-import { PLATFORM_OAUTH_CONFIGS, type Platform } from "./config";
+import { INSTAGRAM_GRAPH_URL, INSTAGRAM_OAUTH_URL, PLATFORM_OAUTH_CONFIGS, type Platform } from "./config";
 
 export interface TokenResponse {
     accessToken: string;
@@ -48,6 +48,8 @@ export async function exchangeCodeForToken(
 
     switch (platform) {
         case "INSTAGRAM":
+            return exchangeInstagramStandaloneToken(code, redirectUri, clientId, clientSecret);
+        case "INSTAGRAM_PAGE":
         case "FACEBOOK":
             return exchangeFacebookToken(code, redirectUri, clientId, clientSecret);
         case "THREADS":
@@ -77,6 +79,8 @@ export async function refreshAccessToken(
     switch (platform) {
         case "INSTAGRAM":
             return refreshMetaLongLivedToken(refreshToken, "ig_refresh_token");
+        case "INSTAGRAM_PAGE":
+            return refreshFacebookToken(refreshToken, clientId, clientSecret);
         case "THREADS":
             return refreshMetaLongLivedToken(refreshToken, "th_refresh_token");
         case "FACEBOOK":
@@ -96,6 +100,42 @@ export async function refreshAccessToken(
 }
 
 // ─── Facebook / Instagram (Meta) ────────────────────────────────────────────
+
+/**
+ * Instagram STANDALONE (Graph API sendiri, graph.instagram.com):
+ * 1. Tukar kode → short-lived token (60 menit) via api.instagram.com.
+ * 2. Tukar short-lived → long-lived token (60 hari) via graph.instagram.com/access_token.
+ */
+async function exchangeInstagramStandaloneToken(
+    code: string,
+    redirectUri: string,
+    clientId: string,
+    clientSecret: string,
+): Promise<TokenResponse> {
+    const res = await fetch(`${INSTAGRAM_OAUTH_URL}/access_token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "authorization_code", redirect_uri: redirectUri, code }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error_message || data.error || "Gagal tukar kode Instagram.");
+
+    const longRes = await fetch(`${INSTAGRAM_GRAPH_URL}/access_token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            grant_type: "ig_exchange_token",
+            client_secret: clientSecret,
+            access_token: data.access_token,
+        }),
+    });
+    const longData = await longRes.json();
+
+    return {
+        accessToken: longData.access_token || data.access_token,
+        expiresIn: longData.expires_in || 5184000,
+    };
+}
 
 async function exchangeFacebookToken(
     code: string,

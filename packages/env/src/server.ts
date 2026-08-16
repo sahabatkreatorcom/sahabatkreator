@@ -23,6 +23,8 @@ export const env = createEnv({
     PEXELS_API_KEY: z.string().optional(),
     UNSPLASH_API_KEY: z.string().optional(),
     OPENROUTER_API_KEY: z.string().optional(),
+    INSTAGRAM_CLIENT_ID: z.string().optional(),
+    INSTAGRAM_CLIENT_SECRET: z.string().optional(),
     META_CLIENT_ID: z.string().optional(),
     META_CLIENT_SECRET: z.string().optional(),
     TIKTOK_CLIENT_ID: z.string().optional(),

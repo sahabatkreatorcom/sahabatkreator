@@ -1,4 +1,4 @@
-import { GRAPH_API_URL, type Platform } from "./config";
+import { GRAPH_API_URL, INSTAGRAM_GRAPH_URL, type Platform } from "./config";
 
 export interface OAuthProfile {
     platformId: string;
@@ -14,7 +14,9 @@ export async function fetchPlatformProfile(
 ): Promise<OAuthProfile | null> {
     switch (platform) {
         case "INSTAGRAM":
-            return fetchInstagramProfile(accessToken);
+            return fetchInstagramStandaloneProfile(accessToken);
+        case "INSTAGRAM_PAGE":
+            return fetchInstagramPageProfile(accessToken);
         case "FACEBOOK":
             return fetchFacebookPageProfile(accessToken);
         case "TIKTOK":
@@ -34,7 +36,29 @@ export async function fetchPlatformProfile(
     }
 }
 
-export async function fetchInstagramProfile(accessToken: string): Promise<OAuthProfile | null> {
+/** Instagram STANDALONE — Graph API sendiri (graph.instagram.com). */
+export async function fetchInstagramStandaloneProfile(accessToken: string): Promise<OAuthProfile | null> {
+    try {
+        const res = await fetch(
+            `${INSTAGRAM_GRAPH_URL}/me?fields=id,username,account_type,profile_picture_url&access_token=${accessToken}`,
+        );
+        const data = await res.json();
+        if (data.error || !data.id) return null;
+
+        return {
+            platformId: data.id,
+            name: data.username || "Instagram user",
+            username: data.username || "",
+            profilePicture: data.profile_picture_url,
+            metadata: { accountType: data.account_type },
+        };
+    } catch {
+        return null;
+    }
+}
+
+/** Instagram yang tertaut Facebook Page — via me/accounts (Graph API Meta). */
+export async function fetchInstagramPageProfile(accessToken: string): Promise<OAuthProfile | null> {
     try {
         const res = await fetch(
             `${GRAPH_API_URL}/me/accounts?fields=id,name,access_token,instagram_business_account{id,name,username,profile_picture_url}`,

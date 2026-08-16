@@ -3,6 +3,7 @@ export const META_OAUTH_VERSION = "v25.0";
 
 export type Platform =
     | "INSTAGRAM"
+    | "INSTAGRAM_PAGE"
     | "FACEBOOK"
     | "META"
     | "TIKTOK"
@@ -17,6 +18,7 @@ export type Platform =
 /** Platform yang bisa dihubungkan via OAuth. MANUAL & META tidak connect langsung. */
 export const CONNECTABLE_PLATFORMS: Platform[] = [
     "INSTAGRAM",
+    "INSTAGRAM_PAGE",
     "FACEBOOK",
     "TIKTOK",
     "YOUTUBE",
@@ -25,6 +27,10 @@ export const CONNECTABLE_PLATFORMS: Platform[] = [
     "LINKEDIN",
     "THREADS",
 ];
+
+/** URL dasar Graph API Instagram standalone vs yang tertaut Facebook Page. */
+export const INSTAGRAM_GRAPH_URL = "https://graph.instagram.com/v25.0";
+export const INSTAGRAM_OAUTH_URL = "https://api.instagram.com/oauth";
 
 export interface PlatformOAuthConfig {
     authUrl: string;
@@ -35,12 +41,25 @@ export interface PlatformOAuthConfig {
 
 /** Credential key di global_platform_credential (enum db). */
 export function credentialPlatform(p: Platform): Platform {
-    if (p === "INSTAGRAM" || p === "FACEBOOK") return "META";
+    if (p === "INSTAGRAM_PAGE" || p === "FACEBOOK") return "META";
     return p;
 }
 
 export const PLATFORM_OAUTH_CONFIGS: Record<Platform, PlatformOAuthConfig> = {
     INSTAGRAM: {
+        authUrl: `${INSTAGRAM_OAUTH_URL}/authorize`,
+        tokenUrl: `${INSTAGRAM_OAUTH_URL}/access_token`,
+        scopes: [
+            "instagram_graph_api",
+            "instagram_content_publish",
+            "instagram_manage_comments",
+            "instagram_manage_insights",
+            "instagram_manage_messages",
+            "instagram_business_manage",
+        ],
+        apiBase: INSTAGRAM_GRAPH_URL,
+    },
+    INSTAGRAM_PAGE: {
         authUrl: `https://www.facebook.com/${META_OAUTH_VERSION}/dialog/oauth`,
         tokenUrl: `${GRAPH_API_URL}/oauth/access_token`,
         scopes: [
@@ -139,6 +158,7 @@ export const PLATFORM_OAUTH_CONFIGS: Record<Platform, PlatformOAuthConfig> = {
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
     INSTAGRAM: "Instagram",
+    INSTAGRAM_PAGE: "Instagram (via Page)",
     FACEBOOK: "Facebook",
     META: "Meta",
     TIKTOK: "TikTok",
@@ -153,6 +173,7 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
 
 export const PLATFORM_COLORS: Record<Platform, string> = {
     INSTAGRAM: "#E4405F",
+    INSTAGRAM_PAGE: "#E4405F",
     FACEBOOK: "#1877F2",
     META: "#0668E1",
     TIKTOK: "#010101",
