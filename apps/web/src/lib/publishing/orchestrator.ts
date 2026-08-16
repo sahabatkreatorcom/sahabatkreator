@@ -2,6 +2,11 @@ import { db, schema } from "@sahabat-kreator/db";
 import { eq } from "drizzle-orm";
 import { publishToInstagram } from "./instagram";
 import { publishToFacebook } from "./facebook";
+import { publishToTikTok } from "./tiktok";
+import { publishToYouTube } from "./youtube";
+import { publishToPinterest } from "./pinterest";
+import { publishToLinkedIn } from "./linkedin";
+import { publishToThreads } from "./threads";
 import { refreshAccessToken, getCredentialsForPlatform } from "@/lib/platforms";
 import { decryptToken, encryptToken } from "@/lib/token-encryption";
 import type { PlatformAccount, PublishPayload, PublishResponse } from "./types";
@@ -50,6 +55,16 @@ export async function publishToPlatform(
             return publishToInstagram(acc, payload);
         case "FACEBOOK":
             return publishToFacebook(acc, payload);
+        case "TIKTOK":
+            return publishToTikTok(acc, payload);
+        case "YOUTUBE":
+            return publishToYouTube(acc, payload);
+        case "PINTEREST":
+            return publishToPinterest(acc, payload);
+        case "LINKEDIN":
+            return publishToLinkedIn(acc, payload);
+        case "THREADS":
+            return publishToThreads(acc, payload);
         case "MANUAL":
             return { success: true };
         default:
