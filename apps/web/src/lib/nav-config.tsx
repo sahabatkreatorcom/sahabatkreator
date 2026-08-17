@@ -9,6 +9,7 @@ import {
     Users,
     Settings,
     FolderTree,
+    Zap,
     type LucideIcon,
 } from "lucide-react";
 
@@ -91,6 +92,14 @@ export const navItems: NavItem[] = [
         label: "Semua post",
         shortLabel: "Post",
         icon: ListTodo,
+        group: "content",
+        mobileTab: false,
+    },
+    {
+        href: "/dashboard/inbox-automation",
+        label: "Automasi inbox",
+        shortLabel: "Automasi",
+        icon: Zap,
         group: "content",
         mobileTab: false,
     },

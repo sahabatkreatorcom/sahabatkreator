@@ -4,6 +4,7 @@ import { db, schema } from "@sahabat-kreator/db";
 import { fetchComments } from "./comments";
 import { getCredentialsForPlatform, refreshAccessToken, type Platform } from "@/lib/platforms";
 import { decryptToken, encryptToken } from "@/lib/token-encryption";
+import { processAutomationForComment } from "@/lib/inbox-automation";
 import type { InboxAccount } from "./types";
 
 export interface InboxSyncResult {
@@ -46,8 +47,21 @@ export async function syncOrganizationComments(organizationId: string): Promise<
 
                     for (const c of comments) {
                         const upserted = await upsertComment(account, post.id, post.platformPostId, c);
-                        if (upserted === "added") result.commentsAdded++;
-                        else if (upserted === "updated") result.commentsUpdated++;
+                        if (upserted === "added") {
+                            result.commentsAdded++;
+                            // Auto-reply (M6) untuk komentar baru yang cocok keyword.
+                            await processAutomationForComment({
+                                organizationId: account.organizationId,
+                                socialAccountId: account.id,
+                                platform: account.platform,
+                                platformPostId: post.platformPostId,
+                                platformCommentId: c.platformCommentId,
+                                authorUsername: c.authorUsername,
+                                text: c.text,
+                            });
+                        } else if (upserted === "updated") {
+                            result.commentsUpdated++;
+                        }
                     }
                 } catch (e) {
                     result.failed++;

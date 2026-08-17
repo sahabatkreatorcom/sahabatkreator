@@ -2,10 +2,20 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw, Search, Send, Trash2, CheckCheck, MessageSquare } from "lucide-react";
+import { Loader2, RefreshCw, Search, Send, Trash2, CheckCheck, MessageSquare, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms";
 import { cn } from "@/lib/utils";
+
+interface SavedResponse {
+    id: string;
+    name: string;
+    content: string;
+    shortcut: string | null;
+    category: string | null;
+    usageCount: number;
+}
 
 interface AccountRef {
     id: string;
@@ -66,6 +76,20 @@ export default function InboxPage() {
     const [busyId, setBusyId] = useState<string | null>(null);
     const [replyFor, setReplyFor] = useState<InboxComment | null>(null);
     const [replyText, setReplyText] = useState("");
+    const [savedResponses, setSavedResponses] = useState<SavedResponse[]>([]);
+    const [responsePickerOpen, setResponsePickerOpen] = useState(false);
+
+    const loadResponses = useCallback(async () => {
+        try {
+            const res = await fetch("/api/saved-responses");
+            const data = await res.json();
+            if (res.ok) setSavedResponses(data.responses ?? []);
+        } catch { /* ignore */ }
+    }, []);
+
+    useEffect(() => {
+        loadResponses();
+    }, [loadResponses]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -295,22 +319,49 @@ export default function InboxPage() {
                                     ))}
 
                                     {replyFor?.id === thread.id ? (
-                                        <div className="mt-3 flex gap-2">
-                                            <input
-                                                autoFocus
-                                                value={replyText}
-                                                onChange={(e) => setReplyText(e.target.value)}
-                                                onKeyDown={(e) => e.key === "Enter" && handleReply(thread)}
-                                                placeholder="Tulis balasan…"
-                                                className="h-9 flex-1 rounded-md border border-border bg-muted/50 px-3 text-sm outline-none focus:border-primary"
-                                            />
-                                            <Button size="sm" loading={busyId === thread.id} onClick={() => handleReply(thread)}>
-                                                <Send className="h-3.5 w-3.5" />
-                                                Kirim
-                                            </Button>
-                                            <Button variant="ghost" size="sm" onClick={() => { setReplyFor(null); setReplyText(""); }}>
-                                                Batal
-                                            </Button>
+                                        <div className="mt-3 space-y-2">
+                                            {savedResponses.length > 0 && (
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {savedResponses.slice(0, 5).map((r) => (
+                                                        <button
+                                                            key={r.id}
+                                                            onClick={() => {
+                                                                setReplyText(r.content);
+                                                                fetch(`/api/saved-responses/${r.id}`, { method: "POST" }).catch(() => {});
+                                                            }}
+                                                            className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                                                        >
+                                                            <Bookmark className="h-3 w-3" />
+                                                            {r.name}
+                                                        </button>
+                                                    ))}
+                                                    {savedResponses.length > 5 && (
+                                                        <button
+                                                            onClick={() => setResponsePickerOpen(true)}
+                                                            className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
+                                                        >
+                                                            Lihat semua…
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <div className="flex gap-2">
+                                                <input
+                                                    autoFocus
+                                                    value={replyText}
+                                                    onChange={(e) => setReplyText(e.target.value)}
+                                                    onKeyDown={(e) => e.key === "Enter" && handleReply(thread)}
+                                                    placeholder="Tulis balasan…"
+                                                    className="h-9 flex-1 rounded-md border border-border bg-muted/50 px-3 text-sm outline-none focus:border-primary"
+                                                />
+                                                <Button size="sm" loading={busyId === thread.id} onClick={() => handleReply(thread)}>
+                                                    <Send className="h-3.5 w-3.5" />
+                                                    Kirim
+                                                </Button>
+                                                <Button variant="ghost" size="sm" onClick={() => { setReplyFor(null); setReplyText(""); }}>
+                                                    Batal
+                                                </Button>
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="mt-2 flex gap-1.5">
@@ -338,6 +389,38 @@ export default function InboxPage() {
                         </div>
                     ))}
                 </div>
+            )}
+
+            {responsePickerOpen && (
+                <Dialog
+                    open={responsePickerOpen}
+                    onClose={() => setResponsePickerOpen(false)}
+                    title="Balasan siap pakai"
+                    description="Pilih untuk mengisi kolom balasan."
+                >
+                    <div className="max-h-80 space-y-2 overflow-y-auto">
+                        {savedResponses.map((r) => (
+                            <button
+                                key={r.id}
+                                onClick={() => {
+                                    setReplyText(r.content);
+                                    setResponsePickerOpen(false);
+                                    fetch(`/api/saved-responses/${r.id}`, { method: "POST" }).catch(() => {});
+                                }}
+                                className="w-full rounded-md border border-border bg-muted/40 p-3 text-left transition-colors hover:border-primary/50 hover:bg-muted"
+                            >
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-sm font-medium">{r.name}</span>
+                                    {r.category && <span className="text-xs text-muted-foreground">{r.category}</span>}
+                                </div>
+                                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{r.content}</p>
+                            </button>
+                        ))}
+                        {savedResponses.length === 0 && (
+                            <p className="py-6 text-center text-sm text-muted-foreground">Belum ada balasan siap pakai.</p>
+                        )}
+                    </div>
+                </Dialog>
             )}
         </div>
     );
