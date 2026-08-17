@@ -1047,6 +1047,7 @@ export async function analyzeMediaForSeb(organizationId: string, mediaId: string
             transcodeStatus: true,
             altText: true,
             filename: true,
+            url: true,
         },
     });
     if (!media) throw new Error("Media tidak ditemukan.");
@@ -1056,12 +1057,16 @@ export async function analyzeMediaForSeb(organizationId: string, mediaId: string
         throw new Error("Video belum diproses worker. Coba lagi beberapa saat.");
     }
 
+    // Video: pakai frame hasil ekstrak worker. Gambar: pakai URL media langsung
+    // (worker hanya memproses video, frame R2 untuk gambar tidak ada).
     const frameCount = isVideo ? 4 : 0;
-    const frameUrls = mediaFrameUrls(organizationId, mediaId, frameCount);
+    const imageUrls: string[] = isVideo
+        ? mediaFrameUrls(organizationId, mediaId, frameCount).map((key) => getPublicR2Url(key))
+        : [media.url];
 
-    const imageContent: Array<{ type: "image_url"; image_url: { url: string } }> = frameUrls.map((key) => ({
+    const imageContent: Array<{ type: "image_url"; image_url: { url: string } }> = imageUrls.map((url) => ({
         type: "image_url",
-        image_url: { url: getPublicR2Url(key) },
+        image_url: { url },
     }));
 
     const raw = await callOpenRouter(
