@@ -1,0 +1,46 @@
+# Deploy VPS — web + worker media.
+# Penggunaan:
+#   1. Salin .env.prod ke .env (atau set environment pada host).
+#   2. docker compose build
+#   3. docker compose up -d
+#
+# Catatan: env build-time web (DATABASE_URL, BETTER_AUTH_*) wajib diset saat build.
+# Variabel berikut diambil dari file `.env` di direktori ini (lihat `env_file`).
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+        BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+        BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+        CORS_ORIGIN: ${CORS_ORIGIN}
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - WORKER_POLL_INTERVAL_MS=${WORKER_POLL_INTERVAL_MS:-10000}
+      - WORKER_BATCH_SIZE=${WORKER_BATCH_SIZE:-3}
+      - WORKER_FRAME_COUNT=${WORKER_FRAME_COUNT:-4}
+      - WORKER_ENABLE_TRANSCODE=${WORKER_ENABLE_TRANSCODE:-true}
+    restart: unless-stopped
