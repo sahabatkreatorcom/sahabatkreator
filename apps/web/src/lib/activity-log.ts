@@ -23,7 +23,9 @@ export type ActivityAction =
     | "automation.updated"
     | "automation.deleted"
     | "automation.triggered"
-    | "comment.replied";
+    | "comment.replied"
+    | "competitor.created"
+    | "competitor.deleted";
 
 export const ACTION_LABELS: Record<ActivityAction, string> = {
     "post.created": "membuat post",
@@ -47,6 +49,8 @@ export const ACTION_LABELS: Record<ActivityAction, string> = {
     "automation.deleted": "menghapus automation",
     "automation.triggered": "automation terpicu",
     "comment.replied": "membalas komentar",
+    "competitor.created": "menambahkan competitor",
+    "competitor.deleted": "menghapus competitor",
 };
 
 export interface ActivityResource {

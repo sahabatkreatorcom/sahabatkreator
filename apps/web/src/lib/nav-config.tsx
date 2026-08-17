@@ -11,6 +11,7 @@ import {
     FolderTree,
     Zap,
     History,
+    Radar,
     type LucideIcon,
 } from "lucide-react";
 
@@ -101,6 +102,14 @@ export const navItems: NavItem[] = [
         label: "Automasi inbox",
         shortLabel: "Automasi",
         icon: Zap,
+        group: "content",
+        mobileTab: false,
+    },
+    {
+        href: "/dashboard/competitors",
+        label: "Competitor & listening",
+        shortLabel: "Competitor",
+        icon: Radar,
         group: "content",
         mobileTab: false,
     },
