@@ -6,7 +6,7 @@ import { Eye, Loader2, RefreshCw, Users, MessageSquare, FileText } from "lucide-
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/dashboard/stat-card";
-import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms";
+import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 import { PLATFORM_STORAGE_POLICIES } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 

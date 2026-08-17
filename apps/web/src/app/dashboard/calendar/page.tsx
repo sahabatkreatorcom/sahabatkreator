@@ -4,7 +4,7 @@ import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PLATFORM_COLORS } from "@/lib/platforms";
+import { PLATFORM_COLORS } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
 
 interface AccountRef {

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 export function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const redirectTo = searchParams.get("redirect") || "/dashboard";
+    const redirectTo = searchParams.get("redirect") || "/";
 
     const [email, setEmail] = React.useState("");
     const [password, setPassword] = React.useState("");
@@ -36,10 +36,10 @@ export function LoginForm() {
             return;
         }
 
-        if (redirectTo && redirectTo !== "/dashboard") {
+        if (redirectTo && redirectTo !== "/") {
             router.push(redirectTo as any);
         } else {
-            router.push("/dashboard");
+            router.push("/" as any);
         }
     }
 

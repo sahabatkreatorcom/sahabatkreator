@@ -39,7 +39,7 @@ export function BackupCodesPageClient({ codes }: Props) {
                     </p>
                 </div>
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                <Button variant="secondary" onClick={() => (router as any).push("/dashboard/settings/security")}>
+                <Button variant="secondary" onClick={() => (router as any).push("/settings/security")}>
                     Kembali ke Keamanan
                 </Button>
             </div>
@@ -75,7 +75,7 @@ export function BackupCodesPageClient({ codes }: Props) {
                     Buat ulang kode
                 </Button>
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                <Button variant="ghost" size="sm" onClick={() => (router as any).push("/dashboard/settings/security")}>
+                <Button variant="ghost" size="sm" onClick={() => (router as any).push("/settings/security")}>
                     Kembali
                 </Button>
             </div>

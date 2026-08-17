@@ -13,6 +13,7 @@ import {
     History,
     Radar,
     Sparkles,
+    Search,
     type LucideIcon,
 } from "lucide-react";
 
@@ -35,7 +36,7 @@ export interface NavItem {
  */
 export const navItems: NavItem[] = [
     {
-        href: "/dashboard",
+        href: "/",
         label: "Ringkasan",
         shortLabel: "Ringkasan",
         icon: LayoutDashboard,
@@ -43,7 +44,7 @@ export const navItems: NavItem[] = [
         mobileTab: true,
     },
     {
-        href: "/dashboard/calendar",
+        href: "/calendar",
         label: "Kalender konten",
         shortLabel: "Kalender",
         icon: CalendarDays,
@@ -51,7 +52,7 @@ export const navItems: NavItem[] = [
         mobileTab: true,
     },
     {
-        href: "/dashboard/analytics",
+        href: "/analytics",
         label: "Analitik",
         shortLabel: "Analitik",
         icon: BarChart3,
@@ -59,7 +60,7 @@ export const navItems: NavItem[] = [
         mobileTab: true,
     },
     {
-        href: "/dashboard/inbox",
+        href: "/inbox",
         label: "Komentar & pesan",
         shortLabel: "Inbox",
         icon: MessageSquare,
@@ -67,7 +68,7 @@ export const navItems: NavItem[] = [
         mobileTab: true,
     },
     {
-        href: "/dashboard/media",
+        href: "/media",
         label: "Media library",
         shortLabel: "Media",
         icon: ImageIcon,
@@ -75,7 +76,7 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
-        href: "/dashboard/compose",
+        href: "/compose",
         label: "Buat konten",
         shortLabel: "Buat",
         icon: PenSquare,
@@ -83,7 +84,7 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
-        href: "/dashboard/content-tools",
+        href: "/content-tools",
         label: "Content tools",
         shortLabel: "Tools",
         icon: FolderTree,
@@ -91,7 +92,7 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
-        href: "/dashboard/posts",
+        href: "/posts",
         label: "Semua post",
         shortLabel: "Post",
         icon: ListTodo,
@@ -99,7 +100,7 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
-        href: "/dashboard/inbox-automation",
+        href: "/inbox-automation",
         label: "Automasi inbox",
         shortLabel: "Automasi",
         icon: Zap,
@@ -107,7 +108,7 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
-        href: "/dashboard/competitors",
+        href: "/competitors",
         label: "Competitor & listening",
         shortLabel: "Competitor",
         icon: Radar,
@@ -115,7 +116,7 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
-        href: "/dashboard/seb",
+        href: "/seb",
         label: "Seb AI",
         shortLabel: "Seb",
         icon: Sparkles,
@@ -123,7 +124,7 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
-        href: "/dashboard/team",
+        href: "/team",
         label: "Anggota tim",
         shortLabel: "Tim",
         icon: Users,
@@ -131,7 +132,7 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
-        href: "/dashboard/trends",
+        href: "/trends",
         label: "Tren",
         shortLabel: "Tren",
         icon: BarChart3,
@@ -139,7 +140,7 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
-        href: "/dashboard/engagement",
+        href: "/engagement",
         label: "Engagement",
         shortLabel: "Engagement",
         icon: MessageSquare,
@@ -147,7 +148,15 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
-        href: "/dashboard/activity",
+        href: "/listening",
+        label: "Social Listening",
+        shortLabel: "Listening",
+        icon: Search,
+        group: "content",
+        mobileTab: false,
+    },
+    {
+        href: "/activity",
         label: "Activity log",
         shortLabel: "Log",
         icon: History,
@@ -155,7 +164,7 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
-        href: "/dashboard/settings",
+        href: "/settings",
         label: "Pengaturan workspace",
         shortLabel: "Pengaturan",
         icon: Settings,

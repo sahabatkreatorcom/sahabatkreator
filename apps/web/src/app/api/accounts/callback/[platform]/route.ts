@@ -21,7 +21,7 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
     const { platform: platformParam } = await params;
     const platform = platformParam.toUpperCase() as Platform;
     const baseUrl = env.BETTER_AUTH_URL.replace(/\/$/, "");
-    const accountsUrl = new URL("/dashboard/settings/connections", baseUrl);
+    const accountsUrl = new URL("/settings/connections", baseUrl);
 
     if (!CONNECTABLE_PLATFORMS.includes(platform)) {
         accountsUrl.searchParams.set("error", "invalid_platform");

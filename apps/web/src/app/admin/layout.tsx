@@ -9,7 +9,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) redirect("/login");
     // Ini role platform (dari plugin admin), bukan role di dalam satu organization.
-    if (session.user.role !== "admin") redirect("/dashboard");
+    if (session.user.role !== "admin") redirect("/" as any);
 
     return (
         <div className="min-h-screen">

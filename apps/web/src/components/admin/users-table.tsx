@@ -70,7 +70,7 @@ export function UsersTable() {
 
     async function impersonate(user: AdminUser) {
         await authClient.admin.impersonateUser({ userId: user.id });
-        window.location.href = "/dashboard";
+        window.location.href = "/";
     }
 
     async function removeUser(user: AdminUser) {

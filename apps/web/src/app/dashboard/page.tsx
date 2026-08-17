@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Button } from "@/components/ui/button";
-import { PLATFORM_LABELS, type Platform } from "@/lib/platforms";
+import { PLATFORM_LABELS, type Platform } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
 
 interface Stats {
@@ -160,7 +160,7 @@ export default function DashboardPage() {
                 <div className="rounded-lg border border-border bg-card">
                     <div className="flex items-center justify-between border-b border-border p-4">
                         <h2 className="text-sm font-semibold">Antrean konten</h2>
-                        <a href="/dashboard/calendar" className="text-xs font-medium text-primary hover:underline">
+                        <a href="/calendar" className="text-xs font-medium text-primary hover:underline">
                             Lihat kalender
                         </a>
                     </div>
@@ -198,7 +198,7 @@ export default function DashboardPage() {
                 <div className="rounded-lg border border-border bg-card">
                     <div className="flex items-center justify-between border-b border-border p-4">
                         <h2 className="text-sm font-semibold">Aktivitas terbaru</h2>
-                        <a href="/dashboard/activity" className="text-xs font-medium text-primary hover:underline">
+                        <a href="/activity" className="text-xs font-medium text-primary hover:underline">
                             Lihat semua
                         </a>
                     </div>

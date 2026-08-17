@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, RefreshCw, Search, Send, Trash2, CheckCheck, MessageSquare, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms";
+import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
 
 interface SavedResponse {

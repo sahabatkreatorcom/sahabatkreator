@@ -418,7 +418,7 @@ Konteks:\n${JSON.stringify(context).slice(0, 65000)}`,
             title: "Laporan Seb siap",
             message: "Seb telah selesai membuat laporan coaching media sosial terbaru.",
             type: "success",
-            link: "/dashboard/seb",
+            link: "/seb",
         });
 
         const highPriority = recs.some((rec) => normalizePriority(rec.priority) === "HIGH");
@@ -429,7 +429,7 @@ Konteks:\n${JSON.stringify(context).slice(0, 65000)}`,
                 title: "Seb menemukan saran prioritas tinggi",
                 message: "Laporan Seb baru berisi rekomendasi prioritas tinggi untuk media sosial Anda.",
                 type: "warning",
-                link: "/dashboard/seb",
+                link: "/seb",
             });
         }
 

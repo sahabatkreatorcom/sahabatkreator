@@ -4,7 +4,7 @@ import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { CalendarClock, CheckCircle2, Send, Trash2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms";
+import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
 
 interface AccountRef {
@@ -116,7 +116,7 @@ export default function PostsPage() {
                     <h1 className="text-lg font-semibold">Posts</h1>
                     <p className="text-sm text-muted-foreground">Kelola konten yang dijadwalkan & diterbitkan.</p>
                 </div>
-                <a href="/dashboard/compose">
+                <a href="/compose">
                     <Button size="sm">+ Buat konten</Button>
                 </a>
             </div>

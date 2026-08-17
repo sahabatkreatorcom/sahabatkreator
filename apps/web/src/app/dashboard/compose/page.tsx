@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { StockMediaPicker } from "@/components/media/stock-media-picker";
-import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms";
+import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
 
 interface Account {
@@ -183,7 +183,7 @@ export default function ComposePage() {
                 ) : accounts.length === 0 ? (
                     <div className="text-sm text-muted-foreground">
                         Belum ada akun terhubung.{" "}
-                        <a href="/dashboard/settings/connections" className="font-medium text-primary hover:underline">
+                        <a href="/settings/connections" className="font-medium text-primary hover:underline">
                             Hubungkan akun
                         </a>
                         .
@@ -261,7 +261,7 @@ export default function ComposePage() {
                         Koleksi hashtag
                     </Button>
                     {templates.length === 0 && collections.length === 0 && (
-                        <a href="/dashboard/content-tools" className="text-xs font-medium text-primary hover:underline">
+                        <a href="/content-tools" className="text-xs font-medium text-primary hover:underline">
                             Kelola di Content tools
                         </a>
                     )}

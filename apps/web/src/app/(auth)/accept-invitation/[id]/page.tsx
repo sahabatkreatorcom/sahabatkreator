@@ -44,7 +44,7 @@ export default async function AcceptInvitationPage({
             <ErrorState
                 title="Undangan sudah dipakai"
                 description={`Anda sudah tergabung di ${invitation.organizationName}.`}
-                actionHref="/dashboard"
+                actionHref="/"
                 actionLabel="Buka dashboard"
             />
         );
@@ -148,7 +148,7 @@ function ErrorState({
 }: {
     title: string;
     description: string;
-    actionHref?: "/login" | "/dashboard";
+    actionHref?: string;
     actionLabel?: string;
 }) {
     return (
@@ -159,7 +159,7 @@ function ErrorState({
             <h1 className="mt-4 text-xl font-semibold">{title}</h1>
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
             <Link
-                href={actionHref!}
+                href={actionHref as any}
                 className="mt-6 flex h-10 w-full items-center justify-center rounded-md border border-border text-sm font-medium hover:bg-muted"
             >
                 {actionLabel}

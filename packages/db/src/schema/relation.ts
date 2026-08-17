@@ -23,6 +23,7 @@ import {
   sebExperiment,
 } from "./seb";
 import { payment, subscription } from "./payment";
+import { socialListeningMonitor, socialListeningItem, socialListeningSource } from "./settings";
 
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
@@ -502,6 +503,36 @@ export const paymentRelations = relations(payment, ({ one }) => ({
 export const subscriptionRelations = relations(subscription, ({ one }) => ({
   organization: one(organization, {
     fields: [subscription.organizationId],
+    references: [organization.id],
+  }),
+}));
+
+export const socialListeningMonitorRelations = relations(socialListeningMonitor, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [socialListeningMonitor.organizationId],
+    references: [organization.id],
+  }),
+  items: many(socialListeningItem),
+}));
+
+export const socialListeningItemRelations = relations(socialListeningItem, ({ one }) => ({
+  organization: one(organization, {
+    fields: [socialListeningItem.organizationId],
+    references: [organization.id],
+  }),
+  monitor: one(socialListeningMonitor, {
+    fields: [socialListeningItem.monitorId],
+    references: [socialListeningMonitor.id],
+  }),
+  socialAccount: one(socialAccount, {
+    fields: [socialListeningItem.socialAccountId],
+    references: [socialAccount.id],
+  }),
+}));
+
+export const socialListeningSourceRelations = relations(socialListeningSource, ({ one }) => ({
+  organization: one(organization, {
+    fields: [socialListeningSource.organizationId],
     references: [organization.id],
   }),
 }));

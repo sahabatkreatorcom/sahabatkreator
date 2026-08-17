@@ -28,7 +28,10 @@ export type ActivityAction =
     | "competitor.deleted"
     | "seb.report_generated"
     | "seb.recommendation_updated"
-    | "seb.media_analyzed";
+    | "seb.media_analyzed"
+    | "listening.created"
+    | "listening.deleted"
+    | "listening.synced";
 
 export const ACTION_LABELS: Record<ActivityAction, string> = {
     "post.created": "membuat post",
@@ -57,6 +60,9 @@ export const ACTION_LABELS: Record<ActivityAction, string> = {
     "seb.report_generated": "membuat laporan Seb",
     "seb.recommendation_updated": "mengubah rekomendasi Seb",
     "seb.media_analyzed": "menganalisis media Seb",
+    "listening.created": "membuat monitor",
+    "listening.deleted": "menghapus monitor",
+    "listening.synced": "sinkronisasi listening",
 };
 
 export interface ActivityResource {

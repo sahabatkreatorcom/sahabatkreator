@@ -50,7 +50,7 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
                     </div>
                     <div className="p-1">
                         <Link
-                            href={"/dashboard/settings" as any}
+                            href={"/settings" as any}
                             role="menuitem"
                             className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                             onClick={() => setOpen(false)}

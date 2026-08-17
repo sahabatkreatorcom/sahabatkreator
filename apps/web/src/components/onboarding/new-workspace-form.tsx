@@ -52,7 +52,7 @@ export function NewWorkspaceForm() {
         }
 
         await authClient.organization.setActive({ organizationId: data.id });
-        router.push("/dashboard");
+        router.push("/" as any);
     }
 
     return (
