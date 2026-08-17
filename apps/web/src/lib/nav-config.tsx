@@ -12,6 +12,7 @@ import {
     Zap,
     History,
     Radar,
+    Sparkles,
     type LucideIcon,
 } from "lucide-react";
 
@@ -110,6 +111,14 @@ export const navItems: NavItem[] = [
         label: "Competitor & listening",
         shortLabel: "Competitor",
         icon: Radar,
+        group: "content",
+        mobileTab: false,
+    },
+    {
+        href: "/dashboard/seb",
+        label: "Seb AI",
+        shortLabel: "Seb",
+        icon: Sparkles,
         group: "content",
         mobileTab: false,
     },

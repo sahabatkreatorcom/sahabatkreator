@@ -2,9 +2,10 @@
 Status: BERJALAN · Service: web/db/payment · Diperbarui: 2026-08-17
 
 ## Sedang dikerjakan
-M8 competitors & listening selesai (lib + API + halaman + nav, typecheck hijau); lanjut M9 SEB AI (besar, butuh riset + OpenRouter key).
+M9 SEB AI bagian inti selesai (lib + API report/recommendations/chat/brand-knowledge + halaman dashboard, typecheck hijau); sisa M9: website scan otomatis, media analysis, experiments, lalu uji live dengan OpenRouter key.
 
 ## Status terakhir
+- **SEB AI inti (M9)**: selesai v1 — `lib/ai/openrouter.ts` (callOpenRouter + safeJsonParse + getOpenRouterSettings dari env OPENROUTER_API_KEY, default model openai/gpt-4o-mini) + `lib/seb-advisor.ts` (DEFAULT_SEB_PROMPT, collectContext 90 hari: org/accounts/posts/analytics/competitors/brand knowledge/rekomendasi sebelumnya; generateSebReport → insert sebReport + sebRecommendation + sebExperiment + pending brand knowledge + notifikasi, fallback laporan bila JSON gagal + repair 1x; list/getSebReport; listSebRecommendations + update status/dueAt; chatWithSeb + sessions + messages; getBrandKnowledge/updateBrandKnowledge manual; normalizeSebTimezone). API `/api/seb/report` (GET list, POST generate), `/api/seb/report/[id]` (GET detail), `/api/seb/recommendations` (GET list + PATCH status), `/api/seb/chat` (POST pesan + GET sesi), `/api/seb/brand-knowledge` (GET + PUT). Halaman `/dashboard/seb` (4 tab: Ringkasan laporan + skor breakdown + ekspand rekomendasi, Rekomendasi + ganti status, Chat Seb streaming sederhana, Brand knowledge form). Nav item "Seb AI". Aktivitas dictatat (seb.report_generated / seb.recommendation_updated). `pnpm -r check-types` hijau. Catatan: belum diuji live — butuh OPENROUTER_API_KEY; tanpa key API balas 400 "OpenRouter belum dikonfigurasi".
 - **Competitors & listening (M8)**: selesai v1 — `lib/competitors.ts` (CRUD; add competitor + isi profil via Instagram Business Discovery bila ada akun IG org; sync via `business_discovery` Graph API — profile (followers, name, avatar) + 12 media terbaru (likes/comments/timestamp), hitung followerGrowth, avgEngagement %, postsPerWeek, upsert competitorPost; hanya IG/IG_PAGE didukung sync, platform lain tetap bisa ditambah). API `/api/competitors` (GET list + POST tambah + DELETE) + `/api/competitors/sync` (POST). Halaman `/dashboard/competitors` (kartu competitor: followers, growth, engagement, posts/minggu; tombol sinkron, hapus, ekspand post terbaru; dialog tambah). Nav item "Competitor & listening". Aktivitas dictatat (competitor.created/deleted). Catatan: Business Discovery butuh akun IG Business/Creator terhubung; error terpeta (2207013=akun tak ditemukan, 100=privat, 190=token expired). `pnpm -r check-types` hijau.
 - **Activity log (M7)**: selesai — `lib/activity-log.ts` (tipe ActivityAction 21 aksi + ACTION_LABELS; `logActivity` fail-safe; `listActivityLogs` filter type prefix/userId + pagination; `getActivitySummary`). API `/api/activity` (GET: list + summary byAction/byUser). Halaman `/dashboard/activity` (stat cards, filter tab per tipe, list jejak + detail waktu, tombol muat lebih banyak). Nav item "Activity log" (group team). Logging diwire ke aksi kunci: posts create/update/delete, publish success/fail (dalam publish-post, mencakup cron), account connect/refresh/disconnect, comment reply, automation create/update/delete. `pnpm -r check-types` hijau.
 - **Inbox automation (M6)**: selesai — `lib/inbox-automation.ts` (CRUD saved responses + automations; `processAutomationForComment` auto-reply keyword; stats triggered/delivered; bump usageCount). API `/api/saved-responses` (+ `[id]` PATCH/DELETE/POST-use) & `/api/automations` (+ `[id]` PATCH/DELETE). Halaman `/dashboard/inbox-automation` (2 tab, toggle aktif, stats). Integrasi: inbox reply box kini punya chip 5 balasan teratas + dialog "Lihat semua"; auto-reply dieksekusi saat inbox sync menemukan komentar baru yang cocok keyword platform. Nav item "Automasi inbox". Catatan: `db.$increment` bukan API drizzle — dipakai read-then-set. `pnpm -r check-types` hijau.
@@ -44,13 +45,14 @@ M8 competitors & listening selesai (lib + API + halaman + nav, typecheck hijau);
 - Penyimpanan metrik analytics memakai kebijakan resmi per platform (policy.ts), bukan toggle consent pengguna: Pinterest dilarang simpan; LinkedIn maks 1 tahun (retensi di-purge); sisanya ALLOWED utk data akun sendiri. Dashboard tetap bisa tampilkan nilai live bila NOT_ALLOWED.
 
 ## Langkah berikutnya
-1. M9 SEB AI (OpenRouter): besar, butuh riset + key; bahas detail sebelum coding.
-2. Uji live competitors: hubungkan IG Business, tambah competitor, klik sinkron di `/dashboard/competitors`.
-3. Jalankan migrasi ke DB lokal (`pnpm db:migrate`) bila DB tersedia — verifikasi tabel benar.
-4. Isi kredensial OAuth global via admin panel (M9) atau langsung di DB — supaya tombol Hubungkan berfungsi.
-5. Schedule cron ke `/api/cron/publish` + `/api/analytics/sync` + `/api/inbox/sync` (Vercel Cron / GitHub Actions / server cron) dengan header `Authorization: Bearer $CRON_SECRET` + `x-organization-id`.
-6. Uji live inbox: hubungkan IG/FB/TikTok, publish post, lalu sinkronkan komentar & balas dari `/dashboard/inbox`.
-7. Uji E2E Playwright (sudah siap: `apps/web/playwright.config.ts`, `e2e/smoke.spec.ts`, `.env.e2e` gitignored) — isi `TEST_EMAIL`/`TEST_PASSWORD`, jalankan `pnpm --filter web test:e2e`.
+1. Uji live SEB: user beri OPENROUTER_API_KEY → set env → generate laporan + chat dari `/dashboard/seb`.
+2. Lanjutan M9 (opsional): website scan otomatis ke brand knowledge (pola ada di socaliseit `scanWebsiteForSebBrandKnowledge`), media analysis multimodal, eksperimen tracking.
+3. Uji live competitors: hubungkan IG Business, tambah competitor, klik sinkron di `/dashboard/competitors`.
+4. Jalankan migrasi ke DB lokal (`pnpm db:migrate`) bila DB tersedia — verifikasi tabel benar.
+5. Isi kredensial OAuth global via admin panel atau langsung di DB — supaya tombol Hubungkan berfungsi.
+6. Schedule cron ke `/api/cron/publish` + `/api/analytics/sync` + `/api/inbox/sync` (Vercel Cron / GitHub Actions / server cron) dengan header `Authorization: Bearer $CRON_SECRET` + `x-organization-id`.
+7. Uji live inbox: hubungkan IG/FB/TikTok, publish post, lalu sinkronkan komentar & balas dari `/dashboard/inbox`.
+8. Uji E2E Playwright (sudah siap: `apps/web/playwright.config.ts`, `e2e/smoke.spec.ts`, `.env.e2e` gitignored) — isi `TEST_EMAIL`/`TEST_PASSWORD`, jalankan `pnpm --filter web test:e2e`.
 
 ## Jangan lakukan
 - Jangan meng-copy auth socaliseit (Prisma/NextAuth) — sudah beda stack.

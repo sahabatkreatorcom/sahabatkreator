@@ -25,7 +25,9 @@ export type ActivityAction =
     | "automation.triggered"
     | "comment.replied"
     | "competitor.created"
-    | "competitor.deleted";
+    | "competitor.deleted"
+    | "seb.report_generated"
+    | "seb.recommendation_updated";
 
 export const ACTION_LABELS: Record<ActivityAction, string> = {
     "post.created": "membuat post",
@@ -51,6 +53,8 @@ export const ACTION_LABELS: Record<ActivityAction, string> = {
     "comment.replied": "membalas komentar",
     "competitor.created": "menambahkan competitor",
     "competitor.deleted": "menghapus competitor",
+    "seb.report_generated": "membuat laporan Seb",
+    "seb.recommendation_updated": "mengubah rekomendasi Seb",
 };
 
 export interface ActivityResource {
