@@ -7,7 +7,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
-import { PLATFORM_STORAGE_POLICIES } from "@/lib/analytics";
+import { PLATFORM_STORAGE_POLICIES } from "@/lib/analytics/policy";
 import { cn } from "@/lib/utils";
 
 interface SeriesPoint {

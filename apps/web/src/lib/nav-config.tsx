@@ -15,6 +15,7 @@ import {
     Sparkles,
     Search,
     Activity,
+    Tag,
     type LucideIcon,
 } from "lucide-react";
 
@@ -161,6 +162,14 @@ export const navItems: NavItem[] = [
         label: "Status publikasi",
         shortLabel: "Status",
         icon: Activity,
+        group: "content",
+        mobileTab: false,
+    },
+    {
+        href: "/pillars",
+        label: "Content Pillars",
+        shortLabel: "Pillars",
+        icon: Tag,
         group: "content",
         mobileTab: false,
     },
