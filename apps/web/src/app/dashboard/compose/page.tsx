@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, ImagePlus, Send, X } from "lucide-react";
+import { CalendarClock, ImagePlus, Send, X, LayoutTemplate, Hash, FolderTree } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
@@ -29,6 +29,26 @@ interface MediaLibraryItem extends MediaItem {
     filename: string;
 }
 
+interface Pillar {
+    id: string;
+    name: string;
+    color: string;
+}
+
+interface CaptionTemplate {
+    id: string;
+    name: string;
+    caption: string;
+    hashtags: string[];
+    category: string | null;
+}
+
+interface HashtagCollection {
+    id: string;
+    name: string;
+    hashtags: string[];
+}
+
 export default function ComposePage() {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
@@ -43,6 +63,12 @@ export default function ComposePage() {
     const [stockPickerOpen, setStockPickerOpen] = useState(false);
     const [libraryMedia, setLibraryMedia] = useState<MediaLibraryItem[]>([]);
     const [loadingAccounts, setLoadingAccounts] = useState(true);
+    const [pillars, setPillars] = useState<Pillar[]>([]);
+    const [templates, setTemplates] = useState<CaptionTemplate[]>([]);
+    const [collections, setCollections] = useState<HashtagCollection[]>([]);
+    const [pillarId, setPillarId] = useState<string>("");
+    const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+    const [collectionPickerOpen, setCollectionPickerOpen] = useState(false);
 
     const loadAccounts = useCallback(async () => {
         setLoadingAccounts(true);
@@ -64,10 +90,36 @@ export default function ComposePage() {
         } catch { /* ignore */ }
     }, []);
 
+    const loadContentTools = useCallback(async () => {
+        try {
+            const [p, t, c] = await Promise.all([
+                fetch("/api/pillars").then((r) => r.json()),
+                fetch("/api/caption-templates").then((r) => r.json()),
+                fetch("/api/hashtag-collections").then((r) => r.json()),
+            ]);
+            setPillars((p.pillars ?? []).map((x: Pillar) => ({ id: x.id, name: x.name, color: x.color })));
+            setTemplates(t.templates ?? []);
+            setCollections(c.collections ?? []);
+        } catch { /* ignore */ }
+    }, []);
+
     useEffect(() => {
         loadAccounts();
         loadLibrary();
-    }, [loadAccounts, loadLibrary]);
+        loadContentTools();
+    }, [loadAccounts, loadLibrary, loadContentTools]);
+
+    function applyTemplate(t: CaptionTemplate) {
+        setCaption(t.caption);
+        if (t.hashtags.length > 0) setCaption((prev) => prev + (prev ? "\n\n" : "") + t.hashtags.map((h) => `#${h}`).join(" "));
+        setTemplatePickerOpen(false);
+    }
+
+    function applyCollection(c: HashtagCollection) {
+        const tags = c.hashtags.map((h) => `#${h}`).join(" ");
+        setCaption((prev) => (prev ? `${prev}\n\n${tags}` : tags));
+        setCollectionPickerOpen(false);
+    }
 
     async function handleSave(action: "draft" | "schedule") {
         if (selectedAccountIds.length === 0) {
@@ -92,6 +144,7 @@ export default function ComposePage() {
                     mediaIds: media.map((m) => m.id),
                     scheduledAt: action === "schedule" ? new Date(scheduledAt).toISOString() : null,
                     autoPublish: action === "schedule",
+                    pillarId: pillarId || undefined,
                 }),
             });
             const data = await res.json();
@@ -179,6 +232,39 @@ export default function ComposePage() {
                 />
                 <div className="flex items-center justify-between pt-1">
                     <span className="text-xs text-muted-foreground">{charCount} karakter</span>
+                </div>
+            </div>
+
+            {/* Content tools: pilar + template + hashtag */}
+            <div className="rounded-lg border border-border bg-card p-4">
+                <p className="pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Content tools</p>
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2 py-1.5">
+                        <FolderTree className="h-3.5 w-3.5 text-muted-foreground" />
+                        <select
+                            value={pillarId}
+                            onChange={(e) => setPillarId(e.target.value)}
+                            className="bg-transparent text-sm outline-none"
+                        >
+                            <option value="">Tanpa pilar</option>
+                            {pillars.map((p) => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <Button variant="secondary" size="sm" disabled={templates.length === 0} onClick={() => setTemplatePickerOpen(true)}>
+                        <LayoutTemplate className="h-3.5 w-3.5" />
+                        Template caption
+                    </Button>
+                    <Button variant="secondary" size="sm" disabled={collections.length === 0} onClick={() => setCollectionPickerOpen(true)}>
+                        <Hash className="h-3.5 w-3.5" />
+                        Koleksi hashtag
+                    </Button>
+                    {templates.length === 0 && collections.length === 0 && (
+                        <a href="/dashboard/content-tools" className="text-xs font-medium text-primary hover:underline">
+                            Kelola di Content tools
+                        </a>
+                    )}
                 </div>
             </div>
 
@@ -275,6 +361,52 @@ export default function ComposePage() {
                     });
                 }}
             />
+
+            {/* Template caption picker */}
+            <Dialog open={templatePickerOpen} onClose={() => setTemplatePickerOpen(false)} title="Template caption" description="Pilih template untuk mengisi caption.">
+                <div className="max-h-80 space-y-2 overflow-y-auto">
+                    {templates.map((t) => (
+                        <button
+                            key={t.id}
+                            onClick={() => applyTemplate(t)}
+                            className="w-full rounded-md border border-border bg-muted/40 p-3 text-left transition-colors hover:border-primary/50 hover:bg-muted"
+                        >
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-medium">{t.name}</span>
+                                {t.category && <span className="text-xs text-muted-foreground">{t.category}</span>}
+                            </div>
+                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{t.caption}</p>
+                        </button>
+                    ))}
+                    {templates.length === 0 && (
+                        <p className="py-6 text-center text-sm text-muted-foreground">Belum ada template. Buat di Content tools.</p>
+                    )}
+                </div>
+            </Dialog>
+
+            {/* Hashtag collection picker */}
+            <Dialog open={collectionPickerOpen} onClose={() => setCollectionPickerOpen(false)} title="Koleksi hashtag" description="Pilih koleksi untuk menambah hashtag ke caption.">
+                <div className="max-h-80 space-y-2 overflow-y-auto">
+                    {collections.map((c) => (
+                        <button
+                            key={c.id}
+                            onClick={() => applyCollection(c)}
+                            className="w-full rounded-md border border-border bg-muted/40 p-3 text-left transition-colors hover:border-primary/50 hover:bg-muted"
+                        >
+                            <span className="text-sm font-medium">{c.name}</span>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                                {c.hashtags.slice(0, 6).map((h) => (
+                                    <span key={h} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">#{h}</span>
+                                ))}
+                                {c.hashtags.length > 6 && <span className="text-xs text-muted-foreground">+{c.hashtags.length - 6}</span>}
+                            </div>
+                        </button>
+                    ))}
+                    {collections.length === 0 && (
+                        <p className="py-6 text-center text-sm text-muted-foreground">Belum ada koleksi. Buat di Content tools.</p>
+                    )}
+                </div>
+            </Dialog>
         </div>
     );
 }

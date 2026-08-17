@@ -2,10 +2,19 @@
 Status: BERJALAN · Service: web/db/payment · Diperbarui: 2026-08-17
 
 ## Sedang dikerjakan
-Milestone 1 (fondasi): port schema Prisma→Drizzle + perbaiki payment SumoPod.
+M5 content tools selesai; lanjut M6 inbox automation (saved responses + auto-reply).
 
 ## Status terakhir
-- **Schema Drizzle selesai & typecheck bersih**: 78 tabel, migrasi `0000_init.sql` (74KB) sudah di-generate di `packages/db/src/migrations/`. File baru di `packages/db/src/schema/`: social, post, media, engagement, commerce, analytics, content, seb, settings, payment. `enum.ts` sudah ditambah `META` + `stock_media_source`.
+- **Content tools (M5)**: selesai — `lib/content-tools.ts` (CRUD pilar/template caption/koleksi hashtag + validasi unik nama). API `/api/pillars`, `/api/caption-templates`, `/api/hashtag-collections` (+ `[id]` PATCH/DELETE). Halaman `/dashboard/content-tools` (3 tab, dialog buat/ubah, pilih warna pilar). Integrasi composer: pilih pilar (disimpan ke post.pillarId via createPosts), tombol Template caption & Koleksi hashtag → isi caption otomatis. Nav item "Content tools" ditambah. `pnpm -r check-types` hijau.
+- **Inbox komentar (M4c)**: selesai v1 — `lib/inbox/` (types.ts; comments.ts = fetch komentar IG standalone/IG_PAGE/FB/TikTok/YT/Threads; reply.ts = balas komentar per platform; sync.ts = upsert komentar post PUBLISHED, token refresh otomatis mengikuti pola orchestrator, batching 5 akun; index.ts re-export). API `/api/inbox` (GET daftar + filter platform/isRead/isReplied/q, PATCH mark read/replied, DELETE) + `/api/inbox/[id]` (POST reply → simpan balasan sebagai thread, PATCH isHidden, DELETE) + `/api/inbox/sync` (POST). Halaman `/dashboard/inbox` (list thread + balasan, filter platform, filter belum dibaca, cari, balas, hapus, tandai dibaca, tombol Sinkronkan).
+  - **Fix bug analytics sync route**: `/api/analytics/sync` sebelumnya pakai `withAuth` sehingga panggilan cron (Bearer CRON_SECRET tanpa sesi) ditolak 401 sebelum sempat diproses — kini pola dual-auth yang benar (`requireAuth` manual + cabang cron). Route `/api/inbox/sync` langsung memakai pola yang sudah benar ini.
+  - Perhatian: `authorId="SELF"` dipakai untuk balasan sendiri; Threads/YT reply belum diuji live (butuh kredensial). Pinterest komentar belum didukung fetch (tidak punya endpoint SMM).
+- **Dashboard analytics (M4b UI)**: selesai — `/dashboard/analytics/page.tsx` (stat cards, chart tren followers/impressions/reach via recharts, kartu per platform, tombol Sinkronkan memanggil `/api/analytics/sync`). Platform NOT_ALLOWED (Pinterest) ditampilkan kartu "data live saja" + banner amber. Dep `recharts` ditambahkan ke web (mengikuti socaliseit yang pakai recharts).
+- **Kalender (M4a)**: selesai — `/dashboard/calendar/page.tsx` (grid bulan, post per hari, klik publish). Typecheck hijau.
+- **Analytics (M4b)**: `lib/analytics/` — metrics.ts (fetch per platform), policy.ts, sync.ts, index.ts; API `/api/analytics/overview` (GET) + `/api/analytics/sync` (POST, auth atau Bearer CRON_SECRET). Typecheck hijau.
+  - **Kebijakan penyimpanan berbasis dokumentasi resmi** (`lib/analytics/policy.ts`), BUKAN toggle consent: INSTAGRAM/INSTAGRAM_PAGE/FACEBOOK/THREADS/TIKTOK/YOUTUBE = ALLOWED (data akun sendiri utk SMM, didukung Meta/TikTok/Google); LINKEDIN = ALLOWED maks 1 tahun (retensi ditegakkan `purgeExpiredAnalytics` setiap sync); PINTEREST = NOT_ALLOWED (developer guidelines larang simpan data API kecuali campaign analytics). Platform tak terdaftar default NOT_ALLOWED.
+  - `consent.ts` (pendekatan lama) dihapus; sync.ts memakai `getPlatformStoragePolicy` + laporan `skippedByPolicy`/`purged`.
+  - Fix pre-existing: overview route `orderBy`/`where` enum typing.
 - **payment package selesai**: `sumopod.ts` kini implementasi API SumoPod nyata (POST /api/v1/payments via fetch, webhook verify Svix/X-Webhook-Token, handleWebhook). Billing plan FREE/PRO/BUSINESS/ENTERPRISE/ADMIN sudah ada. Currency diganti IDR. `@sahabat-kreator/db` kini export `schema`.
 - **Storage**: user memakai Cloudflare R2 (S3-compatible; `@aws-sdk/client-s3` sudah ada di web + lib/storage.ts lengkap: upload/download/delete/presign/getPublicUrl).
 - **Koleksi stock media (M1b)**: selesai — `lib/stock-media.ts` (Pixabay/Pexels/Unsplash search, unified result), API `/api/stock-media/search` + `/api/stock-media/import` (download→R2→insert media+stockMediaImport, dedup per org), komponen `components/media/stock-media-picker.tsx`. Env keys PIXABAY/PEXELS/UNSPLASH ditambahkan ke `packages/env/src/server.ts` + `.env`.
@@ -29,12 +38,13 @@ Milestone 1 (fondasi): port schema Prisma→Drizzle + perbaiki payment SumoPod.
 - Arsitektur post: satu Post per akun platform, multi-platform dikelompokkan via `linkedGroupId` (mengikuti socaliseit).
 - Publisher saat ini mendukung IG (Feed/Reel/Story), FB (Page), TikTok, YouTube, Pinterest, LinkedIn, Threads. GOOGLE_BUSINESS & BLUESKY & META → UNSUPPORTED_PLATFORM.
 - Auto-publish terjadwal jalan via `/api/cron/publish` yang dipanggil scheduler eksternal dengan Bearer CRON_SECRET; claim atomik SCHEDULED→PUBLISHING mencegah double-publish antar runner.
+- Penyimpanan metrik analytics memakai kebijakan resmi per platform (policy.ts), bukan toggle consent pengguna: Pinterest dilarang simpan; LinkedIn maks 1 tahun (retensi di-purge); sisanya ALLOWED utk data akun sendiri. Dashboard tetap bisa tampilkan nilai live bila NOT_ALLOWED.
 
 ## Langkah berikutnya
 1. Jalankan migrasi ke DB lokal (`pnpm db:migrate`) bila DB tersedia — verifikasi 78 tabel benar.
 2. Isi kredensial OAuth global via admin panel (M9) atau langsung di DB — supaya tombol Hubungkan berfungsi.
-3. Schedule cron ke endpoint `/api/cron/publish` (Vercel Cron / GitHub Actions / server cron) dengan header `Authorization: Bearer $CRON_SECRET`.
-4. M4+: calendar, analytics, inbox, AI, billing UI, admin, ekstra (lihat todo sesi).
+3. Schedule cron ke `/api/cron/publish` + `/api/analytics/sync` + `/api/inbox/sync` (Vercel Cron / GitHub Actions / server cron) dengan header `Authorization: Bearer $CRON_SECRET` + `x-organization-id`.
+4. Uji live inbox: hubungkan IG/FB/TikTok, publish post, lalu sinkronkan komentar & balas dari `/dashboard/inbox`.
 
 ## Jangan lakukan
 - Jangan meng-copy auth socaliseit (Prisma/NextAuth) — sudah beda stack.

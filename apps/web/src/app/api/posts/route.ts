@@ -82,6 +82,7 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
         scheduledAt: typeof body.scheduledAt === "string" ? body.scheduledAt : body.scheduledAt === null ? null : undefined,
         autoPublish: body.autoPublish === true,
         firstComment: typeof body.firstComment === "string" ? body.firstComment : undefined,
+        pillarId: typeof body.pillarId === "string" ? body.pillarId : undefined,
         platformSettings:
             body.platformSettings && typeof body.platformSettings === "object"
                 ? (body.platformSettings as Record<string, import("@/lib/posts-service").PlatformSettingsInput>)

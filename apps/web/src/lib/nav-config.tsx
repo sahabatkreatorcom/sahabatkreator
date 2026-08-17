@@ -8,6 +8,7 @@ import {
     ListTodo,
     Users,
     Settings,
+    FolderTree,
     type LucideIcon,
 } from "lucide-react";
 
@@ -74,6 +75,14 @@ export const navItems: NavItem[] = [
         label: "Buat konten",
         shortLabel: "Buat",
         icon: PenSquare,
+        group: "content",
+        mobileTab: false,
+    },
+    {
+        href: "/dashboard/content-tools",
+        label: "Content tools",
+        shortLabel: "Tools",
+        icon: FolderTree,
         group: "content",
         mobileTab: false,
     },

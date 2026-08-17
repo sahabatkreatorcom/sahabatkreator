@@ -10,6 +10,7 @@ export interface CreatePostParams {
     scheduledAt?: string | null;
     autoPublish?: boolean;
     firstComment?: string;
+    pillarId?: string;
     platformSettings?: Record<string, PlatformSettingsInput>;
 }
 
@@ -58,7 +59,7 @@ export interface CreatePostResult {
  * Validasi dasar: caption wajib saat autoPublish, akun harus milik org, waktu jadwal masa depan.
  */
 export async function createPosts(params: CreatePostParams): Promise<CreatePostResult> {
-    const { organizationId, caption, platformAccountIds, mediaIds, scheduledAt, autoPublish, firstComment, platformSettings } = params;
+    const { organizationId, caption, platformAccountIds, mediaIds, scheduledAt, autoPublish, firstComment, pillarId, platformSettings } = params;
     const parsedSettings: Record<string, PlatformSettingsInput> =
         platformSettings && typeof platformSettings === "object" ? platformSettings : {};
 
@@ -140,6 +141,7 @@ export async function createPosts(params: CreatePostParams): Promise<CreatePostR
                 instagramShareToFeed: settings.instagramShareToFeed ?? true,
                 customMediaIds: postMediaIds,
                 linkedGroupId,
+                pillarId: pillarId || null,
             });
 
             if (postMediaIds.length) {
