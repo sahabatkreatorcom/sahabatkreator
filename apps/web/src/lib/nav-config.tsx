@@ -14,6 +14,7 @@ import {
     Radar,
     Sparkles,
     Search,
+    Activity,
     type LucideIcon,
 } from "lucide-react";
 
@@ -152,6 +153,14 @@ export const navItems: NavItem[] = [
         label: "Social Listening",
         shortLabel: "Listening",
         icon: Search,
+        group: "content",
+        mobileTab: false,
+    },
+    {
+        href: "/status",
+        label: "Status publikasi",
+        shortLabel: "Status",
+        icon: Activity,
         group: "content",
         mobileTab: false,
     },
