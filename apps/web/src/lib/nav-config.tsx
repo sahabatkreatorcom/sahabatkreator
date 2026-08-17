@@ -131,6 +131,22 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
+        href: "/dashboard/trends",
+        label: "Tren",
+        shortLabel: "Tren",
+        icon: BarChart3,
+        group: "content",
+        mobileTab: false,
+    },
+    {
+        href: "/dashboard/engagement",
+        label: "Engagement",
+        shortLabel: "Engagement",
+        icon: MessageSquare,
+        group: "content",
+        mobileTab: false,
+    },
+    {
         href: "/dashboard/activity",
         label: "Activity log",
         shortLabel: "Log",
