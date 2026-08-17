@@ -2,14 +2,14 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { Sparkles, ListChecks, MessageSquare, BookOpen, RefreshCw, Loader2, ChevronDown, ChevronUp, Globe } from "lucide-react";
+import { Sparkles, ListChecks, MessageSquare, BookOpen, RefreshCw, Loader2, ChevronDown, ChevronUp, Globe, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-type Tab = "summary" | "recommendations" | "chat" | "brand";
+type Tab = "summary" | "recommendations" | "chat" | "brand" | "media";
 
 interface Report {
     id: string;
@@ -111,6 +111,25 @@ export default function SebPage() {
     const [scanning, setScanning] = useState(false);
     const [scanResult, setScanResult] = useState<{ pages: Array<{ url: string; title: string | null }> } | null>(null);
 
+    // media analysis state
+    const [mediaList, setMediaList] = useState<Array<{
+        id: string;
+        filename: string;
+        type: string;
+        url: string;
+        thumbnailUrl: string | null;
+        duration: number | null;
+        createdAt: string;
+    }>>([]);
+    const [mediaLoading, setMediaLoading] = useState(false);
+    const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+    const [mediaResults, setMediaResults] = useState<Record<string, {
+        ocrText: string | null;
+        sceneSummary: string | null;
+        analysis: Record<string, unknown>;
+        confidence: number;
+    }>>({});
+
     const load = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -199,6 +218,31 @@ export default function SebPage() {
         }
     }
 
+    async function loadMedia() {
+        setMediaLoading(true);
+        try {
+            const data = await api("/api/seb/media", "GET");
+            setMediaList(data.media ?? []);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Gagal memuat media.");
+        } finally {
+            setMediaLoading(false);
+        }
+    }
+
+    async function analyzeMedia(id: string) {
+        setAnalyzingId(id);
+        setError(null);
+        try {
+            const data = await api("/api/seb/media", "POST", { mediaId: id });
+            setMediaResults((prev) => ({ ...prev, [id]: data.analysis }));
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Gagal menganalisis media.");
+        } finally {
+            setAnalyzingId(null);
+        }
+    }
+
     async function saveBrand() {
         setBrandSaving(true);
         setError(null);
@@ -244,6 +288,7 @@ export default function SebPage() {
         { value: "recommendations", label: "Rekomendasi", icon: <ListChecks className="h-4 w-4" /> },
         { value: "chat", label: "Chat Seb", icon: <MessageSquare className="h-4 w-4" /> },
         { value: "brand", label: "Brand knowledge", icon: <BookOpen className="h-4 w-4" /> },
+        { value: "media", label: "Media analysis", icon: <ImageIcon className="h-4 w-4" /> },
     ];
 
     return (
@@ -267,7 +312,10 @@ export default function SebPage() {
                 {TABS.map((t) => (
                     <button
                         key={t.value}
-                        onClick={() => setTab(t.value)}
+                        onClick={() => {
+                            setTab(t.value);
+                            if (t.value === "media" && mediaList.length === 0) loadMedia();
+                        }}
                         className={cn(
                             "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors",
                             tab === t.value
@@ -424,6 +472,132 @@ export default function SebPage() {
                             Kirim
                         </Button>
                     </div>
+                </div>
+            ) : tab === "media" ? (
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                            Analisis visual media yang sudah diproses worker (video otomatis diekstrak frame-nya).
+                        </p>
+                        <Button size="sm" variant="secondary" onClick={loadMedia} disabled={mediaLoading}>
+                            {mediaLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                            Muat ulang
+                        </Button>
+                    </div>
+
+                    {mediaList.length === 0 && !mediaLoading && (
+                        <div className="rounded-lg border border-dashed border-border py-12 text-center">
+                            <ImageIcon className="mx-auto h-8 w-8 text-muted-foreground" />
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                Belum ada media video yang diproses. Upload video lalu jalankan worker untuk mengekstrak frame-nya.
+                            </p>
+                        </div>
+                    )}
+
+                    {mediaList.map((item) => {
+                        const result = mediaResults[item.id];
+                        const analysis = result?.analysis as Record<string, unknown> | undefined;
+                        return (
+                            <div key={item.id} className="rounded-lg border border-border bg-card p-4">
+                                <div className="flex items-start gap-3">
+                                    <img
+                                        src={item.thumbnailUrl || item.url}
+                                        alt={item.filename}
+                                        className="h-16 w-16 shrink-0 rounded-md border border-border object-cover"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate font-medium">{item.filename}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {item.type === "video" ? `Video${item.duration ? ` · ${item.duration}s` : ""}` : "Gambar"}
+                                            {" · "}
+                                            {new Date(item.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                                        </p>
+                                        <div className="mt-1.5 flex items-center gap-2">
+                                            {result && (
+                                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                                    Sudah dianalisis
+                                                </span>
+                                            )}
+                                            <Button
+                                                size="sm"
+                                                variant={result ? "ghost" : "secondary"}
+                                                disabled={analyzingId !== null}
+                                                onClick={() => analyzeMedia(item.id)}
+                                            >
+                                                {analyzingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                                {result ? "Analisis ulang" : "Analisis"}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {result && (
+                                    <div className="mt-3 space-y-2 rounded-md bg-muted/40 p-3">
+                                        {result.sceneSummary && (
+                                            <p className="text-sm text-muted-foreground">
+                                                <span className="font-medium text-foreground">Ringkasan: </span>
+                                                {result.sceneSummary}
+                                            </p>
+                                        )}
+                                        {typeof analysis?.bestPracticeScore === "number" && (
+                                            <p className="text-sm">
+                                                Skor best practice: <span className="font-semibold">{analysis.bestPracticeScore}</span>/100
+                                                {typeof result.confidence === "number" && (
+                                                    <span className="ml-2 text-xs text-muted-foreground">(yakin {Math.round(result.confidence * 100)}%)</span>
+                                                )}
+                                            </p>
+                                        )}
+                                        {Array.isArray(analysis?.visualHooks) && analysis.visualHooks.length > 0 && (
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground">Visual hooks</p>
+                                                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
+                                                    {(analysis.visualHooks as string[]).map((hook, i) => (
+                                                        <li key={i}>{hook}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {Array.isArray(analysis?.strengths) && analysis.strengths.length > 0 && (
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground">Kelebihan</p>
+                                                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
+                                                    {(analysis.strengths as string[]).map((s, i) => (
+                                                        <li key={i}>{s}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {Array.isArray(analysis?.weaknesses) && analysis.weaknesses.length > 0 && (
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground">Kekurangan</p>
+                                                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
+                                                    {(analysis.weaknesses as string[]).map((w, i) => (
+                                                        <li key={i}>{w}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {Array.isArray(analysis?.captionSuggestions) && analysis.captionSuggestions.length > 0 && (
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground">Saran caption</p>
+                                                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
+                                                    {(analysis.captionSuggestions as string[]).map((c, i) => (
+                                                        <li key={i}>{c}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {result.ocrText && (
+                                            <p className="text-sm">
+                                                <span className="font-medium text-foreground">Teks terdeteksi: </span>
+                                                <span className="text-muted-foreground">{result.ocrText}</span>
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             ) : (
                 <div className="space-y-3">

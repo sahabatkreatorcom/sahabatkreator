@@ -27,7 +27,8 @@ export type ActivityAction =
     | "competitor.created"
     | "competitor.deleted"
     | "seb.report_generated"
-    | "seb.recommendation_updated";
+    | "seb.recommendation_updated"
+    | "seb.media_analyzed";
 
 export const ACTION_LABELS: Record<ActivityAction, string> = {
     "post.created": "membuat post",
@@ -55,6 +56,7 @@ export const ACTION_LABELS: Record<ActivityAction, string> = {
     "competitor.deleted": "menghapus competitor",
     "seb.report_generated": "membuat laporan Seb",
     "seb.recommendation_updated": "mengubah rekomendasi Seb",
+    "seb.media_analyzed": "menganalisis media Seb",
 };
 
 export interface ActivityResource {
