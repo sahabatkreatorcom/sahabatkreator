@@ -123,6 +123,14 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
+        href: "/dashboard/team",
+        label: "Anggota tim",
+        shortLabel: "Tim",
+        icon: Users,
+        group: "team",
+        mobileTab: false,
+    },
+    {
         href: "/dashboard/activity",
         label: "Activity log",
         shortLabel: "Log",
