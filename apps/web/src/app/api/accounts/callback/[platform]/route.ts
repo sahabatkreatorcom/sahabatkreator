@@ -5,6 +5,7 @@ import { env } from "@sahabat-kreator/env/server";
 import { eq } from "drizzle-orm";
 import { exchangeCodeForToken, getCredentialsForPlatform, fetchPlatformProfile, CONNECTABLE_PLATFORMS, type Platform } from "@/lib/platforms";
 import { encryptToken } from "@/lib/token-encryption";
+import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
 
@@ -135,6 +136,13 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
                 });
             accountsUrl.searchParams.set("success", "connected");
         }
+
+        await logActivity(
+            stateData.organizationId,
+            existing ? "account.refreshed" : "account.connected",
+            { type: "account", id: existing?.id ?? "new", name: profile.name },
+            { platform },
+        );
     } catch {
         accountsUrl.searchParams.set("error", "save_failed");
         return NextResponse.redirect(accountsUrl);

@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { publishToPlatform } from "./orchestrator";
 import { decryptToken } from "@/lib/token-encryption";
+import { logActivity } from "@/lib/activity-log";
 
 export interface PublishPostResult {
     ok: boolean;
@@ -100,6 +101,12 @@ export async function publishPost(
         await db.update(schema.post)
             .set({ status: "FAILED" })
             .where(eq(schema.post.id, postId));
+        await logActivity(
+            organizationId,
+            "post.failed",
+            { type: "post", id: postId, name: post.caption.slice(0, 100) },
+            { platform: post.socialAccount.platform, error: result.error },
+        );
         return { ok: false, error: result.error, errorCode: result.errorCode };
     }
 
@@ -111,6 +118,12 @@ export async function publishPost(
         })
         .where(eq(schema.post.id, postId));
 
+    await logActivity(
+        organizationId,
+        "post.published",
+        { type: "post", id: postId, name: post.caption.slice(0, 100) },
+        { platform: post.socialAccount.platform },
+    );
     return { ok: true, postId: result.postId, postUrl: result.postUrl };
 }
 

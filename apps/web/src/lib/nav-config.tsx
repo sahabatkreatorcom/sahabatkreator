@@ -10,6 +10,7 @@ import {
     Settings,
     FolderTree,
     Zap,
+    History,
     type LucideIcon,
 } from "lucide-react";
 
@@ -101,6 +102,14 @@ export const navItems: NavItem[] = [
         shortLabel: "Automasi",
         icon: Zap,
         group: "content",
+        mobileTab: false,
+    },
+    {
+        href: "/dashboard/activity",
+        label: "Activity log",
+        shortLabel: "Log",
+        icon: History,
+        group: "team",
         mobileTab: false,
     },
     {

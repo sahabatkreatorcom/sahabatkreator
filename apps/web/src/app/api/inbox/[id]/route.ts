@@ -4,6 +4,7 @@ import { db, schema } from "@sahabat-kreator/db";
 import { withAuth, json } from "@/lib/api";
 import { replyToComment } from "@/lib/inbox";
 import { decryptToken } from "@/lib/token-encryption";
+import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,14 @@ export const POST = withAuth(async (ctx, req: NextRequest, { params }: { params:
     await db.update(schema.comment)
         .set({ isReplied: true, replyCount: (comment.replyCount ?? 0) + 1 })
         .where(and(eq(schema.comment.id, id), eq(schema.comment.organizationId, activeOrganizationId)));
+
+    await logActivity(
+        activeOrganizationId,
+        "comment.replied",
+        { type: "comment", id, name: text.slice(0, 100) },
+        { platform: account.platform, username: comment.authorUsername },
+        { userId: ctx.session.user.id, userName: ctx.session.user.name ?? ctx.session.user.email ?? undefined },
+    );
 
     return json({ success: true, id: result.platformCommentId });
 });

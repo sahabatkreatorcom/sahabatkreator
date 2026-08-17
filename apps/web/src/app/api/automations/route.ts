@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { withAuth, json } from "@/lib/api";
 import { listAutomations, createAutomation } from "@/lib/inbox-automation";
 import type { Platform } from "@/lib/platforms";
+import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
 
@@ -29,5 +30,12 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
         isActive: body.isActive,
     });
     if (result.error) return json({ error: result.error }, { status: result.status });
+    await logActivity(
+        activeOrganizationId,
+        "automation.created",
+        { type: "automation", id: result.automation!.id, name: result.automation!.name.slice(0, 100) },
+        {},
+        { userId: ctx.session.user.id, userName: ctx.session.user.name ?? ctx.session.user.email ?? undefined },
+    );
     return json({ automation: result.automation }, { status: result.status });
 });

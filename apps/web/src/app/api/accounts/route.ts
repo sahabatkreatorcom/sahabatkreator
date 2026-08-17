@@ -5,6 +5,7 @@ import { db, schema } from "@sahabat-kreator/db";
 import { env } from "@sahabat-kreator/env/server";
 import { withAuth, json } from "@/lib/api";
 import { getAuthorizationUrl, getCredentialsForPlatform, CONNECTABLE_PLATFORMS, type Platform } from "@/lib/platforms";
+import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
 
@@ -86,10 +87,17 @@ export const DELETE = withAuth(async (ctx, req: NextRequest) => {
 
     const account = await db.query.socialAccount.findFirst({
         where: (t, { and: _and, eq: _eq }) => _and(_eq(t.id, body.accountId!), _eq(t.organizationId, activeOrganizationId)),
-        columns: { id: true },
+        columns: { id: true, name: true, platform: true },
     });
     if (!account) return json({ error: "Akun tidak ditemukan." }, { status: 404 });
 
     await db.delete(schema.socialAccount).where(eq(schema.socialAccount.id, body.accountId));
+    await logActivity(
+        activeOrganizationId,
+        "account.disconnected",
+        { type: "account", id: account.id, name: account.name },
+        { platform: account.platform },
+        { userId: ctx.session.user.id, userName: ctx.session.user.name ?? ctx.session.user.email ?? undefined },
+    );
     return json({ success: true });
 });

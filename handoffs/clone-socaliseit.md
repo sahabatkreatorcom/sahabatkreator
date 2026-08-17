@@ -2,9 +2,10 @@
 Status: BERJALAN · Service: web/db/payment · Diperbarui: 2026-08-17
 
 ## Sedang dikerjakan
-M6 inbox automation selesai; lanjut M7 activity log.
+M7 activity log selesai (lib + API + halaman + logging di aksi kunci, typecheck hijau); lanjut M8 competitors & listening.
 
 ## Status terakhir
+- **Activity log (M7)**: selesai — `lib/activity-log.ts` (tipe ActivityAction 21 aksi + ACTION_LABELS; `logActivity` fail-safe; `listActivityLogs` filter type prefix/userId + pagination; `getActivitySummary`). API `/api/activity` (GET: list + summary byAction/byUser). Halaman `/dashboard/activity` (stat cards, filter tab per tipe, list jejak + detail waktu, tombol muat lebih banyak). Nav item "Activity log" (group team). Logging diwire ke aksi kunci: posts create/update/delete, publish success/fail (dalam publish-post, mencakup cron), account connect/refresh/disconnect, comment reply, automation create/update/delete. `pnpm -r check-types` hijau.
 - **Inbox automation (M6)**: selesai — `lib/inbox-automation.ts` (CRUD saved responses + automations; `processAutomationForComment` auto-reply keyword; stats triggered/delivered; bump usageCount). API `/api/saved-responses` (+ `[id]` PATCH/DELETE/POST-use) & `/api/automations` (+ `[id]` PATCH/DELETE). Halaman `/dashboard/inbox-automation` (2 tab, toggle aktif, stats). Integrasi: inbox reply box kini punya chip 5 balasan teratas + dialog "Lihat semua"; auto-reply dieksekusi saat inbox sync menemukan komentar baru yang cocok keyword platform. Nav item "Automasi inbox". Catatan: `db.$increment` bukan API drizzle — dipakai read-then-set. `pnpm -r check-types` hijau.
 - **Content tools (M5)**: selesai — `lib/content-tools.ts` (CRUD pilar/template caption/koleksi hashtag + validasi unik nama). API `/api/pillars`, `/api/caption-templates`, `/api/hashtag-collections` (+ `[id]` PATCH/DELETE). Halaman `/dashboard/content-tools` (3 tab, dialog buat/ubah, pilih warna pilar). Integrasi composer: pilih pilar (disimpan ke post.pillarId via createPosts), tombol Template caption & Koleksi hashtag → isi caption otomatis. Nav item "Content tools" ditambah.
 - **Inbox komentar (M4c)**: selesai v1 — `lib/inbox/` (types.ts; comments.ts = fetch komentar IG standalone/IG_PAGE/FB/TikTok/YT/Threads; reply.ts = balas komentar per platform; sync.ts = upsert komentar post PUBLISHED, token refresh otomatis mengikuti pola orchestrator, batching 5 akun; index.ts re-export). API `/api/inbox` (GET daftar + filter platform/isRead/isReplied/q, PATCH mark read/replied, DELETE) + `/api/inbox/[id]` (POST reply → simpan balasan sebagai thread, PATCH isHidden, DELETE) + `/api/inbox/sync` (POST). Halaman `/dashboard/inbox` (list thread + balasan, filter platform, filter belum dibaca, cari, balas, hapus, tandai dibaca, tombol Sinkronkan).
@@ -42,10 +43,13 @@ M6 inbox automation selesai; lanjut M7 activity log.
 - Penyimpanan metrik analytics memakai kebijakan resmi per platform (policy.ts), bukan toggle consent pengguna: Pinterest dilarang simpan; LinkedIn maks 1 tahun (retensi di-purge); sisanya ALLOWED utk data akun sendiri. Dashboard tetap bisa tampilkan nilai live bila NOT_ALLOWED.
 
 ## Langkah berikutnya
-1. Jalankan migrasi ke DB lokal (`pnpm db:migrate`) bila DB tersedia — verifikasi 78 tabel benar.
-2. Isi kredensial OAuth global via admin panel (M9) atau langsung di DB — supaya tombol Hubungkan berfungsi.
-3. Schedule cron ke `/api/cron/publish` + `/api/analytics/sync` + `/api/inbox/sync` (Vercel Cron / GitHub Actions / server cron) dengan header `Authorization: Bearer $CRON_SECRET` + `x-organization-id`.
-4. Uji live inbox: hubungkan IG/FB/TikTok, publish post, lalu sinkronkan komentar & balas dari `/dashboard/inbox`.
+1. M8 Competitors & listening: schema `competitor`/`competitorPost` sudah ada di `packages/db/src/schema/commerce.ts`; baca `C:\Users\user\AppData\Local\Temp\opencode\socaliseit\app\src\lib\competitors\` & `app/api/competitors` untuk pola CRUD + sync. Perlu implementasi fetcher per platform (yang layak: IG/FB/TikTok/YT publik; Pinterest/LinkedIn/Threads perlu penyesuaian).
+2. M9 SEB AI (OpenRouter): besar, butuh riset + key; bahas detail sebelum coding.
+3. Jalankan migrasi ke DB lokal (`pnpm db:migrate`) bila DB tersedia — verifikasi tabel benar.
+4. Isi kredensial OAuth global via admin panel (M9) atau langsung di DB — supaya tombol Hubungkan berfungsi.
+5. Schedule cron ke `/api/cron/publish` + `/api/analytics/sync` + `/api/inbox/sync` (Vercel Cron / GitHub Actions / server cron) dengan header `Authorization: Bearer $CRON_SECRET` + `x-organization-id`.
+6. Uji live inbox: hubungkan IG/FB/TikTok, publish post, lalu sinkronkan komentar & balas dari `/dashboard/inbox`.
+7. Uji E2E Playwright (sudah siap: `apps/web/playwright.config.ts`, `e2e/smoke.spec.ts`, `.env.e2e` gitignored) — isi `TEST_EMAIL`/`TEST_PASSWORD`, jalankan `pnpm --filter web test:e2e`.
 
 ## Jangan lakukan
 - Jangan meng-copy auth socaliseit (Prisma/NextAuth) — sudah beda stack.

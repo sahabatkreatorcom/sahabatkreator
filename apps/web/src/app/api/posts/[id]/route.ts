@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { withAuth, json } from "@/lib/api";
 import { updatePost, deletePost } from "@/lib/posts-service";
+import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,13 @@ export const PATCH = withAuth(async (ctx, req: NextRequest, { params }: { params
     });
 
     if (!result.ok) return json({ error: result.error }, { status: 400 });
+    await logActivity(
+        activeOrganizationId,
+        "post.updated",
+        { type: "post", id },
+        {},
+        { userId: ctx.session.user.id, userName: ctx.session.user.name ?? ctx.session.user.email ?? undefined },
+    );
     return json({ success: true });
 });
 
@@ -82,5 +90,12 @@ export const DELETE = withAuth(async (ctx, _req: NextRequest, { params }: { para
     await db.delete(schema.postMedia).where(eq(schema.postMedia.postId, id));
     await db.delete(schema.publishError).where(eq(schema.publishError.postId, id));
 
+    await logActivity(
+        activeOrganizationId,
+        "post.deleted",
+        { type: "post", id },
+        {},
+        { userId: ctx.session.user.id, userName: ctx.session.user.name ?? ctx.session.user.email ?? undefined },
+    );
     return json({ success: true });
 });

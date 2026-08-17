@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { withAuth, json } from "@/lib/api";
 import { createPosts } from "@/lib/posts-service";
+import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
 
@@ -90,5 +91,16 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
     });
 
     if (result.error) return json({ error: result.error }, { status: result.status });
+    const userId = ctx.session.user.id;
+    const userName = ctx.session.user.name ?? ctx.session.user.email ?? undefined;
+    for (const p of result.posts ?? []) {
+        await logActivity(
+            activeOrganizationId,
+            p.status === "scheduled" ? "post.scheduled" : "post.created",
+            { type: "post", id: p.id, name: p.caption.slice(0, 100) },
+            { platform: p.platform },
+            { userId, userName },
+        );
+    }
     return json({ posts: result.posts, linkedGroupId: result.linkedGroupId, count: result.count }, { status: result.status });
 });

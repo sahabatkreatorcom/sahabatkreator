@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { withAuth, json } from "@/lib/api";
 import { updateAutomation, deleteAutomation } from "@/lib/inbox-automation";
 import type { Platform } from "@/lib/platforms";
+import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,13 @@ export const PATCH = withAuth(async (ctx, req: NextRequest, { params }: { params
         isActive: typeof body.isActive === "boolean" ? body.isActive : undefined,
     });
     if (result.error) return json({ error: result.error }, { status: result.status });
+    await logActivity(
+        activeOrganizationId,
+        "automation.updated",
+        { type: "automation", id },
+        {},
+        { userId: ctx.session.user.id, userName: ctx.session.user.name ?? ctx.session.user.email ?? undefined },
+    );
     return json(result, { status: result.status });
 });
 
@@ -35,5 +43,12 @@ export const DELETE = withAuth(async (ctx, _req: NextRequest, { params }: { para
 
     const result = await deleteAutomation(activeOrganizationId, id);
     if (result.error) return json({ error: result.error }, { status: result.status });
+    await logActivity(
+        activeOrganizationId,
+        "automation.deleted",
+        { type: "automation", id },
+        {},
+        { userId: ctx.session.user.id, userName: ctx.session.user.name ?? ctx.session.user.email ?? undefined },
+    );
     return json(result, { status: result.status });
 });
