@@ -15,7 +15,7 @@ import {
     Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms";
+import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/constants";
 import { cn } from "@/lib/utils";
 
 interface PlatformStat {
