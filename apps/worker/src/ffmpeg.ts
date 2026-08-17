@@ -144,6 +144,22 @@ export async function transcodeToMp4(inputPath: string, outputPath: string): Pro
 }
 
 /**
+ * Transcode satu buffer video menjadi MP4 H.264. Temp file dibersihkan otomatis.
+ */
+export async function transcodeVideoBuffer(input: Buffer): Promise<Buffer> {
+  const dir = await mkdtemp(path.join(tmpdir(), "seb-worker-"));
+  const inputPath = path.join(dir, `input-${randomUUID()}.mp4`);
+  const outputPath = path.join(dir, `output-${randomUUID()}.mp4`);
+  try {
+    await writeFile(inputPath, input);
+    await transcodeToMp4(inputPath, outputPath);
+    return await readFile(outputPath);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/**
  * Proses satu file video:
  * 1. Tulis buffer input ke temp file.
  * 2. Probe + ekstrak frame.
