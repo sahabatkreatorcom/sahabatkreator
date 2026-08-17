@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { withAuth, json } from "@/lib/api";
-import { getBrandKnowledge, updateBrandKnowledge } from "@/lib/seb-advisor";
+import { getBrandKnowledge, updateBrandKnowledge, scanWebsiteForBrandKnowledge } from "@/lib/seb-advisor";
 
 export const dynamic = "force-dynamic";
 
@@ -33,4 +33,22 @@ export const PUT = withAuth(async (ctx, req: NextRequest) => {
     if (!result.ok) return json({ error: "Gagal menyimpan brand knowledge." }, { status: 400 });
 
     return json({ success: true });
+});
+
+/** POST /api/seb/brand-knowledge — scan website → pendingInsights (belum di-approve). */
+export const POST = withAuth(async (ctx, req: NextRequest) => {
+    const { activeOrganizationId } = ctx;
+    if (!activeOrganizationId) return json({ error: "Pilih workspace dulu." }, { status: 400 });
+
+    const body = (await req.json().catch(() => null)) as { websiteUrl?: string } | null;
+    try {
+        const result = await scanWebsiteForBrandKnowledge({
+            organizationId: activeOrganizationId,
+            websiteUrl: body?.websiteUrl,
+        });
+        return json(result, { status: 201 });
+    } catch (e) {
+        const message = e instanceof Error ? e.message : "Gagal memindai website.";
+        return json({ error: message }, { status: e instanceof Error && /OpenRouter belum dikonfigurasi/.test(message) ? 400 : 502 });
+    }
 });

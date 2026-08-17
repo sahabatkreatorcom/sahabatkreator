@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { Sparkles, ListChecks, MessageSquare, BookOpen, RefreshCw, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Sparkles, ListChecks, MessageSquare, BookOpen, RefreshCw, Loader2, ChevronDown, ChevronUp, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -52,6 +52,21 @@ interface Knowledge {
     voiceRules: string | null;
     bannedTopics: string | null;
     websiteScannedAt: string | null;
+    pendingInsights: {
+        source: string;
+        websiteUrl: string;
+        scannedAt: string;
+        pages: Array<{ url: string; title: string | null }>;
+        audience: string | null;
+        positioning: string | null;
+        products: string | null;
+        offers: string | null;
+        voiceRules: string | null;
+        bannedTopics: string | null;
+        learnedInsights: string[];
+        crawlSummary: string;
+        confidence: number;
+    } | null;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -91,6 +106,10 @@ export default function SebPage() {
     const [brandOpen, setBrandOpen] = useState(false);
     const [brandForm, setBrandForm] = useState<Record<string, string>>({});
     const [brandSaving, setBrandSaving] = useState(false);
+    const [scanOpen, setScanOpen] = useState(false);
+    const [scanUrl, setScanUrl] = useState("");
+    const [scanning, setScanning] = useState(false);
+    const [scanResult, setScanResult] = useState<{ pages: Array<{ url: string; title: string | null }> } | null>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -191,6 +210,23 @@ export default function SebPage() {
             setError(e instanceof Error ? e.message : "Gagal menyimpan brand knowledge.");
         } finally {
             setBrandSaving(false);
+        }
+    }
+
+    async function runScan() {
+        if (!scanUrl.trim() || scanning) return;
+        setScanning(true);
+        setError(null);
+        setScanResult(null);
+        try {
+            const data = await api("/api/seb/brand-knowledge", "POST", { websiteUrl: scanUrl });
+            setScanResult({ pages: data.pages ?? [] });
+            setScanOpen(false);
+            loadKnowledge();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Gagal memindai website.");
+        } finally {
+            setScanning(false);
         }
     }
 
@@ -395,24 +431,39 @@ export default function SebPage() {
                         <p className="text-sm text-muted-foreground">
                             Konteks brand membantu Seb memberi saran yang lebih spesifik dan sesuai.
                         </p>
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => {
-                                setBrandForm({
-                                    websiteUrl: knowledge?.websiteUrl ?? "",
-                                    audience: knowledge?.audience ?? "",
-                                    positioning: knowledge?.positioning ?? "",
-                                    products: knowledge?.products ?? "",
-                                    offers: knowledge?.offers ?? "",
-                                    voiceRules: knowledge?.voiceRules ?? "",
-                                    bannedTopics: knowledge?.bannedTopics ?? "",
-                                });
-                                setBrandOpen(true);
-                            }}
-                        >
-                            Edit
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                    setScanUrl(knowledge?.websiteUrl ?? "");
+                                    setScanResult(null);
+                                    setScanOpen(true);
+                                }}
+                                disabled={scanning}
+                            >
+                                {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
+                                Scan website
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                    setBrandForm({
+                                        websiteUrl: knowledge?.websiteUrl ?? "",
+                                        audience: knowledge?.audience ?? "",
+                                        positioning: knowledge?.positioning ?? "",
+                                        products: knowledge?.products ?? "",
+                                        offers: knowledge?.offers ?? "",
+                                        voiceRules: knowledge?.voiceRules ?? "",
+                                        bannedTopics: knowledge?.bannedTopics ?? "",
+                                    });
+                                    setBrandOpen(true);
+                                }}
+                            >
+                                Edit
+                            </Button>
+                        </div>
                     </div>
 
                     <div className="rounded-lg border border-border bg-card p-4">
@@ -425,6 +476,53 @@ export default function SebPage() {
                                 <Field label="Penawaran" value={knowledge.offers} />
                                 <Field label="Aturan suara (voice)" value={knowledge.voiceRules} />
                                 <Field label="Topik yang dihindari" value={knowledge.bannedTopics} />
+
+                                {knowledge.pendingInsights && (
+                                    <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+                                        <p className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                                            <Sparkles className="h-4 w-4" />
+                                            Insight dari scan website
+                                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                                                {Math.round(knowledge.pendingInsights.confidence * 100)}% yakin
+                                            </span>
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {new Date(knowledge.pendingInsights.scannedAt).toLocaleString("id-ID", {
+                                                day: "numeric",
+                                                month: "short",
+                                                year: "numeric",
+                                                hour: "2-digit",
+                                                minute: "2-digit",
+                                            })}
+                                            {" · "}
+                                            {knowledge.pendingInsights.pages.length} halaman
+                                        </p>
+                                        {knowledge.pendingInsights.crawlSummary && (
+                                            <p className="mt-2 text-sm text-muted-foreground">{knowledge.pendingInsights.crawlSummary}</p>
+                                        )}
+                                        <div className="mt-2 space-y-1.5">
+                                            <Field label="Audience" value={knowledge.pendingInsights.audience} />
+                                            <Field label="Positioning" value={knowledge.pendingInsights.positioning} />
+                                            <Field label="Produk" value={knowledge.pendingInsights.products} />
+                                            <Field label="Penawaran" value={knowledge.pendingInsights.offers} />
+                                            <Field label="Aturan suara (voice)" value={knowledge.pendingInsights.voiceRules} />
+                                            <Field label="Topik yang dihindari" value={knowledge.pendingInsights.bannedTopics} />
+                                            {knowledge.pendingInsights.learnedInsights.length > 0 && (
+                                                <div>
+                                                    <p className="text-xs font-medium text-muted-foreground">Insight lain</p>
+                                                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
+                                                        {knowledge.pendingInsights.learnedInsights.map((insight, index) => (
+                                                            <li key={index}>{insight}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="mt-2 text-xs text-muted-foreground">
+                                            Insight ini belum di-approve. Salin ke field brand knowledge di atas jika ingin menggunakannya.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <p className="text-sm text-muted-foreground">Belum ada brand knowledge. Klik Edit untuk mengisinya.</p>
@@ -458,6 +556,39 @@ export default function SebPage() {
                                 <Button size="sm" disabled={brandSaving} onClick={saveBrand}>
                                     {brandSaving && <Loader2 className="h-4 w-4 animate-spin" />}
                                     Simpan
+                                </Button>
+                            </div>
+                        </div>
+                    </Dialog>
+
+                    <Dialog open={scanOpen} onClose={() => setScanOpen(false)} title="Scan website untuk brand knowledge">
+                        <div className="space-y-3">
+                            <p className="text-sm text-muted-foreground">
+                                Seb akan membuka hingga 5 halaman situs Anda (beranda + halaman tentang/produk), mengekstrak konteks brand,
+                                lalu menyimpannya sebagai insight yang belum di-approve.
+                            </p>
+                            <div>
+                                <Label htmlFor="scan-url">URL website</Label>
+                                <Input
+                                    id="scan-url"
+                                    placeholder="mis. https://toko-kamu.com"
+                                    value={scanUrl}
+                                    onChange={(e) => setScanUrl(e.target.value)}
+                                />
+                            </div>
+                            {scanResult && (
+                                <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+                                    <p className="text-sm font-medium text-primary">Scan selesai</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {scanResult.pages.map((page) => page.title || page.url).join(" · ")}
+                                    </p>
+                                </div>
+                            )}
+                            <div className="flex justify-end gap-2 pt-1">
+                                <Button variant="ghost" size="sm" onClick={() => setScanOpen(false)}>Tutup</Button>
+                                <Button size="sm" disabled={scanning || !scanUrl.trim()} onClick={runScan}>
+                                    {scanning && <Loader2 className="h-4 w-4 animate-spin" />}
+                                    {scanning ? "Memindai…" : "Mulai scan"}
                                 </Button>
                             </div>
                         </div>
