@@ -4,6 +4,32 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #13 — Docker build gagal: build args tidak lengkap (ENCRYPTION_KEY, R2_*) & migrate tanpa args
+**Gejala:** `docker compose up -d --build` gagal di `[migrate build] RUN pnpm --filter web build` dengan
+`Invalid environment variables` untuk `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
+`CORS_ORIGIN`, `ENCRYPTION_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
+— semua "received undefined".
+
+**Akar:** (1) Service `migrate` memakai `apps/web/Dockerfile` yang sama tapi **tanpa blok `build.args`**,
+jadi semua ARG kosong saat `next build` dijalankan di stage build. (2) `ENCRYPTION_KEY` dan `R2_*`
+tidak pernah dideklarasikan sebagai ARG/ENV di Dockerfile maupun dilempar dari compose — padahal env
+schema mewajibkannya saat `NODE_ENV=production` (`z.string().min(1)` untuk R2_*, superRefine khusus
+production untuk ENCRYPTION_KEY), dan `next build` mengumpulkan page data `/sitemap.xml` yang
+meng-import DB → env server.
+
+| | |
+|---|---|
+| **File** | `apps/web/Dockerfile` (tambah ARG+ENV `ENCRYPTION_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`), `docker-compose.yml` (blok `build.args` lengkap di service `migrate` — sebelumnya tidak ada — dan service `web`) |
+| **Masalah** | Build Docker web/migrate gagal validasi env |
+| **Akar** | ARG tidak dideklarasikan/lewat untuk ENCRYPTION_KEY & R2_*; service migrate tanpa args |
+| **Fix** | Deklarasikan ARG+ENV di Dockerfile untuk 5 variabel; tambah `build.args` ke `migrate` & `web` dengan nilai dari `.env` (fallback NEXT_PUBLIC_APP_URL). |
+| **Verifikasi** | Belum — user perlu `docker compose up -d --build` ulang di VPS. |
+| **Pelajaran** | Service compose yang berbagi Dockerfile yang menjalankan `next build` WAJIB punya `build.args` sama; setiap variabel wajib-build di env schema harus di-ARG-kan. |
+| **Log Keyword** | docker build, build args, env validation, invalid environment variables, sitemap, migrate, next build |
+| **Deploy** | PENDING — menunggu rebuild di VPS |
+
+---
+
 ### Fix #12 — Kontrak Transcoder (interface) dengan default ffmpeg lokal
 **Gejala:** Transcode video terkunci ke implementasi ffmpeg di `apps/worker/src/ffmpeg.ts` — memindah transcode ke layanan eksternal (Modal.com, dsb) akan mengubah worker loop.
 
