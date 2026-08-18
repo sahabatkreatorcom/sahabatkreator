@@ -5,6 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CalendarDays, ArrowRight, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+// Halaman membaca DB — jangan di-prerender saat build (DB hanya ada saat runtime).
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Blog | Sahabat Kreator - Tips & Panduan Sosial Media",

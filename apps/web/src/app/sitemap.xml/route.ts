@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@sahabat-kreator/db";
 import { eq, desc } from "drizzle-orm";
 
+// Membaca DB — jangan di-prerender saat build (DB hanya ada saat runtime).
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const posts = await db
     .select({

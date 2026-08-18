@@ -9,6 +9,9 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+// Halaman membaca DB — jangan di-prerender saat build (DB hanya ada saat runtime).
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const post = await db.query.blogPost.findFirst({

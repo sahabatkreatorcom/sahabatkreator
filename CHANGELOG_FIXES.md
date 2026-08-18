@@ -4,6 +4,27 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #15 — `next build` gagal: halaman blog & sitemap di-prerender padahal baca DB
+**Gejala:** Docker build web gagal di "Generating static pages" untuk `/blog` dengan
+`getaddrinfo ENOTFOUND postgres` (query `blog_post` join `blog_tag` di `lib/blog.ts:20`).
+
+**Akar:** Halaman publik `(marketing)/blog/page.tsx`, `(marketing)/blog/[slug]/page.tsx`, dan
+`sitemap.xml/route.ts` membaca DB tetapi **tanpa deklarasi dinamik** → Next.js meng-prerender saat
+`next build`. Saat build, host `postgres` belum ada (service baru naik saat runtime) → ENOTFOUND.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/app/(marketing)/blog/page.tsx`, `apps/web/src/app/(marketing)/blog/[slug]/page.tsx`, `apps/web/src/app/sitemap.xml/route.ts` — tambah `export const dynamic = "force-dynamic"` |
+| **Masalah** | Build gagal; halaman blog memaksa akses DB saat build |
+| **Akar** | Halaman statis (default prerender) yang meng-query DB |
+| **Fix** | Paksa dinamis (`force-dynamic`) — DB diakses saat request, bukan saat build. |
+| **Verifikasi** | `pnpm -r check-types` lolos. |
+| **Pelajaran** | Halaman/route yang baca DB harus `force-dynamic` (atau `generateStaticParams` + `revalidate`) bila di-deploy dengan DB yang hanya ada saat runtime. |
+| **Log Keyword** | next build, prerender, force-dynamic, ENOTFOUND postgres, blog, sitemap, static pages |
+| **Deploy** | PENDING — menunggu rebuild di VPS |
+
+---
+
 ### Fix #14 — `next build` gagal: Resend di-init saat import (pakai RESEND_API_KEY yang opsional)
 **Gejala:** Docker build web/migrate gagal saat "Collecting page data for /accept-invitation/[id]" dengan
 `Error: Missing API key. Pass it to the constructor new Resend("re_123")` — padahal env build sudah lengkap.
