@@ -2,7 +2,12 @@
 Status: BERJALAN · Service: web/db/payment/queue · Diperbarui: 2026-08-19
 
 ## Sedang dikerjakan
-**www subdomain (2026-08-19)**: `curl https://sahabatkreator.com` → 200 proxied OK, tapi `www` → **525** (Caddy hanya punya cert apex). Fix: `Caddyfile` tambah site block `www.{$DOMAIN}` → `redir https://{$DOMAIN}{uri} permanent`. **Belum deployed** — perlu `git pull && docker compose up -d caddy` di VPS, lalu verify `curl -I https://www.sahabatkreator.com` → 301. Setelah ini: uji live E2E (upload video → worker ffmpeg, SEB OpenRouter, publish real, SumoPod, webhook platform).
+**better-auth downgrade 1.7.0 (beta) → 1.6.30 (stable) (2026-08-19)**: register error `The field "issuer" does not exist in the "account" Drizzle schema` karena better-auth 1.7.0 (masih rc/beta) mewajibkan kolom `account.issuer`. Keputusan user: **downgrade** (bukan tambah kolom). 
+- `pnpm-workspace.yaml` catalog: `better-auth: ^1.6.22` → `~1.6.29` (caret lama me-resolve ke 1.7.0). Terpasang 1.6.30 (stable track, tanpa `issuer`).
+- Revert: schema `auth.ts` (tanpa issuer), migrasi 0001 dihapus (sql + snapshot + journal entry).
+- Fix API 2FA 1.6: `enable-two-factor-flow.tsx` — `enable({ password, method: "totp" })` → `enable({ password })`, hapus cek `data.method` (1.6 return `{ totpURI, backupCodes }`).
+- `pnpm -r check-types` **lolos** (9 workspace).
+- **Belum deployed**: perlu commit + push → VPS `git pull && docker compose up -d --build` (rebuild web karena dep berubah). Setelah itu uji register lagi di prod.
 
 ## Status terakhir
 - **✅ DEPLOY LIVE (Fix #10–#17, 2026-08-19)**: semua entri CHANGELOG ditandai LIVE. Rangkaian error Docker berurutan yang diselesaikan: (a) Fix #13 build args (ENCRYPTION_KEY + R2_* + args migrate), (b) Fix #14 Resend lazy-init, (c) Fix #15 prerender blog/sitemap force-dynamic, (d) Fix #16 migrate stage dari deps (EACCES corepack), (e) Fix #17 @swc/helpers copy utuh (web crash). DNS Cloudflare: **DNS only (grey cloud)** — Caddy serve SSL langsung. SSL Cloudflare mode Full. Catatan DNS: HTTP-01 challenge Let's Encrypt gagal saat Proxied; grey cloud diperlukan. Caddy certificate obtained via acme HTTP-01.

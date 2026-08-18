@@ -4,6 +4,48 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #19 — Register error: field "issuer" tidak ada di schema "account" (better-auth 1.7.0 beta)
+**Gejala:** Saat register (email/password) di prod: `ERROR [Better Auth]: The field "issuer" does not exist in the "account" Drizzle schema.` User bisa gagal didaftarkan.
+
+**Akar:** `pnpm-workspace.yaml` catalog `better-auth: ^1.6.22` (caret) me-resolve ke **1.7.0** yang masih beta/rc. Di 1.7, `Account.issuer` wajib (breaking change "scope accounts by issuer") — schema `account` di `packages/db` belum punya kolom itu → adaptor drizzle menolak.
+
+**Keputusan:** **Downgrade ke stable track** (bukan menambah kolom `issuer`), karena 1.7 masih beta dan perubahan breaking-nya belum diperlukan.
+
+| | |
+|---|---|
+| **File** | `pnpm-workspace.yaml` (`better-auth: ^1.6.22` → `~1.6.29` → terpasang **1.6.30**), `apps/web/src/components/dashboard/security/enable-two-factor-flow.tsx` (API 2FA 1.6: `enable({ password, method })` → `enable({ password })`; hapus cek `data.method`; return 1.6 = `{ totpURI, backupCodes }`). Migrasi 0001 (dari percobaan tambah `issuer`) dihapus. |
+| **Masalah** | Register error karena better-auth 1.7.0 (beta) butuh kolom `account.issuer` |
+| **Akar** | Catalog caret `^1.6.22` ikut naik ke 1.7.0 beta; 1.7 mewajibkan `issuer` |
+| **Fix** | Pin catalog `~1.6.29` (hanya patch 1.6.x) → terpasang 1.6.30 stable; sesuaikan API 2FA yang berubah |
+| **Verifikasi** | `pnpm -r check-types` lolos (9 workspace). **PENDING deploy** — perlu rebuild web di VPS lalu uji register. |
+| **Pelajaran** | Catalog pnpm pakai caret (`^`) mengizinkan minor upgrade otomatis — risiko versi beta terserap; pin dengan `~` untuk major line yang diinginkan. API better-auth bisa berubah antar minor (2FA `enable`). |
+| **Log Keyword** | issuer, account schema, better-auth, 2FA, enable two factor, method totp, catalog, downgrade |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
+### Fix #18 — `www` subdomain HTTP 525: Caddy tak punya sertifikat untuk `www`
+**Gejala:** Setelah Cloudflare proxied + SSL Full (strict), `https://sahabatkreator.com` → 200,
+tapi `https://www.sahabatkreator.com` → **HTTP 525** (SSL handshake failed). Log Caddy hanya
+menunjukkan proses ACME untuk `sahabatkreator.com`, tidak pernah untuk www.
+
+**Akar:** `Caddyfile` hanya mendefinisikan site block `{$DOMAIN}` (apex). Caddy tidak otomatis
+menerbitkan sertifikat untuk subdomain yang tidak ada di config → handshake www gagal saat
+Cloudflare proxy mencoba koneksi SSL ke origin.
+
+| | |
+|---|---|
+| **File** | `Caddyfile` — tambah site block `www.{$DOMAIN}` → `redir https://{$DOMAIN}{uri} permanent` di atas block apex. |
+| **Masalah** | www → 525 SSL handshake failed (Caddy tak punya cert www) |
+| **Akar** | Tidak ada site block www di Caddyfile → Caddy tidak meng-issue sertifikat untuk www |
+| **Fix** | Blok `www.{$DOMAIN}` dengan redirect permanen ke apex; Caddy auto-TLS menerbitkan sertifikat Let's Encrypt untuk www juga. |
+| **Verifikasi** | VPS: `docker compose up -d --force-recreate caddy` → log `certificate obtained successfully identifier=www.sahabatkreator.com`; `curl -I https://www.sahabatkreator.com` → **301 Moved Permanently** `Location: https://sahabatkreator.com/`. |
+| **Pelajaran** | Setiap subdomain yang diarahkan ke origin harus ada site block-nya di Caddyfile (atau pakai `www` via placeholder) — Caddy hanya menerbitkan cert untuk hostname yang terdaftar di config. |
+| **Log Keyword** | www, 525, SSL handshake, certificate obtained, redir, subdomain |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200, www → 301 redirect apex |
+
+---
+
 ### Fix #17 — Web crash startup: `@swc/helpers` tidak lengkap di standalone (Turbopack tracing)
 **Gejala:** Container `web` restart-loop:
 `Error: Cannot find module '/app/node_modules/.pnpm/next@.../node_modules/@swc/helpers/esm/_interop_require_default.js'`.

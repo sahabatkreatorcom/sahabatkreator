@@ -5,4 +5,4 @@ catalog:
   dotenv: ^17.4.2
   zod: ^4.4.3
   "@types/node": ^26.2.0
-  better-auth: ^1.6.22
+  better-auth: ~1.6.29
