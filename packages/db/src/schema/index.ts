@@ -11,3 +11,4 @@ export * from "./content";
 export * from "./seb";
 export * from "./settings";
 export * from "./payment";
+export * from "./blog";
