@@ -95,6 +95,12 @@ export default function PrivacyPage() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold">8. Kontak</h2>
             <p className="text-muted-foreground">Untuk pertanyaan mengenai kebijakan privasi ini, silakan hubungi kami di privacy@sahabatkreator.id</p>
+            <p className="mt-2 text-sm">
+              Untuk informasi lebih lanjut tentang hak penghapusan data, lihat halaman{' '}
+              <Link href="/penghapusan-data" className="text-primary hover:underline">
+                Kebijakan Penghapusan Data
+              </Link>.
+            </p>
           </section>
         </div>
       </main>

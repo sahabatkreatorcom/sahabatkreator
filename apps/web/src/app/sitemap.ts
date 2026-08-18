@@ -56,6 +56,11 @@ export async function GET() {
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
+  <url>
+    <loc>${baseUrl}/penghapusan-data</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
 `;
 
   for (const post of posts) {

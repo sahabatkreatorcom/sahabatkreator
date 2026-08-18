@@ -77,6 +77,11 @@ export default function TermsPage() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold">8. Kontak</h2>
             <p className="text-muted-foreground">Jika Anda memiliki pertanyaan mengenai Syarat & Ketentuan ini, silakan hubungi kami di support@sahabatkreator.id</p>
+            <p className="mt-2 text-sm">
+              Halaman legal lainnya:{' '}
+              <Link href="/kebijakan-privasi" className="text-primary hover:underline">Kebijakan Privasi</Link> •{' '}
+              <Link href="/penghapusan-data" className="text-primary hover:underline">Penghapusan Data</Link>
+            </p>
           </section>
         </div>
       </main>
