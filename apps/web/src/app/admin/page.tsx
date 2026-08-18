@@ -1,5 +1,5 @@
-import { UsersTable } from "@/components/admin/users-table";
+﻿import { redirect } from "next/navigation";
 
 export default function AdminPage() {
-    return <UsersTable />;
+    redirect("/admin/overview");
 }
