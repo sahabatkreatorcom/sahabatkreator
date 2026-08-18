@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw, Building2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Organization {
@@ -109,7 +109,7 @@ export default function AdminOrganizationsPage() {
                 <div className="flex items-center justify-center gap-2">
                     <Button
                         size="sm"
-                        variant="outline"
+                        variant="secondary"
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page <= 1}
                     >
@@ -120,7 +120,7 @@ export default function AdminOrganizationsPage() {
                     </span>
                     <Button
                         size="sm"
-                        variant="outline"
+                        variant="secondary"
                         onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                         disabled={page >= totalPages}
                     >
