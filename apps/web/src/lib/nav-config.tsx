@@ -16,6 +16,7 @@ import {
     Search,
     Activity,
     Tag,
+    CreditCard,
     type LucideIcon,
 } from "lucide-react";
 
@@ -171,6 +172,14 @@ export const navItems: NavItem[] = [
         shortLabel: "Pillars",
         icon: Tag,
         group: "content",
+        mobileTab: false,
+    },
+    {
+        href: "/billing",
+        label: "Billing",
+        shortLabel: "Billing",
+        icon: CreditCard,
+        group: "team",
         mobileTab: false,
     },
     {

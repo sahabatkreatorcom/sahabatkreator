@@ -29,6 +29,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { ConnectedAccountsSettings } from "@/components/settings/connected-accounts";
+import { PushNotificationSettings } from "@/components/settings/push-notification-settings";
 import { authClient } from "@/lib/auth-client";
 
 interface Organization {
@@ -72,7 +74,7 @@ const TIMEZONES = [
     "Australia/Sydney",
 ];
 
-type Tab = "profile" | "organization" | "appearance" | "notifications" | "accounts" | "brand-tone" | "security";
+type Tab = "profile" | "organization" | "appearance" | "notifications" | "accounts" | "brand-tone" | "security" | "push" | "billing";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "profile", label: "Profil", icon: <User className="h-4 w-4" /> },
@@ -82,6 +84,8 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "accounts", label: "Akun Terhubung", icon: <Globe className="h-4 w-4" /> },
     { id: "brand-tone", label: "Brand Voice", icon: <Sparkles className="h-4 w-4" /> },
     { id: "security", label: "Keamanan", icon: <Shield className="h-4 w-4" /> },
+    { id: "push", label: "Push", icon: <Bell className="h-4 w-4" /> },
+    { id: "billing", label: "Billing", icon: <CreditCard className="h-4 w-4" /> },
 ];
 
 export default function SettingsPage() {
@@ -358,22 +362,7 @@ export default function SettingsPage() {
                     </div>
                 )}
 
-                {activeTab === "accounts" && (
-                    <div className="space-y-4 rounded-lg border border-border bg-card p-5">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-sm font-semibold">Akun Terhubung</h2>
-                            <a href="/accounts" className="text-xs font-medium text-primary hover:underline">
-                                Kelola akun
-                            </a>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                            Kelola akun media sosial di halaman Akun.
-                        </p>
-                        <a href="/accounts">
-                            <Button size="sm">Kelola Akun</Button>
-                        </a>
-                    </div>
-                )}
+                {activeTab === "accounts" && <ConnectedAccountsSettings />}
 
                 {activeTab === "brand-tone" && (
                     <div className="space-y-4 rounded-lg border border-border bg-card p-5">
@@ -410,6 +399,22 @@ export default function SettingsPage() {
                             Simpan brand voice
                         </Button>
                     </div>
+                )}
+
+                {activeTab === "push" && <PushNotificationSettings />}
+
+                {activeTab === "billing" && (
+                    <a href="/dashboard/billing" className="block">
+                        <div className="rounded-lg border border-border bg-card p-5 hover:bg-muted/50">
+                            <h2 className="text-sm font-semibold">Billing & Subscription</h2>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Lihat paket, langganan, dan riwayat pembayaran workspace Anda.
+                            </p>
+                            <Button size="sm" className="mt-3">
+                                Buka Billing
+                            </Button>
+                        </div>
+                    </a>
                 )}
 
                 {activeTab === "security" && (
