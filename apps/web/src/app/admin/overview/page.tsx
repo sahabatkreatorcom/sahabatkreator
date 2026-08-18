@@ -124,7 +124,7 @@ export default function AdminOverviewPage() {
             {/* Quick Links */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Link
-                    href="/admin/users"
+                    href="/admin/users" as any
                     className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted"
                 >
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
@@ -137,7 +137,7 @@ export default function AdminOverviewPage() {
                 </Link>
 
                 <Link
-                    href="/admin/organizations"
+                    href="/admin/organizations" as any
                     className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted"
                 >
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-blue/10">
@@ -150,7 +150,7 @@ export default function AdminOverviewPage() {
                 </Link>
 
                 <Link
-                    href="/admin/billing"
+                    href="/admin/billing" as any
                     className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted"
                 >
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-green/10">
@@ -163,7 +163,7 @@ export default function AdminOverviewPage() {
                 </Link>
 
                 <Link
-                    href="/admin/health"
+                    href="/admin/health" as any
                     className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted"
                 >
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-amber/10">
@@ -182,7 +182,7 @@ export default function AdminOverviewPage() {
                 <div className="rounded-lg border border-border bg-card">
                     <div className="flex items-center justify-between border-b border-border p-4">
                         <h2 className="text-sm font-semibold">User Terbaru</h2>
-                        <Link href="/admin/users" className="text-xs font-medium text-primary hover:underline">
+                        <Link href="/admin/users" as any className="text-xs font-medium text-primary hover:underline">
                             Lihat semua
                         </Link>
                     </div>
@@ -219,7 +219,7 @@ export default function AdminOverviewPage() {
                 <div className="rounded-lg border border-border bg-card">
                     <div className="flex items-center justify-between border-b border-border p-4">
                         <h2 className="text-sm font-semibold">Organisasi Terbaru</h2>
-                        <Link href="/admin/organizations" className="text-xs font-medium text-primary hover:underline">
+                        <Link href="/admin/organizations" as any className="text-xs font-medium text-primary hover:underline">
                             Lihat semua
                         </Link>
                     </div>
