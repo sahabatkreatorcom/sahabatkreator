@@ -2,6 +2,11 @@
 # Dipasang via volume ke service `caddy` di docker-compose.yml.
 # `DOMAIN` disubstitusi dari environment (lihat .env.example).
 
+www.{$DOMAIN} {
+	# Arahkan www ke apex agar tidak ada konten ganda & cukup satu sertifikat utama.
+	redir https://{$DOMAIN}{uri} permanent
+}
+
 {$DOMAIN} {
 	# Redirect semua lalu lintas HTTP (port 80) ke HTTPS otomatis oleh Caddy.
 

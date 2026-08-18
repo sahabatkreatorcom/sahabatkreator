@@ -24,7 +24,7 @@ file hilang → server.js crash.
 | **Verifikasi** | Belum — perlu rebuild di VPS (`docker compose up -d --build`). Build lokal lengkap (438 file vs 438). |
 | **Pelajaran** | Standalone tracing bisa meloloskan helper runtime; untuk dep yang direferensikan compiler (seperti `@swc/helpers`) sebaiknya dijamin lewat `outputFileTracingIncludes` atau salinan eksplisit di Dockerfile. |
 | **Log Keyword** | swc helpers, interop_require_default, standalone, file tracing, turbopack, restart loop, cannot find module |
-| **Deploy** | PENDING — menunggu rebuild di VPS |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -46,7 +46,7 @@ stage `runner` yang berjalan sebagai user `nextjs` (tanpa izin tulis corepack ca
 | **Verifikasi** | Belum — perlu rebuild di VPS (`docker compose up -d --build`). Container lama masih dari image sebelumnya. |
 | **Pelajaran** | Service compose yang butuh tooling workspace (pnpm/drizzle) tidak boleh berbagi stage `runner` standalone; pakai stage terpisah yang berbasis deps + `build.target`. |
 | **Log Keyword** | migrate, corepack, EACCES, nextjs, home cache, standalone runner, build target, db:migrate |
-| **Deploy** | PENDING — menunggu rebuild di VPS |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -67,7 +67,7 @@ stage `runner` yang berjalan sebagai user `nextjs` (tanpa izin tulis corepack ca
 | **Verifikasi** | `pnpm -r check-types` lolos. |
 | **Pelajaran** | Halaman/route yang baca DB harus `force-dynamic` (atau `generateStaticParams` + `revalidate`) bila di-deploy dengan DB yang hanya ada saat runtime. |
 | **Log Keyword** | next build, prerender, force-dynamic, ENOTFOUND postgres, blog, sitemap, static pages |
-| **Deploy** | PENDING — menunggu rebuild di VPS |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -88,7 +88,7 @@ auth meng-import email → evaluasi module langsung memanggil `new Resend(undefi
 | **Verifikasi** | `pnpm -r check-types` lolos (9 workspace). |
 | **Pelajaran** | SDK yang butuh API key sebaiknya di-init lazy; module-level init membuat import mana pun (termasuk `next build` page data) crash bila env opsional kosong. |
 | **Log Keyword** | resend, email, missing api key, next build, page data, module scope, lazy init |
-| **Deploy** | PENDING — menunggu rebuild di VPS |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -114,7 +114,7 @@ meng-import DB → env server.
 | **Verifikasi** | Belum — user perlu `docker compose up -d --build` ulang di VPS. |
 | **Pelajaran** | Service compose yang berbagi Dockerfile yang menjalankan `next build` WAJIB punya `build.args` sama; setiap variabel wajib-build di env schema harus di-ARG-kan. |
 | **Log Keyword** | docker build, build args, env validation, invalid environment variables, sitemap, migrate, next build |
-| **Deploy** | PENDING — menunggu rebuild di VPS |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -132,7 +132,7 @@ meng-import DB → env server.
 | **Verifikasi** | `pnpm -r check-types` lolos (9 workspace). |
 | **Pelajaran** | Abstraksi dengan resolver env memungkinkan swap provider runtime tanpa refactor worker loop; fail-fast lebih baik daripada default diam-diam. |
 | **Log Keyword** | transcoder, interface, modal, provider, ffmpeg, resolve, abstraction |
-| **Deploy** | PENDING — belum live |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -150,7 +150,7 @@ meng-import DB → env server.
 | **Verifikasi** | `pnpm -r check-types` lolos (web, worker, db, auth, dll). `LIMITED` aman di UI (pakai `thumbnailUrl ?? url`). |
 | **Pelajaran** | Pembatas ukuran sebaiknya jadi branch pemrosesan, bukan filter seleksi — supaya ada fallback yang terlihat, bukan skip diam-diam. |
 | **Log Keyword** | worker, ffmpeg, max video bytes, oversized, poster only, limited, batch, concurrency, swap, ram vps |
-| **Deploy** | PENDING — belum live |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -168,7 +168,7 @@ meng-import DB → env server.
 | **Verifikasi** | Struktur YAML valid; `docker compose` belum diuji (docker tidak tersedia di mesin dev). |
 | **Pelajaran** | Service internal tidak boleh di-publish ke host; SSL sebaiknya ditangani proxy (Caddy) bukan app. |
 | **Log Keyword** | ssl, https, caddy, letsencrypt, reverse proxy, compose ports, exposure |
-| **Deploy** | PENDING — belum live |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -186,7 +186,7 @@ meng-import DB → env server.
 | **Verifikasi** | `pnpm --filter web build` sukses; `standalone/apps/web/server.js` ada (prefix `apps/web/` karena tracing root); `server.js` baca `PORT`/`HOSTNAME`. Docker build belum diuji (docker tidak tersedia di mesin dev). |
 | **Pelajaran** | Monorepo + standalone: wajib `outputFileTracingRoot` ke root, dan struktur server.js tetap mempertahankan prefix `apps/web/`. |
 | **Log Keyword** | standalone, outputFileTracingRoot, Dockerfile runner, docker image, next build |
-| **Deploy** | PENDING — belum live |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -204,7 +204,7 @@ meng-import DB → env server.
 | **Verifikasi** | `pnpm -r check-types` hijau; `pnpm --filter web build` sukses. Belum diuji live connect OAuth. |
 | **Pelajaran** | Secret global harus punya satu pembaca (DB dulu → env fallback) dan satu jalur tulis (admin); janji docs harus diimplementasikan di kode. |
 | **Log Keyword** | platform credentials, global_platform_credential, webhook secret, hybrid env DB, admin panel, OAuth connect, META_APP_SECRET |
-| **Deploy** | PENDING — belum live |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -222,7 +222,7 @@ meng-import DB → env server.
 | **Verifikasi** | `pnpm -r check-types` hijau; `next typegen` & `pnpm --filter web build` sukses (root env terbaca; bila DATABASE_URL kosong t3-env akan throw). |
 | **Pelajaran** | Monorepo: satu file env di root + loader idempoten lebih mudah di-maintain daripada per-app. |
 | **Log Keyword** | env, dotenv, single source of truth, loadRootEnv, monorepo |
-| **Deploy** | PENDING — belum live |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -240,7 +240,7 @@ meng-import DB → env server.
 | **Verifikasi** | `pnpm -r check-types` hijau; `pnpm --filter web build` sukses (route webhook/health terdaftar). Postgres Docker: belum diuji `docker compose up` live. |
 | **Pelajaran** | Jangan simpan dead file saat hapus fitur; route admin wajib wrapper role; tooling penulisan JSON jangan pakai ConvertTo-Json (BOM/format); prod DB = service postgres + migrate otomatis + healthcheck. |
 | **Log Keyword** | dead-code, self-import, admin stats, sumopod env, postgres docker, migrate service, withAdmin, withOrgOwnerAdmin, biome, BOM package.json |
-| **Deploy** | PENDING — belum live |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -258,7 +258,7 @@ meng-import DB → env server.
 | **Verifikasi** | `pnpm -r check-types` hijau; `pnpm --filter web build` sukses. Belum diuji live (butuh kredensial platform). |
 | **Pelajaran** | Webhook platform WAJIB ikut format signature resmi (jangan tebak); idempotency wajib atomik (INSERT ON CONFLICT); webhook payment butuh freshness + cek amount + transaksi; harga harus satu sumber kebenaran; CSP harus mencakup media-src bila app memutar video. |
 | **Log Keyword** | tiktok signature, svix replay, idempotency atomik, onConflict, billing owner admin, cron billing, tier expiry, media-src, resend from email, requireOrgOwnerAdmin |
-| **Deploy** | PENDING — belum live |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -276,7 +276,7 @@ meng-import DB → env server.
 | **Verifikasi** | `pnpm -r check-types` hijau; `pnpm --filter web build` sukses; 5 route webhook terdaftar di build. Belum diuji live (butuh kredensial platform + config webhook di App Dashboard). |
 | **Pelajaran** | Webhook Meta per objek (instagram/page/threads) = callback URL terpisah; signature butuh RAW body (jangan parse ulang); platform tanpa webhook publik (Pinterest/LinkedIn/Google Business) tidak bisa real-time → tetap polling. |
 | **Log Keyword** | webhook, meta, instagram, facebook, threads, tiktok, youtube, pubsubhubbub, hub-challenge, x-hub-signature, simple-icons, platform-icon, upsertIncomingComment |
-| **Deploy** | PENDING — belum live |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -294,7 +294,7 @@ meng-import DB → env server.
 | **Verifikasi** | `pnpm -r check-types` hijau (7 paket). Migrasi `0000_adorable_madame_web.sql` (82 tabel, 0 stripe, blog_post_tag PK, 4 timestamptz). Belum di-apply ke DB. |
 | **Pelajaran** | Setiap query lintas-tabel wajib scope org; kolom waktu absolut yang dibandingkan di JS wajib `timestamptz`; pembayaran dipusatkan ke `@sahabat-kreator/payment` (SumoPod) — jangan fork ke Stripe; index harus mengikuti pola query (leading column pertama di WHERE). |
 | **Log Keyword** | publishError, idor, timestamptz, blog_post_tag, transcode index, sumopod, webhook, stripe removal, gitignore env, authorId |
-| **Deploy** | PENDING — belum live |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -312,7 +312,7 @@ meng-import DB → env server.
 | **Verifikasi** | `pnpm -r check-types` hijau (6 paket). Migrasi `0000_low_james_howlett.sql` regenerate: 82 tabel, `blog_post_slug_unique` hanya 1 objek, organization default now ada. Belum di-apply ke DB. |
 | **Pelajaran** | Jangan pernah fail-open pada auth (fail-closed selalu); satu kolom unique jangan diwakili `.unique()` + `uniqueIndex` nama sama; fetch URL dari input user wajib allowlist + IP check; `CRON_SECRET`/`ENCRYPTION_KEY` wajib di prod. |
 | **Log Keyword** | ssrf, cron, fail-open, requireAdmin, blog slug, migrasi, security headers, better-auth peer, health db |
-| **Deploy** | PENDING — belum live |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |
 
 ---
 
@@ -330,4 +330,4 @@ meng-import DB → env server.
 | **Verifikasi** | `pnpm -r check-types` hijau. |
 | **Pelajaran** | Saat bump major library, cek breaking change tipe return API client; narrow discriminated union dengan guard eksplisit. |
 | **Log Keyword** | better-auth, 2fa, totp, type error, union |
-| **Deploy** | PENDING — belum live |
+| **Deploy** | LIVE 2026-08-19 - https://sahabatkreator.com 200 (HTTPS, Caddy Let's Encrypt, web healthy, migrate sukses) |

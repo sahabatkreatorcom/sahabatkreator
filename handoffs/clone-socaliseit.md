@@ -1,12 +1,12 @@
 # Clone fitur socaliseit ke Sahabat Kreator
-Status: BERJALAN · Service: web/db/payment/queue · Diperbarui: 2026-08-18
+Status: BERJALAN · Service: web/db/payment/queue · Diperbarui: 2026-08-19
 
 ## Sedang dikerjakan
-Hardening production + job queue BullMQ + **SumoPod wiring** selesai. Sisa: uji live E2E (SEB OpenRouter, worker ffmpeg di VPS, competitors, inbox, publish real, pembayaran SumoPod).
+**www subdomain (2026-08-19)**: `curl https://sahabatkreator.com` → 200 proxied OK, tapi `www` → **525** (Caddy hanya punya cert apex). Fix: `Caddyfile` tambah site block `www.{$DOMAIN}` → `redir https://{$DOMAIN}{uri} permanent`. **Belum deployed** — perlu `git pull && docker compose up -d caddy` di VPS, lalu verify `curl -I https://www.sahabatkreator.com` → 301. Setelah ini: uji live E2E (upload video → worker ffmpeg, SEB OpenRouter, publish real, SumoPod, webhook platform).
 
 ## Status terakhir
-- **Fix web crash @swc/helpers (baru, Fix #17)**: setelah migrate sukses, container `web` restart-loop — `Cannot find module .../@swc/helpers/esm/_interop_require_default.js`. Turbopack tracing tidak menyertakan seluruh `@swc/helpers` di standalone saat build Docker (lokal lengkap 438 file, VPS tidak). Fix: `apps/web/Dockerfile` — setelah `pnpm --filter web build`, salin utuh `node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers` ke `standalone/node_modules/.pnpm/next@*/node_modules/@swc/helpers`. **Belum diverifikasi** — butuh `docker compose up -d --build` di VPS.
-- **Fix migrate container (baru, Fix #16)**: setelah standalone (Fix #9), service `migrate` gagal — image `runner` tak punya pnpm/packages/db dan jalan sebagai user `nextjs` (EACCES corepack cache). Fix: stage `migrate` baru di `apps/web/Dockerfile` berbasis `deps` (root, `HOME=/root`, `COREPACK_HOME=/root/.cache/node/corepack`) + `build.target: migrate` di compose, blok `args` migrate dihapus. **Terverifikasi** di VPS: migrate Exited 0 (sukses).
+- **✅ DEPLOY LIVE (Fix #10–#17, 2026-08-19)**: semua entri CHANGELOG ditandai LIVE. Rangkaian error Docker berurutan yang diselesaikan: (a) Fix #13 build args (ENCRYPTION_KEY + R2_* + args migrate), (b) Fix #14 Resend lazy-init, (c) Fix #15 prerender blog/sitemap force-dynamic, (d) Fix #16 migrate stage dari deps (EACCES corepack), (e) Fix #17 @swc/helpers copy utuh (web crash). DNS Cloudflare: **DNS only (grey cloud)** — Caddy serve SSL langsung. SSL Cloudflare mode Full. Catatan DNS: HTTP-01 challenge Let's Encrypt gagal saat Proxied; grey cloud diperlukan. Caddy certificate obtained via acme HTTP-01.
+- **Worker hemat RAM + fallback poster-only (baru, Fix #11)**: video > `WORKER_MAX_VIDEO_BYTES` kini tetap diproses → poster saja (ffmpeg 1 frame, tanpa transcode) status `LIMITED`; yang ≤ batas tetap `DONE` penuh (frames + transcode). Query `findPendingVideos` tidak lagi memfilter `size <=` (sebelumnya video besar tak pernah diambil). Default baru untuk VPS kecil: `WORKER_BATCH_SIZE=1`, `WORKER_POLL_INTERVAL_MS=15000` (compose & .env.example); concurrency BullMQ `publishWorker` 3→1, `syncWorker` 2→1 di `apps/web/src/lib/queue-worker.ts`. DEPLOYMENT.md: bagian "Konfigurasi hemat RAM" + langkah swap 2 GB. `pnpm -r check-types` lolos.
 - **Fix prerender blog/sitemap (baru, Fix #15)**: `next build` gagal di `/blog` — `ENOTFOUND postgres` karena halaman blog & sitemap di-prerender saat build padahal baca DB (host postgres belum ada saat build). Fix: `export const dynamic = "force-dynamic"` di `(marketing)/blog/page.tsx`, `(marketing)/blog/[slug]/page.tsx`, `sitemap.xml/route.ts`. `pnpm -r check-types` lolos. **Belum diverifikasi** — rebuild di VPS.
 - **Fix Resend lazy-init (baru, Fix #14)**: `next build` gagal di `/accept-invitation/[id]` — `new Resend(process.env.RESEND_API_KEY)` di module scope `packages/email/src/index.ts` throw saat key kosong. Fix: lazy `getResend()` (instance dibuat saat `sendEmail` dipanggil), ekspor `resend` langsung dihapus. `pnpm -r check-types` lolos. **Belum diverifikasi** — rebuild di VPS.
 - **Fix Docker build args (baru, Fix #13)**: `docker compose up -d --build` gagal — `next build` menolak env kosong (`ENCRYPTION_KEY`, `R2_*`, dan semua ARG saat service `migrate`). Fix: `apps/web/Dockerfile` tambah ARG+ENV `ENCRYPTION_KEY`+`R2_*` (5 var), `docker-compose.yml` tambah blok `build.args` lengkap ke `migrate` (sebelumnya tanpa args) & `web`. **Belum diverifikasi** — user harus rebuild di VPS; pastikan `.env` di VPS punya `ENCRYPTION_KEY` (base64 32B) + `R2_*`.
@@ -41,19 +41,23 @@ Hardening production + job queue BullMQ + **SumoPod wiring** selesai. Sisa: uji 
 - Route tulis admin wajib `requireAdmin`; route tulis user wajib `withAuth`/`requireAuth`.
 
 ## Langkah berikutnya
-1. Uji live E2E SEB: isi OPENROUTER_API_KEY → generate laporan/chat/scan/analisis media di `/dashboard/seb`.
-2. Jalankan worker media di VPS (`docker compose up -d` → service worker) — verifikasi upload video → frame + transcodedUrl terisi.
-3. **Uji Postgres Docker**: isi `.env` (POSTGRES_* + DATABASE_URL) → `docker compose up -d` → verifikasi service `migrate` jalan (82 tabel) lalu web start. **Ganti URL dari Neon ke postgres service di `.env` produksi** (Fix #6).
-4. Uji live publish: hubungkan akun, jadwalkan post, pastikan job queue `publish-post` terproses (log `[queue-worker] publish done`).
-5. Uji live pembayaran SumoPod: isi config di global integration settings (admin) → klik Upgrade di `/dashboard/billing` → bayar QRIS → pastikan webhook `/api/billing/webhook` menerima `payment.completed` → tier org naik.
-6. **Uji live webhook platform**: set `META_APP_SECRET` + `WEBHOOK_VERIFY_TOKEN`, daftarkan 5 URL callback di App Dashboard Meta (IG/FB/Threads) + TikTok portal + YouTube hub → komentar real-time masuk inbox, publish TikTok update status.
-7. Uji live competitors (IG Business), inbox sync, auto-reply.
-8. Isi kredensial OAuth global via admin/DB supaya tombol Hubungkan berfungsi.
-9. Konfigurasi cron safety-net: `/api/cron/publish` (tiap menit) + `/api/cron/billing` (tiap jam) + `/api/analytics/sync` + `/api/inbox/sync` (tiap jam, + `x-organization-id`).
+1. **Uji upload video di prod** (`/dashboard/media`): verifikasi worker ffmpeg di VPS → thumbnail + transcodedUrl terisi (log `[worker] done`). **Ini belum diuji live** — Fix #11 (poster-only & batch=1) belum terverifikasi runtime.
+2. Uji live E2E SEB: isi OPENROUTER_API_KEY → generate laporan/chat/scan/analisis media di `/dashboard/seb`.
+3. Uji live publish: hubungkan akun, jadwalkan post, pastikan job queue `publish-post` terproses (log `[queue-worker] publish done`).
+4. Uji live pembayaran SumoPod: isi config di global integration settings (admin) → klik Upgrade di `/dashboard/billing` → bayar QRIS → pastikan webhook `/api/billing/webhook` menerima `payment.completed` → tier org naik.
+5. **Uji live webhook platform**: set `META_APP_SECRET` + `WEBHOOK_VERIFY_TOKEN` (atau isi Platform Credentials di `/admin/platforms`), daftarkan 5 URL callback di App Dashboard Meta (IG/FB/Threads) + TikTok portal + YouTube hub → komentar real-time masuk inbox, publish TikTok update status.
+6. Uji live competitors (IG Business), inbox sync, auto-reply.
+7. Isi kredensial OAuth global via admin/DB supaya tombol Hubungkan berfungsi.
+8. Konfigurasi cron safety-net: `/api/cron/publish` (tiap menit) + `/api/cron/billing` (tiap jam) + `/api/analytics/sync` + `/api/inbox/sync` (tiap jam, + `x-organization-id`).
+9. **R2_CUSTOM_DOMAIN** opsional (bagian "8. Skala") — set kalau mau URL publik media pakai domain sendiri.
 10. Verifikasi image optimization Next di prod (sharp sekarang di dependencies — aman).
 
 ## Jangan lakukan
 - (tetap) Semua larangan lama berlaku.
+- Jangan aktifkan **"Always Use HTTPS"** di Cloudflare Edge Certificates — bisa menggagalkan HTTP-01 renew Let's Encrypt lewat proxied.
+- Jangan set SSL Cloudflare ke Flexible (origin harus selalu HTTPS; Caddy hanya serve 443).
+- Kalau renew acme gagal suatu saat (`docker compose logs caddy`), jangan langsung ubah Caddyfile — coba grey-cloud sementara dulu (5 menit) untuk renew, baru proxied lagi. Opsi permanen: Cloudflare Origin CA cert.
+- Jangan ubah file CHANGELOG_FIXES.md pakai PowerShell `Set-Content`/`ConvertTo-Json` (BOM/encoding mangle) — pakai tool edit/Write.
 - Jangan enqueue job queue dari route/serverless lain — hanya via `posts-service.ts` (create/update/delete).
 - Jangan mengubah jobId `post:<id>` — dipakai untuk mencegah job ganda.
 - Jangan jalankan worker ffmpeg di proses web (serverless/Next) — tetap di `apps/worker`.
