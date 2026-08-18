@@ -22,7 +22,9 @@ export default function Page() {
         <meta name="msapplication-TileColor" content="#D4A574" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="icon" href="/icons/icon-32.png" sizes="32x32" />
+        <link rel="icon" href="/icons/icon-16.png" sizes="16x16" />
+        <link rel="apple-touch-icon" href="/icons/icon-180.png" />
         <link rel="alternate" type="application/rss+xml" title="Sahabat Kreator" href="/rss.xml" />
       </head>
       <body />
