@@ -1,46 +1,31 @@
-import type { Metadata } from "next";
-import { ThemeProvider } from "@/components/theme-provider";
-import "./globals.css";
+import { seo } from "@/lib/seo";
 
-export const metadata: Metadata = {
-    title: "Sahabat Kreator",
-    description: "AI-powered social media management untuk brand & agency",
-    icons: {
-        icon: [
-            { url: "/favicon/favicon.ico", sizes: "any" },
-            { url: "/favicon/favicon-96x96.png", type: "image/png", sizes: "96x96" },
-            { url: "/favicon/favicon.svg", type: "image/svg+xml" },
-        ],
-        apple: [{ url: "/favicon/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
-    },
-    manifest: "/favicon/site.webmanifest",
-    appleWebApp: {
-        capable: true,
-        statusBarStyle: "default",
-        title: "Sahabat Kreator",
-    },
-};
-
-// Script inline mencegah "flash" tema salah sebelum React hydrate.
-const noFlashScript = `
-(function () {
-  try {
-    var stored = localStorage.getItem("sahabat-kreator-theme") || "system";
-    var isDark = stored === "dark" || (stored === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    if (isDark) document.documentElement.classList.add("dark");
-  } catch (e) {}
-})();
-`;
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-    return (
-        <html lang="id" suppressHydrationWarning>
-            <head>
-                <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
-            </head>
-            <body>
-                <ThemeProvider>{children}</ThemeProvider>
-            </body>
-        </html>
-    );
+export default function Page() {
+  return (
+    <html lang="id">
+      <head>
+        <meta name="robots" content="index, follow" />
+        <meta property="og:locale" content="id_ID" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={seo.title} />
+        <meta property="og:description" content={seo.description} />
+        <meta property="og:url" content={seo.url} />
+        <meta property="og:image" content={seo.image} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={seo.title} />
+        <meta name="twitter:description" content={seo.description} />
+        <meta name="twitter:image" content={seo.image} />
+        <meta name="theme-color" content="#D4A574" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Sahabat Kreator" />
+        <meta name="msapplication-TileColor" content="#D4A574" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="alternate" type="application/rss+xml" title="Sahabat Kreator" href="/rss.xml" />
+      </head>
+      <body />
+    </html>
+  );
 }

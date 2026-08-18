@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
 import { OrgSwitcher } from "@/components/dashboard/org-switcher";
 import { BottomNav } from "@/components/dashboard/bottom-nav";
+import { ServiceWorkerRegistration, PWABanner } from "@/components/pwa";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -46,6 +47,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </div>
 
             <BottomNav isPlatformAdmin={isPlatformAdmin} />
+            <ServiceWorkerRegistration />
+            <PWABanner />
         </div>
     );
 }
