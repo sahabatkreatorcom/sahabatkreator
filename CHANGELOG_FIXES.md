@@ -4,6 +4,28 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #16 — Service `migrate` gagal: image runner standalone tak punya pnpm/packages + user nextjs tak bisa tulis corepack cache
+**Gejala:** Build image sukses, tapi container `migrate` exit 1:
+`EACCES: permission denied, mkdir '/home/nextjs/.cache/node/corepack/v1'` saat menjalankan `pnpm --filter @sahabat-kreator/db db:migrate`.
+
+**Akar:** Setelah `output: "standalone"` (Fix #9), stage `runner` di `apps/web/Dockerfile` hanya berisi
+hasil tracing (`server.js` + node_modules tersaring) — **tidak ada pnpm & `packages/db`** untuk
+`db:migrate`. Service `migrate` di compose memakai Dockerfile yang sama tanpa `target`, jadi jatuh ke
+stage `runner` yang berjalan sebagai user `nextjs` (tanpa izin tulis corepack cache) dan tanpa pnpm.
+
+| | |
+|---|---|
+| **File** | `apps/web/Dockerfile` (stage baru `migrate` berbasis `deps` — punya pnpm + seluruh workspace + node_modules; `HOME=/root`, `COREPACK_HOME=/root/.cache/node/corepack` agar corepack bisa tulis cache), `docker-compose.yml` (service `migrate` kini `build.target: migrate`, hapus blok `args` yang tak relevan) |
+| **Masalah** | Migrasi DB gagal di compose; DB tak pernah di-migrate → web/worker tak start |
+| **Akar** | Service migrate memakai stage runner standalone (tanpa pnpm/packages/db) sebagai user nextjs |
+| **Fix** | Stage `migrate` khusus dari `deps` (root, cache corepack eksplisit) + `target: migrate` di compose. `db:migrate` kini berjalan di image yang memang punya pnpm, drizzle-kit, dan `packages/db`. |
+| **Verifikasi** | Belum — perlu rebuild di VPS (`docker compose up -d --build`). Container lama masih dari image sebelumnya. |
+| **Pelajaran** | Service compose yang butuh tooling workspace (pnpm/drizzle) tidak boleh berbagi stage `runner` standalone; pakai stage terpisah yang berbasis deps + `build.target`. |
+| **Log Keyword** | migrate, corepack, EACCES, nextjs, home cache, standalone runner, build target, db:migrate |
+| **Deploy** | PENDING — menunggu rebuild di VPS |
+
+---
+
 ### Fix #15 — `next build` gagal: halaman blog & sitemap di-prerender padahal baca DB
 **Gejala:** Docker build web gagal di "Generating static pages" untuk `/blog` dengan
 `getaddrinfo ENOTFOUND postgres` (query `blog_post` join `blog_tag` di `lib/blog.ts:20`).

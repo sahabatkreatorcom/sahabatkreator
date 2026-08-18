@@ -48,6 +48,18 @@ ENV DATABASE_URL=$DATABASE_URL \
 COPY apps/web ./apps/web
 RUN pnpm --filter web build
 
+# ---- Migrate: jalankan Drizzle migrasi dari stage deps (punya pnpm + seluruh workspace) ----
+FROM deps AS migrate
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOME=/root \
+    COREPACK_HOME=/root/.cache/node/corepack
+WORKDIR /app
+# Corepack membutuhkan cache yang bisa ditulis; berjalan sebagai root
+# (pnpm + node_modules sudah terpasang di stage deps).
+# DATABASE_URL & env lain dibaca dari process.env (dikirim via env_file compose).
+CMD ["pnpm", "--filter", "@sahabat-kreator/db", "db:migrate"]
+
 # ---- Runner (standalone) ----
 FROM base AS runner
 ENV NODE_ENV=production \
