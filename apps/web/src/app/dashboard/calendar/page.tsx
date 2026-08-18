@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_COLORS } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
 
@@ -109,7 +110,7 @@ export default function CalendarPage() {
             {loading ? (
                 <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat kalender…
+                    Memuat kalenderâ€¦
                 </div>
             ) : (
                 <div className="rounded-lg border border-border bg-card">
@@ -166,9 +167,11 @@ export default function CalendarPage() {
                                                 }}
                                             >
                                                 <span
-                                                    className="h-2 w-2 shrink-0 rounded-full"
+                                                    className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full text-white"
                                                     style={{ background: PLATFORM_COLORS[p.account?.platform as keyof typeof PLATFORM_COLORS] ?? "#888" }}
-                                                />
+                                                >
+                                                    <PlatformIcon platform={p.account?.platform ?? ""} size={8} />
+                                                </span>
                                                 <span className="truncate">{p.caption || p.account?.name || "Post"}</span>
                                             </div>
                                         ))}
@@ -185,7 +188,7 @@ export default function CalendarPage() {
 
             {busyId && (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Menerbitkan…
+                    <Loader2 className="h-4 w-4 animate-spin" /> Menerbitkanâ€¦
                 </p>
             )}
         </div>

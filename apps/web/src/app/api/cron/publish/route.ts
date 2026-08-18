@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
 import { and, lte, eq } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
-import { env } from "@sahabat-kreator/env/server";
-import { json } from "@/lib/api";
+import { json, verifyCronSecret } from "@/lib/api";
 import { publishPost } from "@/lib/publishing/publish-post";
 
 export const dynamic = "force-dynamic";
@@ -22,12 +21,8 @@ export const maxDuration = 300;
  * 3. Publish satu per satu, catat publish_error bila gagal.
  */
 export const POST = async (req: NextRequest) => {
-    const secret = env.CRON_SECRET;
-    if (secret) {
-        const auth = req.headers.get("authorization");
-        if (auth !== `Bearer ${secret}`) {
-            return json({ error: "Unauthorized" }, { status: 401 });
-        }
+    if (!verifyCronSecret(req)) {
+        return json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const now = new Date();

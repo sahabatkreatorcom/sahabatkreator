@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, RefreshCw, Search, Send, Trash2, CheckCheck, MessageSquare, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
 
@@ -131,7 +132,7 @@ export default function InboxPage() {
                 setError(data.error || "Gagal menyinkronkan.");
             } else {
                 setSyncResult(
-                    `Post dicek: ${data.postsChecked ?? 0} · baru: ${data.commentsAdded ?? 0} · diperbarui: ${data.commentsUpdated ?? 0} · gagal: ${data.failed ?? 0}`
+                    `Post dicek: ${data.postsChecked ?? 0} Â· baru: ${data.commentsAdded ?? 0} Â· diperbarui: ${data.commentsUpdated ?? 0} Â· gagal: ${data.failed ?? 0}`
                 );
                 load();
             }
@@ -223,7 +224,7 @@ export default function InboxPage() {
                     <input
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
-                        placeholder="Cari komentar…"
+                        placeholder="Cari komentarâ€¦"
                         className="h-8 w-48 rounded-md border border-border bg-card pl-8 pr-3 text-sm outline-none focus:border-primary"
                     />
                 </div>
@@ -252,7 +253,7 @@ export default function InboxPage() {
             {loading ? (
                 <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat inbox…
+                    Memuat inboxâ€¦
                 </div>
             ) : grouped.length === 0 ? (
                 <div className="rounded-lg border border-border bg-card p-10 text-center">
@@ -278,7 +279,7 @@ export default function InboxPage() {
                                             className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white"
                                             style={{ background: PLATFORM_COLORS[thread.account.platform] }}
                                         >
-                                            {thread.authorUsername[0]?.toUpperCase() ?? "?"}
+                                            <PlatformIcon platform={thread.account.platform} size={14} />
                                         </span>
                                     )}
                                 </button>
@@ -289,7 +290,7 @@ export default function InboxPage() {
                                             className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium text-white"
                                             style={{ background: PLATFORM_COLORS[thread.account.platform] }}
                                         >
-                                            {PLATFORM_LABELS[thread.account.platform]}
+                                            <PlatformIcon platform={thread.account.platform} size={14} />
                                         </span>
                                         <span className="text-sm font-medium">{thread.authorUsername}</span>
                                         <span className="text-xs text-muted-foreground">
@@ -340,7 +341,7 @@ export default function InboxPage() {
                                                             onClick={() => setResponsePickerOpen(true)}
                                                             className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
                                                         >
-                                                            Lihat semua…
+                                                            Lihat semuaâ€¦
                                                         </button>
                                                     )}
                                                 </div>
@@ -351,7 +352,7 @@ export default function InboxPage() {
                                                     value={replyText}
                                                     onChange={(e) => setReplyText(e.target.value)}
                                                     onKeyDown={(e) => e.key === "Enter" && handleReply(thread)}
-                                                    placeholder="Tulis balasan…"
+                                                    placeholder="Tulis balasanâ€¦"
                                                     className="h-9 flex-1 rounded-md border border-border bg-muted/50 px-3 text-sm outline-none focus:border-primary"
                                                 />
                                                 <Button size="sm" loading={busyId === thread.id} onClick={() => handleReply(thread)}>

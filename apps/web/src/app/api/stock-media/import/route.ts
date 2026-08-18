@@ -10,6 +10,25 @@ export const maxDuration = 60;
 
 const VALID_SOURCES: StockMediaSource[] = ["PIXABAY", "PEXELS", "UNSPLASH"];
 
+// Pexels/Unsplash menurunkan URL dari CDN yang berbeda dari domain induk;
+// validasi memakai allowlist suffix domain resmi agar file diunduh dari host milik
+// penyedia stock, bukan URL sewenang-wenang dari user (anti-SSRF).
+const ALLOWED_HOST_SUFFIXES = [
+    "pixabay.com",
+    "pexels.com",
+    "unsplash.com",
+];
+
+function isAllowedStockHost(url: string): boolean {
+    let host: string;
+    try {
+        host = new URL(url).hostname;
+    } catch {
+        return false;
+    }
+    return ALLOWED_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
+}
+
 export const POST = withAuth(async (ctx, req: NextRequest) => {
     const { activeOrganizationId } = ctx;
     if (!activeOrganizationId) {
@@ -37,6 +56,12 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
     }
     if (!body.sourceId || !body.sourceUrl) {
         return json({ error: "sourceId dan sourceUrl wajib." }, { status: 400 });
+    }
+    if (!isAllowedStockHost(body.sourceUrl)) {
+        return json({ error: "URL sumber harus berasal dari domain stock media resmi." }, { status: 400 });
+    }
+    if (body.thumbUrl && !isAllowedStockHost(body.thumbUrl)) {
+        return json({ error: "URL thumbnail harus berasal dari domain stock media resmi." }, { status: 400 });
     }
     if (!isStockMediaConfigured(source)) {
         return json({ error: `${source} API key belum dikonfigurasi di server.` }, { status: 503 });

@@ -322,7 +322,7 @@ function MediaCard({
             )}
         >
             {item.type === "video" ? (
-                <video src={item.thumbnailUrl ?? item.url} className="h-full w-full object-cover" muted preload="metadata" />
+                <video src={item.url} poster={item.thumbnailUrl ?? undefined} className="h-full w-full object-cover" muted preload="metadata" />
             ) : item.type === "audio" ? (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-card p-2">
                     <span className="text-[10px] font-medium uppercase text-muted-foreground">Audio</span>

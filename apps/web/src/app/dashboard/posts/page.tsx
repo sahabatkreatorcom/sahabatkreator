@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { CalendarClock, CheckCircle2, Send, Trash2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +46,7 @@ const STATUS_FILTERS = [
 const STATUS_BADGE: Record<Post["status"], { label: string; className: string }> = {
     draft: { label: "Draft", className: "bg-muted text-muted-foreground" },
     scheduled: { label: "Terjadwal", className: "bg-accent-amber/15 text-accent-amber" },
-    publishing: { label: "Menerbitkan…", className: "bg-primary/15 text-primary" },
+    publishing: { label: "Menerbitkanâ€¦", className: "bg-primary/15 text-primary" },
     published: { label: "Terbit", className: "bg-accent-green/15 text-accent-green" },
     failed: { label: "Gagal", className: "bg-accent-red/15 text-accent-red" },
 };
@@ -143,7 +144,7 @@ export default function PostsPage() {
             {loading ? (
                 <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat post…
+                    Memuat postâ€¦
                 </div>
             ) : posts.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted-foreground">Belum ada post.</p>
@@ -161,7 +162,9 @@ export default function PostsPage() {
                                             >
                                                 {post.account.avatar ? (
                                                     <img src={post.account.avatar} alt="" className="h-3.5 w-3.5 rounded-full object-cover" />
-                                                ) : null}
+                                                ) : (
+                                                    <PlatformIcon platform={post.account.platform} size={14} />
+                                                )}
                                                 {post.account.name}
                                             </span>
                                         )}

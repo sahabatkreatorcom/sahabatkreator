@@ -13,9 +13,7 @@
     "@aws-sdk/client-s3": "^3.1106.0",
     "@sahabat-kreator/db": "workspace:*",
     "@sahabat-kreator/env": "workspace:*",
-    "dotenv": "catalog:",
-    "drizzle-orm": "^0.45.2",
-    "zod": "catalog:"
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "@sahabat-kreator/config": "workspace:*",

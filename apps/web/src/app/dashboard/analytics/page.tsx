@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -6,6 +6,7 @@ import { Eye, Loader2, RefreshCw, Users, MessageSquare, FileText } from "lucide-
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 import { PLATFORM_STORAGE_POLICIES } from "@/lib/analytics/policy";
 import { cn } from "@/lib/utils";
@@ -129,7 +130,7 @@ export default function AnalyticsPage() {
                 setError(data.error || "Gagal menyinkronkan.");
             } else {
                 setSyncResult(
-                    `Tersinkron: ${data.synced ?? 0} akun · dilewati kebijakan: ${data.skippedByPolicy ?? 0} · gagal: ${data.failed ?? 0} · dihapus (retensi): ${data.purged ?? 0}`
+                    `Tersinkron: ${data.synced ?? 0} akun Â· dilewati kebijakan: ${data.skippedByPolicy ?? 0} Â· gagal: ${data.failed ?? 0} Â· dihapus (retensi): ${data.purged ?? 0}`
                 );
                 load();
             }
@@ -140,7 +141,7 @@ export default function AnalyticsPage() {
         }
     }
 
-    // Platform yang terhubung tetapi kebijakannya melarang penyimpanan → tampilkan "live saja".
+    // Platform yang terhubung tetapi kebijakannya melarang penyimpanan â†’ tampilkan "live saja".
     const liveOnlyPlatforms = useMemo(
         () =>
             accounts
@@ -186,14 +187,14 @@ export default function AnalyticsPage() {
             {liveOnlyPlatforms.length > 0 && (
                 <p className="rounded-md bg-accent-amber/10 px-3 py-2 text-sm text-accent-amber">
                     Platform {liveOnlyPlatforms.map((p) => PLATFORM_LABELS[p]).join(", ")} tidak menyimpan metrik karena
-                    kebijakan platform — data ditampilkan langsung (live) dari platform.
+                    kebijakan platform â€” data ditampilkan langsung (live) dari platform.
                 </p>
             )}
 
             {loading && !overview ? (
                 <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat analitik…
+                    Memuat analitikâ€¦
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -230,7 +231,7 @@ export default function AnalyticsPage() {
                                             className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white"
                                             style={{ background: PLATFORM_COLORS[p.platform] }}
                                         >
-                                            {PLATFORM_LABELS[p.platform][0]}
+                                            <PlatformIcon platform={p.platform} size={14} />
                                         </span>
                                     )}
                                     <div className="min-w-0">
@@ -266,12 +267,12 @@ export default function AnalyticsPage() {
                                         className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white"
                                         style={{ background: PLATFORM_COLORS[p] }}
                                     >
-                                        {PLATFORM_LABELS[p][0]}
+                                        <PlatformIcon platform={p} size={14} />
                                     </span>
                                     <p className="truncate text-sm font-medium">{PLATFORM_LABELS[p]}</p>
                                 </div>
                                 <p className="mt-3 text-xs text-muted-foreground">
-                                    Metrik tidak disimpan (kebijakan platform) — tampilkan langsung dari platform.
+                                    Metrik tidak disimpan (kebijakan platform) â€” tampilkan langsung dari platform.
                                 </p>
                             </div>
                         ))}

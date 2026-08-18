@@ -10,7 +10,7 @@
  */
 
 import { db, schema } from "@sahabat-kreator/db";
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual as _timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { PaymentRequest, PaymentResponse, SubscriptionRequest, SubscriptionResponse } from "./types";
 
@@ -116,8 +116,13 @@ class SumoPodService {
       return { success: false, error: "Payment gateway not configured" };
     }
 
+    // Validasi amount: integer positif, batas wajar (IDR).
+    if (!Number.isInteger(request.amount) || request.amount <= 0 || request.amount > 1_000_000_000) {
+      return { success: false, error: "Invalid payment amount" };
+    }
+
     const paymentId = crypto.randomUUID();
-    const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).slice(2, 9).toUpperCase()}`;
+    const invoiceNumber = `INV-${Date.now()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const now = new Date();
 
     try {
@@ -137,13 +142,17 @@ class SumoPodService {
         updatedAt: now,
       });
 
+      // Validasi redirect URL (anti open-redirect via SumoPod).
+      const successReturn = sanitizeReturnUrl(request.metadata?.successReturnUrl);
+      const cancelReturn = sanitizeReturnUrl(request.metadata?.cancelReturnUrl);
+
       const body: CreatePaymentBody = {
         order_id: invoiceNumber,
         amount: request.amount,
         currency: request.currency || "IDR",
         expires_in_hours: 24,
-        success_return_url: request.metadata?.successReturnUrl as string,
-        cancel_return_url: request.metadata?.cancelReturnUrl as string,
+        success_return_url: successReturn,
+        cancel_return_url: cancelReturn,
         payment_method_type_code: (request.metadata?.paymentMethod as string) || "QRIS",
       };
 
@@ -154,6 +163,7 @@ class SumoPodService {
           "X-Api-Key": config.apiKey,
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(15_000),
       });
 
       if (!res.ok) {
@@ -304,6 +314,7 @@ class SumoPodService {
   /**
    * Verify webhook signature (Svix HMAC-SHA256) atau X-Webhook-Token.
    * Gunakan raw body — satu karakter berubah pun akan memecah signature.
+   * Menolak signature lama (replay) dan memakai perbandingan timing-safe.
    */
   async verifyWebhook(
     headers: { "svix-id"?: string; "svix-timestamp"?: string; "svix-signature"?: string; "x-webhook-token"?: string },
@@ -315,7 +326,7 @@ class SumoPodService {
     // Alternatif 1: X-Webhook-Token (lebih sederhana)
     const token = headers["x-webhook-token"];
     if (config.webhookToken && token) {
-      return token === config.webhookToken;
+      return safeEqual(token, config.webhookToken);
     }
 
     // Alternatif 2: signature Svix
@@ -333,7 +344,8 @@ class SumoPodService {
   }
 
   /**
-   * Handle a verified webhook event, apply side effects to DB
+   * Handle a verified webhook event, apply side effects to DB.
+   * Idempoten: payment yang sudah COMPLETED tidak diproses ulang.
    */
   async handleWebhook(event: SumoPodWebhookEvent): Promise<void> {
     const { event_type: eventType, data } = event;
@@ -341,11 +353,21 @@ class SumoPodService {
     if (eventType === "payment.completed") {
       const paymentRecord = await db.query.payment.findFirst({
         where: (t, { eq }) => eq(t.sumopodPaymentId, data.payment_id),
-        columns: { id: true, organizationId: true, invoiceNumber: true },
+        columns: { id: true, organizationId: true, invoiceNumber: true, metadata: true, amount: true, status: true },
       });
+      if (!paymentRecord) return;
 
-      if (paymentRecord) {
-        await db
+      // Idempotency: jangan proses ulang payment yang sudah COMPLETED (retry delivery).
+      if (paymentRecord.status === "COMPLETED") return;
+
+      // Jangan pernah menaikkan plan dari pembayaran yang jumlahnya tidak sesuai.
+      if (data.amount !== paymentRecord.amount) return;
+
+      const planId = (paymentRecord.metadata as { planId?: string } | null)?.planId;
+      const allowlist = ["PRO", "BUSINESS", "ENTERPRISE"];
+
+      await db.transaction(async (tx) => {
+        await tx
           .update(schema.payment)
           .set({
             status: "COMPLETED",
@@ -353,13 +375,38 @@ class SumoPodService {
             updatedAt: new Date(),
           })
           .where(eq(schema.payment.id, paymentRecord.id));
-      }
+
+        // Aktivasi plan org bila metadata menyertakan planId (billing langganan).
+        if (planId && allowlist.includes(planId)) {
+          const org = await tx.query.organization.findFirst({
+            where: (t, { eq }) => eq(t.id, paymentRecord.organizationId),
+            columns: { tier: true, currentPeriodEnd: true, maxMembers: true },
+          });
+          if (org) {
+            // Anti-downgrade: plan yang lebih rendah dari tier aktif tidak menurunkan tier.
+            const rank = (t: string) => ["FREE", "PRO", "BUSINESS", "ENTERPRISE"].indexOf(t);
+            if (rank(planId) < rank(org.tier)) return;
+
+            // Perpanjang dari akhir periode aktif (bukan reset) bila masih berlaku.
+            const base = org.currentPeriodEnd && org.currentPeriodEnd > new Date() ? org.currentPeriodEnd : new Date();
+            await tx
+              .update(schema.organization)
+              .set({
+                tier: planId as "PRO" | "BUSINESS" | "ENTERPRISE",
+                subscriptionStatus: "active",
+                currentPeriodEnd: addMonths(base, 1),
+                maxMembers: getPlanMaxMembers(planId),
+              })
+              .where(eq(schema.organization.id, paymentRecord.organizationId));
+          }
+        }
+      });
     } else if (eventType === "payment.failed") {
       const paymentRecord = await db.query.payment.findFirst({
         where: (t, { eq }) => eq(t.sumopodPaymentId, data.payment_id),
-        columns: { id: true },
+        columns: { id: true, status: true },
       });
-      if (paymentRecord) {
+      if (paymentRecord && paymentRecord.status !== "COMPLETED") {
         await db
           .update(schema.payment)
           .set({ status: "FAILED", updatedAt: new Date() })
@@ -368,9 +415,9 @@ class SumoPodService {
     } else if (eventType === "payment.expired") {
       const paymentRecord = await db.query.payment.findFirst({
         where: (t, { eq }) => eq(t.sumopodPaymentId, data.payment_id),
-        columns: { id: true },
+        columns: { id: true, status: true },
       });
-      if (paymentRecord) {
+      if (paymentRecord && paymentRecord.status !== "COMPLETED") {
         await db
           .update(schema.payment)
           .set({ status: "CANCELED", updatedAt: new Date() })
@@ -382,6 +429,35 @@ class SumoPodService {
 
 // ─── Signature Verification ──────────────────────────────────────────────────
 
+const SVIX_TOLERANCE_SECONDS = 5 * 60; // 5 menit
+
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return _timingSafeEqual(ba, bb);
+}
+
+/**
+ * Validasi URL redirect (success/cancel) agar hanya http(s) menuju host aplikasi
+ * sendiri — mencegah open-redirect via SumoPod bila metadata dipasok pemanggil lain.
+ */
+function sanitizeReturnUrl(value: unknown): string {
+  if (typeof value !== "string" || !value) return "";
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (appUrl) {
+      const appHost = new URL(appUrl).hostname;
+      if (url.hostname !== appHost) return "";
+    }
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
 function verifySvixSignature(
   secret: string,
   svixId: string,
@@ -389,6 +465,12 @@ function verifySvixSignature(
   svixSignature: string,
   rawBody: string,
 ): boolean {
+  const timestamp = Number(svixTimestamp);
+  if (!Number.isFinite(timestamp)) return false;
+
+  // Freshness — tolak webhook lama (replay protection).
+  if (Math.abs(Date.now() / 1000 - timestamp) > SVIX_TOLERANCE_SECONDS) return false;
+
   const secretBytes = Buffer.from(secret.replace("whsec_", ""), "base64");
   const signedContent = `${svixId}.${svixTimestamp}.${rawBody}`;
 
@@ -396,7 +478,18 @@ function verifySvixSignature(
 
   // svix-signature bisa berisi banyak nilai "v1,<sig>" (saat rotate secret)
   const signatures = svixSignature.split(" ").map((s) => s.split(",")[1]);
-  return signatures.includes(expectedSignature);
+  return signatures.some((sig) => sig && safeEqual(sig, expectedSignature));
+}
+
+function getPlanMaxMembers(planId: string): number {
+  const limits: Record<string, number> = { PRO: 5, BUSINESS: 15, ENTERPRISE: 99 };
+  return limits[planId] ?? 5;
+}
+
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d;
 }
 
 // ─── Singleton ────────────────────────────────────────────────────────────────

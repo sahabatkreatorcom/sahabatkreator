@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -15,6 +15,7 @@ import {
     Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/constants";
 import { cn } from "@/lib/utils";
 
@@ -125,7 +126,7 @@ export default function StatusPage() {
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
 
             {loading ? (
-                <p className="py-12 text-sm text-muted-foreground">Memuat status…</p>
+                <p className="py-12 text-sm text-muted-foreground">Memuat statusâ€¦</p>
             ) : !data ? null : (
                 <>
                     <div className="grid gap-3 sm:grid-cols-4">
@@ -174,7 +175,7 @@ export default function StatusPage() {
                                             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
                                             style={{ background: PLATFORM_COLORS[acc.platform as Platform] ?? "#6B7280" }}
                                         >
-                                            {acc.platform.slice(0, 1)}
+                                            <PlatformIcon platform={acc.platform} size={14} />
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
@@ -215,7 +216,7 @@ export default function StatusPage() {
                                                               day: "numeric",
                                                               month: "short",
                                                           })
-                                                        : "—"}
+                                                        : "â€”"}
                                                 </p>
                                             </div>
                                         </div>
@@ -236,7 +237,7 @@ export default function StatusPage() {
                                 {data.published.map((p) => (
                                     <li key={p.id} className="flex items-center gap-3 p-4">
                                         <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">
-                                            {PLATFORM_LABELS[p.platform as Platform] ?? p.platform ?? "—"}
+                                            {PLATFORM_LABELS[p.platform as Platform] ?? p.platform ?? "â€”"}
                                         </span>
                                         <span className="flex-1 truncate text-sm">{p.caption}</span>
                                         <span className="text-xs text-muted-foreground">
@@ -267,7 +268,7 @@ export default function StatusPage() {
                                 {data.scheduled.map((p) => (
                                     <li key={p.id} className="flex items-center gap-3 p-4">
                                         <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">
-                                            {PLATFORM_LABELS[p.platform as Platform] ?? p.platform ?? "—"}
+                                            {PLATFORM_LABELS[p.platform as Platform] ?? p.platform ?? "â€”"}
                                         </span>
                                         <span className="flex-1 truncate text-sm">{p.caption}</span>
                                         <span className="text-xs text-muted-foreground">
@@ -302,7 +303,7 @@ export default function StatusPage() {
                                                 </p>
                                                 <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{err.errorMessage}</p>
                                                 <p className="mt-1 text-xs text-muted-foreground">
-                                                    retry: {err.retryCount} · {new Date(err.createdAt).toLocaleString("id-ID")}
+                                                    retry: {err.retryCount} Â· {new Date(err.createdAt).toLocaleString("id-ID")}
                                                 </p>
                                             </div>
                                         </div>

@@ -43,9 +43,12 @@ export function EnableTwoFactorFlow() {
     }
 
     async function handlePasswordConfirm(password: string) {
-        const { data, error } = await authClient.twoFactor.enable({ password });
+        const { data, error } = await authClient.twoFactor.enable({ password, method: "totp" });
         if (error) {
             return { error: true, message: "Password salah." };
+        }
+        if (data.method !== "totp") {
+            return { error: true, message: "Metode 2FA TOTP tidak tersedia." };
         }
         setTotpURI(data.totpURI);
         setBackupCodes(data.backupCodes);

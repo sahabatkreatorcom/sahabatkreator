@@ -800,6 +800,57 @@ function isBlockedHostname(hostname: string) {
     return false;
 }
 
+/** Apakah alamat IP (v4/v6) merupakan alamat non-publik / berbahaya untuk SSRF. */
+function isBlockedIp(ip: string): boolean {
+    const v4Match = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (v4Match) {
+        const [a, b, c, d] = v4Match.slice(1).map(Number);
+        if ([a, b, c, d].some((n) => n > 255)) return true;
+        if (a === 0 || a === 10 || a === 127) return true;
+        if (a === 169 && b === 254) return true; // link-local + metadata cloud
+        if (a === 172 && b >= 16 && b <= 31) return true;
+        if (a === 192 && b === 168) return true;
+        if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+        return false;
+    }
+
+    // IPv4-mapped: ::ffff:127.0.0.1 → decode dan validasi sebagai IPv4
+    const mapped = ip.toLowerCase().match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+    if (mapped) return isBlockedIp(mapped[1]);
+
+    // IPv6
+    const v6 = ip.toLowerCase();
+    if (v6 === "::" || v6 === "::1") return true;
+    if (v6.startsWith("fe80") || v6.startsWith("fc") || v6.startsWith("fd")) return true; // link-local + ULA
+    if (v6.startsWith("2001:db8")) return true; // documentation range
+    if (v6.startsWith("64:ff9b")) return true; // NAT64 (bisa menuju IP privat)
+    if (v6.startsWith("2002")) {
+        // 6to4 — 2 byte berikutnya adalah IPv4 tersembunyi
+        const parts = v6.split(":");
+        if (parts.length >= 3) {
+            const h = parts[2].padStart(4, "0");
+            return isBlockedIp(`${parseInt(h.slice(0, 2), 16)}.${parseInt(h.slice(2, 4), 16)}`);
+        }
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Resolve DNS hostname lalu pastikan SEMUA alamat yang dihasilkan adalah IP publik.
+ * Ini menutup celah SSRF via DNS rebinding / metadata cloud (169.254.169.254),
+ * IPv4-mapped (::ffff:127.0.0.1), link-local, dan ULA.
+ */
+async function assertPublicResolvedIp(hostname: string): Promise<void> {
+    const { lookup } = await import("node:dns/promises");
+    const addresses = await lookup(hostname, { all: true, verbatim: true });
+    for (const addr of addresses) {
+        if (isBlockedIp(addr.address)) {
+            throw new Error("URL website menunjuk ke alamat internal — tidak diizinkan");
+        }
+    }
+}
+
 function normalizeWebsiteUrl(input: string): URL {
     const trimmed = input.trim();
     if (!trimmed) throw new Error("URL website wajib diisi.");
@@ -807,6 +858,7 @@ function normalizeWebsiteUrl(input: string): URL {
     const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
     const url = new URL(withProtocol);
     if (!["http:", "https:"].includes(url.protocol)) throw new Error("URL website harus menggunakan http atau https");
+    if (url.port && ![80, 443].includes(Number(url.port))) throw new Error("URL website harus menggunakan port standar");
     if (isBlockedHostname(url.hostname)) throw new Error("URL website tidak diizinkan");
     url.hash = "";
     return url;
@@ -865,6 +917,8 @@ async function fetchWebsitePage(url: string) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
+        const parsed = new URL(url);
+        await assertPublicResolvedIp(parsed.hostname);
         const response = await fetch(url, {
             signal: controller.signal,
             headers: { "User-Agent": "SebBrandCrawler/1.0 (+https://sahabat-kreator.com)" },

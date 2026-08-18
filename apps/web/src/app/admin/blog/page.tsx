@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { db, blogPost, blogTag } from "@sahabat-kreator/db";
+import { db, schema } from "@sahabat-kreator/db";
 import { Button } from "@/components/ui/button";
 import { Plus, Edit2, Trash2, Eye, Calendar } from "lucide-react";
 import { requireAuth } from "@/lib/api";
@@ -16,14 +16,14 @@ export default async function AdminBlogPage() {
   }
 
   const posts = await db.select({
-    id: blogPost.id,
-    slug: blogPost.slug,
-    title: blogPost.title,
-    excerpt: blogPost.excerpt,
-    status: blogPost.status,
-    publishedAt: blogPost.publishedAt,
-    createdAt: blogPost.createdAt,
-  }).from(blogPost).orderBy((t) => t.createdAt.desc()).limit(50);
+    id: schema.blogPost.id,
+    slug: schema.blogPost.slug,
+    title: schema.blogPost.title,
+    excerpt: schema.blogPost.excerpt,
+    status: schema.blogPost.status,
+    publishedAt: schema.blogPost.publishedAt,
+    createdAt: schema.blogPost.createdAt,
+  }).from(schema.blogPost).limit(50);
 
   return (
     <div className="space-y-6">

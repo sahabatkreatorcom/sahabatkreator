@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { PlatformIcon } from "@/components/ui/platform-icon";
 import {
     PLATFORM_LABELS,
     PLATFORM_COLORS,
@@ -137,7 +138,7 @@ export default function AccountsPage() {
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
 
             {loading ? (
-                <p className="py-12 text-sm text-muted-foreground">Memuat akun…</p>
+                <p className="py-12 text-sm text-muted-foreground">Memuat akunâ€¦</p>
             ) : accounts.length === 0 ? (
                 <div className="rounded-lg border border-border bg-card p-8 text-center">
                     <Link2 className="mx-auto h-8 w-8 text-muted-foreground/50" />
@@ -165,7 +166,7 @@ export default function AccountsPage() {
                                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white font-bold"
                                     style={{ background: PLATFORM_COLORS[acc.platform as Platform] ?? "#6B7280" }}
                                 >
-                                    {acc.platform.slice(0, 2).toUpperCase()}
+                                    <PlatformIcon platform={acc.platform} size={14} />
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
@@ -240,7 +241,7 @@ export default function AccountsPage() {
                                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
                                 style={{ background: PLATFORM_COLORS[platform as Platform] ?? "#6B7280" }}
                             >
-                                {platform.slice(0, 2).toUpperCase()}
+                                <PlatformIcon platform={platform} size={14} />
                             </div>
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-medium">

@@ -10,6 +10,7 @@ import {
     CreditCard,
     ShieldCheck,
     Server,
+    Plug,
     type LucideIcon,
 } from "lucide-react";
 
@@ -24,6 +25,7 @@ const adminNavItems: AdminNavItem[] = [
     { href: "/admin/users", label: "Users", icon: Users },
     { href: "/admin/organizations", label: "Organizations", icon: Building2 },
     { href: "/admin/billing", label: "Billing", icon: CreditCard },
+    { href: "/admin/platforms", label: "Platform Credentials", icon: Plug },
     { href: "/admin/health", label: "System Health", icon: Server },
 ];
 

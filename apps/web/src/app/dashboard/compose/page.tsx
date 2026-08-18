@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -6,6 +6,7 @@ import { CalendarClock, ImagePlus, Send, X, LayoutTemplate, Hash, FolderTree } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
+import { PlatformIcon } from "@/components/ui/platform-icon";
 import { StockMediaPicker } from "@/components/media/stock-media-picker";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
@@ -179,7 +180,7 @@ export default function ComposePage() {
             <div className="rounded-lg border border-border bg-card p-4">
                 <p className="pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Akun tujuan</p>
                 {loadingAccounts ? (
-                    <p className="text-sm text-muted-foreground">Memuat akun…</p>
+                    <p className="text-sm text-muted-foreground">Memuat akunâ€¦</p>
                 ) : accounts.length === 0 ? (
                     <div className="text-sm text-muted-foreground">
                         Belum ada akun terhubung.{" "}
@@ -209,7 +210,7 @@ export default function ComposePage() {
                                         <img src={account.avatar} alt="" className="h-5 w-5 rounded-full object-cover" />
                                     ) : (
                                         <span className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ background: PLATFORM_COLORS[account.platform] }}>
-                                            {account.name.slice(0, 1).toUpperCase()}
+                                            <PlatformIcon platform={account.platform} size={12} />
                                         </span>
                                     )}
                                     <span className="font-medium">{account.name}</span>
@@ -226,7 +227,7 @@ export default function ComposePage() {
                 <textarea
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
-                    placeholder="Tulis caption kontenmu…"
+                    placeholder="Tulis caption kontenmuâ€¦"
                     rows={5}
                     className="w-full resize-none rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />

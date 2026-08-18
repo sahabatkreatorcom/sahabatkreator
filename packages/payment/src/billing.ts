@@ -75,6 +75,15 @@ export const PLAN_DISPLAY: Record<string, { name: string; description: string; c
   ADMIN: { name: "Admin", description: "Internal — unlimited", color: "#EF4444" },
 };
 
+/** Harga bulanan per plan (IDR). 0 = gratis, null = custom (hubungi sales). */
+export const PLAN_PRICES: Record<string, number | null> = {
+  FREE: 0,
+  PRO: 99_000,
+  BUSINESS: 249_000,
+  ENTERPRISE: null,
+  ADMIN: null,
+};
+
 // ─── Plan Limits ───────────────────────────────────────────────────────────────
 
 export function getPlanLimits(tier: string): PlanLimits {
@@ -232,7 +241,7 @@ export async function getOrganizationBillingInfo(
 
   const settings = await db.query.globalIntegrationSettings.findFirst({
     where: (t, { eq }) => eq(t.id, "global_integration_settings"),
-    columns: { stripeTrialDays: true },
+    columns: { sumopodTrialDays: true },
   });
 
   return {
@@ -240,6 +249,6 @@ export async function getOrganizationBillingInfo(
     subscriptionStatus: org.subscriptionStatus || undefined,
     cancelAtPeriodEnd: org.cancelAtPeriodEnd,
     currentPeriodEnd: org.currentPeriodEnd || undefined,
-    trialDays: settings?.stripeTrialDays ?? 0,
+    trialDays: settings?.sumopodTrialDays ?? 0,
   };
 }

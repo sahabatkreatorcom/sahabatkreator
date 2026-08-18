@@ -1,5 +1,5 @@
-import { db, blogPost, blogTag, blogPostTag, blogComment } from "@sahabat-kreator/db";
-import { eq, desc, asc } from "drizzle-orm";
+import { db, schema } from "@sahabat-kreator/db";
+import { eq, desc, asc, and } from "drizzle-orm";
 
 export interface BlogPostWithTags {
   id: string;
@@ -19,29 +19,29 @@ export interface BlogPostWithTags {
 export async function getAllPublishedPosts(): Promise<BlogPostWithTags[]> {
   const posts = await db
     .select({
-      id: blogPost.id,
-      slug: blogPost.slug,
-      title: blogPost.title,
-      excerpt: blogPost.excerpt,
-      content: blogPost.content,
-      coverImage: blogPost.coverImage,
-      authorId: blogPost.authorId,
-      status: blogPost.status,
-      publishedAt: blogPost.publishedAt,
-      createdAt: blogPost.createdAt,
-      updatedAt: blogPost.updatedAt,
+      id: schema.blogPost.id,
+      slug: schema.blogPost.slug,
+      title: schema.blogPost.title,
+      excerpt: schema.blogPost.excerpt,
+      content: schema.blogPost.content,
+      coverImage: schema.blogPost.coverImage,
+      authorId: schema.blogPost.authorId,
+      status: schema.blogPost.status,
+      publishedAt: schema.blogPost.publishedAt,
+      createdAt: schema.blogPost.createdAt,
+      updatedAt: schema.blogPost.updatedAt,
       tags: {
-        id: blogTag.id,
-        name: blogTag.name,
-        slug: blogTag.slug,
-        color: blogTag.color,
+        id: schema.blogTag.id,
+        name: schema.blogTag.name,
+        slug: schema.blogTag.slug,
+        color: schema.blogTag.color,
       },
     })
-    .from(blogPost)
-    .leftJoin(blogPostTag, eq(blogPost.id, blogPostTag.postId))
-    .leftJoin(blogTag, eq(blogPostTag.tagId, blogTag.id))
-    .where(eq(blogPost.status, "PUBLISHED"))
-    .orderBy(desc(blogPost.publishedAt));
+    .from(schema.blogPost)
+    .leftJoin(schema.blogPostTag, eq(schema.blogPost.id, schema.blogPostTag.postId))
+    .leftJoin(schema.blogTag, eq(schema.blogPostTag.tagId, schema.blogTag.id))
+    .where(eq(schema.blogPost.status, "PUBLISHED"))
+    .orderBy(desc(schema.blogPost.publishedAt));
 
   // Group by post and merge tags
   const postMap = new Map<string, BlogPostWithTags>();
@@ -65,28 +65,28 @@ export async function getAllPublishedPosts(): Promise<BlogPostWithTags[]> {
 export async function getPostBySlug(slug: string): Promise<BlogPostWithTags | null> {
   const post = await db
     .select({
-      id: blogPost.id,
-      slug: blogPost.slug,
-      title: blogPost.title,
-      excerpt: blogPost.excerpt,
-      content: blogPost.content,
-      coverImage: blogPost.coverImage,
-      authorId: blogPost.authorId,
-      status: blogPost.status,
-      publishedAt: blogPost.publishedAt,
-      createdAt: blogPost.createdAt,
-      updatedAt: blogPost.updatedAt,
+      id: schema.blogPost.id,
+      slug: schema.blogPost.slug,
+      title: schema.blogPost.title,
+      excerpt: schema.blogPost.excerpt,
+      content: schema.blogPost.content,
+      coverImage: schema.blogPost.coverImage,
+      authorId: schema.blogPost.authorId,
+      status: schema.blogPost.status,
+      publishedAt: schema.blogPost.publishedAt,
+      createdAt: schema.blogPost.createdAt,
+      updatedAt: schema.blogPost.updatedAt,
       tags: {
-        id: blogTag.id,
-        name: blogTag.name,
-        slug: blogTag.slug,
-        color: blogTag.color,
+        id: schema.blogTag.id,
+        name: schema.blogTag.name,
+        slug: schema.blogTag.slug,
+        color: schema.blogTag.color,
       },
     })
-    .from(blogPost)
-    .leftJoin(blogPostTag, eq(blogPost.id, blogPostTag.postId))
-    .leftJoin(blogTag, eq(blogPostTag.tagId, blogTag.id))
-    .where(eq(blogPost.slug, slug))
+    .from(schema.blogPost)
+    .leftJoin(schema.blogPostTag, eq(schema.blogPost.id, schema.blogPostTag.postId))
+    .leftJoin(schema.blogTag, eq(schema.blogPostTag.tagId, schema.blogTag.id))
+    .where(and(eq(schema.blogPost.slug, slug), eq(schema.blogPost.status, "PUBLISHED")))
     .limit(1);
 
   if (!post[0]) return null;
@@ -100,28 +100,28 @@ export async function getPostBySlug(slug: string): Promise<BlogPostWithTags | nu
 export async function getPostByPostId(id: string): Promise<BlogPostWithTags | null> {
   const post = await db
     .select({
-      id: blogPost.id,
-      slug: blogPost.slug,
-      title: blogPost.title,
-      excerpt: blogPost.excerpt,
-      content: blogPost.content,
-      coverImage: blogPost.coverImage,
-      authorId: blogPost.authorId,
-      status: blogPost.status,
-      publishedAt: blogPost.publishedAt,
-      createdAt: blogPost.createdAt,
-      updatedAt: blogPost.updatedAt,
+      id: schema.blogPost.id,
+      slug: schema.blogPost.slug,
+      title: schema.blogPost.title,
+      excerpt: schema.blogPost.excerpt,
+      content: schema.blogPost.content,
+      coverImage: schema.blogPost.coverImage,
+      authorId: schema.blogPost.authorId,
+      status: schema.blogPost.status,
+      publishedAt: schema.blogPost.publishedAt,
+      createdAt: schema.blogPost.createdAt,
+      updatedAt: schema.blogPost.updatedAt,
       tags: {
-        id: blogTag.id,
-        name: blogTag.name,
-        slug: blogTag.slug,
-        color: blogTag.color,
+        id: schema.blogTag.id,
+        name: schema.blogTag.name,
+        slug: schema.blogTag.slug,
+        color: schema.blogTag.color,
       },
     })
-    .from(blogPost)
-    .leftJoin(blogPostTag, eq(blogPost.id, blogPostTag.postId))
-    .leftJoin(blogTag, eq(blogPostTag.tagId, blogTag.id))
-    .where(eq(blogPost.id, id))
+    .from(schema.blogPost)
+    .leftJoin(schema.blogPostTag, eq(schema.blogPost.id, schema.blogPostTag.postId))
+    .leftJoin(schema.blogTag, eq(schema.blogPostTag.tagId, schema.blogTag.id))
+    .where(eq(schema.blogPost.id, id))
     .limit(1);
 
   if (!post[0]) return null;
@@ -133,25 +133,25 @@ export async function getPostByPostId(id: string): Promise<BlogPostWithTags | nu
 }
 
 export async function getAllTags() {
-  return await db.select().from(blogTag).orderBy(asc(blogTag.name));
+  return await db.select().from(schema.blogTag).orderBy(asc(schema.blogTag.name));
 }
 
 export async function getPostsByTag(tagSlug: string) {
   const posts = await db
     .select({
-      id: blogPost.id,
-      slug: blogPost.slug,
-      title: blogPost.title,
-      excerpt: blogPost.excerpt,
-      coverImage: blogPost.coverImage,
-      status: blogPost.status,
-      publishedAt: blogPost.publishedAt,
+      id: schema.blogPost.id,
+      slug: schema.blogPost.slug,
+      title: schema.blogPost.title,
+      excerpt: schema.blogPost.excerpt,
+      coverImage: schema.blogPost.coverImage,
+      status: schema.blogPost.status,
+      publishedAt: schema.blogPost.publishedAt,
     })
-    .from(blogPost)
-    .innerJoin(blogPostTag, eq(blogPost.id, blogPostTag.postId))
-    .innerJoin(blogTag, eq(blogPostTag.tagId, blogTag.id))
-    .where(eq(blogTag.slug, tagSlug))
-    .orderBy(desc(blogPost.publishedAt));
+    .from(schema.blogPost)
+    .innerJoin(schema.blogPostTag, eq(schema.blogPost.id, schema.blogPostTag.postId))
+    .innerJoin(schema.blogTag, eq(schema.blogPostTag.tagId, schema.blogTag.id))
+    .where(and(eq(schema.blogTag.slug, tagSlug), eq(schema.blogPost.status, "PUBLISHED")))
+    .orderBy(desc(schema.blogPost.publishedAt));
 
   return posts;
 }
@@ -159,8 +159,8 @@ export async function getPostsByTag(tagSlug: string) {
 export async function getRecentPosts(limit = 5) {
   return await db
     .select()
-    .from(blogPost)
-    .where(eq(blogPost.status, "PUBLISHED"))
-    .orderBy(desc(blogPost.publishedAt))
+    .from(schema.blogPost)
+    .where(eq(schema.blogPost.status, "PUBLISHED"))
+    .orderBy(desc(schema.blogPost.publishedAt))
     .limit(limit);
 }

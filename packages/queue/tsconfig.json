@@ -1,0 +1,7 @@
+{
+  "extends": "@sahabat-kreator/config/tsconfig.base.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "rootDir": "src"
+  }
+}

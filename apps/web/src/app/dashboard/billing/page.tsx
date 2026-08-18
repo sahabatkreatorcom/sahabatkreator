@@ -72,8 +72,11 @@ export default function BillingPage() {
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || json.message || "Gagal checkout.");
-            // TODO: redirect ke Stripe checkout
-            alert(json.message || "Checkout berhasil! (demo)");
+            if (json.checkoutUrl) {
+                window.location.href = json.checkoutUrl;
+                return;
+            }
+            setError(json.message || "Checkout tidak tersedia.");
         } catch (e) {
             setError(e instanceof Error ? e.message : "Gagal checkout.");
         } finally {

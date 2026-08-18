@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { db, schema } from "@sahabat-kreator/db";
 import { and, eq } from "drizzle-orm";
+import { enqueuePublishPost, removePublishJob } from "@sahabat-kreator/queue";
 
 export interface CreatePostParams {
     organizationId: string;
@@ -156,6 +157,15 @@ export async function createPosts(params: CreatePostParams): Promise<CreatePostR
             }
         });
 
+        // Jadwalkan job publish di BullMQ (delay = selisih ke scheduledAt).
+        // No-op bila REDIS_URL tidak dikonfigurasi — cron DB polling jadi fallback.
+        if (scheduledDate || platformAutoPublish) {
+            const dueAt = scheduledDate ?? new Date(Date.now() + 30_000);
+            await enqueuePublishPost(organizationId, postId, account.platform, dueAt).catch((e) => {
+                console.error(`[queue] enqueue publish gagal (post=${postId}): ${e instanceof Error ? e.message : String(e)}`);
+            });
+        }
+
         createdPosts.push({
             id: postId,
             caption: postCaption,
@@ -204,6 +214,7 @@ export async function updatePost(
         if (data.scheduledAt === null) {
             values.scheduledAt = null;
             values.status = "DRAFT";
+            await removePublishJob(postId).catch(() => {});
         } else {
             const d = new Date(data.scheduledAt);
             if (d.getTime() < Date.now() - 30_000) {
@@ -211,6 +222,14 @@ export async function updatePost(
             }
             values.scheduledAt = d;
             values.status = "SCHEDULED";
+            const platform = await db.query.post.findFirst({
+                where: eq(schema.post.id, postId),
+                columns: { platform: true },
+            });
+            await removePublishJob(postId).catch(() => {});
+            await enqueuePublishPost(organizationId, postId, platform?.platform ?? "MANUAL", d).catch((e) => {
+                console.error(`[queue] re-enqueue publish gagal (post=${postId}): ${e instanceof Error ? e.message : String(e)}`);
+            });
         }
     }
 
@@ -232,5 +251,6 @@ export async function deletePost(organizationId: string, postId: string): Promis
     }
 
     await db.delete(schema.post).where(and(eq(schema.post.id, postId), eq(schema.post.organizationId, organizationId)));
+    await removePublishJob(postId).catch(() => {});
     return { ok: true };
 }

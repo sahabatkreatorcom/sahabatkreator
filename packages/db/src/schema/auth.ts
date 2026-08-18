@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { orgTierEnum } from "./enum";
 
 export const user = pgTable("user", {
@@ -104,7 +104,7 @@ export const organization = pgTable("organization", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   logo: text("logo"),
-  createdAt: timestamp("created_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
   metadata: text("metadata"),
   tier: orgTierEnum("tier").default("FREE").notNull(),
   maxMembers: integer("max_members").default(5).notNull(),
@@ -113,9 +113,7 @@ export const organization = pgTable("organization", {
   accentColorAlt: text("accent_color_alt").default("#E8B4B8").notNull(),
   darkMode: boolean("dark_mode").default(false).notNull(),
   aiDraftsEnabled: boolean("ai_drafts_enabled").default(true).notNull(),
-  stripeCustomerId: text("stripe_customer_id").unique(),
-  stripeSubscriptionId: text("stripe_subscription_id"),
-  stripePriceId: text("stripe_price_id"),
+  sumopodCustomerId: text("sumopod_customer_id").unique(),
   subscriptionStatus: text("subscription_status"),
   currentPeriodEnd: timestamp("current_period_end"),
   cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
@@ -137,6 +135,7 @@ export const member = pgTable(
   (table) => [
     index("member_organizationId_idx").on(table.organizationId),
     index("member_userId_idx").on(table.userId),
+    uniqueIndex("member_org_user_unique").on(table.organizationId, table.userId),
   ],
 );
 
@@ -159,19 +158,24 @@ export const invitation = pgTable(
   (table) => [
     index("invitation_organizationId_idx").on(table.organizationId),
     index("invitation_email_idx").on(table.email),
+    index("invitation_inviterId_idx").on(table.inviterId),
   ],
 );
 
 // === TEAM (better-auth organization plugin — requires teams.enabled) ===
-export const team = pgTable("team", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  organizationId: text("organization_id")
-    .notNull()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").notNull(),
-  updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),
-});
+export const team = pgTable(
+  "team",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),
+  },
+  (table) => [index("team_organizationId_idx").on(table.organizationId)],
+);
 
 export const teamMember = pgTable(
   "team_member",

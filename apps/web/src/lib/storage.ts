@@ -11,6 +11,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { env } from "@sahabat-kreator/env/server";
 
 /**
  * Cloudflare R2 client for file storage (S3-compatible)
@@ -18,18 +19,19 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
  */
 export const r2Client = new S3Client({
   region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID!}.r2.cloudflarestorage.com`,
+  endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+    accessKeyId: env.R2_ACCESS_KEY_ID,
+    secretAccessKey: env.R2_SECRET_ACCESS_KEY,
   },
 });
 
-const BUCKET_NAME = process.env.R2_BUCKET_NAME!;
+const BUCKET_NAME = env.R2_BUCKET_NAME;
 
-/**
- * Storage utilities for common R2 operations
- */
+/** R2 custom domain (opsional) — dipakai untuk URL publik. */
+const CUSTOM_DOMAIN = env.R2_CUSTOM_DOMAIN;
+
+/** Storage utilities for common R2 operations */
 
 /**
  * Upload a file to R2
@@ -281,13 +283,13 @@ export async function getDownloadUrl(
 /**
  * Get the public URL for a file (requires public bucket or custom domain)
  * @param key - The file key
- * @param customDomain - Optional custom domain for public access (e.g., "files.example.com")
+ * @param customDomain - Optional custom domain override; fallback ke R2_CUSTOM_DOMAIN env
  */
 export function getPublicUrl(key: string, customDomain?: string): string {
-  if (customDomain) {
-    return `https://${customDomain}/${key}`;
+  const domain = customDomain || CUSTOM_DOMAIN;
+  if (domain) {
+    return `https://${domain}/${key}`;
   }
-  // R2 public buckets use the format: https://pub-<hash>.r2.dev/<key>
-  // This requires setting up public access in Cloudflare dashboard
-  return `https://${BUCKET_NAME}.${process.env.R2_ACCOUNT_ID}.r2.dev/${key}`;
+  // R2 public buckets use the format: https://<bucket>.<account>.r2.dev/<key>
+  return `https://${BUCKET_NAME}.${env.R2_ACCOUNT_ID}.r2.dev/${key}`;
 }

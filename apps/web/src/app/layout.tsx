@@ -1,8 +1,14 @@
 import { seo } from "@/lib/seo";
+import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
 
-export default function Page() {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="id">
+    <html lang="id" suppressHydrationWarning>
       <head>
         <meta name="robots" content="index, follow" />
         <meta property="og:locale" content="id_ID" />
@@ -26,7 +32,11 @@ export default function Page() {
         <link rel="apple-touch-icon" href="/favicon/apple-touch-icon.png" />
         <link rel="alternate" type="application/rss+xml" title="Sahabat Kreator" href="/rss.xml" />
       </head>
-      <body />
+      <body>
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

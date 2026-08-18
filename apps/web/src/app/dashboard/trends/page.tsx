@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
+import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
 
@@ -167,7 +168,7 @@ export default function TrendsPage() {
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
 
             {loading ? (
-                <p className="py-12 text-sm text-muted-foreground">Memuat…</p>
+                <p className="py-12 text-sm text-muted-foreground">Memuatâ€¦</p>
             ) : !data || data.platformTrends.length === 0 ? (
                 <div className="rounded-lg border border-border bg-card p-8 text-center">
                     <BarChart3 className="mx-auto h-8 w-8 text-muted-foreground/50" />
@@ -187,7 +188,7 @@ export default function TrendsPage() {
                                     </div>
                                     <p className="mt-1 text-sm font-medium">
                                         {PLATFORM_LABELS[bestGrower.platform as Platform] ?? bestGrower.platform}
-                                        {bestGrower.accountName ? ` · ${bestGrower.accountName}` : ""}
+                                        {bestGrower.accountName ? ` Â· ${bestGrower.accountName}` : ""}
                                     </p>
                                     <p className="mt-1 text-lg font-semibold text-primary">
                                         +{formatNumber(bestGrower.delta.followers)} pengikut
@@ -223,13 +224,13 @@ export default function TrendsPage() {
                                             className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
                                             style={{ background: PLATFORM_COLORS[p.platform as Platform] ?? "#6B7280" }}
                                         >
-                                            {p.platform.slice(0, 1)}
+                                            <PlatformIcon platform={p.platform} size={14} />
                                         </div>
                                     )}
                                     <div>
                                         <p className="text-sm font-medium">{PLATFORM_LABELS[p.platform as Platform] ?? p.platform}</p>
                                         <p className="text-xs text-muted-foreground">
-                                            {formatNumber(p.latest.followers)} pengikut · {formatNumber(p.latest.impressions)} tayangan
+                                            {formatNumber(p.latest.followers)} pengikut Â· {formatNumber(p.latest.impressions)} tayangan
                                         </p>
                                     </div>
                                     <div className="ml-auto flex items-center gap-3 text-xs">
@@ -302,9 +303,9 @@ export default function TrendsPage() {
                                         <div className="min-w-0 flex-1">
                                             <p className="line-clamp-1 text-sm font-medium">{post.caption || "(tanpa caption)"}</p>
                                             <p className="text-xs text-muted-foreground">
-                                                {post.platform ? PLATFORM_LABELS[post.platform as Platform] ?? post.platform : "—"}
+                                                {post.platform ? PLATFORM_LABELS[post.platform as Platform] ?? post.platform : "â€”"}
                                                 {post.publishedAt
-                                                    ? ` · ${new Date(post.publishedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`
+                                                    ? ` Â· ${new Date(post.publishedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`
                                                     : ""}
                                             </p>
                                         </div>

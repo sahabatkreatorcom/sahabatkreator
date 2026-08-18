@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 
 export function RegisterForm() {
     const searchParams = useSearchParams();
-    const redirectTo = searchParams.get("redirect") || "/";
+    const redirectTo = searchParams.get("redirect") || "/dashboard";
 
     const [name, setName] = React.useState("");
     const [email, setEmail] = React.useState(searchParams.get("email") || "");

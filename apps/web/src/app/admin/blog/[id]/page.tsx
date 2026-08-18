@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Eye, Calendar } from "lucide-react";
+import { ArrowLeft, Save, Eye, Calendar, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 interface PostData {
@@ -24,7 +24,7 @@ interface PostData {
 
 export default function BlogEditorPage({ params }: { params: Promise<{ id?: string }> }) {
   const router = useRouter();
-  const { id } = await params;
+  const { id } = use(params);
   const isEdit = !!id;
 
   const [post, setPost] = useState<PostData>({
@@ -171,7 +171,7 @@ export default function BlogEditorPage({ params }: { params: Promise<{ id?: stri
               placeholder="judul-post-anda"
             />
             <p className="text-xs text-muted-foreground">
-              https://sahabatkreator.id/blog/{post.slug || "..."
+              https://sahabatkreator.id/blog/{post.slug || "..."}
             </p>
           </div>
 
@@ -217,7 +217,7 @@ export default function BlogEditorPage({ params }: { params: Promise<{ id?: stri
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
                 placeholder="Tambah tag..."
               />
-              <Button type="button" variant="outline" onClick={addTag}>
+              <Button type="button" variant="secondary" onClick={addTag}>
                 Tambah
               </Button>
             </div>

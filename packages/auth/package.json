@@ -12,16 +12,15 @@
     }
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "lint": "biome check src"
   },
   "dependencies": {
-    "@better-auth/drizzle-adapter": "^1.6.22",
+    "@better-auth/utils": "0.4.2",
     "@sahabat-kreator/db": "workspace:*",
     "@sahabat-kreator/email": "workspace:*",
     "@sahabat-kreator/env": "workspace:*",
-    "better-auth": "catalog:",
-    "dotenv": "catalog:",
-    "zod": "catalog:"
+    "better-auth": "catalog:"
   },
   "devDependencies": {
     "@sahabat-kreator/config": "workspace:*",

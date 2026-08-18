@@ -122,20 +122,13 @@ export const globalAISettings = pgTable("global_ai_settings", {
 
 export const globalIntegrationSettings = pgTable("global_integration_settings", {
   id: text("id").primaryKey().default("global_integration_settings"),
-  stripeSecretKey: text("stripe_secret_key"),
-  stripePublishableKey: text("stripe_publishable_key"),
-  stripeWebhookSecret: text("stripe_webhook_secret"),
-  stripeProPriceId: text("stripe_pro_price_id"),
-  stripeBusinessPriceId: text("stripe_business_price_id"),
-  stripeEnterprisePriceId: text("stripe_enterprise_price_id"),
-  stripeTrialDays: integer("stripe_trial_days").default(0).notNull(),
-  stripeConfigured: boolean("stripe_configured").default(false).notNull(),
   sumopodApiKey: text("sumopod_api_key"),
   sumopodApiSecret: text("sumopod_api_secret"),
   sumopodWebhookSecret: text("sumopod_webhook_secret"),
   sumopodWebhookToken: text("sumopod_webhook_token"),
   sumopodBase: text("sumopod_base").default("https://api-pay-sandbox.sumopod.com"),
   sumopodConfigured: boolean("sumopod_configured").default(false).notNull(),
+  sumopodTrialDays: integer("sumopod_trial_days").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

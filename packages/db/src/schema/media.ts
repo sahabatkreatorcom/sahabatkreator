@@ -57,6 +57,7 @@ export const media = pgTable(
     index("media_org_hash_idx").on(table.organizationId, table.contentHash),
     index("media_source_idx").on(table.sourceMediaId),
     index("media_folder_idx").on(table.folderId),
+    index("media_transcode_status_created_idx").on(table.transcodeStatus, table.createdAt),
   ],
 );
 

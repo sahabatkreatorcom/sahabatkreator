@@ -1,0 +1,40 @@
+# Root .dockerignore — berlaku untuk seluruh docker build (web & worker).
+# Tanpa ini, COPY bisa menyalin node_modules host Windows (binary salah platform)
+# dan .env (secrets bocor ke layer image).
+
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+.next
+dist
+build
+*.tsbuildinfo
+
+# Environment — semua varian secret, kecuali contoh
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+**/!.env.example
+
+# Repo internals
+.git
+.gitignore
+handoffs
+docs
+.turbo
+
+# Test/coverage
+coverage
+playwright-report
+playwright-screenshots
+test-results
+
+# Misc
+README.md
+CHANGELOG_FIXES.md
+*.log
+.DS_Store

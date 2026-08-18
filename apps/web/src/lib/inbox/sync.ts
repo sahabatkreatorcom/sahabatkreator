@@ -109,21 +109,29 @@ async function resolveAccount(account: {
     return { id: account.id, organizationId: account.organizationId, platform: account.platform, accessToken: token };
 }
 
-async function upsertComment(
+export interface IncomingComment {
+    platformCommentId: string;
+    platformPostId: string;
+    authorId: string;
+    authorUsername: string;
+    authorAvatar?: string | null;
+    text: string;
+    createdAt?: Date;
+    likeCount?: number;
+    parentId?: string | null;
+}
+
+/**
+ * Upsert satu komentar (dari webhook real-time atau sync berkala).
+ * Return: "added" | "updated" | "skipped".
+ */
+export async function upsertIncomingComment(
     account: InboxAccount,
-    postId: string,
-    platformPostId: string,
-    c: {
-        platformCommentId: string;
-        authorId: string;
-        authorUsername: string;
-        authorAvatar?: string | null;
-        text: string;
-        createdAt: Date;
-        likeCount?: number;
-        parentId?: string | null;
-    },
+    postId: string | null,
+    c: IncomingComment,
 ): Promise<"added" | "updated" | "skipped"> {
+    if (!c.platformCommentId || !c.platformPostId) return "skipped";
+
     const existing = await db.query.comment.findFirst({
         where: (t, { and: _and, eq: _eq }) =>
             _and(_eq(t.socialAccountId, account.id), _eq(t.platformCommentId, c.platformCommentId)),
@@ -160,7 +168,7 @@ async function upsertComment(
         organizationId: account.organizationId,
         socialAccountId: account.id,
         postId,
-        platformPostId,
+        platformPostId: c.platformPostId,
         platformCommentId: c.platformCommentId,
         authorId: c.authorId,
         authorUsername: c.authorUsername,
@@ -171,9 +179,37 @@ async function upsertComment(
         isRead: false,
         isReplied: false,
         isHidden: false,
-        createdAt: c.createdAt,
+        createdAt: c.createdAt ?? new Date(),
         syncedAt: new Date(),
     });
 
     return "added";
+}
+
+async function upsertComment(
+    account: InboxAccount,
+    postId: string,
+    platformPostId: string,
+    c: {
+        platformCommentId: string;
+        authorId: string;
+        authorUsername: string;
+        authorAvatar?: string | null;
+        text: string;
+        createdAt: Date;
+        likeCount?: number;
+        parentId?: string | null;
+    },
+): Promise<"added" | "updated" | "skipped"> {
+    return upsertIncomingComment(account, postId, {
+        platformCommentId: c.platformCommentId,
+        platformPostId,
+        authorId: c.authorId,
+        authorUsername: c.authorUsername,
+        authorAvatar: c.authorAvatar ?? null,
+        text: c.text,
+        createdAt: c.createdAt,
+        likeCount: c.likeCount ?? 0,
+        parentId: c.parentId ?? null,
+    });
 }

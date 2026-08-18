@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link2, Link2Off, Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 
 interface Account {
@@ -130,7 +131,7 @@ export default function ConnectionsPage() {
             {loading ? (
                 <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat akun…
+                    Memuat akunâ€¦
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -144,7 +145,7 @@ export default function ConnectionsPage() {
                                 <p className="truncate text-sm font-medium">{account.name}</p>
                                 <p className="truncate text-xs text-muted-foreground">
                                     {PLATFORM_LABELS[account.platform]}
-                                    {account.username ? ` · @${account.username}` : ""}
+                                    {account.username ? ` Â· @${account.username}` : ""}
                                 </p>
                                 {account.lastRefreshError && (
                                     <p className="mt-0.5 text-xs text-accent-amber">{account.lastRefreshError}</p>
@@ -224,10 +225,10 @@ function PlatformAvatar({
     }
     return (
         <span
-            className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-white"
             style={{ background: PLATFORM_COLORS[platform] }}
         >
-            {name.slice(0, 2).toUpperCase()}
+            <PlatformIcon platform={platform} size={18} />
         </span>
     );
 }

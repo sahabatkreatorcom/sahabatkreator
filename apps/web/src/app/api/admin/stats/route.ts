@@ -1,32 +1,38 @@
-import { NextResponse } from "next/server";
 import { auth } from "@sahabat-kreator/auth";
-import { headers } from "next/headers";
+import { withAdmin, json } from "@/lib/api";
+import { gte } from "drizzle-orm";
+import { db, schema } from "@sahabat-kreator/db";
 
-export async function GET() {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session || session.user.role !== "admin") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+export const dynamic = "force-dynamic";
 
+export const GET = withAdmin(async (ctx) => {
     try {
-        const usersRes = await auth.api.listUsers({ headers: await headers(), query: { limit: 1 } });
-        const totalUsers = (usersRes as any)?.total ?? 0;
+        const since = new Date();
+        since.setDate(since.getDate() - 7);
 
-        const orgsRes = await auth.api.listOrganizations({ headers: await headers(), query: { limit: 1 } });
-        const totalOrganizations = (orgsRes as any)?.total ?? 0;
+        const [usersRes, orgsRes, totalPosts, totalInboxMessages, usersThisWeek, organizationsThisWeek, postsThisWeek] =
+            await Promise.all([
+                auth.api.listUsers({ headers: ctx.headers, query: { limit: 1 } }),
+                auth.api.listOrganizations({ headers: ctx.headers, query: { limit: 1 } }),
+                db.$count(schema.post),
+                db.$count(schema.comment),
+                db.$count(schema.user, gte(schema.user.createdAt, since)),
+                db.$count(schema.organization, gte(schema.organization.createdAt, since)),
+                db.$count(schema.post, gte(schema.post.createdAt, since)),
+            ]);
 
-        const stats = {
-            totalUsers,
-            totalOrganizations,
-            totalPosts: 1234,
-            totalInboxMessages: 5678,
-            usersThisWeek: 45,
-            organizationsThisWeek: 12,
-            postsThisWeek: 234,
-        };
-
-        return NextResponse.json(stats);
+        return json({
+            totalUsers: (usersRes as any)?.total ?? 0,
+            totalOrganizations: (orgsRes as any)?.total ?? 0,
+            totalPosts,
+            totalInboxMessages,
+            usersThisWeek,
+            organizationsThisWeek,
+            postsThisWeek,
+        });
     } catch (e) {
-        return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 });
+        console.error("[admin:stats] gagal:", e);
+        return json({ error: "Failed to fetch stats" }, { status: 500 });
     }
-}
+});
+

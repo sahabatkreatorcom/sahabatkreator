@@ -1,31 +1,38 @@
-import { NextResponse } from "next/server";
-import { auth } from "@sahabat-kreator/auth";
-import { headers } from "next/headers";
+import { sql } from "drizzle-orm";
+import { db } from "@sahabat-kreator/db";
+import { withAdmin, json } from "@/lib/api";
 
-export async function GET() {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session || session.user.role !== "admin") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const dynamic = "force-dynamic";
+
+export const GET = withAdmin(async (ctx) => {
+    const mem = process.memoryUsage();
+    const started = Date.now();
+    let dbStatus = "unhealthy";
+    try {
+        await db.execute(sql`select 1`);
+        dbStatus = "healthy";
+    } catch {
+        dbStatus = "unhealthy";
     }
+    const dbMs = Date.now() - started;
 
     const health = {
-        status: "healthy" as const,
-        uptime: "3d 12h 45m",
-        version: "1.0.0",
+        status: dbStatus === "healthy" ? ("healthy" as const) : ("degraded" as const),
+        uptimeSeconds: Math.floor(process.uptime()),
+        version: process.env.npm_package_version || "dev",
+        nodeVersion: process.version,
         components: [
-            { name: "Database", status: "healthy", message: "Connected and responsive" },
+            { name: "Database", status: dbStatus, message: `${dbMs}ms` },
             { name: "Auth Service", status: "healthy", message: "Operational" },
-            { name: "File Storage", status: "healthy", message: "S3 connected" },
-            { name: "Queue Worker", status: "healthy", message: "Processing normally" },
         ],
         metrics: {
-            memoryUsage: "2.4 GB",
-            cpuUsage: "35%",
-            dbConnections: 12,
-            activeSessions: 145,
+            memoryRssMb: Math.round(mem.rss / 1024 / 1024),
+            memoryHeapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+            cpuTimeMs: process.cpuUsage().user / 1000,
         },
         lastCheck: new Date().toISOString(),
     };
 
-    return NextResponse.json(health);
-}
+    const status = dbStatus === "healthy" ? 200 : 503;
+    return json(health, { status });
+});

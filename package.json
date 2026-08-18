@@ -16,12 +16,7 @@
     "db:generate": "turbo -F @sahabat-kreator/db db:generate",
     "db:migrate": "turbo -F @sahabat-kreator/db db:migrate",
     "test": "pnpm --filter web test",
-    "check": "biome check --write ."
-  },
-  "dependencies": {
-    "@sahabat-kreator/env": "workspace:*",
-    "dotenv": "catalog:",
-    "zod": "catalog:"
+    "check": "biome check ."
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.7",

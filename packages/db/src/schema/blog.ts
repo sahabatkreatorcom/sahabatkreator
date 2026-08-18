@@ -1,23 +1,25 @@
 import {
   index,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 
 export const blogPost = pgTable(
   "blog_post",
   {
     id: text("id").primaryKey(),
-    slug: text("slug").notNull().unique(),
+    slug: text("slug").notNull(),
     title: text("title").notNull(),
     excerpt: text("excerpt"),
     content: text("content").notNull(),
     coverImage: text("cover_image"),
     authorId: text("author_id").notNull(),
     status: text("status").notNull().default("DRAFT"),
-    publishedAt: timestamp("published_at"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -43,7 +45,8 @@ export const blogPostTag = pgTable(
     tagId: text("tag_id").notNull().references(() => blogTag.id, { onDelete: "cascade" }),
   },
   (table) => [
-    { pk: table.postId, column: table.tagId },
+    primaryKey({ columns: [table.postId, table.tagId] }),
+    index("blog_post_tag_tag_idx").on(table.tagId),
   ],
 );
 
@@ -65,3 +68,23 @@ export const blogComment = pgTable(
     index("blog_comment_status_idx").on(table.status),
   ],
 );
+
+export const blogPostRelations = relations(blogPost, ({ many }) => ({
+  tags: many(blogPostTag),
+  comments: many(blogComment),
+}));
+
+export const blogTagRelations = relations(blogTag, ({ many }) => ({
+  posts: many(blogPostTag),
+}));
+
+export const blogPostTagRelations = relations(blogPostTag, ({ one }) => ({
+  post: one(blogPost, {
+    fields: [blogPostTag.postId],
+    references: [blogPost.id],
+  }),
+  tag: one(blogTag, {
+    fields: [blogPostTag.tagId],
+    references: [blogTag.id],
+  }),
+}));

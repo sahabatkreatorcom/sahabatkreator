@@ -21,8 +21,8 @@ export const post = pgTable(
       .references(() => organization.id, { onDelete: "cascade" }),
     caption: text("caption").notNull(),
     status: postStatusEnum("status").default("DRAFT").notNull(),
-    scheduledAt: timestamp("scheduled_at"),
-    publishedAt: timestamp("published_at"),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
     autoPublish: boolean("auto_publish").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -91,6 +91,7 @@ export const post = pgTable(
     ),
     index("post_linked_group_idx").on(table.linkedGroupId),
     index("post_social_account_idx").on(table.socialAccountId),
+    index("post_status_scheduled_idx").on(table.status, table.scheduledAt),
   ],
 );
 

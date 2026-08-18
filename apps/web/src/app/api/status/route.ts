@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { desc, eq, and, gte, like } from "drizzle-orm";
+import { desc, eq, and, gte } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { withAuth, json } from "@/lib/api";
 
@@ -44,13 +44,20 @@ export const GET = withAuth(async (_ctx, req: NextRequest) => {
             where: eq(schema.socialAccount.organizationId, activeOrganizationId),
             columns: { id: true, platform: true, name: true, username: true, isActive: true, lastRefreshAt: true, lastRefreshError: true },
         }),
-        db.query.publishError.findMany({
-            where: (t, { and: _and, gte: _gte }) =>
-                _and(_gte(t.occurredAt, since)),
-            columns: { id: true, postId: true, platform: true, errorHuman: true, errorCode: true, occurredAt: true },
-            orderBy: [desc(schema.publishError.occurredAt)],
-            limit: 20,
-        }),
+        // publish_error tidak punya organizationId → filter via join ke post.
+        db.select({
+            id: schema.publishError.id,
+            postId: schema.publishError.postId,
+            platform: schema.publishError.platform,
+            errorHuman: schema.publishError.errorHuman,
+            errorCode: schema.publishError.errorCode,
+            occurredAt: schema.publishError.occurredAt,
+        })
+            .from(schema.publishError)
+            .innerJoin(schema.post, eq(schema.publishError.postId, schema.post.id))
+            .where(and(eq(schema.post.organizationId, activeOrganizationId), gte(schema.publishError.occurredAt, since)))
+            .orderBy(desc(schema.publishError.occurredAt))
+            .limit(20),
         db.query.activity.findMany({
             where: (t, { and: _and, eq: _eq, gte: _gte, like: _like }) =>
                 and(

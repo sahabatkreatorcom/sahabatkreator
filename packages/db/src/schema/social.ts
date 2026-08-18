@@ -25,7 +25,7 @@ export const socialAccount = pgTable(
     avatar: text("avatar"),
     accessToken: text("access_token").notNull(),
     refreshToken: text("refresh_token"),
-    tokenExpiry: timestamp("token_expiry"),
+    tokenExpiry: timestamp("token_expiry", { withTimezone: true }),
     isActive: boolean("is_active").default(true).notNull(),
     lastRefreshAt: timestamp("last_refresh_at"),
     lastRefreshError: text("last_refresh_error"),
