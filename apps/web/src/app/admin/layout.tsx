@@ -8,7 +8,7 @@ import { AdminSidebar } from "@/components/admin/admin-sidebar";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) redirect("/login");
+    if (!session) redirect("/login" as any);
     if (session.user.role !== "admin") redirect("/dashboard" as any);
 
     return (
