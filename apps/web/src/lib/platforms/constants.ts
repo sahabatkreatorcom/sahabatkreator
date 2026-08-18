@@ -34,4 +34,16 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
     MANUAL: "Manual",
 };
 
+export const CONNECTABLE_PLATFORMS: Platform[] = [
+    "INSTAGRAM",
+    "INSTAGRAM_PAGE",
+    "FACEBOOK",
+    "TIKTOK",
+    "YOUTUBE",
+    "PINTEREST",
+    "GOOGLE_BUSINESS",
+    "LINKEDIN",
+    "THREADS",
+];
+
 export type { Platform };
