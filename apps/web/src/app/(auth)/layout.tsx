@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Logo } from "@/components/ui/logo";
+import Link from "next/link";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
     return (
@@ -19,7 +20,14 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                         Dibuat untuk tim dan agency yang mengelola banyak brand sekaligus.
                     </p>
                 </div>
-                <p className="text-xs text-primary-foreground/60">© {new Date().getFullYear()} Sahabat Kreator</p>
+                <div className="text-xs text-primary-foreground/60">
+                    <p>© {new Date().getFullYear()} Sahabat Kreator</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        <Link href="/syarat-ketentuan" className="hover:text-primary-foreground">Syarat & Ketentuan</Link>
+                        <Link href="/kebijakan-privasi" className="hover:text-primary-foreground">Kebijakan Privasi</Link>
+                        <Link href="/penghapusan-data" className="hover:text-primary-foreground">Penghapusan Data</Link>
+                    </div>
+                </div>
             </div>
 
             {/* Panel kanan: form */}
@@ -37,6 +45,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                             {children}
                         </Suspense>
                     </div>
+                </div>
+                {/* Legal links di form juga */}
+                <div className="mt-6 text-center text-xs text-muted-foreground">
+                    Dengan melanjutkan, Anda menyetujui{' '}
+                    <Link href="/syarat-ketentuan" className="text-primary hover:underline">Syarat & Ketentuan</Link> dan{' '}
+                    <Link href="/kebijakan-privasi" className="text-primary hover:underline">Kebijakan Privasi</Link> kami.
                 </div>
             </div>
         </div>
