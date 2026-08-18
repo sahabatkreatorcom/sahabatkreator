@@ -4,6 +4,27 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #14 — `next build` gagal: Resend di-init saat import (pakai RESEND_API_KEY yang opsional)
+**Gejala:** Docker build web/migrate gagal saat "Collecting page data for /accept-invitation/[id]" dengan
+`Error: Missing API key. Pass it to the constructor new Resend("re_123")` — padahal env build sudah lengkap.
+
+**Akar:** `packages/email/src/index.ts` membuat `new Resend(process.env.RESEND_API_KEY)` di **module scope**.
+`RESEND_API_KEY` adalah opsional di env schema, tapi saat `next build` mengumpulkan halaman `/accept-invitation/[id]`,
+auth meng-import email → evaluasi module langsung memanggil `new Resend(undefined)` → throw.
+
+| | |
+|---|---|
+| **File** | `packages/email/src/index.ts` |
+| **Masalah** | Build gagal meski env lengkap; email tak terkirim tanpa key |
+| **Akar** | Inisialisasi Resend di module-level dengan key opsional |
+| **Fix** | Lazy-init `getResend()` — instance dibuat hanya saat `sendEmail` dipanggil; tanpa `RESEND_API_KEY` lempar error jelas di runtime, bukan saat import. Ekspor `resend` langsung dihapus (tidak ada konsumennya). |
+| **Verifikasi** | `pnpm -r check-types` lolos (9 workspace). |
+| **Pelajaran** | SDK yang butuh API key sebaiknya di-init lazy; module-level init membuat import mana pun (termasuk `next build` page data) crash bila env opsional kosong. |
+| **Log Keyword** | resend, email, missing api key, next build, page data, module scope, lazy init |
+| **Deploy** | PENDING — menunggu rebuild di VPS |
+
+---
+
 ### Fix #13 — Docker build gagal: build args tidak lengkap (ENCRYPTION_KEY, R2_*) & migrate tanpa args
 **Gejala:** `docker compose up -d --build` gagal di `[migrate build] RUN pnpm --filter web build` dengan
 `Invalid environment variables` untuk `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
