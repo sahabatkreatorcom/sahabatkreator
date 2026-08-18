@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
   typedRoutes: true,
   reactCompiler: true,
   poweredByHeader: false,
+  output: "standalone",
+  outputFileTracingRoot: workspaceRoot,
   turbopack: {
     root: turbopackRoot,
   },

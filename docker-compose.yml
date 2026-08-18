@@ -1,10 +1,12 @@
-# Deploy VPS — postgres + web + worker media + Redis (job queue) + migrate.
+# Deploy VPS — caddy (SSL) + postgres + web + worker media + Redis (job queue) + migrate.
 # Penggunaan:
-#   1. Salin .env.prod ke .env (isi POSTGRES_USER/PASSWORD/DB + DATABASE_URL).
-#   2. docker compose build
-#   3. docker compose up -d
+#   1. Salin .env.example ke .env (isi POSTGRES_USER/PASSWORD/DB + DATABASE_URL + DOMAIN).
+#   2. Arahkan DNS domain ke IP VPS (A record).
+#   3. docker compose up -d --build  → Caddy otomatis dapat sertifikat Let's Encrypt.
 #
 # Catatan:
+#   - Caddy (service `caddy`) satu-satunya yang expose port publik (80/443);
+#     `web` (Next.js) & `postgres` TIDAK ter-expose ke host — hanya antar service.
 #   - DATABASE_URL menunjuk service `postgres` (tanpa sslmode):
 #       postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
 #   - Service `migrate` menjalankan migrasi Drizzle sekali sebelum web/worker start.
@@ -13,6 +15,24 @@
 #     (scheduling fallback ke cron DB polling).
 
 services:
+  # Reverse proxy + SSL otomatis (Let's Encrypt) — satu-satunya yang expose port publik.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -22,8 +42,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-sahabat}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # Tidak expose port publik — DB hanya bisa diakses antar service compose.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sahabat} -d ${POSTGRES_DB:-sahabat}"]
       interval: 5s
@@ -72,8 +91,7 @@ services:
     environment:
       - NODE_ENV=production
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-    ports:
-      - "${WEB_PORT:-3000}:3000"
+    # Tidak expose port publik — dilayani Caddy (HTTPS) dalam network compose.
     restart: unless-stopped
     depends_on:
       postgres:
@@ -97,11 +115,12 @@ services:
       - .env
     environment:
       - NODE_ENV=production
-      - WORKER_POLL_INTERVAL_MS=${WORKER_POLL_INTERVAL_MS:-10000}
-      - WORKER_BATCH_SIZE=${WORKER_BATCH_SIZE:-3}
+      - WORKER_POLL_INTERVAL_MS=${WORKER_POLL_INTERVAL_MS:-15000}
+      - WORKER_BATCH_SIZE=${WORKER_BATCH_SIZE:-1}
       - WORKER_FRAME_COUNT=${WORKER_FRAME_COUNT:-4}
       - WORKER_MAX_VIDEO_BYTES=${WORKER_MAX_VIDEO_BYTES:-104857600}
       - WORKER_ENABLE_TRANSCODE=${WORKER_ENABLE_TRANSCODE:-true}
+      - TRANSCODER=${TRANSCODER:-local}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -112,3 +131,5 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  caddy-data:
+  caddy-config:

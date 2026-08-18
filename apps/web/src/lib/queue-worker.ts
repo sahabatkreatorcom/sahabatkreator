@@ -45,7 +45,7 @@ export function startQueueWorkers(): () => Promise<void> {
         },
         {
             connection: redisConnectionOptions(),
-            concurrency: 3,
+            concurrency: 1,
         },
     );
 
@@ -63,7 +63,7 @@ export function startQueueWorkers(): () => Promise<void> {
         },
         {
             connection: redisConnectionOptions(),
-            concurrency: 2,
+            concurrency: 1,
         },
     );
 

@@ -1,0 +1,17 @@
+# Caddyfile — reverse proxy + SSL otomatis (Let's Encrypt).
+# Dipasang via volume ke service `caddy` di docker-compose.yml.
+# `DOMAIN` disubstitusi dari environment (lihat .env.example).
+
+{$DOMAIN} {
+	# Redirect semua lalu lintas HTTP (port 80) ke HTTPS otomatis oleh Caddy.
+
+	encode gzip
+
+	reverse_proxy web:3000
+
+	# Header keamanan tambahan di sisi edge (HSTS utama sudah di next.config.ts).
+	header {
+		-Strict-Transport-Security
+		+Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	}
+}

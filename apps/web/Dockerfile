@@ -1,4 +1,4 @@
-# Web app (Next.js) — build untuk VPS Docker.
+# Web app (Next.js) �?" build untuk VPS Docker.
 # Build: docker build -f apps/web/Dockerfile -t sahabat-kreator-web .
 #
 # Catatan:
@@ -6,6 +6,8 @@
 #     jadi stage `deps` meng-install semua package lalu build hanya package web.
 #   - Env build-time (DATABASE_URL, BETTER_AUTH_*) wajib diset karena t3-env/zod
 #     memvalidasi saat `next build`; disalurkan via ARG agar tidak tersimpan di image final.
+#   - `output: "standalone"` di next.config.ts: image runner hanya berisi hasil tracing
+#     (modul yang benar-benar dipakai), tanpa node_modules workspace utuh.
 
 FROM node:22-slim AS base
 RUN corepack enable
@@ -36,18 +38,23 @@ ENV DATABASE_URL=$DATABASE_URL \
 COPY apps/web ./apps/web
 RUN pnpm --filter web build
 
-# ---- Runner ----
+# ---- Runner (standalone) ----
 FROM base AS runner
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1
 RUN useradd --system --uid 1001 nextjs
-COPY --from=deps --chown=nextjs:nextjs /app/node_modules ./node_modules
-COPY --from=deps --chown=nextjs:nextjs /app/apps/web/node_modules ./apps/web/node_modules
-COPY --from=deps --chown=nextjs:nextjs /app/packages ./packages
-COPY --from=build --chown=nextjs:nextjs /app/apps/web/.next ./apps/web/.next
+
+# Hasil tracing standalone (server + node_modules yang diperlukan saja).
+# Karena outputFileTracingRoot = root workspace, struktur mempertahankan
+# prefix `apps/web/` → salin seluruh standalone ke /app lalu cwd di apps/web.
+COPY --from=build --chown=nextjs:nextjs /app/apps/web/.next/standalone ./
+# Aset statis & public dipasang via symlink (pola resmi Next.js).
+COPY --from=build --chown=nextjs:nextjs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build --chown=nextjs:nextjs /app/apps/web/public ./apps/web/public
-COPY --from=build --chown=nextjs:nextjs /app/apps/web/package.json ./apps/web/package.json
+
 USER nextjs
-WORKDIR /app/apps/web
 EXPOSE 3000
-CMD ["pnpm", "start"]
+ENV PORT=3000 HOSTNAME=0.0.0.0
+# Entry standalone membaca working dirnya sendiri; set cwd ke app agar aset ditemukan.
+WORKDIR /app/apps/web
+CMD ["node", "server.js"]

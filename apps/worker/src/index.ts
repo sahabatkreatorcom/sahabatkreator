@@ -1,19 +1,22 @@
 import { db, schema } from "@sahabat-kreator/db";
 import { and, eq, isNull, sql, like } from "drizzle-orm";
 import { downloadObjectBuffer, uploadObject, frameObjectKey, publicUrlForKey } from "./storage.js";
-import { processVideoBuffer, transcodeVideoBuffer } from "./ffmpeg.js";
+import { processVideoBuffer } from "./ffmpeg.js";
+import { resolveTranscoder } from "./transcoder/index.js";
 
 const POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_INTERVAL_MS) || 10_000;
-const BATCH_SIZE = Number(process.env.WORKER_BATCH_SIZE) || 3;
+const BATCH_SIZE = Number(process.env.WORKER_BATCH_SIZE) || 1;
 const FRAME_COUNT = Number(process.env.WORKER_FRAME_COUNT) || 4;
 const MAX_VIDEO_BYTES = Number(process.env.WORKER_MAX_VIDEO_BYTES) || 100 * 1024 * 1024;
 const ENABLE_TRANSCODE = process.env.WORKER_ENABLE_TRANSCODE !== "false";
+const transcoder = resolveTranscoder();
 
 interface PendingMedia {
     id: string;
     organizationId: string;
     url: string;
     mimeType: string;
+    size: number;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -31,13 +34,13 @@ async function findPendingVideos(): Promise<PendingMedia[]> {
             organizationId: schema.media.organizationId,
             url: schema.media.url,
             mimeType: schema.media.mimeType,
+            size: schema.media.size,
         })
         .from(schema.media)
         .where(
             and(
                 like(schema.media.mimeType, "video/%"),
                 isNull(schema.media.transcodeStatus),
-                sql`${schema.media.size} <= ${MAX_VIDEO_BYTES}`,
             ),
         )
         .orderBy(sql`${schema.media.createdAt} ASC`)
@@ -71,21 +74,30 @@ async function processMedia(item: PendingMedia): Promise<void> {
             return;
         }
 
-        const result = await processVideoBuffer(input, { count: FRAME_COUNT });
+        const oversized = item.size > MAX_VIDEO_BYTES;
+        if (oversized) {
+            log(`poster-only ${item.id}: ${item.size} byte > MAX ${MAX_VIDEO_BYTES}`);
+        }
+
+        // Video besar (> MAX_VIDEO_BYTES): cukup poster, tanpa frames & transcode —
+        // hemat RAM (ffmpeg hanya ekstrak 1 frame). Video normal: frame + transcode opsional.
+        const result = await processVideoBuffer(input, { count: oversized ? 0 : FRAME_COUNT });
 
         const posterKey = frameObjectKey(item.organizationId, item.id, 0);
         await uploadObject(posterKey, result.poster, "image/jpeg");
 
-        for (let i = 0; i < result.frames.length; i++) {
-            await uploadObject(frameObjectKey(item.organizationId, item.id, i + 1), result.frames[i]!, "image/jpeg");
+        if (!oversized) {
+            for (let i = 0; i < result.frames.length; i++) {
+                await uploadObject(frameObjectKey(item.organizationId, item.id, i + 1), result.frames[i]!, "image/jpeg");
+            }
         }
 
         let transcodedUrl: string | null = null;
-        if (ENABLE_TRANSCODE) {
+        if (ENABLE_TRANSCODE && !oversized) {
             try {
-                const transcoded = await transcodeVideoBuffer(input);
+                const { output } = await transcoder.transcode({ input, mimeType: item.mimeType });
                 const transcodeKey = `orgs/${item.organizationId}/media-transcoded/${item.id}.mp4`;
-                await uploadObject(transcodeKey, transcoded, "video/mp4");
+                await uploadObject(transcodeKey, output, "video/mp4");
                 transcodedUrl = publicUrlForKey(transcodeKey);
             } catch (e) {
                 log(`transcode ${item.id} gagal (dilewati): ${e instanceof Error ? e.message : String(e)}`);
@@ -96,7 +108,7 @@ async function processMedia(item: PendingMedia): Promise<void> {
 
         await db.update(schema.media)
             .set({
-                transcodeStatus: "DONE",
+                transcodeStatus: oversized ? "LIMITED" : "DONE",
                 thumbnailUrl: publicUrlForKey(posterKey),
                 transcodedUrl,
                 width: result.width,
@@ -105,7 +117,7 @@ async function processMedia(item: PendingMedia): Promise<void> {
             })
             .where(eq(schema.media.id, item.id));
 
-        log(`done ${item.id}: ${result.frames.length + 1} frame${transcodedUrl ? ", transcoded" : ""}, ${result.durationSeconds ?? "?"}s, ${dimensions ? `${dimensions.width}x${dimensions.height}` : "no dims"}`);
+        log(`done ${item.id}: ${oversized ? "poster-only" : `${result.frames.length + 1} frame`}${transcodedUrl ? ", transcoded" : ""}, ${result.durationSeconds ?? "?"}s, ${dimensions ? `${dimensions.width}x${dimensions.height}` : "no dims"}`);
     } catch (e) {
         log(`fail ${item.id}: ${e instanceof Error ? e.message : String(e)}`);
         await db.update(schema.media)
@@ -115,7 +127,7 @@ async function processMedia(item: PendingMedia): Promise<void> {
 }
 
 export async function runWorkerLoop(): Promise<void> {
-    log(`start (poll=${POLL_INTERVAL_MS}ms, batch=${BATCH_SIZE}, frames=${FRAME_COUNT})`);
+    log(`start (poll=${POLL_INTERVAL_MS}ms, batch=${BATCH_SIZE}, frames=${FRAME_COUNT}, maxBytes=${MAX_VIDEO_BYTES}, transcode=${ENABLE_TRANSCODE}, transcoder=${transcoder.name})`);
     while (true) {
         try {
             const pending = await findPendingVideos();

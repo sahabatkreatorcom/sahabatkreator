@@ -4,6 +4,78 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #12 — Kontrak Transcoder (interface) dengan default ffmpeg lokal
+**Gejala:** Transcode video terkunci ke implementasi ffmpeg di `apps/worker/src/ffmpeg.ts` — memindah transcode ke layanan eksternal (Modal.com, dsb) akan mengubah worker loop.
+
+**Akar:** Tidak ada abstraksi; worker loop memanggil `transcodeVideoBuffer` langsung.
+
+| | |
+|---|---|
+| **File** | `apps/worker/src/transcoder/types.ts` (baru: `Transcoder`, `TranscodeRequest`, `TranscodeResult`), `apps/worker/src/transcoder/local.ts` (baru: `LocalTranscoder` = bungkus ffmpeg), `apps/worker/src/transcoder/index.ts` (baru: `resolveTranscoder()` — env `TRANSCODER`, default "local", fail-fast untuk "modal" yang belum ada), `apps/worker/src/index.ts` (pakai `transcoder.transcode(...)`, log start tampilkan `transcoder=<name>`), `.env.example` + `docker-compose.yml` (`TRANSCODER=local`) |
+| **Masalah** | Transcode tidak bisa dialihkan ke provider lain tanpa ubah worker loop |
+| **Akar** | Tidak ada kontrak/abstraksi transcoder |
+| **Fix** | Interface `Transcoder` + resolver env. Worker loop tak tahu implementasinya. Implementasi Modal tinggal menambah `transcoder/modal.ts` + daftarkan di `resolveTranscoder()` — worker loop tidak berubah. Fail-fast bila `TRANSCODER=modal` (agar tidak diam-diam memakai ffmpeg lokal). |
+| **Verifikasi** | `pnpm -r check-types` lolos (9 workspace). |
+| **Pelajaran** | Abstraksi dengan resolver env memungkinkan swap provider runtime tanpa refactor worker loop; fail-fast lebih baik daripada default diam-diam. |
+| **Log Keyword** | transcoder, interface, modal, provider, ffmpeg, resolve, abstraction |
+| **Deploy** | PENDING — belum live |
+
+---
+
+### Fix #11 — Worker media: fallback poster-only untuk video besar + default hemat RAM
+**Gejala:** Video > `WORKER_MAX_VIDEO_BYTES` (default 100 MB) **tidak pernah diproses** — query `findPendingVideos` memfilter `size <= MAX`, jadi video besar diam-diam terabaikan (tanpa thumbnail, tanpa analisis Seb). VPS 2 core/4GB rentan OOM karena ffmpeg transcode berat (batch default 3 + concurrency publish 3).
+
+**Akar:** Filter ukuran di query seleksi (bukan branch pasca-download) membuat video besar tak pernah diambil; default batch/concurrency terlalu besar untuk VPS kecil.
+
+| | |
+|---|---|
+| **File** | `apps/worker/src/index.ts` (hapus filter `size <=` dari query, ambil kolom `size`, branch poster-only: `count:0`, tanpa transcode, status `LIMITED`; log start kini sertakan `maxBytes`), `apps/web/src/lib/queue-worker.ts` (concurrency `publishWorker` 3→1, `syncWorker` 2→1), `.env.example` (batch 1, poll 15000, komentar VPS kecil), `docker-compose.yml` (default batch 1, poll 15000), `docs/DEPLOYMENT.md` (bagian "Konfigurasi hemat RAM" + langkah swap 2 GB) |
+| **Masalah** | Video besar tak diproses; risiko OOM ffmpeg di VPS 4 GB |
+| **Akar** | Filter ukuran di query; default batch/concurrency terlalu tinggi |
+| **Fix** | Semua video diambil; yang > batas dibuat poster saja (ffmpeg 1 frame, tanpa transcode) status `LIMITED`; yang normal tetap `DONE` penuh. Default batch=1, poll=15s, concurrency=1. |
+| **Verifikasi** | `pnpm -r check-types` lolos (web, worker, db, auth, dll). `LIMITED` aman di UI (pakai `thumbnailUrl ?? url`). |
+| **Pelajaran** | Pembatas ukuran sebaiknya jadi branch pemrosesan, bukan filter seleksi — supaya ada fallback yang terlihat, bukan skip diam-diam. |
+| **Log Keyword** | worker, ffmpeg, max video bytes, oversized, poster only, limited, batch, concurrency, swap, ram vps |
+| **Deploy** | PENDING — belum live |
+
+---
+
+### Fix #10 — SSL/HTTPS produksi: reverse proxy Caddy + harden exposure port
+**Gejala:** `docker-compose.yml` mengekspos port publik `3000` (web) & `5432` (postgres) langsung ke host — tanpa HTTPS (web HTTP-only), DB terbuka ke internet.
+
+**Akar:** Tidak ada layer reverse proxy/SSL di deployment; compose mem-publish port service tanpa perlu.
+
+| | |
+|---|---|
+| **File** | `Caddyfile` (baru: `{$DOMAIN}` auto TLS Let's Encrypt, redirect 80→443, `reverse_proxy web:3000`, header HSTS), `docker-compose.yml` (service `caddy` + volume `caddy-data`/`caddy-config`, hapus `ports` publik di `postgres` & `web`, `depends_on web: service_healthy`), `.env.example` (tambah `DOMAIN`, hapus `WEB_PORT`/`POSTGRES_PORT`), `docs/DEPLOYMENT.md` (bagian "DNS & SSL", arsitektur Caddy, renumber 2→8) |
+| **Masalah** | Tidak ada HTTPS & port internal terexpose publik |
+| **Akar** | Tanpa proxy TLS; `ports:` dipublish ke host |
+| **Fix** | Caddy satu-satunya yang expose 80/443; postgres & web hanya di network compose; env `DOMAIN` wajib; dokumen langkah DNS A-record + firewall 80/443. |
+| **Verifikasi** | Struktur YAML valid; `docker compose` belum diuji (docker tidak tersedia di mesin dev). |
+| **Pelajaran** | Service internal tidak boleh di-publish ke host; SSL sebaiknya ditangani proxy (Caddy) bukan app. |
+| **Log Keyword** | ssl, https, caddy, letsencrypt, reverse proxy, compose ports, exposure |
+| **Deploy** | PENDING — belum live |
+
+---
+
+### Fix #9 — Next.js output standalone + Dockerfile runner minimal
+**Gejala:** Image web Docker menyalin seluruh `node_modules` workspace + source → besar & memuat file tak terpakai.
+
+**Akar:** `next build` default memakai mode tracing yang terpisah dari runtime; runner Docker menyalin semua dep workspace.
+
+| | |
+|---|---|
+| **File** | `apps/web/next.config.ts` (`output: "standalone"` + `outputFileTracingRoot: workspaceRoot`), `apps/web/Dockerfile` (runner → salin `.next/standalone` + symlink `.next/static` & `public`, `CMD node server.js`, cwd `apps/web` karena struktur standalone mempertahankan prefix workspace) |
+| **Masalah** | Image runner besar & menyertakan file tak dipakai |
+| **Akar** | Tidak memakai standalone output Next.js |
+| **Fix** | `output: "standalone"` + `outputFileTracingRoot` root workspace; runner hanya hasil tracing; aset via COPY static+public. |
+| **Verifikasi** | `pnpm --filter web build` sukses; `standalone/apps/web/server.js` ada (prefix `apps/web/` karena tracing root); `server.js` baca `PORT`/`HOSTNAME`. Docker build belum diuji (docker tidak tersedia di mesin dev). |
+| **Pelajaran** | Monorepo + standalone: wajib `outputFileTracingRoot` ke root, dan struktur server.js tetap mempertahankan prefix `apps/web/`. |
+| **Log Keyword** | standalone, outputFileTracingRoot, Dockerfile runner, docker image, next build |
+| **Deploy** | PENDING — belum live |
+
+---
+
 ### Fix #8 — Kredensial platform: hybrid env→DB + admin panel + webhook secret terpusat
 **Gejala:** (1) `getCredentialsForPlatform` hanya baca DB `global_platform_credential` — padahal tak ada admin API/UI untuk mengisinya, dan `.env.example` menjanjikan "fallback env" yang tak pernah diimplementasikan → callback OAuth pasti gagal `no_credentials`. (2) Secret webhook dibaca langsung dari env per-platform (`META_APP_SECRET`, `TIKTOK_CLIENT_SECRET`, `WEBHOOK_VERIFY_TOKEN`) sedangkan OAuth connect baca DB — dua sumber berbeda; kredensial diisi via DB tapi webhook TikTok/Meta tetap pakai env (salah verifikasi). (3) Tidak ada jalur pengisian kredensial platform untuk pengajuan akses API.
 
