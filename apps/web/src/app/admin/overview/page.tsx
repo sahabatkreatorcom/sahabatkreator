@@ -184,7 +184,7 @@ export default function AdminOverviewPage() {
                         <h2 className="text-sm font-semibold">User Terbaru</h2>
                         <a href="/admin/users" className="text-xs font-medium text-primary hover:underline">
                             Lihat semua
-                        </Link>
+                        </a>
                     </div>
                     {!recentUsers.length ? (
                         <p className="p-6 text-sm text-muted-foreground">Belum ada user.</p>
@@ -221,7 +221,7 @@ export default function AdminOverviewPage() {
                         <h2 className="text-sm font-semibold">Organisasi Terbaru</h2>
                         <a href="/admin/organizations" className="text-xs font-medium text-primary hover:underline">
                             Lihat semua
-                        </Link>
+                        </a>
                     </div>
                     {!recentOrgs.length ? (
                         <p className="p-6 text-sm text-muted-foreground">Belum ada organisasi.</p>
