@@ -4,6 +4,32 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #20 — Setelah login/buat workspace redirect ke `/` (landing) bukan `/dashboard`
+**Gejala:** User login (atau membuat workspace pertama, atau menerima undangan) berakhir di
+`https://sahabatkreator.com/` (halaman landing) — harusnya masuk dashboard.
+
+**Akar:** 3 komponen memakai `router.push("/")` setelah aksi sukses, padahal user sudah terautentikasi
+dan punya workspace aktif:
+1. `new-workspace-form.tsx` — setelah `organization.create` + `setActive`.
+2. `accept-invitation-actions.tsx` — setelah `acceptInvitation`/`rejectInvitation` + `setActive`.
+3. `verify-2fa-form.tsx` — fallback `post-login-redirect` default ke `"/"`.
+
+Alur lengkap yang keliru: login → `/dashboard` → layout redirect ke `/onboarding/new-workspace`
+(belum punya org) → buat workspace → `push("/")` → landing.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/components/onboarding/new-workspace-form.tsx`, `apps/web/src/components/auth/accept-invitation-actions.tsx`, `apps/web/src/components/auth/verify-2fa-form.tsx` |
+| **Masalah** | Setelah aksi sukses user diarahkan ke landing, bukan dashboard |
+| **Akar** | `router.push("/")` dipakai di 3 tempat untuk redirect post-auth |
+| **Fix** | Ganti semua ke `router.push("/dashboard")`; fallback 2FA default `/` → `/dashboard` |
+| **Verifikasi** | `pnpm --filter web check-types` lolos. **PENDING deploy** — perlu rebuild web di VPS lalu uji login/registrasi/undangan. |
+| **Pelajaran** | Jangan redirect ke `/` untuk user terautentikasi; selalu ke `/dashboard`. Dashboard layout sudah handle redirect ke onboarding bila org belum ada — jadi push `/dashboard` aman dari loop. |
+| **Log Keyword** | redirect, login, dashboard, onboarding, new-workspace, accept invitation, verify 2fa, landing |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #19 — Register error: field "issuer" tidak ada di schema "account" (better-auth 1.7.0 beta)
 **Gejala:** Saat register (email/password) di prod: `ERROR [Better Auth]: The field "issuer" does not exist in the "account" Drizzle schema.` User bisa gagal didaftarkan.
 

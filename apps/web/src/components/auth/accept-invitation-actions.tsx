@@ -24,14 +24,14 @@ export function AcceptInvitationActions({ invitationId }: { invitationId: string
         if (data?.invitation.organizationId) {
             await authClient.organization.setActive({ organizationId: data.invitation.organizationId });
         }
-        router.push("/" as any);
+        router.push("/dashboard");
     }
 
     async function handleDecline() {
         setLoading("decline");
         await authClient.organization.rejectInvitation({ invitationId });
         setLoading(null);
-        router.push("/" as any);
+        router.push("/dashboard");
     }
 
     return (

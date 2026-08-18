@@ -5,7 +5,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { admin, organization, twoFactor } from "better-auth/plugins";
-import { sendEmail } from "@sahabat-kreator/email";
+import { sendEmail, emailTemplates } from "@sahabat-kreator/email";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL!;
 
@@ -22,13 +22,11 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: true,
     async sendResetPassword({ user, url }) {
-      await sendEmail({
-        to: user.email,
-        subject: "Reset password Anda",
-        html: `<p>Halo ${user.name},</p>
-               <p>Klik tautan berikut untuk reset password (berlaku 1 jam):</p>
-               <a href="${url}">${url}</a>`,
+      const { subject, html } = emailTemplates.resetPassword({
+        name: user.name,
+        url,
       });
+      await sendEmail({ to: user.email, subject, html });
     },
   },
 
@@ -36,12 +34,11 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
     async sendVerificationEmail({ user, url }) {
-      await sendEmail({
-        to: user.email,
-        subject: "Verifikasi email Anda",
-        html: `<p>Halo ${user.name}, klik untuk verifikasi akun Anda:</p>
-               <a href="${url}">${url}</a>`,
+      const { subject, html } = emailTemplates.verifyEmail({
+        name: user.name,
+        url,
       });
+      await sendEmail({ to: user.email, subject, html });
     },
   },
 
@@ -58,13 +55,13 @@ export const auth = betterAuth({
 
       async sendInvitationEmail(data) {
         const inviteLink = `${APP_URL}/accept-invitation/${data.invitation.id}`;
-        await sendEmail({
-          to: data.email,
-          subject: `Undangan bergabung ke ${data.organization.name}`,
-          html: `<p>${data.inviter.user.name} mengundang Anda ke workspace
-                 <b>${data.organization.name}</b> sebagai <b>${data.role}</b>.</p>
-                 <a href="${inviteLink}">Terima Undangan</a>`,
+        const { subject, html } = emailTemplates.invitation({
+          inviterName: data.inviter.user.name,
+          organizationName: data.organization.name,
+          role: data.role,
+          url: inviteLink,
         });
+        await sendEmail({ to: data.email, subject, html });
       },
       // teams: aktifkan kalau butuh sub-grup dalam satu organization
       teams: { enabled: true, maximumTeams: 20 },
@@ -87,12 +84,11 @@ export const auth = betterAuth({
         digits: 6,
         allowedAttempts: 5,
         async sendOTP({ user, otp }) {
-          await sendEmail({
-            to: user.email,
-            subject: "Kode verifikasi 2FA Anda",
-            html: `<p>Kode OTP Anda: <b style="font-size:20px">${otp}</b></p>
-                   <p>Berlaku 5 menit.</p>`,
+          const { subject, html } = emailTemplates.otp({
+            name: user.name,
+            otp,
           });
+          await sendEmail({ to: user.email, subject, html });
         },
       },
       skipVerificationOnEnable: false, // wajib verifikasi TOTP saat pertama enable

@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+export { emailTemplates } from "./templates";
 
 type EmailContent =
   | { html: string; text?: string; react?: never }

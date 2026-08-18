@@ -55,7 +55,7 @@ export function Verify2FAForm() {
             return;
         }
 
-        const redirectTo = sessionStorage.getItem("post-login-redirect") || "/";
+        const redirectTo = sessionStorage.getItem("post-login-redirect") || "/dashboard";
         sessionStorage.removeItem("post-login-redirect");
         router.push(redirectTo as any);
     }

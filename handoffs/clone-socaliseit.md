@@ -2,12 +2,9 @@
 Status: BERJALAN · Service: web/db/payment/queue · Diperbarui: 2026-08-19
 
 ## Sedang dikerjakan
-**better-auth downgrade 1.7.0 (beta) → 1.6.30 (stable) (2026-08-19)**: register error `The field "issuer" does not exist in the "account" Drizzle schema` karena better-auth 1.7.0 (masih rc/beta) mewajibkan kolom `account.issuer`. Keputusan user: **downgrade** (bukan tambah kolom). 
-- `pnpm-workspace.yaml` catalog: `better-auth: ^1.6.22` → `~1.6.29` (caret lama me-resolve ke 1.7.0). Terpasang 1.6.30 (stable track, tanpa `issuer`).
-- Revert: schema `auth.ts` (tanpa issuer), migrasi 0001 dihapus (sql + snapshot + journal entry).
-- Fix API 2FA 1.6: `enable-two-factor-flow.tsx` — `enable({ password, method: "totp" })` → `enable({ password })`, hapus cek `data.method` (1.6 return `{ totpURI, backupCodes }`).
-- `pnpm -r check-types` **lolos** (9 workspace).
-- **Belum deployed**: perlu commit + push → VPS `git pull && docker compose up -d --build` (rebuild web karena dep berubah). Setelah itu uji register lagi di prod.
+**Redirect post-login (2026-08-19)**: setelah login/buat workspace, user mendarat di `/` (landing) alih-alih `/dashboard`. Sebab: 3 tempat `router.push("/")`. Fix: `new-workspace-form.tsx` → `/dashboard`; `accept-invitation-actions.tsx` (terima+tolak) → `/dashboard`; `verify-2fa-form.tsx` fallback `/` → `/dashboard`. Typecheck lolos. Alur baru: login → `/dashboard` → layout redirect `/onboarding/new-workspace` bila belum punya org → buat → `/dashboard`. **Belum deployed** (ikut commit deploy berikutnya).
+**Email template profesional (2026-08-19)**: `packages/email/src/templates.ts` baru — layout branded (header gelap + aksen #D4A574, kartu, footer, copyright), CTA button + fallback link, escapeHtml, opsi OTP box. 4 call-site di `auth.ts` (verifikasi email, reset password, undangan org, OTP 2FA) kini pakai `emailTemplates`. Typecheck lolos. **Belum deployed**.
+**better-auth downgrade (Fix #19, PENDING deploy)**: 1.7.0 (beta, wajib `account.issuer`) → 1.6.30 stable via catalog `~1.6.29`; API 2FA `enable` disesuaikan. Typecheck lolos.
 
 ## Status terakhir
 - **✅ DEPLOY LIVE (Fix #10–#17, 2026-08-19)**: semua entri CHANGELOG ditandai LIVE. Rangkaian error Docker berurutan yang diselesaikan: (a) Fix #13 build args (ENCRYPTION_KEY + R2_* + args migrate), (b) Fix #14 Resend lazy-init, (c) Fix #15 prerender blog/sitemap force-dynamic, (d) Fix #16 migrate stage dari deps (EACCES corepack), (e) Fix #17 @swc/helpers copy utuh (web crash). DNS Cloudflare: **DNS only (grey cloud)** — Caddy serve SSL langsung. SSL Cloudflare mode Full. Catatan DNS: HTTP-01 challenge Let's Encrypt gagal saat Proxied; grey cloud diperlukan. Caddy certificate obtained via acme HTTP-01.
