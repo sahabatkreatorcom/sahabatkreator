@@ -27,11 +27,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
           yang sama diambil dari nav-config.tsx dan dirender ulang oleh
           BottomNav — jadi tidak ada dua sumber daftar menu. */}
             <aside className="hidden flex-col border-r border-border lg:flex">
-                <div className="p-3">
-                    <OrgSwitcher organizations={organizations} activeOrganizationId={activeOrganizationId} />
-                </div>
                 <div className="flex-1 overflow-y-auto">
-                    <Sidebar isPlatformAdmin={isPlatformAdmin} />
+                    <Sidebar
+                        isPlatformAdmin={isPlatformAdmin}
+                        organizations={organizations}
+                        activeOrganizationId={activeOrganizationId}
+                    />
                 </div>
             </aside>
 

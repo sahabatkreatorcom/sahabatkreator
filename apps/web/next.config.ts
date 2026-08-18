@@ -70,6 +70,10 @@ const nextConfig: NextConfig = {
       { source: '/trends', destination: '/dashboard/trends' },
       { source: '/engagement', destination: '/dashboard/engagement' },
       { source: '/activity', destination: '/dashboard/activity' },
+      { source: '/listening', destination: '/dashboard/listening' },
+      { source: '/status', destination: '/dashboard/status' },
+      { source: '/pillars', destination: '/dashboard/pillars' },
+      { source: '/billing', destination: '/dashboard/billing' },
     ];
   },
 };

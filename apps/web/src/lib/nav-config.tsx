@@ -39,7 +39,7 @@ export interface NavItem {
  */
 export const navItems: NavItem[] = [
     {
-        href: "/",
+        href: "/dashboard",
         label: "Ringkasan",
         shortLabel: "Ringkasan",
         icon: LayoutDashboard,

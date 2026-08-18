@@ -13,13 +13,12 @@ interface Org {
     logo?: string | null;
 }
 
-export function OrgSwitcher({
-    organizations,
-    activeOrganizationId,
-}: {
+export type OrgSwitcherProps = {
     organizations: Org[];
     activeOrganizationId: string;
-}) {
+};
+
+export function OrgSwitcher({ organizations, activeOrganizationId }: OrgSwitcherProps) {
     const router = useRouter();
     const [open, setOpen] = React.useState(false);
     const ref = React.useRef<HTMLDivElement>(null);

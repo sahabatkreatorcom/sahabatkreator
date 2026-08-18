@@ -6,6 +6,7 @@ import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 
 export function RegisterForm() {
     const searchParams = useSearchParams();
@@ -95,11 +96,10 @@ export function RegisterForm() {
 
             <div>
                 <Label htmlFor="password">Password</Label>
-                <Input
+<PasswordInput
                     id="password"
-                    type="password"
-                    required
                     autoComplete="new-password"
+                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Minimal 8 karakter"

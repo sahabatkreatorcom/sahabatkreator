@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
+import { OrgSwitcher, type OrgSwitcherProps } from "@/components/dashboard/org-switcher";
 import { navItems, type NavItem } from "@/lib/nav-config";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +22,15 @@ function isActive(href: string, pathname: string): boolean {
     return pathname.startsWith(href + "/");
 }
 
-export function Sidebar({ isPlatformAdmin }: { isPlatformAdmin?: boolean }) {
+export function Sidebar({
+    isPlatformAdmin,
+    organizations,
+    activeOrganizationId,
+}: {
+    isPlatformAdmin?: boolean;
+    organizations: OrgSwitcherProps["organizations"];
+    activeOrganizationId: string;
+}) {
     const pathname = usePathname();
     const contentItems = navItems.filter((i) => i.group === "content");
     const teamItems = navItems.filter((i) => i.group === "team");
@@ -32,6 +41,10 @@ export function Sidebar({ isPlatformAdmin }: { isPlatformAdmin?: boolean }) {
                 <Logo size={28} className="rounded-md" />
                 <span className="text-sm font-semibold leading-tight">Sahabat Kreator</span>
             </Link>
+
+            <div className="px-0.5">
+                <OrgSwitcher organizations={organizations} activeOrganizationId={activeOrganizationId} />
+            </div>
 
             <div>
                 <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
