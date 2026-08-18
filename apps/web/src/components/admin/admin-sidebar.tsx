@@ -11,6 +11,7 @@ import {
     ShieldCheck,
     Server,
     Plug,
+    FileText,
     type LucideIcon,
 } from "lucide-react";
 
@@ -26,11 +27,13 @@ const adminNavItems: AdminNavItem[] = [
     { href: "/admin/organizations", label: "Organizations", icon: Building2 },
     { href: "/admin/billing", label: "Billing", icon: CreditCard },
     { href: "/admin/platforms", label: "Platform Credentials", icon: Plug },
+    { href: "/admin/blog", label: "Blog", icon: FileText },
     { href: "/admin/health", label: "System Health", icon: Server },
 ];
 
 function isActive(href: string, pathname: string): boolean {
     if (pathname === href) return true;
+    if (href === "/admin") return false;
     return pathname.startsWith(href + "/");
 }
 

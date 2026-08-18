@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw, Save } from "lucide-react";
+import { Loader2, RefreshCw, Save, Link2, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,8 @@ interface PlatformCredential {
     webhookVerifyToken: string | null;
     isConfigured: boolean;
     updatedAt: string | null;
+    callbackUrl: string | null;
+    webhookUrls: string[];
 }
 
 interface PlatformForm {
@@ -149,6 +151,37 @@ export default function AdminPlatformCredentialsPage() {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-3">
+                                {(p.callbackUrl || p.webhookUrls.length > 0) && (
+                                    <div className="space-y-2 rounded-md bg-muted/50 p-3 text-xs">
+                                        {p.callbackUrl && (
+                                            <div>
+                                                <p className="mb-1 flex items-center gap-1.5 font-medium text-muted-foreground">
+                                                    <Link2 className="h-3 w-3" />
+                                                    Callback URL (OAuth redirect)
+                                                </p>
+                                                <code className="block break-all rounded bg-background px-2 py-1">
+                                                    {p.callbackUrl}
+                                                </code>
+                                            </div>
+                                        )}
+                                        {p.webhookUrls.length > 0 && (
+                                            <div>
+                                                <p className="mb-1 flex items-center gap-1.5 font-medium text-muted-foreground">
+                                                    <Webhook className="h-3 w-3" />
+                                                    Webhook URL
+                                                </p>
+                                                {p.webhookUrls.map((url) => (
+                                                    <code
+                                                        key={url}
+                                                        className="block break-all rounded bg-background px-2 py-1"
+                                                    >
+                                                        {url}
+                                                    </code>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 <div>
                                     <Label htmlFor={`client-id-${p.platform}`}>Client ID</Label>
                                     <Input

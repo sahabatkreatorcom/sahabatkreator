@@ -105,7 +105,7 @@ export function UsersTable() {
                 />
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-border bg-card">
+            <div className="rounded-lg border border-border bg-card">
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">

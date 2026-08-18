@@ -13,6 +13,7 @@ import { db, schema } from "@sahabat-kreator/db";
 import { createHmac, timingSafeEqual as _timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { PaymentRequest, PaymentResponse, SubscriptionRequest, SubscriptionResponse } from "./types";
+import { decryptToken } from "./encryption";
 
 const DEFAULT_BASE_URL = "https://api-pay-sandbox.sumopod.com";
 
@@ -88,9 +89,9 @@ class SumoPodService {
       }
 
       return {
-        apiKey: settings.sumopodApiKey,
-        webhookSecret: settings.sumopodWebhookSecret || undefined,
-        webhookToken: settings.sumopodWebhookToken || undefined,
+        apiKey: decryptToken(settings.sumopodApiKey),
+        webhookSecret: decryptToken(settings.sumopodWebhookSecret || ""),
+        webhookToken: decryptToken(settings.sumopodWebhookToken || ""),
         baseUrl: settings.sumopodBase || DEFAULT_BASE_URL,
       };
     } catch (error) {

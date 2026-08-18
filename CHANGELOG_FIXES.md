@@ -4,6 +4,37 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #21 — Area admin: billing mock, nav blog hilang, dropdown tertutup, Overview selalu aktif, platform tanpa callback URL, SumoPod tanpa UI
+**Gejala:** 7 temuan di `/admin`:
+1. `/admin/billing` menampilkan angka statis (Rp 15.000.000 / 45 sub) — data palsu, bukan dari DB.
+2. Editor blog (`/admin/blog`, `/admin/blog/new`, `/admin/blog/[id]`) sudah ada tapi tak ada menu di sidebar admin → tidak bisa ditemukan.
+3. Daftar platform di `/admin/platforms` tampil 8 (IG, Meta, TikTok, YouTube, Pinterest, Google Business, LinkedIn, Threads) — perlu dipastikan tak ada yang terlewat & tak ada petunjuk callback/webhook URL untuk developer portal.
+4. Dropdown action di `/admin/users` terpotong (tombol menu aksi user) — item terbawah tak terlihat.
+5. Nav "Overview" di sidebar admin selalu menyala di semua sub-route `/admin/*`.
+6. **Konfigurasi SumoPod Pay (`global_integration_settings`) tidak punya UI admin sama sekali** — hanya bisa diisi manual via DB.
+7. (Bonus) halaman blog publik `/blog/[slug]` memakai `sahabatkreator.id` hardcode di preview slug editor.
+
+**Akar:**
+1. `apps/web/src/app/api/admin/billing/stats/route.ts` mengembalikan literal hardcoded — tak pernah query `payment`/`subscription`.
+2. `adminNavItems` di `admin-sidebar.tsx` tidak punya entri Blog.
+3. List kredensial benar (FACEBOOK & INSTAGRAM_PAGE memang pakai kredensial META via `credentialPlatform`; BLUESKY tidak punya OAuth client id/secret — memakai app password), tapi UI tak menampilkan callback URL (`/api/accounts/callback/<platform>`) & webhook URL yang harus didaftarkan.
+4. Wrapper tabel `overflow-hidden rounded-lg` memotong dropdown absolute (`top-[calc(100%-4px)]`) milik `<td>` terakhir.
+5. `isActive("/admin", pathname)` memakai prefix `startsWith(href + "/")` → `/admin/users`.startsWith(`/admin/`) = true.
+6. Tidak pernah ada route admin + halaman untuk menulis `globalIntegrationSettings`; secret SumoPod disimpan plaintext dan dibaca plaintext oleh `sumopod.ts`.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/app/api/admin/billing/stats/route.ts` (query real: sum amount COMPLETED by month, count subscription aktif + cancel bulan ini + distinct org), `apps/web/src/components/admin/admin-sidebar.tsx` (tambah item `Blog` → `/admin/blog`; `isActive` exact-match untuk `/admin`), `apps/web/src/app/api/admin/platform-credentials/route.ts` (+`callbackUrl` & `webhookUrls` berbasis `BETTER_AUTH_URL`), `apps/web/src/app/admin/platforms/page.tsx` (render callback/webhook URL per kartu), `apps/web/src/components/admin/users-table.tsx` (hapus `overflow-hidden`), `apps/web/src/app/api/admin/sumo-pod/route.ts` (**baru**: GET masked + PUT upsert `globalIntegrationSettings`, secret di-`encryptToken`), `apps/web/src/app/admin/billing/page.tsx` (+kartu `SumoPodPaySettingsCard`: API key/secret, webhook secret/token, base URL, trial days, toggle aktif), `packages/payment/src/encryption.ts` (**baru**: AES-256-GCM encrypt/decrypt dipakai `sumopod.ts`), `packages/payment/src/sumopod.ts` (baca config kini `decryptToken`), `packages/payment/package.json` (+dep `@sahabat-kreator/env`) |
+| **Masalah** | Billing mock; nav blog hilang; dropdown action terpotong; Overview selalu aktif; platform tanpa info callback URL; SumoPod tanpa UI admin & secret plaintext |
+| **Akar** | Stats hardcoded; sidebar tanpa item blog; `overflow-hidden` di wrapper tabel; `isActive` prefix; UI credential tanpa URL setup; belum ada route+halaman admin untuk `global_integration_settings` |
+| **Fix** | Billing query DB nyata (totalRevenue, monthlyRevenue, revenueLastMonth, activeSubscriptions, totalCustomers, churnRate); sidebar +Blog; isActive `/admin` exact; users-table tanpa overflow-hidden; API+UI callback/webhook URL; API+UI SumoPod Pay dengan secret terenkripsi + decrypt di service |
+| **Verifikasi** | `pnpm --filter web check-types` lolos (web) setelah `pnpm install` (payment +dep env). **PENDING deploy** — perlu rebuild web di VPS. Data billing = 0/Rp0 bila belum ada payment COMPLETED (wajar). |
+| **Pelajaran** | Cek `overflow-hidden` di wrapper tabel saat dropdown absolute terpotong. Jangan hardcode angka statistik admin — selalu query DB. Sidebar nav perlu exact-match untuk root route agar tak menyala di sub-route. Secret gateway pembayaran wajib dienkripsi di DB & didekripsi hanya di service. |
+| **Log Keyword** | admin, billing, mock, blog, sidebar, dropdown, overflow-hidden, isActive, callback url, webhook, platform credentials, sumopod, payment, encrypt, global integration settings |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #20 — Setelah login/buat workspace redirect ke `/` (landing) bukan `/dashboard`
 **Gejala:** User login (atau membuat workspace pertama, atau menerima undangan) berakhir di
 `https://sahabatkreator.com/` (halaman landing) — harusnya masuk dashboard.

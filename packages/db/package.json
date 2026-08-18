@@ -14,7 +14,8 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed:blog": "tsx src/seed/seed-blog.ts"
   },
   "dependencies": {
     "@sahabat-kreator/env": "workspace:*",
@@ -26,6 +27,7 @@
     "@sahabat-kreator/config": "workspace:*",
     "@types/pg": "^8.21.0",
     "drizzle-kit": "^0.31.10",
+    "tsx": "^4.19.0",
     "typescript": "^6.0.3"
   }
 }

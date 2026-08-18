@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { db, schema } from "@sahabat-kreator/db";
 import { eq } from "drizzle-orm";
+import { env } from "@sahabat-kreator/env/server";
 import { withAdmin, json } from "@/lib/api";
 import { encryptToken } from "@/lib/token-encryption";
 import {
@@ -24,6 +25,15 @@ const MANAGED_PLATFORMS: Platform[] = [
     "THREADS",
 ];
 
+/** Path webhook per platform (untuk dipasang di developer portal masing-masing). */
+const WEBHOOK_PATHS: Partial<Record<Platform, string[]>> = {
+    INSTAGRAM: ["/api/webhooks/instagram"],
+    META: ["/api/webhooks/instagram", "/api/webhooks/facebook", "/api/webhooks/threads"],
+    TIKTOK: ["/api/webhooks/tiktok"],
+    YOUTUBE: ["/api/webhooks/youtube"],
+    THREADS: ["/api/webhooks/threads"],
+};
+
 function validPlatform(value: string): value is Platform {
     return MANAGED_PLATFORMS.includes(value as Platform);
 }
@@ -46,6 +56,7 @@ export const GET = withAdmin(async () => {
     });
 
     const byPlatform = new Map(rows.map((r) => [r.platform, r]));
+    const baseUrl = env.BETTER_AUTH_URL.replace(/\/$/, "");
 
     const list = MANAGED_PLATFORMS.map((platform) => {
         const row = byPlatform.get(platform);
@@ -58,6 +69,10 @@ export const GET = withAdmin(async () => {
             webhookVerifyToken: row?.webhookVerifyToken ?? null,
             isConfigured: !!row?.isConfigured,
             updatedAt: row?.updatedAt ?? null,
+            callbackUrl: CONNECTABLE_PLATFORMS.includes(platform)
+                ? `${baseUrl}/api/accounts/callback/${platform.toLowerCase()}`
+                : null,
+            webhookUrls: (WEBHOOK_PATHS[platform] ?? []).map((p) => `${baseUrl}${p}`),
         };
     });
 
