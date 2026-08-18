@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     try {
         const res = await auth.api.listUsers({
             headers: await headers(),
-            query: { limit, sortBy: "createdAt", sortOrder: "desc" }
+            query: { limit }
         });
         const users = (res as any)?.users ?? [];
         return NextResponse.json({ users });

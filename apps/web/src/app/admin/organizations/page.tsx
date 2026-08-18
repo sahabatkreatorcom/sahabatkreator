@@ -121,7 +121,7 @@ export default function AdminOrganizationsPage() {
                                     </div>
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs">
                                         <a href={`/admin/organizations/${org.id}`}>Detail</a>
                                     </Button>
                                 </td>
@@ -135,10 +135,10 @@ export default function AdminOrganizationsPage() {
                 <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Halaman {page + 1} dari {totalPages}</span>
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>
+                        <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>
                             Sebelumnya
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>
+                        <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>
                             Berikutnya
                         </Button>
                     </div>
