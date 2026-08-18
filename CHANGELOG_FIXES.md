@@ -4,6 +4,30 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #17 — Web crash startup: `@swc/helpers` tidak lengkap di standalone (Turbopack tracing)
+**Gejala:** Container `web` restart-loop:
+`Error: Cannot find module '/app/node_modules/.pnpm/next@.../node_modules/@swc/helpers/esm/_interop_require_default.js'`.
+Migrate & worker OK; hanya web yang gagal.
+
+**Akar:** `next build` (Turbopack) me-referensikan helper `@swc/helpers/esm/_interop_require_default`
+di kode hasil kompilasi, tapi file-tracing **standalone** tidak selalu menyertakan seluruh isi
+`@swc/helpers` — build lokal lengkap (438 file), build Docker di VPS tidak. Inkonsistensi tracing
+antar environment (bug Turbopack file tracing yang dikenal). Runner hanya berisi hasil tracing →
+file hilang → server.js crash.
+
+| | |
+|---|---|
+| **File** | `apps/web/Dockerfile` — setelah `pnpm --filter web build`, RUN menyalin **utuh** `node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers` ke `standalone/node_modules/.pnpm/next@*/node_modules/@swc/helpers` (pakai glob pnpm path). |
+| **Masalah** | Web crash loop karena helper next hilang dari image standalone |
+| **Akar** | Turbopack tracing tidak menyertakan semua file `@swc/helpers` saat build Docker |
+| **Fix** | Salin `@swc/helpers` secara eksplisit dari node_modules build ke standalone (fallback di Dockerfile, tidak bergantung tracing). |
+| **Verifikasi** | Belum — perlu rebuild di VPS (`docker compose up -d --build`). Build lokal lengkap (438 file vs 438). |
+| **Pelajaran** | Standalone tracing bisa meloloskan helper runtime; untuk dep yang direferensikan compiler (seperti `@swc/helpers`) sebaiknya dijamin lewat `outputFileTracingIncludes` atau salinan eksplisit di Dockerfile. |
+| **Log Keyword** | swc helpers, interop_require_default, standalone, file tracing, turbopack, restart loop, cannot find module |
+| **Deploy** | PENDING — menunggu rebuild di VPS |
+
+---
+
 ### Fix #16 — Service `migrate` gagal: image runner standalone tak punya pnpm/packages + user nextjs tak bisa tulis corepack cache
 **Gejala:** Build image sukses, tapi container `migrate` exit 1:
 `EACCES: permission denied, mkdir '/home/nextjs/.cache/node/corepack/v1'` saat menjalankan `pnpm --filter @sahabat-kreator/db db:migrate`.

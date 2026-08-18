@@ -47,6 +47,16 @@ ENV DATABASE_URL=$DATABASE_URL \
     NEXT_TELEMETRY_DISABLED=1
 COPY apps/web ./apps/web
 RUN pnpm --filter web build
+# Fallback tracing Turbopack: `@swc/helpers` (dependency next) kadang hanya
+# sebagian ikut ter-trace → server standalone gagal di runtime. Salin utuh
+# dari node_modules build ke dalam hasil standalone (path pnpm .pnpm).
+RUN helpers_src=$(ls -d /app/node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers 2>/dev/null | head -1) && \
+    nextdir=$(ls -d /app/apps/web/.next/standalone/node_modules/.pnpm/next@*/node_modules 2>/dev/null | head -1) && \
+    if [ -n "$helpers_src" ] && [ -n "$nextdir" ]; then \
+      mkdir -p "$nextdir/@swc"; \
+      rm -rf "$nextdir/@swc/helpers"; \
+      cp -r "$helpers_src" "$nextdir/@swc/helpers"; \
+    fi
 
 # ---- Migrate: jalankan Drizzle migrasi dari stage deps (punya pnpm + seluruh workspace) ----
 FROM deps AS migrate
