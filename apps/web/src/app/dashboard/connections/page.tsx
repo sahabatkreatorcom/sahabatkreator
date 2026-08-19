@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link2, Link2Off, Loader2, ChevronDown } from "lucide-react";
+import { Link2, Link2Off, Loader2, ChevronDown, AlertTriangle } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -29,6 +29,35 @@ interface PageChoice {
     username?: string;
     avatar?: string | null;
 }
+
+const PLATFORM_ORDER = [
+    "INSTAGRAM",
+    "INSTAGRAM_PAGE",
+    "FACEBOOK",
+    "TIKTOK",
+    "YOUTUBE",
+    "THREADS",
+    "PINTEREST",
+    "LINKEDIN",
+    "GOOGLE_BUSINESS",
+] as Platform[];
+
+function tokenStatus(tokenExpiry: string | null): { label: string; tone: "ok" | "warn" | "expired" | "none" } {
+    if (!tokenExpiry) return { label: "Token tidak diketahui", tone: "none" };
+    const expiry = new Date(tokenExpiry).getTime();
+    const now = Date.now();
+    if (expiry < now) return { label: "Token kedaluwarsa — hubungkan ulang", tone: "expired" };
+    const daysLeft = (expiry - now) / 86_400_000;
+    if (daysLeft < 7) return { label: `Token hampir kedaluwarsa (${Math.max(0, Math.floor(daysLeft))} hari)`, tone: "warn" };
+    return { label: `Token valid hingga ${new Date(tokenExpiry).toLocaleDateString("id-ID")}`, tone: "ok" };
+}
+
+const TOKEN_TONE_STYLE: Record<string, string> = {
+    ok: "text-accent-green",
+    warn: "text-accent-amber",
+    expired: "text-accent-red",
+    none: "text-muted-foreground",
+};
 
 export default function ConnectionsPage() {
     const searchParams = useSearchParams();
@@ -193,73 +222,127 @@ export default function ConnectionsPage() {
         acc[a.platform] = (acc[a.platform] ?? 0) + 1;
         return acc;
     }, {});
+    const connectedPlatformCount = connected.size;
+    const accountsWithIssue = accounts.filter(
+        (a) =>
+            a.lastRefreshError ||
+            (a.tokenExpiry && new Date(a.tokenExpiry).getTime() < Date.now()),
+    ).length;
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-lg font-semibold">Koneksi akun</h1>
-                <p className="text-sm text-muted-foreground">
-                    Hubungkan akun sosial untuk menjadwalkan & menerbitkan konten.
-                </p>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h1 className="text-lg font-semibold">Koneksi akun</h1>
+                    <p className="text-sm text-muted-foreground">
+                        Hubungkan akun sosial untuk menjadwalkan & menerbitkan konten.
+                    </p>
+                </div>
             </div>
 
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
             {notice && <p className="rounded-md bg-accent-green/10 px-3 py-2 text-sm text-accent-green">{notice}</p>}
 
             {loading ? (
-                <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat akunâ€¦
+                <div className="grid gap-4 md:grid-cols-3">
+                    {[0, 1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="h-28 animate-pulse rounded-lg border border-border bg-muted/40" />
+                    ))}
                 </div>
             ) : (
-                <div className="space-y-4">
-                    {accounts.map((account) => (
-                        <div
-                            key={account.id}
-                            className="flex items-center gap-3 rounded-lg border border-border bg-card p-4"
-                        >
-                            <PlatformAvatar platform={account.platform} avatar={account.avatar} name={account.name} />
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium">{account.name}</p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                    {PLATFORM_LABELS[account.platform]}
-                                    {account.username ? ` Â· @${account.username}` : ""}
-                                </p>
-                                {account.lastRefreshError && (
-                                    <p className="mt-0.5 text-xs text-accent-amber">{account.lastRefreshError}</p>
-                                )}
-                            </div>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                loading={disconnecting === account.id}
-                                onClick={() => handleDisconnect(account.id)}
-                            >
-                                <Link2Off className="h-4 w-4" />
-                                Putus
-                            </Button>
+                <div className="space-y-6">
+                    {/* Ringkasan */}
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-lg border border-border bg-card p-4">
+                            <p className="text-2xl font-semibold">{accounts.length}</p>
+                            <p className="text-xs text-muted-foreground">Total akun terhubung</p>
                         </div>
-                    ))}
+                        <div className="rounded-lg border border-border bg-card p-4">
+                            <p className="text-2xl font-semibold">{connectedPlatformCount}</p>
+                            <p className="text-xs text-muted-foreground">Platform aktif</p>
+                        </div>
+                        <div className="rounded-lg border border-border bg-card p-4">
+                            <p className={`text-2xl font-semibold ${accountsWithIssue > 0 ? "text-accent-amber" : ""}`}>
+                                {accountsWithIssue}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Akun perlu perhatian (token / error)</p>
+                        </div>
+                    </div>
 
+                    {/* Daftar akun per platform */}
+                    {accounts.length > 0 && (
+                        <div>
+                            <p className="pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                Akun terhubung
+                            </p>
+                            <div className="grid gap-3 lg:grid-cols-2">
+                                {accounts.map((account) => {
+                                    const status = tokenStatus(account.tokenExpiry);
+                                    return (
+                                        <div
+                                            key={account.id}
+                                            className="flex items-center gap-3 rounded-lg border border-border bg-card p-4"
+                                        >
+                                            <PlatformAvatar platform={account.platform} avatar={account.avatar} name={account.name} />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="truncate text-sm font-medium">{account.name}</p>
+                                                    {!account.isActive && (
+                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                            Tidak aktif
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="truncate text-xs text-muted-foreground">
+                                                    {PLATFORM_LABELS[account.platform]}
+                                                    {account.username ? ` · @${account.username}` : ""}
+                                                </p>
+                                                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                                                    <span className={TOKEN_TONE_STYLE[status.tone]}>{status.label}</span>
+                                                    {account.lastRefreshError && (
+                                                        <span className="flex items-center gap-1 text-accent-amber">
+                                                            <AlertTriangle className="h-3 w-3" />
+                                                            Refresh gagal
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                loading={disconnecting === account.id}
+                                                onClick={() => handleDisconnect(account.id)}
+                                            >
+                                                <Link2Off className="h-4 w-4" />
+                                                Putus
+                                            </Button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Hubungkan platform */}
                     <div>
                         <p className="pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             Hubungkan platform
                         </p>
                         <div className="grid gap-3 md:grid-cols-2">
-                            {(["INSTAGRAM", "INSTAGRAM_PAGE", "FACEBOOK", "TIKTOK", "YOUTUBE", "THREADS", "PINTEREST", "LINKEDIN", "GOOGLE_BUSINESS"] as Platform[]).map((platform) => (
+                            {PLATFORM_ORDER.map((platform) => (
                                 <div
                                     key={platform}
-                                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-4"
+                                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-muted-foreground/30"
                                 >
                                     <div className="flex items-center gap-3">
                                         <PlatformAvatar platform={platform} name={PLATFORM_LABELS[platform]} />
                                         <div>
                                             <span className="text-sm font-medium">{PLATFORM_LABELS[platform]}</span>
-                                            {countByPlatform[platform] > 0 && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    {countByPlatform[platform]} akun terhubung
-                                                </p>
-                                            )}
+                                            <p className="text-xs text-muted-foreground">
+                                                {countByPlatform[platform] > 0
+                                                    ? `${countByPlatform[platform]} akun terhubung`
+                                                    : "Belum terhubung"}
+                                            </p>
                                         </div>
                                     </div>
                                     <Button
