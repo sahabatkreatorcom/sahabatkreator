@@ -10,7 +10,6 @@ import {
     Building2,
     Palette,
     Bell,
-    Globe,
     Sparkles,
     CreditCard,
     Shield,
@@ -29,7 +28,6 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { ConnectedAccountsSettings } from "@/components/settings/connected-accounts";
 import { PushNotificationSettings } from "@/components/settings/push-notification-settings";
 import { authClient } from "@/lib/auth-client";
 
@@ -74,14 +72,13 @@ const TIMEZONES = [
     "Australia/Sydney",
 ];
 
-type Tab = "profile" | "organization" | "appearance" | "notifications" | "accounts" | "brand-tone" | "security" | "push" | "billing";
+type Tab = "profile" | "organization" | "appearance" | "notifications" | "brand-tone" | "security" | "push" | "billing";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "profile", label: "Profil", icon: <User className="h-4 w-4" /> },
     { id: "organization", label: "Workspace", icon: <Building2 className="h-4 w-4" /> },
     { id: "appearance", label: "Tampilan", icon: <Palette className="h-4 w-4" /> },
     { id: "notifications", label: "Notifikasi", icon: <Bell className="h-4 w-4" /> },
-    { id: "accounts", label: "Akun Terhubung", icon: <Globe className="h-4 w-4" /> },
     { id: "brand-tone", label: "Brand Voice", icon: <Sparkles className="h-4 w-4" /> },
     { id: "security", label: "Keamanan", icon: <Shield className="h-4 w-4" /> },
     { id: "push", label: "Push", icon: <Bell className="h-4 w-4" /> },
@@ -361,8 +358,6 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 )}
-
-                {activeTab === "accounts" && <ConnectedAccountsSettings />}
 
                 {activeTab === "brand-tone" && (
                     <div className="space-y-4 rounded-lg border border-border bg-card p-5">

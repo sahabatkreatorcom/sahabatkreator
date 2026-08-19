@@ -56,6 +56,7 @@ const nextConfig: NextConfig = {
     return [
       { source: '/settings', destination: '/dashboard/settings' },
       { source: '/settings/:path*', destination: '/dashboard/settings/:path*' },
+      { source: '/connections', destination: '/dashboard/connections' },
       { source: '/calendar', destination: '/dashboard/calendar' },
       { source: '/analytics', destination: '/dashboard/analytics' },
       { source: '/inbox', destination: '/dashboard/inbox' },

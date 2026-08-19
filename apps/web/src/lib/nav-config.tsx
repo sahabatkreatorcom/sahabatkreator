@@ -17,6 +17,7 @@ import {
     Activity,
     Tag,
     CreditCard,
+    Link2,
     type LucideIcon,
 } from "lucide-react";
 
@@ -182,6 +183,14 @@ export const navItems: NavItem[] = [
         label: "Anggota tim",
         shortLabel: "Tim",
         icon: Users,
+        group: "workspace",
+        mobileTab: false,
+    },
+    {
+        href: "/connections",
+        label: "Koneksi akun",
+        shortLabel: "Akun",
+        icon: Link2,
         group: "workspace",
         mobileTab: false,
     },

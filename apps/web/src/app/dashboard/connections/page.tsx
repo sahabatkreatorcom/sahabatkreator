@@ -84,13 +84,13 @@ export default function ConnectionsPage() {
                         ? "Tidak ada halaman dengan Instagram business account yang ditemukan."
                         : "Tidak ada halaman Facebook yang ditemukan.",
                 );
-                router.replace("/settings/connections");
+                router.replace("/connections");
                 return;
             }
             setPendingChoices({ platform, pages: data.pages });
         } catch (e) {
             setError(e instanceof Error ? e.message : "Gagal memuat pilihan halaman.");
-            router.replace("/settings/connections");
+            router.replace("/connections");
         } finally {
             setPendingLoading(false);
         }
@@ -111,7 +111,7 @@ export default function ConnectionsPage() {
             if (!res.ok) throw new Error(data.error || "Gagal menyimpan akun.");
             setPendingChoices(null);
             setNotice("Akun berhasil dihubungkan.");
-            router.replace("/settings/connections");
+            router.replace("/connections");
             loadAccounts();
         } catch (e) {
             setError(e instanceof Error ? e.message : "Gagal menyimpan akun.");
@@ -122,7 +122,7 @@ export default function ConnectionsPage() {
 
     const cancelPending = () => {
         setPendingChoices(null);
-        router.replace("/settings/connections");
+        router.replace("/connections");
     };
 
     const loadAccounts = useCallback(async () => {

@@ -184,7 +184,7 @@ export default function ComposePage() {
                 ) : accounts.length === 0 ? (
                     <div className="text-sm text-muted-foreground">
                         Belum ada akun terhubung.{" "}
-                        <a href="/settings/connections" className="font-medium text-primary hover:underline">
+                        <a href="/connections" className="font-medium text-primary hover:underline">
                             Hubungkan akun
                         </a>
                         .

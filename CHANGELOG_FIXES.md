@@ -4,6 +4,32 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #28 — Konsolidasi kelola akun: tab settings, sidebar "Akun", dan /settings/connections → satu halaman /connections
+**Permintaan:** Kelola akun saat ini tersebar di 3 tempat: tab "Akun Terhubung" di `/dashboard/settings`, grup "Akun" di sidebar (menampilkan daftar akun), dan halaman `/settings/connections`. Dengan banyak akun, daftar di sidebar bikin scroll panjang. Disatukan menjadi **satu halaman `/connections`**.
+
+**Perubahan:**
+- Halaman `apps/web/src/app/dashboard/settings/connections/page.tsx` dipindah → `apps/web/src/app/dashboard/connections/page.tsx` (URL `/connections` via rewrite).
+- `next.config.ts`: +rewrite `/connections` → `/dashboard/connections`.
+- `nav-config.tsx`: +item "Koneksi akun" (`/connections`, icon Link2) di grup **workspace**.
+- `sidebar.tsx`: hapus `<AccountSidebar/>` (grup "Akun").
+- `dashboard/settings/page.tsx`: hapus tab "accounts" + import `ConnectedAccountsSettings`.
+- `dashboard/settings/layout.tsx`: hapus link "Koneksi akun".
+- Hapus file `account-sidebar.tsx` & `connected-accounts.tsx` (tak terpakai).
+- `compose/page.tsx` & callback OAuth: link/redirect `/settings/connections` → `/connections`.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/app/dashboard/connections/page.tsx` (dipindah dari settings/connections), `apps/web/next.config.ts`, `apps/web/src/lib/nav-config.tsx`, `apps/web/src/components/dashboard/sidebar.tsx`, `apps/web/src/app/dashboard/settings/{page,layout}.tsx`, `apps/web/src/app/dashboard/compose/page.tsx`, `apps/web/src/app/api/accounts/callback/[platform]/route.ts`; hapus `account-sidebar.tsx`, `connected-accounts.tsx` |
+| **Masalah** | 3 tempat kelola akun; sidebar panjang bila akun banyak |
+| **Akar** | Duplikasi UI kelola akun |
+| **Fix** | Satu halaman `/connections`; sidebar hanya link "Koneksi akun" di grup Workspace |
+| **Verifikasi** | `next typegen` + `pnpm --filter web exec tsc --noEmit` lolos. **PENDING deploy** — rebuild web, uji `/connections` (list + dialog pilih halaman FB/IG + tambah akun). |
+| **Pelajaran** | Konsolidasikan entry point kelola akun jadi satu halaman; sidebar cukup link, jangan tampilkan daftar penuh (bisa panjang). |
+| **Log Keyword** | connections, akun, sidebar, settings, konsolidasi, rewrite, nav |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #27 — Sidebar nav dikelompokkan per fungsi + akun terhubung tampil di sidebar (avatar riil)
 **Gejala/permintaan:** (1) Tab "Akun Terhubung" di `/dashboard/settings` menampilkan avatar **placeholder** (inisial platform, `acc.platform.slice(0,2)`) padahal data avatar riil sudah ada di `/api/accounts`. (2) Sidebar nav hanya punya 2 grup longgar ("Konten"/"Pengaturan") — item tidak dikelompokkan berdasarkan fungsi. (3) User ingin daftar akun terhubung tampil langsung di sidebar agar akses cepat.
 

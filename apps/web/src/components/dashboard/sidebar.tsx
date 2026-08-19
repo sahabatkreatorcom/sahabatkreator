@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
 import { OrgSwitcher, type OrgSwitcherProps } from "@/components/dashboard/org-switcher";
-import { AccountSidebar } from "@/components/dashboard/account-sidebar";
 import { navItems, navGroups, type NavItem } from "@/lib/nav-config";
 import { cn } from "@/lib/utils";
 
@@ -61,8 +60,6 @@ export function Sidebar({
                     </div>
                 );
             })}
-
-            <AccountSidebar />
         </nav>
     );
 }

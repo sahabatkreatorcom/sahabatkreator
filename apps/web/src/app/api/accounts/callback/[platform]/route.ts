@@ -21,7 +21,7 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
     const { platform: platformParam } = await params;
     const platform = platformParam.toUpperCase() as Platform;
     const baseUrl = env.BETTER_AUTH_URL.replace(/\/$/, "");
-    const accountsUrl = new URL("/settings/connections", baseUrl);
+    const accountsUrl = new URL("/connections", baseUrl);
 
     if (!CONNECTABLE_PLATFORMS.includes(platform)) {
         accountsUrl.searchParams.set("error", "invalid_platform");
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
                 accessToken: encryptToken(tokens.accessToken),
                 expiresAt: new Date(Date.now() + 10 * 60 * 1000),
             });
-            const pickUrl = new URL("/settings/connections", baseUrl);
+            const pickUrl = new URL("/connections", baseUrl);
             pickUrl.searchParams.set("pending", sessionId);
             pickUrl.searchParams.set("platform", platform);
             return NextResponse.redirect(pickUrl);
