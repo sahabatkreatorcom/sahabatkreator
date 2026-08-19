@@ -4,6 +4,26 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #27 — Sidebar nav dikelompokkan per fungsi + akun terhubung tampil di sidebar (avatar riil)
+**Gejala/permintaan:** (1) Tab "Akun Terhubung" di `/dashboard/settings` menampilkan avatar **placeholder** (inisial platform, `acc.platform.slice(0,2)`) padahal data avatar riil sudah ada di `/api/accounts`. (2) Sidebar nav hanya punya 2 grup longgar ("Konten"/"Pengaturan") — item tidak dikelompokkan berdasarkan fungsi. (3) User ingin daftar akun terhubung tampil langsung di sidebar agar akses cepat.
+
+**Akar:**
+1. `connected-accounts.tsx` tidak memakai `acc.avatar` — selalu inisial 2 huruf platform.
+2. `nav-config.tsx` memakai `group: "content" | "team"` — kategori terlalu lebar; `sidebar.tsx` hardcode 2 grup.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/lib/nav-config.tsx` (`NavGroup` baru: overview/content/inbox/insight/workspace + `navGroups[]` dengan label fungsi; item dipetakan ulang), `apps/web/src/components/dashboard/sidebar.tsx` (render per-grup dinamis dari `navGroups`), `apps/web/src/components/dashboard/account-sidebar.tsx` (**baru**: daftar akun terhubung dgn avatar riil dari `/api/accounts` + link Kelola/Tambah ke `/settings/connections`), `apps/web/src/components/settings/connected-accounts.tsx` (avatar riil `acc.avatar`, fallback inisial nama) |
+| **Masalah** | Avatar placeholder; sidebar tidak terkelompok per fungsi; akun tak terlihat di sidebar |
+| **Akar** | `connected-accounts.tsx` abaikan avatar; `NavGroup` hanya 2 nilai; sidebar hardcode grup |
+| **Fix** | Avatar riil + fallback; 5 grup fungsi (Ringkasan/Konten/Inbox/Analitik & Riset/Workspace); `AccountSidebar` di sidebar antara Konten & Analitik; komponen settings pakai avatar |
+| **Verifikasi** | `pnpm --filter web exec tsc --noEmit` lolos. **PENDING deploy** — rebuild web, cek sidebar grup + avatar akun. |
+| **Pelajaran** | Sidebar nav lebih mudah dirawat bila grouping data-driven (`navGroups[]`); jangan hardcode grup di komponen. Avatar akun: selalu pakai `avatar` dari `/api/accounts`. |
+| **Log Keyword** | sidebar, nav, group, fungsi, akun terhubung, avatar, connected accounts, nav-config |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #26 — Halaman /dashboard/billing tidak menampilkan hasil redirect pembayaran SumoPod (?status=)
 **Gejala:** Setelah checkout SumoPod selesai, user di-redirect kembali ke `/dashboard/billing?status=success` (atau `?status=cancelled`), tapi halaman tidak menampilkan konfirmasi apa pun — seolah-olah tidak terjadi apa-apa.
 

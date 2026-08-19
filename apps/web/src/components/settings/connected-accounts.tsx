@@ -118,12 +118,20 @@ export function ConnectedAccountsSettings() {
                                 !acc.isActive && "opacity-60"
                             )}
                         >
-                            <div
-                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white font-bold text-sm"
-                                style={{ background: PLATFORM_COLORS[acc.platform as Platform] ?? "#6B7280" }}
-                            >
-                                {acc.platform.slice(0, 2).toUpperCase()}
-                            </div>
+                            {acc.avatar ? (
+                                <img
+                                    src={acc.avatar}
+                                    alt={acc.name || acc.username || acc.platform}
+                                    className="h-10 w-10 shrink-0 rounded-full object-cover"
+                                />
+                            ) : (
+                                <div
+                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white font-bold text-sm"
+                                    style={{ background: PLATFORM_COLORS[acc.platform as Platform] ?? "#6B7280" }}
+                                >
+                                    {(acc.name || acc.username || acc.platform).slice(0, 2).toUpperCase()}
+                                </div>
+                            )}
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                     <p className="truncate text-sm font-medium">

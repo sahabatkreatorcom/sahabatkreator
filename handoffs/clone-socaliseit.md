@@ -2,6 +2,7 @@
 Status: BERJALAN · Service: web/db/payment/queue · Diperbarui: 2026-08-19
 
 ## Sedang dikerjakan
+**Sidebar grouped by function + akun di sidebar (Fix #27, PENDING deploy)**: `nav-config.tsx` grup jadi 5 fungsi (overview/content/inbox/insight/workspace) via `navGroups[]`; `sidebar.tsx` render dinamis per grup; komponen baru `account-sidebar.tsx` (daftar akun + avatar riil dari `/api/accounts`, link ke `/settings/connections`); `connected-accounts.tsx` avatar riil. Typecheck lolos. **Belum deployed**.
 **Billing redirect (Fix #26, PENDING deploy)**: `/dashboard/billing` kini baca `?status=` (success/cancelled) → banner konfirmasi. Typecheck lolos. **Belum deployed**.
 **Media delete 500 (pushed 99d17a0, PENDING deploy)**: route DELETE `/api/media` ganti `sql ANY(array)` (error Postgres → 500) → `inArray` + try/catch. Terverifikasi delete DB OK di Neon. **Belum deployed** — VPS masih kode lama (500 saat hapus media).
 **Pinterest Trial access / Sandbox (Fix #24, PENDING deploy)**: env baru `PINTEREST_SANDBOX` + helper `pinterest-config.ts` (`PINTEREST_API_BASE`/`PINTEREST_TOKEN_URL`) → semua panggilan API Pinterest (OAuth token, user_account, pins, media) bisa diarahkan ke `api-sandbox.pinterest.com/v5`. Video Pin diblokir saat sandbox (batasan resmi). `.env.example` + dokumentasi. Typecheck web+env lolos. **Belum deployed** — set `PINTEREST_SANDBOX=true` saat ingin uji trial access.

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
 import { OrgSwitcher, type OrgSwitcherProps } from "@/components/dashboard/org-switcher";
-import { navItems, type NavItem } from "@/lib/nav-config";
+import { AccountSidebar } from "@/components/dashboard/account-sidebar";
+import { navItems, navGroups, type NavItem } from "@/lib/nav-config";
 import { cn } from "@/lib/utils";
 
 /**
@@ -32,8 +33,6 @@ export function Sidebar({
     activeOrganizationId: string;
 }) {
     const pathname = usePathname();
-    const contentItems = navItems.filter((i) => i.group === "content");
-    const teamItems = navItems.filter((i) => i.group === "team");
 
     return (
         <nav className="flex h-full flex-col gap-6 overflow-y-auto p-3">
@@ -46,27 +45,24 @@ export function Sidebar({
                 <OrgSwitcher organizations={organizations} activeOrganizationId={activeOrganizationId} />
             </div>
 
-            <div>
-                <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Konten
-                </p>
-                <ul className="space-y-0.5">
-                    {contentItems.map((item) => (
-                        <NavItemRow key={item.href} item={item} active={isActive(item.href, pathname)} />
-                    ))}
-                </ul>
-            </div>
+            {navGroups.map((group) => {
+                const items = navItems.filter((i) => i.group === group.id);
+                if (items.length === 0) return null;
+                return (
+                    <div key={group.id}>
+                        <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {group.label}
+                        </p>
+                        <ul className="space-y-0.5">
+                            {items.map((item) => (
+                                <NavItemRow key={item.href} item={item} active={isActive(item.href, pathname)} />
+                            ))}
+                        </ul>
+                    </div>
+                );
+            })}
 
-            <div>
-                <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Pengaturan
-                </p>
-                <ul className="space-y-0.5">
-                    {teamItems.map((item) => (
-                        <NavItemRow key={item.href} item={item} active={isActive(item.href, pathname)} />
-                    ))}
-                </ul>
-            </div>
+            <AccountSidebar />
         </nav>
     );
 }
