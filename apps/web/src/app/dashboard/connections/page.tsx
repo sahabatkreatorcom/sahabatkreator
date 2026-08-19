@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link2, Link2Off, Loader2, ChevronDown, AlertTriangle } from "lucide-react";
+import { Link2, Link2Off, Loader2, ChevronDown, AlertTriangle, RefreshCw } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -66,6 +66,8 @@ export default function ConnectionsPage() {
     const [loading, setLoading] = useState(true);
     const [connecting, setConnecting] = useState<Platform | null>(null);
     const [disconnecting, setDisconnecting] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState<string | null>(null);
+    const [autoRefreshing, setAutoRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const activeOrgRef = useRef<string | null>(null);
@@ -172,6 +174,61 @@ export default function ConnectionsPage() {
         loadAccounts();
     }, [loadAccounts]);
 
+    // Auto-refresh senyap untuk akun yang tokennya hampir kedaluwarsa / bermasalah.
+    // Hanya dijalankan sekali saat halaman dimuat (bukan saat navigasi balik).
+    const didAutoRefresh = useRef(false);
+    useEffect(() => {
+        if (didAutoRefresh.current) return;
+        didAutoRefresh.current = true;
+        if (accounts.length === 0) return;
+
+        const needsRefresh = accounts.some(
+            (a) =>
+                a.lastRefreshError ||
+                (a.tokenExpiry && new Date(a.tokenExpiry).getTime() < Date.now() + 7 * 86_400_000),
+        );
+        if (!needsRefresh) return;
+
+        setAutoRefreshing(true);
+        fetch("/api/accounts/refresh")
+            .then((res) => res.json())
+            .then((data) => {
+                if (data.results?.some((r: { refreshed: boolean }) => r.refreshed)) {
+                    setNotice("Token yang hampir kedaluwarsa berhasil diperbarui otomatis.");
+                } else if (data.results?.some((r: { error?: string }) => r.error)) {
+                    const failed = data.results.find((r: { error?: string }) => r.error);
+                    setError(`Beberapa akun perlu dihubungkan ulang: ${failed?.error ?? "token tidak bisa diperbarui."}`);
+                }
+                loadAccounts();
+            })
+            .catch(() => {})
+            .finally(() => setAutoRefreshing(false));
+    }, [accounts, loadAccounts]);
+
+    async function handleRefresh(id: string) {
+        setRefreshing(id);
+        setError(null);
+        try {
+            const res = await fetch("/api/accounts/refresh", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ accountId: id }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setError(data.error || "Gagal memperbarui token.");
+                loadAccounts();
+                return;
+            }
+            setNotice(data.refreshed ? "Token berhasil diperbarui." : "Token masih valid, tidak perlu diperbarui.");
+            loadAccounts();
+        } catch {
+            setError("Gagal memperbarui token.");
+        } finally {
+            setRefreshing(null);
+        }
+    }
+
     async function handleConnect(platform: Platform) {
         setConnecting(platform);
         setError(null);
@@ -242,6 +299,12 @@ export default function ConnectionsPage() {
 
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
             {notice && <p className="rounded-md bg-accent-green/10 px-3 py-2 text-sm text-accent-green">{notice}</p>}
+            {autoRefreshing && (
+                <p className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Memeriksa & memperbarui token secara otomatis…
+                </p>
+            )}
 
             {loading ? (
                 <div className="grid gap-4 md:grid-cols-3">
@@ -307,15 +370,28 @@ export default function ConnectionsPage() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                loading={disconnecting === account.id}
-                                                onClick={() => handleDisconnect(account.id)}
-                                            >
-                                                <Link2Off className="h-4 w-4" />
-                                                Putus
-                                            </Button>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    loading={disconnecting === account.id}
+                                                    onClick={() => handleDisconnect(account.id)}
+                                                >
+                                                    <Link2Off className="h-4 w-4" />
+                                                    Putus
+                                                </Button>
+                                                {(status.tone === "warn" || status.tone === "expired" || status.tone === "none" || account.lastRefreshError) && (
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="sm"
+                                                        loading={refreshing === account.id}
+                                                        onClick={() => handleRefresh(account.id)}
+                                                    >
+                                                        <RefreshCw className="h-4 w-4" />
+                                                        Perbarui
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}

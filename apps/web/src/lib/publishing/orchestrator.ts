@@ -1,5 +1,3 @@
-import { db, schema } from "@sahabat-kreator/db";
-import { eq } from "drizzle-orm";
 import { publishToInstagram } from "./instagram";
 import { publishToFacebook } from "./facebook";
 import { publishToTikTok } from "./tiktok";
@@ -7,8 +5,7 @@ import { publishToYouTube } from "./youtube";
 import { publishToPinterest } from "./pinterest";
 import { publishToLinkedIn } from "./linkedin";
 import { publishToThreads } from "./threads";
-import { refreshAccessToken, getCredentialsForPlatform } from "@/lib/platforms";
-import { decryptToken, encryptToken } from "@/lib/token-encryption";
+import { refreshAccountTokenIfNeeded } from "@/lib/platforms/token-refresh";
 import type { PlatformAccount, PublishPayload, PublishResponse } from "./types";
 
 /**
@@ -19,33 +16,19 @@ export async function publishToPlatform(
     account: PlatformAccount,
     payload: PublishPayload,
 ): Promise<PublishResponse> {
-    // Refresh token bila kedaluwarsa
+    // Refresh token bila perlu (Meta: preemptif 7 hari; lain: saat expired)
     let token = account.accessToken;
-    if (account.tokenExpiresAt && new Date() > account.tokenExpiresAt) {
-        if (!account.refreshToken) {
-            return { success: false, error: "Token akses kedaluwarsa dan tidak ada refresh token. Hubungkan ulang akun.", errorCode: "TOKEN_EXPIRED" };
-        }
-        try {
-            const credentials = await getCredentialsForPlatform(account.platform) || undefined;
-            const refreshed = await refreshAccessToken(account.platform, decryptToken(account.refreshToken), credentials);
-
-            await db.update(schema.socialAccount)
-                .set({
-                    accessToken: encryptToken(refreshed.accessToken),
-                    refreshToken: refreshed.refreshToken ? encryptToken(refreshed.refreshToken) : undefined,
-                    tokenExpiry: new Date(Date.now() + refreshed.expiresIn * 1000),
-                })
-                .where(eq(schema.socialAccount.id, account.id));
-
-            token = refreshed.accessToken;
-        } catch (refreshError) {
-            return {
-                success: false,
-                error: `Gagal refresh token: ${refreshError instanceof Error ? refreshError.message : "unknown"}. Hubungkan ulang akun.`,
-                errorCode: "TOKEN_REFRESH_FAILED",
-            };
-        }
+    const refreshed = await refreshAccountTokenIfNeeded({
+        id: account.id,
+        platform: account.platform,
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
+        tokenExpiry: account.tokenExpiresAt,
+    });
+    if (refreshed.needReconnect) {
+        return { success: false, error: refreshed.error, errorCode: "TOKEN_EXPIRED" };
     }
+    token = refreshed.token;
 
     const acc = { ...account, accessToken: token };
 

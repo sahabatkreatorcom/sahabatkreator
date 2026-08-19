@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { fetchComments } from "./comments";
-import { getCredentialsForPlatform, refreshAccessToken, type Platform } from "@/lib/platforms";
-import { decryptToken, encryptToken } from "@/lib/token-encryption";
+import { type Platform } from "@/lib/platforms";
+import { refreshAccountTokenIfNeeded } from "@/lib/platforms/token-refresh";
 import { processAutomationForComment } from "@/lib/inbox-automation";
 import type { InboxAccount } from "./types";
 
@@ -88,25 +88,23 @@ async function resolveAccount(account: {
     refreshToken?: string | null;
     tokenExpiry?: Date | null;
 }): Promise<InboxAccount> {
-    let token = decryptToken(account.accessToken);
-
-    if (account.tokenExpiry && new Date() > account.tokenExpiry) {
-        if (!account.refreshToken) {
-            throw new Error("Token akses kedaluwarsa dan tidak ada refresh token. Hubungkan ulang akun.");
-        }
-        const credentials = (await getCredentialsForPlatform(account.platform)) || undefined;
-        const refreshed = await refreshAccessToken(account.platform, decryptToken(account.refreshToken), credentials);
-        await db.update(schema.socialAccount)
-            .set({
-                accessToken: encryptToken(refreshed.accessToken),
-                refreshToken: refreshed.refreshToken ? encryptToken(refreshed.refreshToken) : undefined,
-                tokenExpiry: new Date(Date.now() + refreshed.expiresIn * 1000),
-            })
-            .where(eq(schema.socialAccount.id, account.id));
-        token = refreshed.accessToken;
+    const refreshed = await refreshAccountTokenIfNeeded({
+        id: account.id,
+        platform: account.platform,
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
+        tokenExpiry: account.tokenExpiry,
+    });
+    if (refreshed.needReconnect) {
+        throw new Error(refreshed.error);
     }
 
-    return { id: account.id, organizationId: account.organizationId, platform: account.platform, accessToken: token };
+    return {
+        id: account.id,
+        organizationId: account.organizationId,
+        platform: account.platform,
+        accessToken: refreshed.token,
+    };
 }
 
 export interface IncomingComment {

@@ -14,6 +14,7 @@ export type ActivityAction =
     | "account.connected"
     | "account.disconnected"
     | "account.refreshed"
+    | "account.refresh_failed"
     | "team.invited"
     | "team.removed"
     | "team.role_changed"
@@ -45,6 +46,7 @@ export const ACTION_LABELS: Record<ActivityAction, string> = {
     "account.connected": "menghubungkan akun",
     "account.disconnected": "memutus akun",
     "account.refreshed": "merefresh token akun",
+    "account.refresh_failed": "gagal merefresh token akun",
     "team.invited": "mengundang anggota",
     "team.removed": "menghapus anggota",
     "team.role_changed": "mengubah peran anggota",
