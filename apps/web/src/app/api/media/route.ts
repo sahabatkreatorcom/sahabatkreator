@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { withAuth, json } from "@/lib/api";
 import { uploadFile, deleteFile, getPublicUrl } from "@/lib/storage";
@@ -227,29 +227,35 @@ export const DELETE = withAuth(async (ctx, req: NextRequest) => {
         return json({ error: "Tidak ada ID media." }, { status: 400 });
     }
 
-    const items = await db.query.media.findMany({
-        where: (t, { and: _and, eq: _eq, inArray }) =>
-            _and(_eq(t.organizationId, activeOrganizationId), inArray(t.id, body.ids!)),
-        columns: { id: true, url: true, thumbnailUrl: true, transcodedUrl: true },
-    });
+    try {
+        const items = await db.query.media.findMany({
+            where: (t, { and: _and, eq: _eq, inArray }) =>
+                _and(_eq(t.organizationId, activeOrganizationId), inArray(t.id, body.ids!)),
+            columns: { id: true, url: true, thumbnailUrl: true, transcodedUrl: true },
+        });
 
-    if (items.length === 0) return json({ error: "Media tidak ditemukan." }, { status: 404 });
+        if (items.length === 0) return json({ error: "Media tidak ditemukan." }, { status: 404 });
 
-    // Hapus file dari R2: url utama + thumbnail + hasil transcode (bila ada).
-    const keys = new Set<string>();
-    for (const m of items) {
-        for (const raw of [m.url, m.thumbnailUrl, m.transcodedUrl]) {
-            if (!raw) continue;
-            const key = keyFromUrl(raw);
-            if (key && !key.startsWith("http")) keys.add(key);
+        // Hapus file dari R2: url utama + thumbnail + hasil transcode (bila ada).
+        const keys = new Set<string>();
+        for (const m of items) {
+            for (const raw of [m.url, m.thumbnailUrl, m.transcodedUrl]) {
+                if (!raw) continue;
+                const key = keyFromUrl(raw);
+                if (key && !key.startsWith("http")) keys.add(key);
+            }
         }
-    }
-    await Promise.allSettled([...keys].map((key) => deleteFile(key)));
-    await db.delete(schema.media).where(
-        and(eq(schema.media.organizationId, activeOrganizationId), sql`${schema.media.id} = ANY(${body.ids})`),
-    );
+        await Promise.allSettled([...keys].map((key) => deleteFile(key)));
 
-    return json({ success: true, deleted: items.length });
+        await db
+            .delete(schema.media)
+            .where(and(eq(schema.media.organizationId, activeOrganizationId), inArray(schema.media.id, body.ids!)));
+
+        return json({ success: true, deleted: items.length });
+    } catch (e) {
+        console.error("[media] DELETE gagal:", e);
+        return json({ error: e instanceof Error ? e.message : "Gagal menghapus media." }, { status: 500 });
+    }
 });
 
 function serializeMedia(m: {
