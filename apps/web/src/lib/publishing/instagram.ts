@@ -3,8 +3,8 @@ import type { PlatformAccount, PublishPayload, PublishResponse } from "./types";
 
 /**
  * Instagram Publisher — Feed, Story, Reel.
- * - INSTAGRAM_PAGE (tertaut FB Page): pakai Graph API Meta (graph.facebook.com/v25.0).
- * - INSTAGRAM (standalone): pakai Graph API sendiri (graph.instagram.com/v25.0).
+ * - INSTAGRAM_PAGE (tertaut FB Page): pakai Graph API Meta (graph.facebook.com/v26.0).
+ * - INSTAGRAM (standalone): pakai Graph API sendiri (graph.instagram.com/v26.0).
  * Keduanya memakai alur container yang sama.
  */
 

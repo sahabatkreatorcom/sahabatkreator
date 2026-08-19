@@ -4,7 +4,7 @@ import type { PlatformAccount, PublishPayload, PublishResponse } from "./types";
  * Facebook Publisher — post ke Page Feed (Graph API).
  */
 
-const GRAPH_URL = "https://graph.facebook.com/v25.0";
+const GRAPH_URL = "https://graph.facebook.com/v26.0";
 
 export async function publishToFacebook(
     account: PlatformAccount,

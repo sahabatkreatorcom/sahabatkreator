@@ -1,5 +1,5 @@
-export const GRAPH_API_URL = "https://graph.facebook.com/v25.0";
-export const META_OAUTH_VERSION = "v25.0";
+export const GRAPH_API_URL = "https://graph.facebook.com/v26.0";
+export const META_OAUTH_VERSION = "v26.0";
 
 export type Platform =
     | "INSTAGRAM"
@@ -29,7 +29,7 @@ export const CONNECTABLE_PLATFORMS: Platform[] = [
 ];
 
 /** URL dasar Graph API Instagram standalone vs yang tertaut Facebook Page. */
-export const INSTAGRAM_GRAPH_URL = "https://graph.instagram.com/v25.0";
+export const INSTAGRAM_GRAPH_URL = "https://graph.instagram.com/v26.0";
 export const INSTAGRAM_OAUTH_URL = "https://api.instagram.com/oauth";
 
 export interface PlatformOAuthConfig {
@@ -50,12 +50,11 @@ export const PLATFORM_OAUTH_CONFIGS: Record<Platform, PlatformOAuthConfig> = {
         authUrl: `${INSTAGRAM_OAUTH_URL}/authorize`,
         tokenUrl: `${INSTAGRAM_OAUTH_URL}/access_token`,
         scopes: [
-            "instagram_graph_api",
-            "instagram_content_publish",
-            "instagram_manage_comments",
-            "instagram_manage_insights",
-            "instagram_manage_messages",
-            "instagram_business_manage",
+            "instagram_business_basic",
+            "instagram_business_content_publish",
+            "instagram_business_manage_comments",
+            "instagram_business_manage_insights",
+            "instagram_business_manage_messages",
         ],
         apiBase: INSTAGRAM_GRAPH_URL,
     },
