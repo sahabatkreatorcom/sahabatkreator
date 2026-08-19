@@ -28,18 +28,25 @@ export interface TokenAccountInput {
  * Pastikan token akun masih berlaku. Refresh otomatis bila perlu:
  * - Meta (IG/FB/Threads): 7 hari sebelum expiry, pakai access token.
  * - Platform lain: saat sudah expired, pakai refreshToken.
+ * `force` dipakai tombol "Perbarui" manual — paksa refresh walau belum lewat expiry.
  * Kembalikan access token plaintext yang siap dipakai; simpan token baru ke DB.
  */
-export async function refreshAccountTokenIfNeeded(account: TokenAccountInput): Promise<TokenRefreshResult> {
+export async function refreshAccountTokenIfNeeded(
+    account: TokenAccountInput,
+    options: { force?: boolean } = {},
+): Promise<TokenRefreshResult> {
     const accessToken = decryptToken(account.accessToken);
 
     const isMeta = META_LONG_LIVED.includes(account.platform);
     const expiry = account.tokenExpiry ? new Date(account.tokenExpiry).getTime() : null;
 
     // Meta: refresh preemptif < 7 hari. Lainnya: refresh bila sudah lewat.
-    const needsRefresh = isMeta
-        ? expiry !== null && expiry < Date.now() + PREEMPTIVE_DAYS * 86_400_000
-        : expiry !== null && expiry < Date.now();
+    // `force` mengesampingkan keduanya (dipakai tombol "Perbarui" manual).
+    const needsRefresh = options.force
+        ? true
+        : isMeta
+          ? expiry !== null && expiry < Date.now() + PREEMPTIVE_DAYS * 86_400_000
+          : expiry !== null && expiry < Date.now();
 
     if (!needsRefresh) return { refreshed: false, token: accessToken };
 

@@ -9,6 +9,14 @@ import { Dialog } from "@/components/ui/dialog";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 
+/**
+ * Platform yang access token-nya berumur pendek TAPI punya refresh token
+ * (YouTube 1 jam, TikTok ±24 jam, Pinterest/LinkedIn/Google Business). Untuk
+ * platform ini, expiry access token yang dekat adalah hal NORMAL — bukan
+ * sinyal "hampir kedaluwarsa" selama refresh token tersedia.
+ */
+const REFRESH_TOKEN_PLATFORMS: Platform[] = ["YOUTUBE", "GOOGLE_BUSINESS", "TIKTOK", "PINTEREST", "LINKEDIN"];
+
 interface Account {
     id: string;
     platform: Platform;
@@ -16,6 +24,7 @@ interface Account {
     username: string | null;
     avatar: string | null;
     tokenExpiry: string | null;
+    hasRefreshToken: boolean;
     lastRefreshError: string | null;
     isActive: boolean;
     createdAt: string;
@@ -42,14 +51,25 @@ const PLATFORM_ORDER = [
     "GOOGLE_BUSINESS",
 ] as Platform[];
 
-function tokenStatus(tokenExpiry: string | null): { label: string; tone: "ok" | "warn" | "expired" | "none" } {
-    if (!tokenExpiry) return { label: "Token tidak diketahui", tone: "none" };
-    const expiry = new Date(tokenExpiry).getTime();
+function tokenStatus(account: Pick<Account, "platform" | "tokenExpiry" | "hasRefreshToken" | "lastRefreshError">): {
+    label: string;
+    tone: "ok" | "warn" | "expired" | "none";
+} {
+    // Platform ber-refresh token: access token pendek itu normal, selama ada
+    // refresh token dan belum ada error refresh, anggap valid.
+    if (REFRESH_TOKEN_PLATFORMS.includes(account.platform) && account.hasRefreshToken && !account.lastRefreshError) {
+        return { label: "Token aktif (refresh otomatis)", tone: "ok" };
+    }
+    if (account.lastRefreshError) {
+        return { label: "Refresh gagal — hubungkan ulang", tone: "expired" };
+    }
+    if (!account.tokenExpiry) return { label: "Token tidak diketahui", tone: "none" };
+    const expiry = new Date(account.tokenExpiry).getTime();
     const now = Date.now();
     if (expiry < now) return { label: "Token kedaluwarsa — hubungkan ulang", tone: "expired" };
     const daysLeft = (expiry - now) / 86_400_000;
     if (daysLeft < 7) return { label: `Token hampir kedaluwarsa (${Math.max(0, Math.floor(daysLeft))} hari)`, tone: "warn" };
-    return { label: `Token valid hingga ${new Date(tokenExpiry).toLocaleDateString("id-ID")}`, tone: "ok" };
+    return { label: `Token valid hingga ${new Date(expiry).toLocaleDateString("id-ID")}`, tone: "ok" };
 }
 
 const TOKEN_TONE_STYLE: Record<string, string> = {
@@ -212,7 +232,7 @@ export default function ConnectionsPage() {
             const res = await fetch("/api/accounts/refresh", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ accountId: id }),
+                body: JSON.stringify({ accountId: id, force: true }),
             });
             const data = await res.json();
             if (!res.ok) {
@@ -227,6 +247,10 @@ export default function ConnectionsPage() {
         } finally {
             setRefreshing(null);
         }
+    }
+
+    async function handleReconnect(platform: Platform) {
+        await handleConnect(platform);
     }
 
     async function handleConnect(platform: Platform) {
@@ -280,11 +304,11 @@ export default function ConnectionsPage() {
         return acc;
     }, {});
     const connectedPlatformCount = connected.size;
-    const accountsWithIssue = accounts.filter(
-        (a) =>
-            a.lastRefreshError ||
-            (a.tokenExpiry && new Date(a.tokenExpiry).getTime() < Date.now()),
-    ).length;
+    const accountsWithIssue = accounts.filter((a) => {
+        if (a.lastRefreshError) return true;
+        const st = tokenStatus(a);
+        return st.tone === "expired" || st.tone === "warn" || st.tone === "none";
+    }).length;
 
     return (
         <div className="space-y-6">
@@ -340,7 +364,7 @@ export default function ConnectionsPage() {
                             </p>
                             <div className="grid gap-3 lg:grid-cols-2">
                                 {accounts.map((account) => {
-                                    const status = tokenStatus(account.tokenExpiry);
+                                    const status = tokenStatus(account);
                                     return (
                                         <div
                                             key={account.id}
@@ -380,7 +404,17 @@ export default function ConnectionsPage() {
                                                     <Link2Off className="h-4 w-4" />
                                                     Putus
                                                 </Button>
-                                                {(status.tone === "warn" || status.tone === "expired" || status.tone === "none" || account.lastRefreshError) && (
+                                                {(status.tone === "expired" || account.lastRefreshError) ? (
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="sm"
+                                                        loading={connecting === account.platform}
+                                                        onClick={() => handleReconnect(account.platform)}
+                                                    >
+                                                        <Link2 className="h-4 w-4" />
+                                                        Hubungkan ulang
+                                                    </Button>
+                                                ) : (status.tone === "warn" || status.tone === "none") && (
                                                     <Button
                                                         variant="secondary"
                                                         size="sm"

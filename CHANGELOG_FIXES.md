@@ -4,6 +4,36 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #30 — Bahasa Mandarin di /listening + status token misleading + tombol hubungkan ulang + 502/503 SEB
+**Gejala:** (1) Halaman `/listening` masih berbahasa Mandarin ("新增監控", "監控中", "載入中", dll). (2) Konsol error `502 ()` & `503 ()` saat memakai Seb. (3) TikTok tampil "Token hampir kedaluwarsa (0 hari)" tapi klik "Perbarui" menjawab "Token masih valid" — kontradiktif. (4) Threads "Token kedaluwarsa — hubungkan ulang" TANPA tombol hubungkan ulang. (5) YouTube "Token berhasil diperbarui" tapi status tetap "Token hampir kedaluwarsa (0 hari)".
+
+**Akar:**
+1. UI listening pernah ditulis bahasa Mandarin dan belum diterjemahkan penuh.
+2. Route Seb (report/chat/brand-knowledge) mengembalikan `502` untuk semua error non-konfigurasi (termasuk OpenRouter request failed), sehingga console penuh error 502/503 tanpa pesan berguna.
+3. Helper refresh (`token-refresh.ts`) untuk platform NON-Meta hanya me-refresh saat token SUDAH expired. Tombol "Perbarui" muncul saat tone `warn` (< 7 hari) tapi helper menolak karena belum expired → jawaban "masih valid".
+4. Halaman connections hanya punya tombol "Perbarui" & "Putus"; akun yang refresh-nya gagal total tidak punya jalur OAuth ulang.
+5. `tokenStatus()` menghitung berdasarkan `tokenExpiry` untuk SEMUA platform — padahal YouTube/TikTok punya access token berumur pendek + refresh token (auto). Setelah refresh, expiry masih < 7 hari → selalu "hampir kedaluwarsa".
+
+**Fix:**
+1. Terjemahkan semua teks Mandarin di `/listening` → Bahasa Indonesia.
+2. Route Seb: error OpenRouter (belum dikonfigurasi / request failed) → `400` + pesan asli; error lain → `500`. Tidak lagi 502/503.
+3. `refreshAccountTokenIfNeeded(account, { force })` — tombol "Perbarui" memanggil POST refresh dengan `force: true`.
+4. Halaman connections: akun `expired`/`lastRefreshError` → tombol **"Hubungkan ulang"** (OAuth ulang); akun `warn`/`none` → tombol "Perbarui". Ringkasan "Akun perlu perhatian" ikut konsisten.
+5. `tokenStatus(account)` kini tahu platform ber-refresh token (`YOUTUBE`/`GOOGLE_BUSINESS`/`TIKTOK`/`PINTEREST`/`LINKEDIN`): bila ada refreshToken & tanpa error → "Token aktif (refresh otomatis)" (ok), tak peduli expiry access token yang pendek. GET `/api/accounts` kini mengirim `hasRefreshToken`.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/app/dashboard/listening/page.tsx`, `apps/web/src/app/dashboard/connections/page.tsx`, `apps/web/src/app/api/accounts/route.ts`, `apps/web/src/app/api/accounts/refresh/route.ts`, `apps/web/src/lib/platforms/token-refresh.ts`, `apps/web/src/app/api/seb/{report,chat,brand-knowledge}/route.ts` |
+| **Masalah** | Teks Mandarin; 502/503 Seb; refresh token kontradiktif; tak ada tombol hubungkan ulang; status token misleading untuk platform access-token pendek |
+| **Akar** | UI terjemahan tidak tuntas; route Seb memetakan semua error → 502; helper refresh non-Meta hanya saat expired; UI tak punya jalur OAuth ulang; tokenStatus abai keberadaan refresh token |
+| **Fix** | Terjemahkan UI; route Seb → 400/500 + pesan jelas; `force` refresh untuk tombol manual; tombol "Hubungkan ulang"; tokenStatus sadar refresh token (`hasRefreshToken`) |
+| **Verifikasi** | `pnpm --filter web exec tsc --noEmit` + `pnpm --filter db check-types` lolos. **PENDING verifikasi live** — TikTok: klik Perbarui harus benar-benar refresh; Threads expired: muncul tombol "Hubungkan ulang"; YouTube: tampil "Token aktif (refresh otomatis)"; /listening tanpa Mandarin; Seb tidak lagi 502/503. |
+| **Pelajaran** | Jangan asumsikan semua platform pakai long-lived token — platform OAuth dengan refresh token (YouTube 1 jam, TikTok) punya access token pendek secara desain; status token harus bedakan ada-tidaknya refresh token. Error provider (OpenRouter) bukan 502 (bad gateway) — kembalikan 4xx + pesan asli agar UI bisa menampilkan. |
+| **Log Keyword** | listening, mandarin, 502, 503, seb, openrouter, token, refresh, force, hubungkan ulang, hasRefreshToken, youtube, tiktok, threads |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #29 — Input di Dialog cuma bisa ketik 1 huruf (focus dicuri tiap re-render)
 **Gejala:** Form "Pilar baru" dan "Koleksi hashtag baru" di `/content-tools` hanya menerima 1 huruf per ketikan; setelah huruf pertama, input kehilangan fokus sehingga ketikan berikutnya tidak masuk.
 

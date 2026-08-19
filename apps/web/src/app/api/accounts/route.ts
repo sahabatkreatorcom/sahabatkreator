@@ -29,6 +29,7 @@ export const GET = withAuth(async (ctx) => {
             username: a.username,
             avatar: a.avatar,
             tokenExpiry: a.tokenExpiry?.toISOString() ?? null,
+            hasRefreshToken: Boolean(a.refreshToken),
             lastRefreshError: a.lastRefreshError ? "Perlu perhatian — token mungkin bermasalah." : null,
             isActive: a.isActive,
             createdAt: a.createdAt.toISOString(),

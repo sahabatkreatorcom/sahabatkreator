@@ -49,6 +49,8 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
         return json(result, { status: 201 });
     } catch (e) {
         const message = e instanceof Error ? e.message : "Gagal memindai website.";
-        return json({ error: message }, { status: e instanceof Error && /OpenRouter belum dikonfigurasi/.test(message) ? 400 : 502 });
+        const isConfigError = /OpenRouter belum dikonfigurasi/.test(message);
+        const isProviderError = /OpenRouter request failed/.test(message);
+        return json({ error: message }, { status: isConfigError || isProviderError ? 400 : 500 });
     }
 });

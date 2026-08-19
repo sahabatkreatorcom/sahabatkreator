@@ -7,15 +7,16 @@ import { logActivity } from "@/lib/activity-log";
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/accounts/refresh — perbarui token akses akun (manual / auto-refresh UI).
- * Body: { accountId }
+ * POST /api/accounts/refresh — perbarui token akses akun (manual).
+ * Body: { accountId, force? } — `force: true` memaksa refresh walau belum lewat expiry
+ * (dipakai tombol "Perbarui"; terutama berguna untuk platform access-token pendek).
  * Respons: { success, refreshed, error? }
  */
 export const POST = withAuth(async (ctx, req: NextRequest) => {
     const { activeOrganizationId } = ctx;
     if (!activeOrganizationId) return json({ error: "Pilih workspace dulu." }, { status: 400 });
 
-    const body = (await req.json().catch(() => null)) as { accountId?: string } | null;
+    const body = (await req.json().catch(() => null)) as { accountId?: string; force?: boolean } | null;
     if (!body?.accountId) return json({ error: "Account ID wajib." }, { status: 400 });
 
     const account = await db.query.socialAccount.findFirst({
@@ -24,13 +25,16 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
     });
     if (!account) return json({ error: "Akun tidak ditemukan." }, { status: 404 });
 
-    const result = await refreshAccountTokenIfNeeded({
-        id: account.id,
-        platform: account.platform,
-        accessToken: account.accessToken,
-        refreshToken: account.refreshToken,
-        tokenExpiry: account.tokenExpiry,
-    });
+    const result = await refreshAccountTokenIfNeeded(
+        {
+            id: account.id,
+            platform: account.platform,
+            accessToken: account.accessToken,
+            refreshToken: account.refreshToken,
+            tokenExpiry: account.tokenExpiry,
+        },
+        { force: Boolean(body.force) },
+    );
 
     if (result.needReconnect) {
         await logActivity(
@@ -53,7 +57,16 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
         );
     }
 
-    return json({ success: true, refreshed: result.refreshed, tokenExpiry: result.refreshed ? new Date(Date.now() + 60 * 86_400_000).toISOString() : null });
+    let tokenExpiry: string | null = null;
+    if (result.refreshed) {
+        const updated = await db.query.socialAccount.findFirst({
+            where: (t, { eq: _eq }) => _eq(t.id, account.id),
+            columns: { tokenExpiry: true },
+        });
+        tokenExpiry = updated?.tokenExpiry?.toISOString() ?? null;
+    }
+
+    return json({ success: true, refreshed: result.refreshed, tokenExpiry });
 });
 
 /**

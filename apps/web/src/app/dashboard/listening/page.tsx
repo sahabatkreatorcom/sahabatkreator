@@ -64,17 +64,17 @@ const SENTIMENT_COLORS = {
 };
 
 const SENTIMENT_LABELS = {
-    positive: "正面",
-    negative: "負面",
-    question: "提問",
-    neutral: "中性",
+    positive: "Positif",
+    negative: "Negatif",
+    question: "Pertanyaan",
+    neutral: "Netral",
 };
 
 const SOURCE_LABELS = {
-    comment: "留言",
-    mention: "被提到",
-    review: "評價",
-    dm: "私訊",
+    comment: "Komentar",
+    mention: "Disebut",
+    review: "Ulasan",
+    dm: "DM",
 };
 
 export default function ListeningPage() {
@@ -97,11 +97,11 @@ export default function ListeningPage() {
         try {
             const res = await fetch("/api/listening");
             const json = await res.json();
-            if (!res.ok) throw new Error(json.error || "載入失敗");
+            if (!res.ok) throw new Error(json.error || "Gagal memuat");
             setData(json);
             setSelectedIds([]);
         } catch (e) {
-            setError(e instanceof Error ? e.message : "載入失敗");
+            setError(e instanceof Error ? e.message : "Gagal memuat");
         } finally {
             setLoading(false);
         }
@@ -121,10 +121,10 @@ export default function ListeningPage() {
                 body: JSON.stringify({ action: "sync" }),
             });
             const json = await res.json();
-            if (!res.ok) throw new Error(json.error || "同步失敗");
+            if (!res.ok) throw new Error(json.error || "Gagal sinkronisasi");
             load();
         } catch (e) {
-            setError(e instanceof Error ? e.message : "同步失敗");
+            setError(e instanceof Error ? e.message : "Gagal sinkronisasi");
         } finally {
             setSyncing(false);
         }
@@ -150,30 +150,30 @@ export default function ListeningPage() {
                 }),
             });
             const json = await res.json();
-            if (!res.ok) throw new Error(json.error || "建立失敗");
+            if (!res.ok) throw new Error(json.error || "Gagal membuat");
             setNewName("");
             setNewKeywords("");
             setCreateOpen(false);
             load();
         } catch (e) {
-            setError(e instanceof Error ? e.message : "建立失敗");
+            setError(e instanceof Error ? e.message : "Gagal membuat");
         } finally {
             setCreating(false);
         }
     }
 
     async function handleDelete(monitorId: string) {
-        if (!confirm("確定要刪除此監控？")) return;
+        if (!confirm("Hapus monitoring ini?")) return;
         setError(null);
         try {
             const res = await fetch(`/api/listening?monitorId=${encodeURIComponent(monitorId)}`, {
                 method: "DELETE",
             });
             const json = await res.json();
-            if (!res.ok) throw new Error(json.error || "刪除失敗");
+            if (!res.ok) throw new Error(json.error || "Gagal menghapus");
             load();
         } catch (e) {
-            setError(e instanceof Error ? e.message : "刪除失敗");
+            setError(e instanceof Error ? e.message : "Gagal menghapus");
         }
     }
 
@@ -205,16 +205,16 @@ export default function ListeningPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-lg font-semibold">Social Listening</h1>
-                    <p className="text-sm text-muted-foreground">監控關鍵字、貼文、評論與情感分析。</p>
+                    <p className="text-sm text-muted-foreground">Pantau kata kunci, postingan, komentar, dan analisis sentimen.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button size="sm" variant="secondary" onClick={handleSync} disabled={syncing || !data?.monitors?.length}>
                         {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                        同步
+                        Sinkronisasi
                     </Button>
                     <Button size="sm" onClick={() => setCreateOpen(true)}>
                         <Plus className="h-4 w-4" />
-                        新增監控
+                        Tambah monitoring
                     </Button>
                 </div>
             </div>
@@ -222,24 +222,24 @@ export default function ListeningPage() {
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
 
             {loading ? (
-                <p className="py-12 text-sm text-muted-foreground">載入中…</p>
+                <p className="py-12 text-sm text-muted-foreground">Memuat…</p>
             ) : !data ? null : (
                 <>
                     <div className="grid gap-3 sm:grid-cols-4">
                         <div className="rounded-lg border border-border bg-card p-4">
-                            <p className="text-xs text-muted-foreground">活躍監控</p>
+                            <p className="text-xs text-muted-foreground">Monitoring aktif</p>
                             <p className="mt-1 text-2xl font-semibold">{data.monitors.filter((m) => m.isActive).length}</p>
                         </div>
                         <div className="rounded-lg border border-border bg-card p-4">
-                            <p className="text-xs text-muted-foreground">監聽結果</p>
+                            <p className="text-xs text-muted-foreground">Hasil pantauan</p>
                             <p className="mt-1 text-2xl font-semibold">{data.items.length}</p>
                         </div>
                         <div className="rounded-lg border border-border bg-card p-4">
-                            <p className="text-xs text-muted-foreground">未讀</p>
+                            <p className="text-xs text-muted-foreground">Belum dibaca</p>
                             <p className="mt-1 text-2xl font-semibold text-primary">{data.unreadCount}</p>
                         </div>
                         <div className="rounded-lg border border-border bg-card p-4">
-                            <p className="text-xs text-muted-foreground">正面 sentiment</p>
+                            <p className="text-xs text-muted-foreground">Sentimen positif</p>
                             <p className={cn("mt-1 text-2xl font-semibold", SENTIMENT_COLORS.positive)}>
                                 {data.sentiment.positive}
                             </p>
@@ -249,11 +249,11 @@ export default function ListeningPage() {
                     {data.monitors.length === 0 ? (
                         <div className="rounded-lg border border-border bg-card p-8 text-center">
                             <Tag className="mx-auto h-8 w-8 text-muted-foreground/50" />
-                            <p className="mt-2 text-sm font-medium">尚未建立監控</p>
-                            <p className="text-sm text-muted-foreground">新增監控來開始追蹤關鍵字與討論。</p>
+                            <p className="mt-2 text-sm font-medium">Belum ada monitoring</p>
+                            <p className="text-sm text-muted-foreground">Buat monitoring untuk mulai melacak kata kunci dan diskusi.</p>
                             <Button className="mt-4" size="sm" onClick={() => setCreateOpen(true)}>
                                 <Plus className="h-4 w-4" />
-                                新增第一個監控
+                                Buat monitoring pertama
                             </Button>
                         </div>
                     ) : (
@@ -261,7 +261,7 @@ export default function ListeningPage() {
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm">
                                     <Tag className="h-4 w-4 text-muted-foreground" />
-                                    <span className="font-medium">監控中：</span>
+                                    <span className="font-medium">Dipantau:</span>
                                     {data.monitors.map((m) => (
                                         <span
                                             key={m.id}
@@ -280,16 +280,16 @@ export default function ListeningPage() {
                                         onChange={(e) => setFilterSentiment(e.target.value)}
                                         className="h-9 rounded-md border border-input bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
-                                        <option value="all">全部 sentiment</option>
-                                        <option value="positive">正面</option>
-                                        <option value="negative">負面</option>
-                                        <option value="question">提問</option>
-                                        <option value="neutral">中性</option>
+                                        <option value="all">Semua sentiment</option>
+                                        <option value="positive">Positif</option>
+                                        <option value="negative">Negatif</option>
+                                        <option value="question">Pertanyaan</option>
+                                        <option value="neutral">Netral</option>
                                     </select>
                                     {selectedIds.length > 0 && (
                                         <Button size="sm" variant="secondary" onClick={markRead}>
                                             <Check className="h-4 w-4" />
-                                            標記已讀 ({selectedIds.length})
+                                            Tandai sudah dibaca ({selectedIds.length})
                                         </Button>
                                     )}
                                 </div>
@@ -300,8 +300,8 @@ export default function ListeningPage() {
                                     <Search className="mx-auto h-8 w-8 text-muted-foreground/50" />
                                     <p className="mt-2 text-sm text-muted-foreground">
                                         {data.items.length === 0
-                                            ? "尚未有監聽結果。點擊「同步」來掃描現有資料。"
-                                            : "沒有符合條件的結果。"}
+                                            ? "Belum ada hasil pantauan. Klik «Sinkronisasi» untuk memindai data yang ada."
+                                            : "Tidak ada hasil yang cocok."}
                                     </p>
                                 </div>
                             ) : (
@@ -357,7 +357,7 @@ export default function ListeningPage() {
                                                         </span>
                                                     </div>
                                                     <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                                                        {item.content || "(無內容)"}
+                                                        {item.content || "(tanpa konten)"}
                                                     </p>
                                                     {item.matchedKeywords && item.matchedKeywords.length > 0 && (
                                                         <div className="mt-1 flex flex-wrap gap-1">
@@ -385,32 +385,32 @@ export default function ListeningPage() {
             <Dialog
                 open={createOpen}
                 onClose={() => setCreateOpen(false)}
-                title="新增監控"
-                description="設定關鍵字來追蹤相關討論。"
+                title="Tambah monitoring"
+                description="Atur kata kunci untuk melacak diskusi terkait."
             >
                 <div className="space-y-4">
                     <div>
-                        <Label htmlFor="monitor-name">名稱</Label>
+                        <Label htmlFor="monitor-name">Nama</Label>
                         <Input
                             id="monitor-name"
                             value={newName}
                             onChange={(e) => setNewName(e.target.value)}
-                            placeholder="例如：品牌名稱、產品名"
+                            placeholder="mis. Nama brand, nama produk"
                         />
                     </div>
                     <div>
-                        <Label htmlFor="monitor-keywords">關鍵字（逗號分隔）</Label>
+                        <Label htmlFor="monitor-keywords">Kata kunci (pisahkan dengan koma)</Label>
                         <Input
                             id="monitor-keywords"
                             value={newKeywords}
                             onChange={(e) => setNewKeywords(e.target.value)}
-                            placeholder="品牌, 產品名, 社群帳號"
+                            placeholder="brand, nama produk, akun sosial"
                         />
-                        <p className="mt-1 text-xs text-muted-foreground">輸入多個關鍵字，用逗號分隔</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Masukkan beberapa kata kunci, pisahkan dengan koma</p>
                     </div>
                     <div className="flex justify-end gap-2 pt-1">
                         <Button variant="ghost" size="sm" onClick={() => setCreateOpen(false)}>
-                            取消
+                            Batal
                         </Button>
                         <Button
                             size="sm"
@@ -418,7 +418,7 @@ export default function ListeningPage() {
                             onClick={handleCreate}
                         >
                             {creating && <Loader2 className="h-4 w-4 animate-spin" />}
-                            建立監控
+                            Buat monitoring
                         </Button>
                     </div>
                 </div>
