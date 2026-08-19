@@ -18,16 +18,18 @@ export function Dialog({
     children: React.ReactNode;
 }) {
     const ref = React.useRef<HTMLDivElement>(null);
+    const onCloseRef = React.useRef(onClose);
+    onCloseRef.current = onClose;
 
     React.useEffect(() => {
         if (!open) return;
         function onKeyDown(e: KeyboardEvent) {
-            if (e.key === "Escape") onClose();
+            if (e.key === "Escape") onCloseRef.current();
         }
         document.addEventListener("keydown", onKeyDown);
         ref.current?.focus();
         return () => document.removeEventListener("keydown", onKeyDown);
-    }, [open, onClose]);
+    }, [open]);
 
     if (!open) return null;
 

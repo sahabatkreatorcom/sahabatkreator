@@ -4,6 +4,24 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #29 — Input di Dialog cuma bisa ketik 1 huruf (focus dicuri tiap re-render)
+**Gejala:** Form "Pilar baru" dan "Koleksi hashtag baru" di `/content-tools` hanya menerima 1 huruf per ketikan; setelah huruf pertama, input kehilangan fokus sehingga ketikan berikutnya tidak masuk.
+
+**Akar:** `Dialog` (`apps/web/src/components/ui/dialog.tsx`) punya `useEffect` dengan dependency `[open, onClose]`. Semua pemanggil meneruskan `onClose` sebagai arrow inline (`() => setPillarOpen(false)`) → referensi baru tiap render. Setiap ketikan memicu re-render → effect di-cleanup lalu di-jalankan ulang → `ref.current?.focus()` di-eksekusi → fokus ditarik dari input ke kontainer dialog setelah huruf pertama. Berdampak ke SEMUA dialog yang memakai komponen `Dialog` (content-tools, stock-media-picker, team, dst.).
+
+| | |
+|---|---|
+| **File** | `apps/web/src/components/ui/dialog.tsx` |
+| **Masalah** | 1 huruf per ketikan di dialog dengan input teks |
+| **Akar** | Effect dialog dependen pada `onClose` yang berubah tiap render (arrow inline) → re-focus tiap re-render mencuri fokus dari input |
+| **Fix** | Simpan `onClose` ke ref (`onCloseRef`, diperbarui tiap render); effect hanya dependen `[open]`, handler Escape memakai `onCloseRef.current`. Fokus hanya ditarik saat dialog terbuka, bukan tiap re-render. |
+| **Verifikasi** | `pnpm --filter web exec tsc --noEmit` lolos. **PENDING verifikasi live** — ketik di dialog pilar/koleksi hashtag harusnya mengalir normal (multi-huruf). |
+| **Pelajaran** | Jangan taruh callback inline di dependency array `useEffect` tanpa stabilisasi (useCallback/ref) — kalau effect-nya punya efek samping (focus, fetch), tiap re-render akan me-refresh side-effect tersebut. |
+| **Log Keyword** | dialog, input, focus, 1 huruf, content-tools, useCallback, ref, typing |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #28 — Konsolidasi kelola akun: tab settings, sidebar "Akun", dan /settings/connections → satu halaman /connections
 **Permintaan:** Kelola akun saat ini tersebar di 3 tempat: tab "Akun Terhubung" di `/dashboard/settings`, grup "Akun" di sidebar (menampilkan daftar akun), dan halaman `/settings/connections`. Dengan banyak akun, daftar di sidebar bikin scroll panjang. Disatukan menjadi **satu halaman `/connections`**.
 
