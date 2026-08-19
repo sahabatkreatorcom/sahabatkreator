@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
     Loader2,
     Check,
@@ -10,6 +11,8 @@ import {
     Users,
     Zap,
     Star,
+    CheckCircle2,
+    AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -37,10 +40,13 @@ interface BillingData {
 }
 
 export default function BillingPage() {
+    const searchParams = useSearchParams();
     const [data, setData] = useState<BillingData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+
+    const paymentStatus = searchParams.get("status");
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -98,6 +104,30 @@ export default function BillingPage() {
             </div>
 
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
+
+            {paymentStatus === "success" && (
+                <div className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                    <div>
+                        <p className="text-sm font-semibold text-emerald-700">Pembayaran berhasil</p>
+                        <p className="text-sm text-emerald-700/80">
+                            Terima kasih! Paket Anda sedang diaktifkan. Status bisa berubah dalam beberapa saat setelah
+                            konfirmasi pembayaran diterima.
+                        </p>
+                    </div>
+                </div>
+            )}
+            {paymentStatus === "cancelled" && (
+                <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                    <div>
+                        <p className="text-sm font-semibold text-amber-700">Pembayaran dibatalkan</p>
+                        <p className="text-sm text-amber-700/80">
+                            Anda membatalkan pembayaran. Paket Anda tidak berubah. Silakan coba lagi kapan saja.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Current Plan */}
             {data && (

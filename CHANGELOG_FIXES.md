@@ -4,6 +4,24 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #26 — Halaman /dashboard/billing tidak menampilkan hasil redirect pembayaran SumoPod (?status=)
+**Gejala:** Setelah checkout SumoPod selesai, user di-redirect kembali ke `/dashboard/billing?status=success` (atau `?status=cancelled`), tapi halaman tidak menampilkan konfirmasi apa pun — seolah-olah tidak terjadi apa-apa.
+
+**Akar:** `apps/web/src/app/api/billing/route.ts:122-123` sudah meng-`override` `success_return_url`/`cancel_return_url` ke `/dashboard/billing?status=success|cancelled`, tetapi halaman billing tidak membaca query `status`.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/app/dashboard/billing/page.tsx` (baca `useSearchParams().get("status")` → banner sukses/batal) |
+| **Masalah** | Tidak ada feedback setelah redirect pembayaran |
+| **Akar** | Halaman tidak memproses query `?status=` |
+| **Fix** | Banner hijau "Pembayaran berhasil" / amber "Pembayaran dibatalkan" saat `status=success`/`cancelled` |
+| **Verifikasi** | `pnpm --filter web exec tsc --noEmit` lolos. **PENDING deploy** — rebuild web di VPS, lalu uji checkout → bayar/batal → cek banner muncul. |
+| **Pelajaran** | Saat menyetel redirect URL payment, pastikan halaman tujuan benar-benar membaca query/param-nya. |
+| **Log Keyword** | sumopod, payment, billing, redirect, success, cancelled, return url, banner |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #25 — Google Console: nama app tidak terlihat di home; delete media tak hapus transcode; avatar FB page hilang; SW/icons/CSP
 **Gejala:**
 1. **Google OAuth consent verification** menolak: (a) "Your home page does not explain the purpose of your app", (b) "The app name 'Sahabat Kreator' ... does not match the app name on your home page".
