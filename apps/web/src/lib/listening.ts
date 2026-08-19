@@ -278,5 +278,5 @@ export async function getListeningDashboard(organizationId: string) {
         question: allItems.filter((i) => i.sentiment === "question").length,
     };
 
-    return { monitors, unreadCount: unread.length, sentiment };
+    return { monitors, items: allItems, unreadCount: unread.length, sentiment };
 }
