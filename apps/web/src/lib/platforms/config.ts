@@ -138,6 +138,7 @@ export const PLATFORM_OAUTH_CONFIGS: Record<Platform, PlatformOAuthConfig> = {
             "threads_manage_insights",
             "threads_manage_replies",
             "threads_read_replies",
+            "threads_share_to_instagram",
         ],
         apiBase: "https://graph.threads.net/v1.0",
     },

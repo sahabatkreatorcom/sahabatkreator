@@ -41,6 +41,19 @@ export interface PlatformIssue {
     message: string;
 }
 
+export interface PlatformSettingsShape {
+    tiktokPrivacyLevel?: string;
+    youtubePrivacy?: string;
+    boardId?: string;
+    linkedinVisibility?: string;
+    threadsTopicTag?: string;
+    threadsShareToIg?: boolean;
+    instagramLocationId?: string;
+    instagramUserTags?: { username: string; x?: number; y?: number }[];
+    instagramCollaborators?: string[];
+    altText?: string;
+}
+
 /**
  * Validasi konten untuk satu platform: panjang caption, jumlah & jenis media.
  * Draft tidak wajib media — hanya jadi peringatan; publish/schedule wajib.
@@ -49,7 +62,7 @@ export function validatePlatformContent(
     platform: Platform,
     caption: string,
     media: { type: MediaType }[],
-    opts: { checkMediaRequired?: boolean } = {},
+    opts: { checkMediaRequired?: boolean; settings?: PlatformSettingsShape } = {},
 ): PlatformIssue[] {
     const rule = PLATFORM_RULES[platform] ?? PLATFORM_RULES.MANUAL;
     const issues: PlatformIssue[] = [];
@@ -92,6 +105,32 @@ export function validatePlatformContent(
             });
             break;
         }
+    }
+
+    const settings = opts.settings ?? {};
+    if (platform === "TIKTOK" && !settings.tiktokPrivacyLevel) {
+        issues.push({
+            platform,
+            label: rule.label,
+            severity: "error",
+            message: "TikTok wajib memilih tingkat privasi sebelum diterbitkan.",
+        });
+    }
+    if (platform === "YOUTUBE" && !settings.youtubePrivacy) {
+        issues.push({
+            platform,
+            label: rule.label,
+            severity: "error",
+            message: "YouTube wajib memilih status privasi sebelum diterbitkan.",
+        });
+    }
+    if (platform === "PINTEREST" && !settings.boardId) {
+        issues.push({
+            platform,
+            label: rule.label,
+            severity: "error",
+            message: "Pinterest wajib memilih board tujuan.",
+        });
     }
 
     return issues;

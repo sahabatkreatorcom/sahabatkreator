@@ -1,0 +1,1 @@
+ALTER TABLE "post" ADD COLUMN "threads_share_to_ig" boolean DEFAULT false NOT NULL;

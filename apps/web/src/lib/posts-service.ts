@@ -30,11 +30,22 @@ export interface PlatformSettingsInput {
     youtubeCategory?: string;
     youtubePlaylist?: string;
     videoTags?: string[];
+    youtubePrivacy?: string;
     altText?: string;
     threadsTopicTag?: string;
+    threadsShareToIg?: boolean;
     linkedinVisibility?: string;
     tiktokPrivacyLevel?: string;
+    tiktokComments?: boolean;
+    tiktokDuets?: boolean;
+    tiktokStitches?: boolean;
+    tiktokBrandOrganic?: boolean;
+    tiktokBrandContent?: boolean;
+    tiktokIsAigc?: boolean;
     instagramShareToFeed?: boolean;
+    instagramLocationId?: string;
+    instagramUserTags?: { username: string; x?: number; y?: number }[];
+    instagramCollaborators?: string[];
 }
 
 export interface CreatedPostInfo {
@@ -135,11 +146,22 @@ export async function createPosts(params: CreatePostParams): Promise<CreatePostR
                 youtubeCategory: settings.youtubeCategory || null,
                 youtubePlaylist: settings.youtubePlaylist || null,
                 videoTags: settings.videoTags || [],
+                youtubePrivacy: settings.youtubePrivacy || null,
                 altText: settings.altText || null,
                 threadsTopicTag: settings.threadsTopicTag || null,
+                threadsShareToIg: settings.threadsShareToIg,
                 linkedinVisibility: settings.linkedinVisibility || null,
                 tiktokPrivacyLevel: settings.tiktokPrivacyLevel || null,
+                tiktokComments: settings.tiktokComments,
+                tiktokDuets: settings.tiktokDuets,
+                tiktokStitches: settings.tiktokStitches,
+                tiktokBrandOrganic: settings.tiktokBrandOrganic,
+                tiktokBrandContent: settings.tiktokBrandContent,
+                tiktokIsAigc: settings.tiktokIsAigc,
                 instagramShareToFeed: settings.instagramShareToFeed ?? true,
+                instagramLocationId: settings.instagramLocationId || null,
+                instagramUserTags: settings.instagramUserTags ?? null,
+                instagramCollaborators: settings.instagramCollaborators ?? null,
                 customMediaIds: postMediaIds,
                 linkedGroupId,
                 pillarId: pillarId || null,

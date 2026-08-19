@@ -40,5 +40,21 @@ export async function publishToFacebook(
         return { success: false, error: data.error.message, errorCode: data.error.code?.toString() };
     }
 
+    // Komentar pertama diposting SETELAH post terbit (tidak didukung saat pembuatan).
+    if (data.id && payload.firstComment?.trim()) {
+        try {
+            await fetch(`${GRAPH_URL}/${data.id}/comments`, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    message: payload.firstComment.trim(),
+                    access_token: account.accessToken,
+                }),
+            });
+        } catch {
+            // non-fatal
+        }
+    }
+
     return { success: true, postId: data.id, postUrl: `https://facebook.com/${data.id}` };
 }

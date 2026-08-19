@@ -85,10 +85,39 @@ export async function publishToYouTube(
             await setYouTubeThumbnail(account.accessToken, videoId, payload.thumbnailUrl);
         }
 
+        // Komentar pertama diposting SETELAH video terbit (via Comment Threads API).
+        if (payload.firstComment?.trim()) {
+            await addYouTubeFirstComment(account.accessToken, videoId, payload.firstComment.trim());
+        }
+
         return { success: true, postId: videoId, postUrl: `https://youtube.com/watch?v=${videoId}` };
     } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
         return { success: false, error: message };
+    }
+}
+
+async function addYouTubeFirstComment(
+    accessToken: string,
+    videoId: string,
+    message: string,
+): Promise<void> {
+    try {
+        await fetch("https://www.googleapis.com/youtube/v3/commentThreads?part=snippet", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json; charset=UTF-8",
+            },
+            body: JSON.stringify({
+                snippet: {
+                    videoId,
+                    topLevelComment: { snippet: { textOriginal: message } },
+                },
+            }),
+        });
+    } catch {
+        // non-fatal
     }
 }
 

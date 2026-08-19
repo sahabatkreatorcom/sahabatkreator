@@ -19,15 +19,23 @@ export async function publishToInstagram(
     const igUserId = account.accountId;
     const base = graphBase(account);
 
+    let result: PublishResponse;
     if (payload.postType === "story") {
-        return publishStory(base, igUserId, account.accessToken, payload);
+        result = await publishStory(base, igUserId, account.accessToken, payload);
+    } else if (payload.postType === "reel") {
+        result = await publishReel(base, igUserId, account.accessToken, payload);
+    } else {
+        result = await publishFeed(base, igUserId, account.accessToken, payload);
     }
 
-    if (payload.postType === "reel") {
-        return publishReel(base, igUserId, account.accessToken, payload);
+    // Komentar pertama hanya untuk media yang mendukung komentar (bukan story),
+    // dan dilakukan SETELAH publish (API tidak mendukung saat buat container).
+    if (result.success && result.postId && payload.firstComment?.trim()) {
+        await addInstagramFirstComment(base, result.postId, account.accessToken, payload.firstComment.trim())
+            .catch(() => {});
     }
 
-    return publishFeed(base, igUserId, account.accessToken, payload);
+    return result;
 }
 
 // ─── Feed ────────────────────────────────────────────────────────────────────
@@ -62,6 +70,12 @@ async function publishFeed(
             image_url: url,
             caption: payload.caption,
             is_carousel_item: false,
+            alt_text: payload.altText,
+            location_id: payload.instagramLocationId,
+            user_tags: payload.instagramUserTags?.length
+                ? payload.instagramUserTags.map((t) => ({ username: t.username, x: t.x ?? 0.5, y: t.y ?? 0.5 }))
+                : undefined,
+            collaborators: payload.instagramCollaborators?.length ? payload.instagramCollaborators : undefined,
         }),
     });
     const container = await containerRes.json();
@@ -104,6 +118,7 @@ async function publishCarousel(
             media_type: "CAROUSEL",
             children: childIds,
             caption: payload.caption,
+            collaborators: payload.instagramCollaborators?.length ? payload.instagramCollaborators : undefined,
         }),
     });
     const carousel = await carouselRes.json();
@@ -132,6 +147,8 @@ async function publishReel(
         caption: payload.caption,
         share_to_feed: payload.instagramShareToFeed ?? true,
         comments_disabled: payload.instagramComments === false,
+        location_id: payload.instagramLocationId,
+        collaborators: payload.instagramCollaborators?.length ? payload.instagramCollaborators : undefined,
     };
     if (payload.thumbnailUrl) body.cover_url = payload.thumbnailUrl;
     if (payload.isTrialReel) body.is_trial_reel = true;
@@ -169,6 +186,9 @@ async function publishStory(
         body: JSON.stringify({
             media_type: "STORIES",
             [isVideo ? "video_url" : "image_url"]: url,
+            user_tags: payload.instagramUserTags?.length
+                ? payload.instagramUserTags.map((t) => ({ username: t.username, x: t.x ?? 0.5, y: t.y ?? 0.5 }))
+                : undefined,
         }),
     });
     const container = await res.json();
@@ -216,4 +236,29 @@ async function publishContainer(
     }
 
     return { success: true, postId: result.id, postUrl: `https://instagram.com/p/${result.id}` };
+}
+
+/**
+ * Posting komentar pertama dilakukan SETELAH media dipublish —
+ * API Instagram tidak mendukung first comment saat pembuatan container.
+ * Non-fatal: kegagalan komentar tidak menggagalkan publish post.
+ */
+export async function addInstagramFirstComment(
+    base: string,
+    mediaId: string,
+    token: string,
+    message: string,
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const res = await fetch(`${base}/${mediaId}/comments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ message }),
+        });
+        const data = await res.json();
+        if (data.error) return { success: false, error: data.error.message };
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : "Gagal menambahkan komentar pertama" };
+    }
 }

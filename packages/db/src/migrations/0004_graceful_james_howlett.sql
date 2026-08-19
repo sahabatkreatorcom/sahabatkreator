@@ -1,0 +1,1 @@
+ALTER TABLE "post" ADD COLUMN "instagram_location_id" text;

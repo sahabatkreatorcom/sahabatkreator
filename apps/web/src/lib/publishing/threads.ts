@@ -16,6 +16,7 @@ export async function publishToThreads(
 
     const opts: Record<string, string> = {};
     if (inputPayload.threadsTopicTag) opts.topic_tag = inputPayload.threadsTopicTag;
+    if (inputPayload.threadsShareToIg) opts.crossreshare_to_ig = "true";
 
     try {
         // Carousel: buat child container per media

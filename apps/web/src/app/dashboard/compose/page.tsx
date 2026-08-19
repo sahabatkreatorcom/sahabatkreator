@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CalendarClock, ImagePlus, Send, X, LayoutTemplate, Hash, FolderTree, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog } from "@/components/ui/dialog";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { StockMediaPicker } from "@/components/media/stock-media-picker";
@@ -55,6 +56,7 @@ export default function ComposePage() {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
     const [caption, setCaption] = useState("");
+    const [firstComment, setFirstComment] = useState("");
     const [media, setMedia] = useState<MediaItem[]>([]);
     const [scheduleOpen, setScheduleOpen] = useState(false);
     const [scheduledAt, setScheduledAt] = useState<string>("");
@@ -71,6 +73,7 @@ export default function ComposePage() {
     const [pillarId, setPillarId] = useState<string>("");
     const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
     const [collectionPickerOpen, setCollectionPickerOpen] = useState(false);
+    const [platformSettings, setPlatformSettings] = useState<Record<string, Record<string, string | boolean | string[] | { username: string; x: number; y: number }[]>>>({});
 
     const loadAccounts = useCallback(async () => {
         setLoadingAccounts(true);
@@ -154,11 +157,13 @@ export default function ComposePage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     caption,
+                    firstComment,
                     platformAccountIds: selectedAccountIds,
                     mediaIds: media.map((m) => m.id),
                     scheduledAt: isSchedule ? new Date(scheduledAt).toISOString() : null,
                     autoPublish: isPublish || isSchedule,
                     pillarId: pillarId || undefined,
+                    platformSettings,
                 }),
             });
             const data = await res.json();
@@ -168,6 +173,7 @@ export default function ComposePage() {
             }
             setSuccess(isSchedule ? "Post dijadwalkan." : isPublish ? "Post diterbitkan." : "Draft disimpan.");
             setCaption("");
+            setFirstComment("");
             setMedia([]);
             setScheduledAt("");
         } catch {
@@ -186,9 +192,18 @@ export default function ComposePage() {
     /** Isu validasi per akun terpilih (live saat mengetik/menambah media). */
     const issues: { account: Account; issues: PlatformIssue[] }[] = selectedAccounts.map((account) => ({
         account,
-        issues: validatePlatformContent(account.platform, caption, media),
+        issues: validatePlatformContent(account.platform, caption, media, {
+            settings: (platformSettings[account.id] ?? {}) as never,
+        }),
     }));
     const hasErrors = issues.some(({ issues: list }) => list.some((i) => i.severity === "error"));
+
+    /** Akun terpilih yang membutuhkan pengaturan tambahan. */
+    const settingsAccounts = selectedAccounts.filter((a) =>
+        ["TIKTOK", "YOUTUBE", "PINTEREST", "LINKEDIN", "THREADS", "INSTAGRAM", "INSTAGRAM_PAGE"].includes(a.platform)
+    );
+    const hasSettingsIssue = (account: Account) =>
+        issues.find((x) => x.account.id === account.id)?.issues.some((i) => i.severity === "error") ?? false;
 
     return (
         <div className="mx-auto max-w-3xl space-y-4">
@@ -223,9 +238,29 @@ export default function ComposePage() {
                                 <button
                                     key={account.id}
                                     onClick={() => {
-                                        setSelectedAccountIds((prev) =>
-                                            selected ? prev.filter((id) => id !== account.id) : [...prev, account.id]
-                                        );
+                                        setSelectedAccountIds((prev) => {
+                                            const next = selected ? prev.filter((id) => id !== account.id) : [...prev, account.id];
+                                            if (!selected) {
+                                                const defaults: Record<string, string | boolean> =
+                                                    account.platform === "TIKTOK"
+                                                        ? { tiktokPrivacyLevel: "SELF_ONLY" }
+                                                        : account.platform === "YOUTUBE"
+                                                          ? { youtubePrivacy: "private" }
+                                                          : account.platform === "LINKEDIN"
+                                                            ? { linkedinVisibility: "PUBLIC" }
+                                                            : account.platform === "THREADS"
+                                                              ? { threadsShareToIg: false }
+                                                              : {};
+                                                setPlatformSettings((s) => ({ ...s, [account.id]: defaults }));
+                                            } else {
+                                                setPlatformSettings((s) => {
+                                                    const next = { ...s };
+                                                    delete next[account.id];
+                                                    return next;
+                                                });
+                                            }
+                                            return next;
+                                        });
                                     }}
                                     className={cn(
                                         "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors",
@@ -298,6 +333,248 @@ export default function ComposePage() {
                     </div>
                 )}
             </div>
+
+            {/* Komentar pertama (Instagram, Facebook, YouTube) */}
+            {selectedAccounts.some((a) => ["INSTAGRAM", "INSTAGRAM_PAGE", "FACEBOOK", "META", "YOUTUBE"].includes(a.platform)) && (
+                <div className="rounded-lg border border-border bg-card p-4">
+                    <label className="flex items-center justify-between text-sm font-medium text-foreground">
+                        Komentar pertama
+                        <span className="text-xs font-normal text-muted-foreground">
+                            Diposting otomatis setelah konten terbit
+                        </span>
+                    </label>
+                    <textarea
+                        value={firstComment}
+                        onChange={(e) => setFirstComment(e.target.value)}
+                        placeholder="Tulis komentar pertama yang otomatis muncul di bawah post…"
+                        rows={2}
+                        className="mt-2 w-full resize-none rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <div className="flex items-center justify-between pt-1">
+                        <span className="text-xs text-muted-foreground">{firstComment.length} karakter</span>
+                        {selectedAccounts.some((a) => ["INSTAGRAM", "INSTAGRAM_PAGE"].includes(a.platform)) && (
+                            <span className="text-xs text-muted-foreground">Instagram: maks 2.196</span>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Platform settings (per akun) */}
+            {settingsAccounts.length > 0 && (
+                <div className="rounded-lg border border-border bg-card p-4">
+                    <p className="pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Pengaturan per platform
+                    </p>
+                    <div className="space-y-4">
+                        {settingsAccounts.map((account) => {
+                            const s = platformSettings[account.id] ?? {};
+                            const set = (key: string, value: string | boolean | { username: string; x: number; y: number }[] | string[]) =>
+                                setPlatformSettings((prev) => ({
+                                    ...prev,
+                                    [account.id]: { ...(prev[account.id] ?? {}), [key]: value },
+                                }));
+                            return (
+                                <div key={account.id} className="rounded-md border border-border bg-muted/40 p-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ background: PLATFORM_COLORS[account.platform] }}>
+                                            <PlatformIcon platform={account.platform} size={12} />
+                                        </span>
+                                        <p className="text-sm font-medium">{account.name}</p>
+                                        <span className="text-xs text-muted-foreground">{PLATFORM_LABELS[account.platform]}</span>
+                                    </div>
+                                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                        {account.platform === "TIKTOK" && (
+                                            <>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Tingkat privasi *</Label>
+                                                    <select
+                                                        value={(s.tiktokPrivacyLevel as string) ?? ""}
+                                                        onChange={(e) => set("tiktokPrivacyLevel", e.target.value)}
+                                                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                    >
+                                                        <option value="SELF_ONLY">Hanya saya</option>
+                                                        <option value="PRIVATE_TO_FRIENDS">Teman</option>
+                                                        <option value="PUBLIC">Publik</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Komentar</Label>
+                                                    <select
+                                                        value={(s.tiktokComments as boolean) === false ? "off" : "on"}
+                                                        onChange={(e) => set("tiktokComments", e.target.value === "on")}
+                                                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                    >
+                                                        <option value="on">Diaktifkan</option>
+                                                        <option value="off">Dimatikan</option>
+                                                    </select>
+                                                </div>
+                                            </>
+                                        )}
+                                        {account.platform === "YOUTUBE" && (
+                                            <>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Status privasi *</Label>
+                                                    <select
+                                                        value={(s.youtubePrivacy as string) ?? ""}
+                                                        onChange={(e) => set("youtubePrivacy", e.target.value)}
+                                                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                    >
+                                                        <option value="private">Private</option>
+                                                        <option value="unlisted">Unlisted</option>
+                                                        <option value="public">Public</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Judul video</Label>
+                                                    <Input
+                                                        value={(s.videoTitle as string) ?? ""}
+                                                        onChange={(e) => set("videoTitle", e.target.value)}
+                                                        placeholder="Kosongkan untuk memakai caption"
+                                                        className="h-9"
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+                                        {account.platform === "PINTEREST" && (
+                                            <div className="space-y-1 sm:col-span-2">
+                                                <Label className="text-xs">Board ID *</Label>
+                                                <Input
+                                                    value={(s.boardId as string) ?? ""}
+                                                    onChange={(e) => set("boardId", e.target.value)}
+                                                    placeholder="Contoh: 123456789012345678 (dari URL board Pinterest)"
+                                                    className="h-9"
+                                                />
+                                            </div>
+                                        )}
+                                        {account.platform === "LINKEDIN" && (
+                                            <div className="space-y-1 sm:col-span-2">
+                                                <Label className="text-xs">Visibilitas</Label>
+                                                <select
+                                                    value={(s.linkedinVisibility as string) ?? "PUBLIC"}
+                                                    onChange={(e) => set("linkedinVisibility", e.target.value)}
+                                                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                >
+                                                    <option value="PUBLIC">Publik</option>
+                                                    <option value="CONNECTIONS">Hanya koneksi</option>
+                                                </select>
+                                            </div>
+                                        )}
+                                        {account.platform === "THREADS" && (
+                                            <>
+                                                <div className="space-y-1 sm:col-span-2">
+                                                    <Label className="text-xs">Topic tag (opsional)</Label>
+                                                    <Input
+                                                        value={(s.threadsTopicTag as string) ?? ""}
+                                                        onChange={(e) => set("threadsTopicTag", e.target.value)}
+                                                        placeholder="mis. teknologi, makanan"
+                                                        className="h-9"
+                                                    />
+                                                </div>
+                                                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={s.threadsShareToIg === true}
+                                                        onChange={(e) => set("threadsShareToIg", e.target.checked)}
+                                                        className="h-4 w-4 accent-primary"
+                                                    />
+                                                    <span>
+                                                        Bagikan juga ke Instagram Story
+                                                        <span className="block text-xs text-muted-foreground">
+                                                            Membutuhkan akun Instagram tertaut & izin threads_share_to_instagram
+                                                        </span>
+                                                    </span>
+                                                </label>
+                                            </>
+                                        )}
+                                        {(account.platform === "INSTAGRAM" || account.platform === "INSTAGRAM_PAGE") && (
+                                            <>
+                                                <div className="space-y-1 sm:col-span-2">
+                                                    <Label className="text-xs">Lokasi (opsional)</Label>
+                                                    <Input
+                                                        value={(s.instagramLocationId as string) ?? ""}
+                                                        onChange={(e) => {
+                                                            const raw = e.target.value.trim();
+                                                            const match = raw.match(/instagram\.com\/explore\/locations\/(\d+)/) || raw.match(/^(\d+)$/);
+                                                            set("instagramLocationId", match ? match[1] : raw);
+                                                        }}
+                                                        placeholder="Tempel URL lokasi Instagram (instagram.com/explore/locations/…) atau ID-nya"
+                                                        className="h-9"
+                                                    />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Hanya untuk foto feed & reel (bukan carousel/story).
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-1 sm:col-span-2">
+                                                    <Label className="text-xs">Tag pengguna (opsional)</Label>
+                                                    <Input
+                                                        value={((s.instagramUserTags as { username: string }[] | undefined) ?? [])
+                                                            .map((t) => t.username)
+                                                            .join(", ")}
+                                                        onChange={(e) =>
+                                                            set(
+                                                                "instagramUserTags",
+                                                                e.target.value
+                                                                    .split(",")
+                                                                    .map((u) => u.trim())
+                                                                    .filter(Boolean)
+                                                                    .map((username) => ({ username, x: 0.5, y: 0.5 })),
+                                                            )
+                                                        }
+                                                        placeholder="username1, username2 (pisahkan dengan koma)"
+                                                        className="h-9"
+                                                    />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Hanya untuk foto feed & story. Koordinat default: tengah.
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-1 sm:col-span-2">
+                                                    <Label className="text-xs">Kolaborator (opsional, maks 3)</Label>
+                                                    <Input
+                                                        value={((s.instagramCollaborators as string[] | undefined) ?? []).join(", ")}
+                                                        onChange={(e) =>
+                                                            set(
+                                                                "instagramCollaborators",
+                                                                e.target.value
+                                                                    .split(",")
+                                                                    .map((u) => u.trim())
+                                                                    .filter(Boolean)
+                                                                    .slice(0, 3),
+                                                            )
+                                                        }
+                                                        placeholder="username1, username2 (maks 3, pisahkan dengan koma)"
+                                                        className="h-9"
+                                                    />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Diundang sebagai kolaborator (foto, carousel, reel).
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-1 sm:col-span-2">
+                                                    <Label className="text-xs">Teks alternatif (alt text, opsional)</Label>
+                                                    <Input
+                                                        value={(s.altText as string) ?? ""}
+                                                        onChange={(e) => set("altText", e.target.value)}
+                                                        placeholder="Deskripsi aksesibilitas gambar (maks 100 karakter)"
+                                                        maxLength={100}
+                                                        className="h-9"
+                                                    />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Hanya untuk foto feed (bukan reel/story/carousel).
+                                                    </p>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                    {hasSettingsIssue(account) && (
+                                        <p className="mt-2 text-xs text-accent-red">
+                                            Lengkapi setting wajib di atas untuk platform ini.
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Content tools: pilar + template + hashtag */}
             <div className="rounded-lg border border-border bg-card p-4">

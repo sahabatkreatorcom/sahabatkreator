@@ -32,6 +32,7 @@ export interface PublishPayload {
     youtubeCommentsEnabled?: boolean;
     linkedinVisibility?: string;
     threadsTopicTag?: string;
+    threadsShareToIg?: boolean;
     tiktokPrivacyLevel?: string;
     tiktokBrandOrganic?: boolean;
     tiktokBrandContent?: boolean;
@@ -41,6 +42,9 @@ export interface PublishPayload {
     tiktokStitches?: boolean;
     instagramShareToFeed?: boolean;
     instagramComments?: boolean;
+    instagramLocationId?: string;
+    instagramUserTags?: { username: string; x?: number; y?: number }[];
+    instagramCollaborators?: string[];
     isTrialReel?: boolean;
     altText?: string;
 }

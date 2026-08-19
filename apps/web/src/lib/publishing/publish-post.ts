@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { publishToPlatform } from "./orchestrator";
+import type { PublishPayload } from "./types";
 import { decryptToken } from "@/lib/token-encryption";
 import { logActivity } from "@/lib/activity-log";
 
@@ -61,6 +62,7 @@ export async function publishPost(
         youtubeCommentsEnabled: post.youtubeCommentsEnabled,
         linkedinVisibility: post.linkedinVisibility ?? undefined,
         threadsTopicTag: post.threadsTopicTag ?? undefined,
+        threadsShareToIg: post.threadsShareToIg,
         tiktokPrivacyLevel: post.tiktokPrivacyLevel ?? undefined,
         tiktokBrandOrganic: post.tiktokBrandOrganic,
         tiktokBrandContent: post.tiktokBrandContent,
@@ -70,6 +72,9 @@ export async function publishPost(
         tiktokStitches: post.tiktokStitches,
         instagramShareToFeed: post.instagramShareToFeed,
         instagramComments: post.instagramComments,
+        instagramLocationId: post.instagramLocationId ?? undefined,
+        instagramUserTags: post.instagramUserTags as unknown as PublishPayload["instagramUserTags"] | undefined,
+        instagramCollaborators: post.instagramCollaborators as unknown as PublishPayload["instagramCollaborators"] | undefined,
         isTrialReel: post.isTrialReel,
         altText: post.altText ?? undefined,
     };
