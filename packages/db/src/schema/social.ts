@@ -75,3 +75,26 @@ export const audienceActivity = pgTable("audience_activity", {
     .$onUpdate(() => new Date())
     .notNull(),
 });
+
+/**
+ * Sesi OAuth "pending" untuk platform yang butuh pemilihan target (Facebook Page,
+ * Instagram via Page). Token user (long-lived) disimpan sementara sementara user
+ * memilih halaman mana yang akan dihubungkan; baris dihapus setelah selesai.
+ */
+export const pendingOauthSession = pgTable(
+  "pending_oauth_session",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    platform: platformEnum("platform").notNull(),
+    accessToken: text("access_token").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("pending_oauth_session_org_idx").on(table.organizationId),
+    index("pending_oauth_session_expiry_idx").on(table.expiresAt),
+  ],
+);

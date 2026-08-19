@@ -28,7 +28,7 @@ const MANAGED_PLATFORMS: Platform[] = [
 /** Path webhook per platform (untuk dipasang di developer portal masing-masing). */
 const WEBHOOK_PATHS: Partial<Record<Platform, string[]>> = {
     INSTAGRAM: ["/api/webhooks/instagram"],
-    META: ["/api/webhooks/instagram", "/api/webhooks/facebook", "/api/webhooks/threads"],
+    META: ["/api/webhooks/instagram", "/api/webhooks/facebook"],
     TIKTOK: ["/api/webhooks/tiktok"],
     YOUTUBE: ["/api/webhooks/youtube"],
     THREADS: ["/api/webhooks/threads"],

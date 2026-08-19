@@ -1,4 +1,4 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+﻿import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@sahabat-kreator/db";
 import { env } from "@sahabat-kreator/env/server";
@@ -81,16 +81,34 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
         return NextResponse.redirect(accountsUrl);
     }
 
+    // FACEBOOK & INSTAGRAM_PAGE butuh pemilihan halaman target — simpan token
+    // sementara, lalu biarkan user memilih halaman di halaman connections.
+    if (platform === "FACEBOOK" || platform === "INSTAGRAM_PAGE") {
+        try {
+            const sessionId = randomUUID();
+            await db.insert(schema.pendingOauthSession).values({
+                id: sessionId,
+                organizationId: stateData.organizationId,
+                platform,
+                accessToken: encryptToken(tokens.accessToken),
+                expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+            });
+            const pickUrl = new URL("/settings/connections", baseUrl);
+            pickUrl.searchParams.set("pending", sessionId);
+            pickUrl.searchParams.set("platform", platform);
+            return NextResponse.redirect(pickUrl);
+        } catch {
+            accountsUrl.searchParams.set("error", "save_failed");
+            return NextResponse.redirect(accountsUrl);
+        }
+    }
+
     const profile = await fetchPlatformProfile(platform, tokens.accessToken);
     if (!profile) {
         accountsUrl.searchParams.set("error", "profile_fetch_failed");
         return NextResponse.redirect(accountsUrl);
     }
 
-    const effectiveToken =
-        (platform === "FACEBOOK" || platform === "INSTAGRAM_PAGE") && profile.metadata?.pageAccessToken
-            ? String(profile.metadata.pageAccessToken)
-            : tokens.accessToken;
     const tokenExpiry = new Date(Date.now() + tokens.expiresIn * 1000);
 
     const existing = await db.query.socialAccount.findFirst({
@@ -107,7 +125,7 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
         if (existing) {
             await db.update(schema.socialAccount)
                 .set({
-                    accessToken: encryptToken(effectiveToken),
+                    accessToken: encryptToken(tokens.accessToken),
                     refreshToken: tokens.refreshToken ? encryptToken(tokens.refreshToken) : null,
                     tokenExpiry,
                     name: profile.name,
@@ -129,7 +147,7 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
                     name: profile.name,
                     username: profile.username,
                     avatar: profile.profilePicture ?? null,
-                    accessToken: encryptToken(effectiveToken),
+                    accessToken: encryptToken(tokens.accessToken),
                     refreshToken: tokens.refreshToken ? encryptToken(tokens.refreshToken) : null,
                     tokenExpiry,
                     isActive: true,

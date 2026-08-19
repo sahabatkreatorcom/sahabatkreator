@@ -1,4 +1,5 @@
 import { GRAPH_API_URL, INSTAGRAM_GRAPH_URL, type Platform } from "./config";
+import { PINTEREST_API_BASE } from "./pinterest-config";
 
 export interface OAuthProfile {
     platformId: string;
@@ -6,6 +7,55 @@ export interface OAuthProfile {
     username: string;
     profilePicture?: string;
     metadata?: Record<string, unknown>;
+}
+
+export interface PageChoice {
+    pageId: string;
+    pageName: string;
+    pageAccessToken: string;
+    instagramBusinessAccount?: {
+        id: string;
+        name: string;
+        username: string;
+        profilePicture?: string;
+    };
+}
+
+/**
+ * Daftar halaman Facebook + Instagram business account (bila tertaut) dari
+ * user access token. Dipakai oleh dialog pilihan halaman saat menghubungkan
+ * FACEBOOK / INSTAGRAM_PAGE.
+ */
+export async function fetchPageChoices(accessToken: string): Promise<PageChoice[] | null> {
+    try {
+        const res = await fetch(
+            `${GRAPH_API_URL}/me/accounts?fields=id,name,access_token,instagram_business_account{id,name,username,profile_picture_url}`,
+            { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        const data = await res.json();
+        if (data.error || !Array.isArray(data.data)) return null;
+
+        return data.data.map((page: {
+            id: string;
+            name: string;
+            access_token: string;
+            instagram_business_account?: { id: string; name?: string; username?: string; profile_picture_url?: string };
+        }) => ({
+            pageId: page.id,
+            pageName: page.name,
+            pageAccessToken: page.access_token,
+            instagramBusinessAccount: page.instagram_business_account
+                ? {
+                      id: page.instagram_business_account.id,
+                      name: page.instagram_business_account.name || page.name,
+                      username: page.instagram_business_account.username || "",
+                      profilePicture: page.instagram_business_account.profile_picture_url,
+                  }
+                : undefined,
+        }));
+    } catch {
+        return null;
+    }
 }
 
 export async function fetchPlatformProfile(
@@ -164,7 +214,7 @@ export async function fetchGoogleBusinessProfile(accessToken: string): Promise<O
 
 export async function fetchPinterestProfile(accessToken: string): Promise<OAuthProfile | null> {
     try {
-        const res = await fetch("https://api.pinterest.com/v5/user_account", {
+        const res = await fetch(`${PINTEREST_API_BASE}/user_account`, {
             headers: { Authorization: `Bearer ${accessToken}` },
         });
         const data = await res.json();

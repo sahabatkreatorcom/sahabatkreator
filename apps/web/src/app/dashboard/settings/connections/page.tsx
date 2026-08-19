@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link2, Link2Off, Loader2 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { Link2, Link2Off, Loader2, ChevronDown } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 
@@ -20,8 +21,18 @@ interface Account {
     createdAt: string;
 }
 
+interface PageChoice {
+    pageId: string;
+    pageName: string;
+    accountId?: string;
+    accountName?: string;
+    username?: string;
+    avatar?: string | null;
+}
+
 export default function ConnectionsPage() {
     const searchParams = useSearchParams();
+    const router = useRouter();
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
     const [connecting, setConnecting] = useState<Platform | null>(null);
@@ -30,10 +41,17 @@ export default function ConnectionsPage() {
     const [notice, setNotice] = useState<string | null>(null);
     const activeOrgRef = useRef<string | null>(null);
 
+    // Pilihan halaman (dialog FACEBOOK / INSTAGRAM_PAGE)
+    const [pendingChoices, setPendingChoices] = useState<{ platform: Platform; pages: PageChoice[] } | null>(null);
+    const [pendingLoading, setPendingLoading] = useState(false);
+    const [pendingSaving, setPendingSaving] = useState(false);
+
     // Tangani parameter query dari callback OAuth
     useEffect(() => {
         const success = searchParams.get("success");
         const err = searchParams.get("error");
+        const pendingId = searchParams.get("pending");
+        const pendingPlatform = searchParams.get("platform");
         if (success === "connected") setNotice("Akun berhasil dihubungkan.");
         else if (success === "reconnected") setNotice("Akun berhasil diperbarui.");
         else if (err) {
@@ -48,8 +66,64 @@ export default function ConnectionsPage() {
                 save_failed: "Gagal menyimpan akun.",
             };
             setError(messages[err] ?? `Gagal menghubungkan (${err}).`);
+        } else if (pendingId && pendingPlatform) {
+            loadPendingChoices(pendingId, pendingPlatform as Platform);
         }
     }, [searchParams]);
+
+    const loadPendingChoices = async (pendingId: string, platform: Platform) => {
+        setPendingLoading(true);
+        setError(null);
+        try {
+            const res = await fetch(`/api/accounts/pending/${pendingId}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Gagal memuat pilihan halaman.");
+            if (data.pages.length === 0) {
+                setError(
+                    platform === "INSTAGRAM_PAGE"
+                        ? "Tidak ada halaman dengan Instagram business account yang ditemukan."
+                        : "Tidak ada halaman Facebook yang ditemukan.",
+                );
+                router.replace("/settings/connections");
+                return;
+            }
+            setPendingChoices({ platform, pages: data.pages });
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Gagal memuat pilihan halaman.");
+            router.replace("/settings/connections");
+        } finally {
+            setPendingLoading(false);
+        }
+    };
+
+    const savePendingChoice = async (pageId: string) => {
+        const pendingId = searchParams.get("pending");
+        if (!pendingId) return;
+        setPendingSaving(true);
+        setError(null);
+        try {
+            const res = await fetch(`/api/accounts/pending/${pendingId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pageId }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Gagal menyimpan akun.");
+            setPendingChoices(null);
+            setNotice("Akun berhasil dihubungkan.");
+            router.replace("/settings/connections");
+            loadAccounts();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Gagal menyimpan akun.");
+        } finally {
+            setPendingSaving(false);
+        }
+    };
+
+    const cancelPending = () => {
+        setPendingChoices(null);
+        router.replace("/settings/connections");
+    };
 
     const loadAccounts = useCallback(async () => {
         setLoading(true);
@@ -115,6 +189,10 @@ export default function ConnectionsPage() {
     }
 
     const connected = new Set(accounts.map((a) => a.platform));
+    const countByPlatform = accounts.reduce<Record<string, number>>((acc, a) => {
+        acc[a.platform] = (acc[a.platform] ?? 0) + 1;
+        return acc;
+    }, {});
 
     return (
         <div className="space-y-6">
@@ -175,30 +253,87 @@ export default function ConnectionsPage() {
                                 >
                                     <div className="flex items-center gap-3">
                                         <PlatformAvatar platform={platform} name={PLATFORM_LABELS[platform]} />
-                                        <span className="text-sm font-medium">{PLATFORM_LABELS[platform]}</span>
+                                        <div>
+                                            <span className="text-sm font-medium">{PLATFORM_LABELS[platform]}</span>
+                                            {countByPlatform[platform] > 0 && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {countByPlatform[platform]} akun terhubung
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
-                                    {connected.has(platform) ? (
-                                        <span className="flex items-center gap-1.5 text-xs font-medium text-accent-green">
-                                            <span className="h-1.5 w-1.5 rounded-full bg-accent-green" />
-                                            Terhubung
-                                        </span>
-                                    ) : (
-                                        <Button
-                                            size="sm"
-                                            variant="secondary"
-                                            loading={connecting === platform}
-                                            onClick={() => handleConnect(platform)}
-                                        >
-                                            <Link2 className="h-4 w-4" />
-                                            Hubungkan
-                                        </Button>
-                                    )}
+                                    <Button
+                                        size="sm"
+                                        variant={connected.has(platform) ? "secondary" : "primary"}
+                                        loading={connecting === platform}
+                                        onClick={() => handleConnect(platform)}
+                                    >
+                                        <Link2 className="h-4 w-4" />
+                                        {connected.has(platform) ? "Tambah akun" : "Hubungkan"}
+                                    </Button>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Dialog pilihan halaman (FACEBOOK / INSTAGRAM_PAGE) */}
+            <Dialog
+                open={pendingLoading || pendingChoices !== null}
+                onClose={cancelPending}
+                title={pendingChoices?.platform === "INSTAGRAM_PAGE" ? "Pilih halaman Instagram" : "Pilih halaman Facebook"}
+                description={
+                    pendingChoices?.platform === "INSTAGRAM_PAGE"
+                        ? "Pilih halaman Facebook yang tertaut dengan Instagram business account untuk dihubungkan."
+                        : "Pilih halaman Facebook yang ingin dihubungkan."
+                }
+            >
+                {pendingLoading ? (
+                    <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Memuat pilihan halaman...
+                    </div>
+                ) : (
+                    <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                        {pendingChoices?.pages.map((page) => (
+                            <button
+                                key={`${page.pageId}-${page.accountId ?? "fb"}`}
+                                onClick={() => savePendingChoice(page.pageId)}
+                                disabled={pendingSaving}
+                                className="flex w-full items-center gap-3 rounded-md border border-border bg-background p-3 text-left transition-colors hover:bg-muted disabled:opacity-50"
+                            >
+                                {page.avatar ? (
+                                    <img
+                                        src={page.avatar}
+                                        alt={page.accountName || page.pageName}
+                                        className="h-9 w-9 rounded-full object-cover"
+                                    />
+                                ) : (
+                                    <span
+                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white"
+                                        style={{ background: pendingChoices.platform === "INSTAGRAM_PAGE" ? "#E4405F" : "#1877F2" }}
+                                    >
+                                        <PlatformIcon platform={pendingChoices.platform === "INSTAGRAM_PAGE" ? "INSTAGRAM" : "FACEBOOK"} size={18} />
+                                    </span>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium">
+                                        {pendingChoices.platform === "INSTAGRAM_PAGE" ? page.accountName || page.pageName : page.pageName}
+                                    </p>
+                                    {pendingChoices.platform === "INSTAGRAM_PAGE" && page.username && (
+                                        <p className="truncate text-xs text-muted-foreground">@{page.username}</p>
+                                    )}
+                                    <p className="truncate text-xs text-muted-foreground">
+                                        {pendingChoices.platform === "INSTAGRAM_PAGE" ? `via halaman: ${page.pageName}` : "Halaman Facebook"}
+                                    </p>
+                                </div>
+                                <ChevronDown className="h-4 w-4 -rotate-90 text-muted-foreground" />
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </Dialog>
         </div>
     );
 }

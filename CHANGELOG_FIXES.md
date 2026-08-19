@@ -4,6 +4,66 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #24 — Dukungan Pinterest Trial access / Sandbox (api-sandbox.pinterest.com)
+**Gejala:** Pinterest API selalu dipanggil ke production (`api.pinterest.com/v5`) — tidak ada cara menguji dengan **Trial access** yang menyediakan **Sandbox environment** (`api-sandbox.pinterest.com`) untuk meng-explore API tanpa menyentuh data produksi.
+
+**Akar:** Base URL Pinterest di-*hardcode* di 4 tempat (`config.ts` tokenUrl/apiBase, `oauth.ts` exchange/refresh, `profile.ts` user_account, `publishing/pinterest.ts` pins/media) — semuanya production.
+
+**Dokumentasi resmi (dari docs Pinterest, agt 2026):** Trial access → semua Pins & Boards dibuat hanya visible to creator (Sandbox entity); rate limit harian per-app; sandbox memakai subdomain `api-sandbox.` pada token & semua endpoint data (OAuth authorize tetap `www.pinterest.com/oauth/`); token sandbox terpisah dari production (tak bisa ditukar); **video Pin tidak didukung di Sandbox**; untuk produksi hapus `-sandbox` dan pakai token produksi.
+
+| | |
+|---|---|
+| **File** | `packages/env/src/server.ts` (+`PINTEREST_SANDBOX` enum true/false default false), `apps/web/src/lib/platforms/pinterest-config.ts` (**baru**: `PINTEREST_IS_SANDBOX`, `PINTEREST_API_BASE`, `PINTEREST_TOKEN_URL`), `apps/web/src/lib/platforms/oauth.ts` (exchange/refresh pakai `PINTEREST_TOKEN_URL`), `apps/web/src/lib/platforms/profile.ts` (user_account pakai `PINTEREST_API_BASE`), `apps/web/src/lib/publishing/pinterest.ts` (pins/media pakai `PINTEREST_API_BASE`; **video ditolak saat sandbox** → error `SANDBOX_NO_VIDEO`), `.env.example` (+blok Pinterest sandbox) |
+| **Masalah** | Tidak ada cara pakai Trial access / Sandbox Pinterest |
+| **Akar** | Base URL Pinterest hardcode production di 4 file |
+| **Fix** | Env `PINTEREST_SANDBOX` mengarahkan semua panggilan API (token+data) ke `api-sandbox.pinterest.com/v5`; video Pin diblokir eksplisit saat sandbox (sesuai batasan resmi); dokumentasi di `.env.example` |
+| **Verifikasi** | `pnpm --filter web exec tsc --noEmit` & `pnpm --filter @sahabat-kreator/env check-types` lolos. **PENDING deploy** — perlu set `PINTEREST_SANDBOX=true` di env saat ingin uji trial, lalu uji connect + publish Pin. |
+| **Pelajaran** | Platform yang punya sandbox environment (Pinterest api-sandbox) butuh base URL yang bisa di-toggle per-env; jangan hardcode host API di banyak file — pusatkan di satu helper (`pinterest-config.ts`). Token environment sandbox tidak pernah boleh dicampur ke production. |
+| **Log Keyword** | pinterest, sandbox, trial access, api-sandbox, video pin, base url, oauth token |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
+### Fix #23 — Koneksi akun sosial hanya mendukung 1 akun per platform di halaman connections
+**Gejala:** Di `/settings/connections`, begitu satu akun dari suatu platform terhubung (mis. 1 Instagram), tombol "Hubungkan" berubah jadi status "Terhubung" dan tidak bisa menambah akun kedua (mis. 2 Instagram, 3 Threads).
+
+**Akar:** `connections/page.tsx` memakai `connected = new Set(accounts.map(a => a.platform))` lalu mengganti tombol dengan label statis "Terhubung" — secara implisit membatasi satu akun per platform di UI. Backend sebenarnya sudah mendukung multi-akun: `social_account` unik per `(org, platform, platformId)`, `createPosts` menerima `platformAccountIds[]` (1 post per akun), halaman `/dashboard/accounts` & komponen settings sudah punya tombol "Tambah Akun".
+
+| | |
+|---|---|
+| **File** | `apps/web/src/app/dashboard/settings/connections/page.tsx` (tombol selalu "Hubungkan"/"Tambah akun" + tampilkan jumlah akun per platform `countByPlatform`) |
+| **Masalah** | Tidak bisa menambah akun ke-2/ke-3 dari platform yang sama di halaman connections |
+| **Akar** | UI membatasi 1 akun per platform via `Set(platform)`; backend sudah multi-akun |
+| **Fix** | Selalu tampilkan tombol aksi per platform (label "Hubungkan" bila 0 akun, "Tambah akun" bila ≥1) + indikator jumlah akun; arahkan ke `/dashboard/accounts` sebagai pengingat bahwa kelola akun penuh ada di sana |
+| **Verifikasi** | `pnpm --filter web exec tsc --noEmit` lolos. **PENDING deploy** — perlu rebuild web. Belum diuji dengan 2 akun Instagram nyata (butuh login Instagram berbeda). |
+| **Pelajaran** | Jangan simpan asumsi "1 akun per platform" di UI hanya karena data per platform; backend sudah per-akun (platformId unik). |
+| **Log Keyword** | multi account, multiple accounts, connections, social account, platform, tambah akun |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
+### Fix #22 — OAuth Instagram: scope standalone salah + koneksi Facebook/Instagram-Page auto-ambil halaman pertama
+**Gejala:**
+1. Hubungkan **Instagram (standalone)** → redirect ke halaman error Instagram: `Invalid Request: Request parameters are invalid: Invalid platform app`.
+2. Hubungkan **Facebook Page** atau **Instagram (via Page)** → langsung menghubungkan **halaman pertama** dari `me/accounts` tanpa dialog pilihan — user tidak bisa memilih halaman mana yang dihubungkan.
+
+**Akar:**
+1. Scope `INSTAGRAM` standalone di `config.ts` memakai scope **Instagram Graph API** (`instagram_graph_api`, `instagram_content_publish`, dst.) yang seharusnya dipakai lewat **Facebook Login**. Endpoint standalone `api.instagram.com/oauth/authorize` (Instagram API with Instagram Login — rebrand dari Basic Display, tidak deprecated) menolak kombinasi itu → "Invalid platform app". Terbukti dengan tes langsung: scope lama → error; tanpa scope → login OK.
+2. `fetchPlatformProfile` untuk `FACEBOOK`/`INSTAGRAM_PAGE` memakai `data.data?.[0]` / `.find(...)` → halaman pertama selalu terpilih. Tidak ada mekanisme memilih halaman.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/lib/platforms/config.ts` (scope standalone IG → `instagram_business_basic`, `instagram_business_content_publish`, `instagram_business_manage_comments`, `instagram_business_manage_insights`, `instagram_business_manage_messages`), `apps/web/src/lib/platforms/profile.ts` (+`fetchPageChoices` & `PageChoice`), `apps/web/src/app/api/accounts/callback/[platform]/route.ts` (FACEBOOK/INSTAGRAM_PAGE → simpan sesi pending + redirect `?pending=<id>`; platform lain alur lama; hapus `effectiveToken` yang kini tak terpakai), `apps/web/src/app/api/accounts/pending/[id]/route.ts` (**baru**: GET daftar halaman/IG business, POST pilih halaman → simpan akun + hapus sesi), `packages/db/src/schema/social.ts` (+`pendingOauthSession`, expires 10 menit), migrasi `0001_hesitant_spectrum.sql`, `apps/web/src/app/dashboard/settings/connections/page.tsx` (+dialog pilih halaman saat `?pending=`) |
+| **Masalah** | IG standalone gagal "Invalid platform app"; FB/IG-Page tidak ada dialog pilih halaman |
+| **Akar** | Scope standalone salah (pakai scope Graph API via FB Login); profil auto-ambil halaman pertama |
+| **Fix** | Scope standalone diperbaiki ke scope Instagram API with Instagram Login; alur FACEBOOK/INSTAGRAM_PAGE kini 2 langkah: OAuth → simpan token sementara → dialog pilih halaman → simpan akun dgn page access token |
+| **Verifikasi** | Tes langsung OAuth authorize: scope baru → **halaman login Instagram OK** (sebelumnya error). `pnpm --filter web exec tsc --noEmit` lolos. Migrasi `0001` belum di-apply. **PENDING deploy** — perlu `db:migrate` di Neon+VPS lalu rebuild web, uji connect FB Page (dialog) & IG standalone. |
+| **Pelajaran** | Scope Instagram standalone vs via-Page itu beda set — jangan pakai scope Graph API (FB Login) di endpoint `api.instagram.com/oauth/authorize`. Untuk platform yang punya banyak target (FB Page, IG via Page), jangan auto-pick pertama — sediakan sesi pending + dialog pilih. |
+| **Log Keyword** | instagram, oauth, standalone, instagram api with instagram login, basic display, scope, invalid platform app, facebook page, page picker, pending session, me/accounts |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #21 — Area admin: billing mock, nav blog hilang, dropdown tertutup, Overview selalu aktif, platform tanpa callback URL, SumoPod tanpa UI
 **Gejala:** 7 temuan di `/admin`:
 1. `/admin/billing` menampilkan angka statis (Rp 15.000.000 / 45 sub) — data palsu, bukan dari DB.

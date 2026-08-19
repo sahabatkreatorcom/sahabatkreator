@@ -61,6 +61,10 @@ export const env = createEnv({
     YOUTUBE_CLIENT_SECRET: z.string().optional(),
     PINTEREST_CLIENT_ID: z.string().optional(),
     PINTEREST_CLIENT_SECRET: z.string().optional(),
+    PINTEREST_SANDBOX: z
+      .enum(["true", "false"])
+      .default("false")
+      .describe("Arahkan panggilan Pinterest API ke api-sandbox.pinterest.com (Trial access / Sandbox) alih-alih production."),
     LINKEDIN_CLIENT_ID: z.string().optional(),
     LINKEDIN_CLIENT_SECRET: z.string().optional(),
     THREADS_CLIENT_ID: z.string().optional(),

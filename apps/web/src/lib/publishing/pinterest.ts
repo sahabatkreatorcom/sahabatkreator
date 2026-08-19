@@ -1,11 +1,13 @@
 import type { PlatformAccount, PublishPayload, PublishResponse } from "./types";
-
-const PINTEREST_API_URL = "https://api.pinterest.com/v5";
+import { PINTEREST_API_BASE, PINTEREST_IS_SANDBOX } from "@/lib/platforms/pinterest-config";
 
 /**
  * Pinterest Publisher — Pin & Carousel.
  * Media kami di R2 publik → pakai source image_url (Pinterest menarik dari URL).
  * Video wajib di-upload via /media dulu (Pinterest tidak menerima URL video mentah).
+ *
+ * Sandbox (Trial access): semua Pin/Board = Sandbox entity (visible only to
+ * creator). Catatan: video Pin TIDAK didukung di Sandbox — ditolak lebih awal.
  */
 export async function publishToPinterest(
     account: PlatformAccount,
@@ -21,6 +23,9 @@ export async function publishToPinterest(
     }
     if (payload.mediaUrls.length === 0) {
         return { success: false, error: "Pinterest membutuhkan gambar atau video." };
+    }
+    if (payload.mediaType === "video" && PINTEREST_IS_SANDBOX) {
+        return { success: false, error: "Video Pin tidak didukung di Sandbox Pinterest (Trial access).", errorCode: "SANDBOX_NO_VIDEO" };
     }
 
     try {
@@ -50,7 +55,7 @@ export async function publishToPinterest(
             pinBody.cover_image_url = payload.thumbnailUrl;
         }
 
-        const res = await fetch(`${PINTEREST_API_URL}/pins`, {
+        const res = await fetch(`${PINTEREST_API_BASE}/pins`, {
             method: "POST",
             headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },
             body: JSON.stringify(pinBody),
@@ -84,7 +89,7 @@ async function publishCarousel(
             media_source: { source_type: "image_url", url },
         }));
 
-        const res = await fetch(`${PINTEREST_API_URL}/pins`, {
+        const res = await fetch(`${PINTEREST_API_BASE}/pins`, {
             method: "POST",
             headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },
             body: JSON.stringify({ board_id: boardId, carousel_slots: items }),
@@ -107,7 +112,7 @@ async function uploadVideo(
     buffer: Buffer,
 ): Promise<{ success: true; mediaId: string } | { success: false; error: string }> {
     try {
-        const register = await fetch(`${PINTEREST_API_URL}/media`, {
+        const register = await fetch(`${PINTEREST_API_BASE}/media`, {
             method: "POST",
             headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
             body: JSON.stringify({ media_type: "video" }),
@@ -132,7 +137,7 @@ async function uploadVideo(
 
         for (let attempt = 0; attempt < 30; attempt++) {
             await new Promise((r) => setTimeout(r, attempt < 3 ? 2000 : 5000));
-            const statusRes = await fetch(`${PINTEREST_API_URL}/media/${reg.media_id}`, {
+            const statusRes = await fetch(`${PINTEREST_API_BASE}/media/${reg.media_id}`, {
                 headers: { Authorization: `Bearer ${accessToken}` },
             });
             const status = await statusRes.json();

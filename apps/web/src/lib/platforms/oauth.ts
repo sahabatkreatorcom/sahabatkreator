@@ -1,4 +1,5 @@
 import { INSTAGRAM_GRAPH_URL, INSTAGRAM_OAUTH_URL, PLATFORM_OAUTH_CONFIGS, type Platform } from "./config";
+import { PINTEREST_TOKEN_URL } from "./pinterest-config";
 
 export interface TokenResponse {
     accessToken: string;
@@ -311,7 +312,7 @@ async function exchangePinterestToken(
     clientSecret: string,
 ): Promise<TokenResponse> {
     const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-    const res = await fetch("https://api.pinterest.com/v5/oauth/token", {
+    const res = await fetch(PINTEREST_TOKEN_URL, {
         method: "POST",
         headers: { Authorization: `Basic ${basicAuth}`, "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri }),
@@ -332,7 +333,7 @@ async function refreshPinterestToken(
     clientSecret: string,
 ): Promise<TokenResponse> {
     const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-    const res = await fetch("https://api.pinterest.com/v5/oauth/token", {
+    const res = await fetch(PINTEREST_TOKEN_URL, {
         method: "POST",
         headers: { Authorization: `Basic ${basicAuth}`, "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }),
