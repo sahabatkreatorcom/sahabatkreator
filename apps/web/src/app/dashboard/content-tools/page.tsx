@@ -57,6 +57,7 @@ export default function ContentToolsPage() {
     const [pillarName, setPillarName] = useState("");
     const [pillarDesc, setPillarDesc] = useState("");
     const [pillarColor, setPillarColor] = useState(COLOR_OPTIONS[0]);
+    const [pillarSaving, setPillarSaving] = useState(false);
 
     const [templateOpen, setTemplateOpen] = useState(false);
     const [templateEdit, setTemplateEdit] = useState<CaptionTemplate | null>(null);
@@ -64,11 +65,13 @@ export default function ContentToolsPage() {
     const [templateCaption, setTemplateCaption] = useState("");
     const [templateCategory, setTemplateCategory] = useState("");
     const [templateHashtags, setTemplateHashtags] = useState("");
+    const [templateSaving, setTemplateSaving] = useState(false);
 
     const [collectionOpen, setCollectionOpen] = useState(false);
     const [collectionEdit, setCollectionEdit] = useState<HashtagCollection | null>(null);
     const [collectionName, setCollectionName] = useState("");
     const [collectionTags, setCollectionTags] = useState("");
+    const [collectionSaving, setCollectionSaving] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -107,8 +110,9 @@ export default function ContentToolsPage() {
     // ── Pillars ──
     async function savePillar() {
         if (!pillarName.trim()) return;
+        setPillarSaving(true);
+        setError(null);
         try {
-            setError(null);
             if (pillarEdit) {
                 await api(`/api/pillars/${pillarEdit.id}`, "PATCH", {
                     name: pillarName,
@@ -125,6 +129,8 @@ export default function ContentToolsPage() {
             load();
         } catch (e) {
             setError(e instanceof Error ? e.message : "Gagal menyimpan pilar.");
+        } finally {
+            setPillarSaving(false);
         }
     }
 
@@ -142,8 +148,9 @@ export default function ContentToolsPage() {
     // ── Caption templates ──
     async function saveTemplate() {
         if (!templateName.trim() || !templateCaption.trim()) return;
+        setTemplateSaving(true);
+        setError(null);
         try {
-            setError(null);
             const hashtags = templateHashtags.split(",").map((h) => h.trim().replace(/^#/, "")).filter(Boolean);
             const body = {
                 name: templateName,
@@ -165,6 +172,8 @@ export default function ContentToolsPage() {
             load();
         } catch (e) {
             setError(e instanceof Error ? e.message : "Gagal menyimpan template.");
+        } finally {
+            setTemplateSaving(false);
         }
     }
 
@@ -182,8 +191,9 @@ export default function ContentToolsPage() {
     // ── Hashtag collections ──
     async function saveCollection() {
         if (!collectionName.trim() || !collectionTags.trim()) return;
+        setCollectionSaving(true);
+        setError(null);
         try {
-            setError(null);
             const hashtags = collectionTags.split(",").map((h) => h.trim().replace(/^#/, "")).filter(Boolean);
             const body = { name: collectionName, hashtags };
             if (collectionEdit) {
@@ -198,6 +208,8 @@ export default function ContentToolsPage() {
             load();
         } catch (e) {
             setError(e instanceof Error ? e.message : "Gagal menyimpan koleksi.");
+        } finally {
+            setCollectionSaving(false);
         }
     }
 
@@ -362,6 +374,7 @@ export default function ContentToolsPage() {
             {/* Dialog pilar */}
             <Dialog open={pillarOpen} onClose={() => setPillarOpen(false)} title={pillarEdit ? "Ubah pilar" : "Pilar baru"}>
                 <div className="space-y-3">
+                    {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
                     <div>
                         <Label htmlFor="pillar-name">Nama</Label>
                         <Input id="pillar-name" value={pillarName} onChange={(e) => setPillarName(e.target.value)} placeholder="mis. Edukasi" />
@@ -385,7 +398,7 @@ export default function ContentToolsPage() {
                     </div>
                     <div className="flex justify-end gap-2 pt-1">
                         <Button variant="ghost" size="sm" onClick={() => setPillarOpen(false)}>Batal</Button>
-                        <Button size="sm" onClick={savePillar}>Simpan</Button>
+                        <Button size="sm" onClick={savePillar} loading={pillarSaving}>Simpan</Button>
                     </div>
                 </div>
             </Dialog>
@@ -393,6 +406,7 @@ export default function ContentToolsPage() {
             {/* Dialog template */}
             <Dialog open={templateOpen} onClose={() => setTemplateOpen(false)} title={templateEdit ? "Ubah template" : "Template caption baru"}>
                 <div className="space-y-3">
+                    {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
                     <div>
                         <Label htmlFor="tmpl-name">Nama</Label>
                         <Input id="tmpl-name" value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="mis. Promo produk baru" />
@@ -418,7 +432,7 @@ export default function ContentToolsPage() {
                     </div>
                     <div className="flex justify-end gap-2 pt-1">
                         <Button variant="ghost" size="sm" onClick={() => setTemplateOpen(false)}>Batal</Button>
-                        <Button size="sm" onClick={saveTemplate}>Simpan</Button>
+                        <Button size="sm" onClick={saveTemplate} loading={templateSaving}>Simpan</Button>
                     </div>
                 </div>
             </Dialog>
@@ -426,6 +440,7 @@ export default function ContentToolsPage() {
             {/* Dialog koleksi hashtag */}
             <Dialog open={collectionOpen} onClose={() => setCollectionOpen(false)} title={collectionEdit ? "Ubah koleksi" : "Koleksi hashtag baru"}>
                 <div className="space-y-3">
+                    {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
                     <div>
                         <Label htmlFor="coll-name">Nama</Label>
                         <Input id="coll-name" value={collectionName} onChange={(e) => setCollectionName(e.target.value)} placeholder="mis. Foodie campaign" />
@@ -436,7 +451,7 @@ export default function ContentToolsPage() {
                     </div>
                     <div className="flex justify-end gap-2 pt-1">
                         <Button variant="ghost" size="sm" onClick={() => setCollectionOpen(false)}>Batal</Button>
-                        <Button size="sm" onClick={saveCollection}>Simpan</Button>
+                        <Button size="sm" onClick={saveCollection} loading={collectionSaving}>Simpan</Button>
                     </div>
                 </div>
             </Dialog>

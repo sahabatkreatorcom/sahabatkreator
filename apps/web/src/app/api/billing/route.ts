@@ -119,8 +119,8 @@ export const POST = withOrgOwnerAdmin(async (authCtx, req: NextRequest) => {
         customerEmail: session.user.email,
         metadata: {
             planId: tier,
-            successReturnUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?status=success`,
-            cancelReturnUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?status=cancelled`,
+            successReturnUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?status=completed`,
+            cancelReturnUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?status=failed`,
             paymentMethod: "QRIS",
         },
     });

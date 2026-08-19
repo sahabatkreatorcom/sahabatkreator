@@ -47,6 +47,14 @@ export default function BillingPage() {
     const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
     const paymentStatus = searchParams.get("status");
+    const orderId = searchParams.get("order_id");
+
+    const paymentSuccess = paymentStatus === "success" || paymentStatus === "completed" || paymentStatus === "COMPLETED";
+    const paymentCancelled =
+        paymentStatus === "cancelled" ||
+        paymentStatus === "canceled" ||
+        paymentStatus === "failed" ||
+        paymentStatus === "expired";
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -105,7 +113,7 @@ export default function BillingPage() {
 
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
 
-            {paymentStatus === "success" && (
+            {paymentSuccess && (
                 <div className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
                     <div>
@@ -113,17 +121,20 @@ export default function BillingPage() {
                         <p className="text-sm text-emerald-700/80">
                             Terima kasih! Paket Anda sedang diaktifkan. Status bisa berubah dalam beberapa saat setelah
                             konfirmasi pembayaran diterima.
+                            {orderId && <span className="mt-1 block text-xs">Order: {orderId}</span>}
                         </p>
                     </div>
                 </div>
             )}
-            {paymentStatus === "cancelled" && (
+            {paymentCancelled && (
                 <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
                     <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                     <div>
-                        <p className="text-sm font-semibold text-amber-700">Pembayaran dibatalkan</p>
+                        <p className="text-sm font-semibold text-amber-700">Pembayaran tidak selesai</p>
                         <p className="text-sm text-amber-700/80">
-                            Anda membatalkan pembayaran. Paket Anda tidak berubah. Silakan coba lagi kapan saja.
+                            Pembayaran Anda gagal, dibatalkan, atau kedaluwarsa. Paket Anda tidak berubah. Silakan coba
+                            lagi kapan saja.
+                            {orderId && <span className="mt-1 block text-xs">Order: {orderId}</span>}
                         </p>
                     </div>
                 </div>
