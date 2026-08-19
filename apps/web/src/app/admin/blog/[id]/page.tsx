@@ -171,7 +171,7 @@ export default function BlogEditorPage({ params }: { params: Promise<{ id?: stri
               placeholder="judul-post-anda"
             />
             <p className="text-xs text-muted-foreground">
-              https://sahabatkreator.id/blog/{post.slug || "..."}
+              https://sahabatkreator.com/blog/{post.slug || "..."}
             </p>
           </div>
 

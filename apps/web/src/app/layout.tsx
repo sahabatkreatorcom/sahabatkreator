@@ -22,7 +22,7 @@ export default function RootLayout({
         <meta name="twitter:description" content={seo.description} />
         <meta name="twitter:image" content={seo.image} />
         <meta name="theme-color" content="#D4A574" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Sahabat Kreator" />
         <meta name="msapplication-TileColor" content="#D4A574" />

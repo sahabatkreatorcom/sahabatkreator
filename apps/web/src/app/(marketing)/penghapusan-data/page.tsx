@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Shield, Trash2, Clock, AlertTriangle } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -90,7 +90,7 @@ export default function DataDeletionPage() {
             </p>
             <ol className="list-decimal space-y-2 pl-6 text-muted-foreground">
               <li><strong>Panel Pengaturan Akun</strong> — Buka <code>Settings → Account → Delete Data</code></li>
-              <li><strong>Email</strong> — Kirim permintaan ke <a href="mailto:privacy@sahabatkreator.id" className="text-primary hover:underline">privacy@sahabatkreator.id</a></li>
+              <li><strong>Email</strong> — Kirim permintaan ke <a href="mailto:privacy@sahabatkreator.com" className="text-primary hover:underline">privacy@sahabatkreator.com</a></li>
               <li><strong>Live Chat</strong> — Hubungi tim dukungan melalui chat di platform</li>
               <li><strong>Formulir Online</strong> — Isi formulir penghapusan data di halaman support</li>
             </ol>
@@ -237,7 +237,7 @@ export default function DataDeletionPage() {
               Jika Anda memiliki pertanyaan mengenai penghapusan data atau ingin mengajukan permintaan, silakan hubungi Data Protection Officer kami:
             </p>
             <div className="mt-4 space-y-2">
-              <p className="text-muted-foreground">📧 Email: <a href="mailto:privacy@sahabatkreator.id" className="text-primary hover:underline">privacy@sahabatkreator.id</a></p>
+              <p className="text-muted-foreground">📧 Email: <a href="mailto:privacy@sahabatkreator.com" className="text-primary hover:underline">privacy@sahabatkreator.com</a></p>
               <p className="text-muted-foreground">📞 Telepon: +62 812-3456-7890</p>
               <p className="text-muted-foreground">📍 Alamat: Jl. Sudirman No. 123, Jakarta, Indonesia</p>
             </div>

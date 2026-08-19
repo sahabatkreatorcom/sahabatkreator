@@ -15,7 +15,7 @@ export async function GET() {
     .where(eq(schema.blogPost.status, "PUBLISHED"))
     .orderBy(desc(schema.blogPost.publishedAt));
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sahabatkreator.id";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sahabatkreator.com";
   
   let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "id_ID",
-    url: "https://sahabatkreator.id",
+  url: "https://sahabatkreator.com",
     siteName: "Sahabat Kreator",
     title: "Sahabat Kreator — Platform Manajemen Media Sosial AI",
     description:
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
     creator: "@sahabatkreator",
   },
   alternates: {
-    canonical: "https://sahabatkreator.id",
+    canonical: "https://sahabatkreator.com",
   },
   category: "social media management",
   formatDetection: {
@@ -86,18 +86,18 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico" },
-      { url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" },
-      { url: "/icons/icon-512.png", type: "image/png", sizes: "512x512" },
+      { url: "/favicon/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/favicon/icon-512.png", type: "image/png", sizes: "512x512" },
     ],
     apple: [
-      { url: "/icons/icon-192.png" },
-      { url: "/icons/icon-512.png" },
+      { url: "/favicon/icon-192.png" },
+      { url: "/favicon/icon-512.png" },
     ],
   },
   manifest: "/manifest.json",
   appLinks: {
     web: {
-      url: "https://sahabatkreator.id/dashboard",
+      url: "https://sahabatkreator.com/dashboard",
       should_fallback: false,
     },
   },
@@ -107,6 +107,6 @@ export const seo = {
   title: "Sahabat Kreator — Platform Manajemen Media Sosial AI",
   description:
     "Platform manajemen media sosial AI-powered. Kelola semua akun sosial media dalam satu dashboard.",
-  url: "https://sahabatkreator.id",
+  url: "https://sahabatkreator.com",
   image: "/og-image.jpg",
 };

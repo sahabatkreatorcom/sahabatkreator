@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Mail, MessageCircle, Send } from "lucide-react";
@@ -16,8 +16,8 @@ const contacts = [
   {
     icon: Mail,
     label: "Email",
-    value: "support@sahabatkreator.id",
-    href: "mailto:support@sahabatkreator.id",
+    value: "support@sahabatkreator.com",
+    href: "mailto:support@sahabatkreator.com",
   },
   {
     icon: MessageCircle,

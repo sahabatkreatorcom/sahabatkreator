@@ -60,7 +60,7 @@ export const GET = withAuth(async (ctx, req: NextRequest, { params }: RouteParam
         pages: choices.map((p) => ({
             pageId: p.pageId,
             pageName: p.pageName,
-            avatar: null,
+            avatar: p.pagePicture ?? null,
         })),
     });
 });
@@ -105,7 +105,7 @@ export const POST = withAuth(async (ctx, req: NextRequest, { params }: RoutePara
             platformId: choice.pageId,
             name: choice.pageName,
             username: choice.pageName,
-            profilePicture: null,
+            profilePicture: choice.pagePicture ?? null,
         };
     }
 

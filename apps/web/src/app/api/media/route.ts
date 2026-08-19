@@ -230,12 +230,21 @@ export const DELETE = withAuth(async (ctx, req: NextRequest) => {
     const items = await db.query.media.findMany({
         where: (t, { and: _and, eq: _eq, inArray }) =>
             _and(_eq(t.organizationId, activeOrganizationId), inArray(t.id, body.ids!)),
-        columns: { id: true, url: true, thumbnailUrl: true },
+        columns: { id: true, url: true, thumbnailUrl: true, transcodedUrl: true },
     });
 
     if (items.length === 0) return json({ error: "Media tidak ditemukan." }, { status: 404 });
 
-    await Promise.allSettled(items.map((m) => deleteFile(keyFromUrl(m.url))));
+    // Hapus file dari R2: url utama + thumbnail + hasil transcode (bila ada).
+    const keys = new Set<string>();
+    for (const m of items) {
+        for (const raw of [m.url, m.thumbnailUrl, m.transcodedUrl]) {
+            if (!raw) continue;
+            const key = keyFromUrl(raw);
+            if (key && !key.startsWith("http")) keys.add(key);
+        }
+    }
+    await Promise.allSettled([...keys].map((key) => deleteFile(key)));
     await db.delete(schema.media).where(
         and(eq(schema.media.organizationId, activeOrganizationId), sql`${schema.media.id} = ANY(${body.ids})`),
     );
@@ -279,7 +288,9 @@ function keyFromUrl(url: string): string {
     try {
         const u = new URL(url);
         // getPublicUrl menghasilkan https://<bucket>.<account>.r2.dev/<key>
-        return u.pathname.replace(/^\//, "");
+        // atau https://<custom-domain>/<key>.
+        const path = u.pathname.replace(/^\//, "");
+        return decodeURIComponent(path);
     } catch {
         return url;
     }

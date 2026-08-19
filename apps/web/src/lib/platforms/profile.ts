@@ -13,6 +13,7 @@ export interface PageChoice {
     pageId: string;
     pageName: string;
     pageAccessToken: string;
+    pagePicture?: string;
     instagramBusinessAccount?: {
         id: string;
         name: string;
@@ -29,7 +30,7 @@ export interface PageChoice {
 export async function fetchPageChoices(accessToken: string): Promise<PageChoice[] | null> {
     try {
         const res = await fetch(
-            `${GRAPH_API_URL}/me/accounts?fields=id,name,access_token,instagram_business_account{id,name,username,profile_picture_url}`,
+            `${GRAPH_API_URL}/me/accounts?fields=id,name,access_token,picture{url},instagram_business_account{id,name,username,profile_picture_url}`,
             { headers: { Authorization: `Bearer ${accessToken}` } },
         );
         const data = await res.json();
@@ -39,11 +40,13 @@ export async function fetchPageChoices(accessToken: string): Promise<PageChoice[
             id: string;
             name: string;
             access_token: string;
+            picture?: { data?: { url?: string } };
             instagram_business_account?: { id: string; name?: string; username?: string; profile_picture_url?: string };
         }) => ({
             pageId: page.id,
             pageName: page.name,
             pageAccessToken: page.access_token,
+            pagePicture: page.picture?.data?.url,
             instagramBusinessAccount: page.instagram_business_account
                 ? {
                       id: page.instagram_business_account.id,

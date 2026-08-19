@@ -16,9 +16,19 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Beranda | Sahabat Kreator",
+  title: "Sahabat Kreator | Platform Manajemen Media Sosial AI-Powered",
+  applicationName: "Sahabat Kreator",
   description:
-    "Platform manajemen media sosial AI-powered untuk kreator dan bisnis Indonesia: jadwalkan konten, pantau analitik, balas komentar, dan tingkatkan engagement dalam satu dashboard.",
+    "Sahabat Kreator adalah platform manajemen media sosial AI-powered untuk kreator dan bisnis Indonesia: jadwalkan konten, pantau analitik, balas komentar, dan tingkatkan engagement dalam satu dashboard.",
+  openGraph: {
+    title: "Sahabat Kreator | Platform Manajemen Media Sosial",
+    description:
+      "Jadwalkan konten ke Instagram, TikTok, YouTube, Facebook, LinkedIn, dan lainnya, pantau analitik, dan dapatkan rekomendasi asisten AI dalam satu dashboard.",
+    url: "https://sahabatkreator.com",
+    siteName: "Sahabat Kreator",
+    type: "website",
+    locale: "id_ID",
+  },
   robots: {
     index: true,
     follow: true,
@@ -127,12 +137,13 @@ export default function LandingPage() {
               Platform Manajemen Media Sosial AI-Powered
             </div>
             <h1 className="text-4xl font-bold leading-tight tracking-tight md:text-6xl">
-              Kelola Semua Akun Sosial Media dalam{" "}
+              Sahabat Kreator: Kelola Semua Akun Sosial Media dalam{" "}
               <span className="text-primary">Satu Dashboard</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
-              Jadwalkan konten, balas komentar, pantau analitik, dan dapatkan rekomendasi
-              dari asisten AI — untuk Instagram, TikTok, YouTube, Facebook, LinkedIn, dan lainnya.
+              Platform manajemen media sosial untuk kreator Indonesia. Jadwalkan konten,
+              balas komentar, pantau analitik, dan dapatkan rekomendasi dari asisten AI —
+              untuk Instagram, TikTok, YouTube, Facebook, LinkedIn, dan lainnya.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link href="/register">

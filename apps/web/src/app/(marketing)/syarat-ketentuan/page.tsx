@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -97,7 +97,7 @@ export default function TermsPage() {
             <h2 className="text-xl font-semibold">8. Kontak</h2>
             <p className="text-muted-foreground">
               Jika Anda memiliki pertanyaan mengenai Syarat & Ketentuan ini, silakan hubungi kami
-              di support@sahabatkreator.id
+              di support@sahabatkreator.com
             </p>
             <p className="mt-2 text-sm">
               Halaman legal lainnya:{" "}

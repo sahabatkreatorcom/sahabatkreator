@@ -44,6 +44,7 @@ export default function MediaLibraryPage() {
     const [stockPickerOpen, setStockPickerOpen] = useState(false);
     const [newFolderOpen, setNewFolderOpen] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
+    const [actionError, setActionError] = useState<string | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     const loadFolders = useCallback(async () => {
@@ -96,14 +97,22 @@ export default function MediaLibraryPage() {
     async function handleDelete() {
         if (selected.size === 0) return;
         if (!confirm(`Hapus ${selected.size} media?`)) return;
-        const res = await fetch("/api/media", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ids: Array.from(selected) }),
-        });
-        if (res.ok) {
+        setActionError(null);
+        try {
+            const res = await fetch("/api/media", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: Array.from(selected) }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                setActionError(data?.error || "Gagal menghapus media.");
+                return;
+            }
             setSelected(new Set());
             await Promise.all([loadMedia(), loadFolders()]);
+        } catch {
+            setActionError("Gagal menghapus media.");
         }
     }
 
@@ -180,6 +189,8 @@ export default function MediaLibraryPage() {
                     </Button>
                 )}
             </div>
+
+            {actionError && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{actionError}</p>}
 
             <div className="flex gap-4">
                 {/* Folder sidebar */}

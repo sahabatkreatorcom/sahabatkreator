@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: Props) {
     openGraph: {
       title: post.title,
       description: post.excerpt || `Baca artikel tentang ${post.title}`,
-      url: `https://sahabatkreator.id/blog/${slug}`,
+      url: `https://sahabatkreator.com/blog/${slug}`,
       type: "article",
       publishedTime: post.publishedAt?.toISOString() || new Date().toISOString(),
       siteName: "Sahabat Kreator",
@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: Props) {
       description: post.excerpt || `Baca artikel tentang ${post.title}`,
     },
     alternates: {
-      canonical: `https://sahabatkreator.id/blog/${slug}`,
+      canonical: `https://sahabatkreator.com/blog/${slug}`,
     },
   };
 }

@@ -10,9 +10,9 @@ const OFFLINE_URL = "/offline.html";
 const PRECACHE_ASSETS = [
   "/manifest.json",
   "/offline.html",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/icons/icon-maskable-192.png",
+  "/favicon/icon-192.png",
+  "/favicon/icon-512.png",
+  "/favicon/icon-maskable-192.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -80,7 +80,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   const isImmutableAsset =
-    url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/favicon/") ||
     url.pathname.startsWith("/splash/") ||
     url.pathname.match(/\.(png|jpg|jpeg|svg|gif|webp|ico)$/);
   if (isImmutableAsset) {
@@ -141,8 +141,8 @@ self.addEventListener("push", (event) => {
   let data = {
     title: "Sahabat Kreator",
     body: "Notifikasi baru",
-    icon: "/icons/icon-192.png",
-    badge: "/icons/icon-72.png",
+    icon: "/favicon/icon-192.png",
+    badge: "/favicon/icon-72.png",
     tag: "default",
     data: { url: "/dashboard" },
   };
@@ -155,8 +155,8 @@ self.addEventListener("push", (event) => {
   }
   const options = {
     body: data.body,
-    icon: data.icon || "/icons/icon-192.png",
-    badge: data.badge || "/icons/icon-72.png",
+    icon: data.icon || "/favicon/icon-192.png",
+    badge: data.badge || "/favicon/icon-72.png",
     tag: data.tag || "default",
     data: data.data || { url: "/dashboard" },
   };

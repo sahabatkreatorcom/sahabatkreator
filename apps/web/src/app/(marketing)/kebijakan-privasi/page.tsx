@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-semibold">8. Kontak</h2>
             <p className="text-muted-foreground">
               Untuk pertanyaan mengenai kebijakan privasi ini, silakan hubungi kami di
-              privacy@sahabatkreator.id
+              privacy@sahabatkreator.com
             </p>
             <p className="mt-2 text-sm">
               Untuk informasi lebih lanjut tentang hak penghapusan data, lihat halaman{" "}

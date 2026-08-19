@@ -4,6 +4,32 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #25 — Google Console: nama app tidak terlihat di home; delete media tak hapus transcode; avatar FB page hilang; SW/icons/CSP
+**Gejala:**
+1. **Google OAuth consent verification** menolak: (a) "Your home page does not explain the purpose of your app", (b) "The app name 'Sahabat Kreator' ... does not match the app name on your home page".
+2. **Delete galeri/media** kadang "gagal" — file hasil transcode video (`transcodedUrl`) & thumbnail tidak pernah dihapus dari R2, dan UI tak menampilkan pesan error.
+3. **Avatar Facebook page** tidak tersimpan setelah connect (avatar kosong).
+4. **Konsol browser**: CSP memblokir `static.cloudflareinsights.com/beacon.min.js`; `apple-mobile-web-app-capable` deprecated; `sw.js` install gagal (`Cache.addAll` Request failed); manifest shortcuts menunjuk `/icons/*` yang tidak ada (file asli di `/favicon/`).
+
+**Akar:**
+1. Hero home page tidak menyebut nama "Sahabat Kreator" (hanya badge "Platform Manajemen Media Sosial"); metadata OG/app name kurang.
+2. `DELETE /api/media` hanya menghapus `url` (satu key), tidak `thumbnailUrl`/`transcodedUrl`; UI `handleDelete` tanpa feedback error.
+3. Alur pending (Fix #22) tidak menyertakan avatar FB page — `fetchPageChoices` tidak minta `picture{url}`; `PageChoice.pagePicture` null → avatar null.
+4. Semua aset ikon ada di `/favicon/` tapi `sw.js` (precache + push + isImmutableAsset), `manifest.json` (shortcuts), dan `seo.ts` (icons) memakai `/icons/*` yang tidak ada → `addAll` gagal; CSP tidak allow Cloudflare beacon; layout pakai tag deprecated.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/app/(marketing)/page.tsx` (H1 hero + subtext sebut "Sahabat Kreator"; metadata `applicationName` + openGraph siteName/title/url), `apps/web/src/app/api/media/route.ts` (DELETE hapus url+thumbnail+transcoded; `keyFromUrl` +decodeURIComponent), `apps/web/src/app/dashboard/media/page.tsx` (+state `actionError` + feedback), `apps/web/src/lib/platforms/profile.ts` (`fetchPageChoices` +`picture{url}` → `PageChoice.pagePicture`), `apps/web/src/app/api/accounts/pending/[id]/route.ts` (FACEBOOK simpan `pagePicture`; GET list sertakan avatar), `apps/web/public/sw.js` (precache/push/isImmutableAsset `/icons/`→`/favicon/`), `apps/web/public/manifest.json` (shortcuts icons path), `apps/web/src/lib/seo.ts` (icons `/icons/`→`/favicon/`), `apps/web/next.config.ts` (CSP `script-src` +`https://static.cloudflareinsights.com`), `apps/web/src/app/layout.tsx` (`apple-mobile-web-app-capable`→`mobile-web-app-capable`) |
+| **Masalah** | Verifikasi Google menolak; delete media tak bersih; avatar FB hilang; SW install gagal + warning konsol |
+| **Akar** | Hero tanpa nama app; delete hanya 1 key + tanpa error UI; pending tidak ambil picture; path ikon salah `/icons/` vs `/favicon/`; CSP kurang allow; tag deprecated |
+| **Fix** | Home + metadata sebut nama & tujuan; DELETE hapus semua file R2 milik media + feedback error; avatar page diambil dari `picture{url}`; semua path ikon/manifest/SEO konsisten `/favicon/`; CSP +cloudflare beacon; meta mobile-web-app-capable |
+| **Verifikasi** | `pnpm --filter web exec tsc --noEmit` lolos. **PENDING deploy** — perlu rebuild web di VPS. Setelah deploy: cek konsol browser (SW install bersih, no CSP block), connect FB page → avatar tampil, hapus video → file transcode hilang dari R2, submit ulang verifikasi Google (home page + nama app). |
+| **Pelajaran** | Google OAuth verification butuh nama app & tujuan EKSPLISIT di home page (hero). SW precache `addAll` gagal total bila satu path salah — pastikan path aset sesuai struktur public/. Simpan nama path ikon konsisten (pilih satu: `/favicon/`). Hapus semua artefak R2 (thumbnail/transcode) saat media dihapus. |
+| **Log Keyword** | google console, oauth consent, app name, home page, delete media, r2, transcode, avatar, facebook page, service worker, precache, manifest, icons, csp, cloudflare beacon, apple-mobile-web-app-capable |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #24 — Dukungan Pinterest Trial access / Sandbox (api-sandbox.pinterest.com)
 **Gejala:** Pinterest API selalu dipanggil ke production (`api.pinterest.com/v5`) — tidak ada cara menguji dengan **Trial access** yang menyediakan **Sandbox environment** (`api-sandbox.pinterest.com`) untuk meng-explore API tanpa menyentuh data produksi.
 

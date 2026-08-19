@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, MessageSquare } from "lucide-react";
@@ -58,7 +58,7 @@ const faqs = [
   {
     question: "Bagaimana cara menghubungi support?",
     answer:
-      "Anda bisa menghubungi kami lewat halaman Kontak, email ke support@sahabatkreator.id, atau lihat FAQ ini untuk jawaban cepat.",
+      "Anda bisa menghubungi kami lewat halaman Kontak, email ke support@sahabatkreator.com, atau lihat FAQ ini untuk jawaban cepat.",
   },
 ];
 

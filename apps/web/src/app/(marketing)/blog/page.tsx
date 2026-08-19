@@ -16,13 +16,13 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: "Blog | Sahabat Kreator",
       description: "Tips, tutorial, dan panduan manajemen media sosial dari Sahabat Kreator.",
-      url: "https://sahabatkreator.id/blog",
+      url: "https://sahabatkreator.com/blog",
       siteName: "Sahabat Kreator",
       type: "website",
       locale: "id_ID",
     },
     alternates: {
-      canonical: "https://sahabatkreator.id/blog",
+      canonical: "https://sahabatkreator.com/blog",
     },
     robots: {
       index: true,
