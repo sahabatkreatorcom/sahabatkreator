@@ -15,6 +15,7 @@
     "db:studio": "turbo -F @sahabat-kreator/db db:studio",
     "db:generate": "turbo -F @sahabat-kreator/db db:generate",
     "db:migrate": "turbo -F @sahabat-kreator/db db:migrate",
+    "db:seed": "turbo -F @sahabat-kreator/db db:seed:blog",
     "test": "pnpm --filter web test",
     "check": "biome check ."
   },
