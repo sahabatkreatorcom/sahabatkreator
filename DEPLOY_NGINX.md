@@ -139,125 +139,28 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## Langkah 5 — Edit docker-compose.yml
+## Langkah 5 — Deploy
 
-Hapus service `caddy` dan expose port web ke localhost. Buka `docker-compose.yml` lalu lakukan perubahan berikut:
-
-### 5a. Hapus service caddy
-
-Hapus seluruh block:
-```yaml
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      DOMAIN: ${DOMAIN}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      web:
-        condition: service_healthy
-```
-
-### 5b. Tambahkan ports ke service web
-
-Tambahkan baris `ports:` di service `web`:
-```yaml
-  web:
-    build:
-      ...
-    ports:
-      - "127.0.0.1:3000:3000"
-    ...
-```
-
-### 5c. Hapus volume caddy
-
-Hapus dari blok `volumes`:
-```yaml
-  caddy-data:
-  caddy-config:
-```
-
-Simpan file.
-
-```yaml
-services:
-  # --- HAPUS service caddy ---
-  # ports "80:80" dan "443:443" dihapus; nginx yang melayani SSL
-
-  postgres:
-    # (sama seperti sebelumnya)
-
-  migrate:
-    # (sama)
-
-  redis:
-    # (sama)
-
-  web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        DATABASE_URL: ${DATABASE_URL}
-        BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-        BETTER_AUTH_URL: ${BETTER_AUTH_URL}
-        CORS_ORIGIN: ${CORS_ORIGIN}
-        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
-        ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-        R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
-        R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
-        R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
-        R2_BUCKET_NAME: ${R2_BUCKET_NAME}
-    env_file:
-      - .env
-    environment:
-      - NODE_ENV=production
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      # Expose ke nginx (hanya localhost)
-    ports:
-      - "127.0.0.1:3000:3000"
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 40s
-
-  worker:
-    # (sama seperti sebelumnya)
-```
-
-## Langkah 6 — Build & Deploy
+Tidak perlu edit `docker-compose.yml` — sudah tersedia override. Cukup jalankan:
 
 ```bash
 cd /opt/sahabatkreator
-sudo docker compose down
-sudo docker compose up -d --build
-sudo docker compose ps
+sudo docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build
+sudo docker compose -f docker-compose.yml -f docker-compose.override.yml ps
+```
+
+Verifikasi container web berjalan & expose port:
+```bash
+sudo docker compose -f docker-compose.yml -f docker-compose.override.yml ps web
+# Harus ada baris: "127.0.0.1:3000->3000/tcp"
 ```
 
 Cek logs:
 ```bash
-sudo docker compose logs -f web worker
+sudo docker compose -f docker-compose.yml -f docker-compose.override.yml logs -f web worker
 ```
 
-Verifikasi:
+Verifikasi endpoint:
 ```bash
 curl -s https://sahabatkreator.com/api/health
 # Harusnya: {"ok":true,"db":"healthy","ts":"..."}
@@ -277,17 +180,10 @@ curl -s https://sahabatkreator.com/api/health
 ## Maintenance
 
 ```bash
-# Rebuild setelah update kode
 cd /opt/sahabatkreator
 git pull
-sudo docker compose down
-sudo docker compose up -d --build
-
-# Lihat logs
-sudo docker compose logs -f web
-
-# Restart semua service
-sudo docker compose restart
+sudo docker compose -f docker-compose.yml -f docker-compose.override.yml down
+sudo docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build
 ```
 
 ---
