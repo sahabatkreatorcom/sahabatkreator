@@ -8,9 +8,9 @@ Panduan ini menjelaskan cara deploy Sahabat Kreator di VPS yang sudah menjalanka
 
 - VPS Ubuntu dengan `docker`, `docker compose v2`, `nginx` terinstall
 - Domain `sahabatkreator.com` (atau subdomain) sudah diarahkan A record ke IP VPS
-- Port 80 & 443 terbuka di firewall (bisa juga pakai Cloudflare **DNS only/grey proxy** untuk menghindari masalah SSL)
-- **SSL menggunakan Let's Encrypt (certbot)**, bukan Cloudflare Origin Certificate
-  > Lebih mudah: certbot otomatis perpanjang sertifikat, tidak perlu regenerate manual
+- Cloudflare account dengan SSL mode = **Flexible** (Cloudflare terminate SSL, koneksi ke origin = HTTP)
+- **TIDAK perlu** Cloudflare Origin Certificate — nginx hanya serve HTTP
+- Port 80 terbuka di firewall (Cloudflare sudah handle HTTPS)
 
 ---
 
@@ -54,23 +54,7 @@ Generate key:
 openssl rand -base64 32
 ```
 
-## Langkah 3 — Install Certbot & Generate Sertifikat
-
-```bash
-# Install certbot
-sudo apt install certbot python3-certbot-nginx -y
-
-# Generate sertifikat Let's Encrypt (otomatis konfigurasi nginx)
-sudo certbot certonly --nginx -d sahabatkreator.com -d www.sahabatkreator.com
-
-# Atau jika ingin manual (tanpa auto-edit nginx):
-sudo certbot certonly --webroot -w /var/www/certbot -d sahabatkreator.com -d www.sahabatkreator.com
-
-# Verifikasi sertifikat
-sudo ls -la /etc/letsencrypt/live/sahabatkreator.com/
-```
-
-## Langkah 4 — Konfigurasi nginx
+## Langkah 3 — Konfigurasi nginx
 
 Salin config nginx ke server:
 
@@ -85,7 +69,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-> **Catatan:** Config ini menggunakan Let's Encrypt cert di `/etc/letsencrypt/live/sahabatkreator.com/`. Certbot otomatis perpanjang setiap 90 hari.
+> **Catatan:** Config ini menggunakan mode **HTTP** (tanpa SSL). Cloudflare Flexible SSL akan menangani HTTPS di sisi Cloudflare, lalu forward ke origin (nginx) via HTTP.
 
 Symlink ke sites-enabled & test:
 ```bash
