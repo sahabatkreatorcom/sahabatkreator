@@ -4,10 +4,12 @@
 #
 # Perubahan dari docker-compose.yml utama:
 #   - caddy tidak dimuat (tidak ada profile "caddy" di command di atas)
-#   - web di-expose ke 127.0.0.1:3000 agar nginx bisa proxy
-#   - volume caddy di-drop (tidak dipakai)
+#   - web di-expose ke 127.0.0.1:3001 agar nginx bisa proxy
+#   - Volume caddy di-drop (tidak dipakai)
+#
+# Catatan: port 3000 dipakai aplikasi lain (toeflynk), jadi dipakai 3001.
 
 services:
   web:
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3001:3000"

@@ -73,7 +73,7 @@ Buat file `/etc/nginx/sites-available/sahabatkreator`:
 
 ```nginx
 upstream sahabatkreator {
-    server 127.0.0.1:3000;
+    server 127.0.0.1:3001;
 }
 
 server {
@@ -131,6 +131,8 @@ server {
     }
 }
 ```
+
+> **Catatan:** Port `3001` dipakai di host karena `3000` sudah dipakai toeflynk di server yang sama. Ubah ke port lain kalau ada konflik tambahan.
 
 Symlink ke sites-enabled & test:
 ```bash
