@@ -8,9 +8,9 @@ Panduan ini menjelaskan cara deploy Sahabat Kreator di VPS yang sudah menjalanka
 
 - VPS Ubuntu dengan `docker`, `docker compose v2`, `nginx` terinstall
 - Domain `sahabatkreator.com` (atau subdomain) sudah diarahkan A record ke IP VPS
-- Cloudflare account dengan SSL mode = **Full** atau **Full (strict)**
-- Sertifikat origin Cloudflare (`origin.crt` + `origin.key`) tersedia di `/etc/nginx/ssl/sahabatkreator/`
-  > Cara generate: Cloudflare Dashboard → SSL/TLS → Origin Server → Create Certificate → download bundle
+- Port 80 & 443 terbuka di firewall (bisa juga pakai Cloudflare **DNS only/grey proxy** untuk menghindari masalah SSL)
+- **SSL menggunakan Let's Encrypt (certbot)**, bukan Cloudflare Origin Certificate
+  > Lebih mudah: certbot otomatis perpanjang sertifikat, tidak perlu regenerate manual
 
 ---
 
@@ -54,85 +54,38 @@ Generate key:
 openssl rand -base64 32
 ```
 
-## Langkah 3 — Buat Sertifikat Nginx
+## Langkah 3 — Install Certbot & Generate Sertifikat
 
 ```bash
-sudo mkdir -p /etc/nginx/ssl/sahabatkreator
-sudo tee /etc/nginx/ssl/sahabatkreator/origin.crt > /dev/null <<'EOF'
-<tempel isi origin.crt dari Cloudflare>
-EOF
-sudo tee /etc/nginx/ssl/sahabatkreator/origin.key > /dev/null <<'EOF'
-<tempel isi origin.key dari Cloudflare>
-EOF
-sudo chmod 600 /etc/nginx/ssl/sahabatkreator/*
+# Install certbot
+sudo apt install certbot python3-certbot-nginx -y
+
+# Generate sertifikat Let's Encrypt (otomatis konfigurasi nginx)
+sudo certbot certonly --nginx -d sahabatkreator.com -d www.sahabatkreator.com
+
+# Atau jika ingin manual (tanpa auto-edit nginx):
+sudo certbot certonly --webroot -w /var/www/certbot -d sahabatkreator.com -d www.sahabatkreator.com
+
+# Verifikasi sertifikat
+sudo ls -la /etc/letsencrypt/live/sahabatkreator.com/
 ```
 
 ## Langkah 4 — Konfigurasi nginx
 
-Buat file `/etc/nginx/sites-available/sahabatkreator`:
+Salin config nginx ke server:
 
-```nginx
-upstream sahabatkreator {
-    server 127.0.0.1:3001;
-}
-
-server {
-    listen 80;
-    server_name sahabatkreator.com www.sahabatkreator.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name sahabatkreator.com www.sahabatkreator.com;
-
-    # Cloudflare Origin Certificate
-    ssl_certificate     /etc/nginx/ssl/sahabatkreator/origin.crt;
-    ssl_certificate_key /etc/nginx/ssl/sahabatkreator/origin.key;
-
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
-    ssl_prefer_server_ciphers off;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 1d;
-    ssl_session_tickets off;
-
-    # Trust Cloudflare IPs
-    set_real_ip_from 173.245.48.0/20;
-    set_real_ip_from 103.21.244.0/22;
-    set_real_ip_from 103.22.200.0/22;
-    set_real_ip_from 103.31.4.0/22;
-    set_real_ip_from 141.101.64.0/18;
-    set_real_ip_from 108.162.192.0/18;
-    set_real_ip_from 190.93.240.0/20;
-    set_real_ip_from 188.114.96.0/20;
-    set_real_ip_from 197.234.240.0/22;
-    set_real_ip_from 198.41.128.0/17;
-    set_real_ip_from 162.158.0.0/15;
-    set_real_ip_from 104.16.0.0/13;
-    set_real_ip_from 172.64.0.0/13;
-    set_real_ip_from 131.0.72.0/22;
-    real_ip_header CF-Connecting-IP;
-
-    # Timeout cukup panjang untuk SEB report generation (maxDuration 300s)
-    proxy_read_timeout 320s;
-    proxy_send_timeout 320s;
-
-    location / {
-        proxy_pass http://sahabatkreator;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
+```bash
+sudo cp nginx-sahabatkreator.conf /etc/nginx/sites-available/sahabatkreator
+sudo ln -sf /etc/nginx/sites-available/sahabatkreator /etc/nginx/sites-enabled/
 ```
 
-> **Catatan:** Port `3001` dipakai di host karena `3000` sudah dipakai toeflynk di server yang sama. Ubah ke port lain kalau ada konflik tambahan.
+Test & reload nginx:
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+> **Catatan:** Config ini menggunakan Let's Encrypt cert di `/etc/letsencrypt/live/sahabatkreator.com/`. Certbot otomatis perpanjang setiap 90 hari.
 
 Symlink ke sites-enabled & test:
 ```bash
