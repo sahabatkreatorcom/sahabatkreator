@@ -221,10 +221,9 @@ async function exchangeThreadsToken(
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error?.message || "Gagal tukar kode Threads.");
 
-    const longRes = await fetch("https://graph.threads.net/access_token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ grant_type: "th_exchange_token", client_secret: clientSecret, access_token: data.access_token }),
+    const longParams = new URLSearchParams({ grant_type: "th_exchange_token", client_secret: clientSecret, access_token: data.access_token });
+    const longRes = await fetch(`https://graph.threads.net/access_token?${longParams}`, {
+        method: "GET",
     });
     const longData = await longRes.json();
     if (!longRes.ok || longData.error) {
