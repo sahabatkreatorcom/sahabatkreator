@@ -21,3 +21,8 @@ export function initials(name: string) {
     .join("")
     .toUpperCase();
 }
+
+/** Format tanggal/waktu dalam timezone WIB (Asia/Jakarta). */
+export function formatDateWIB(date: Date | string | number) {
+  return new Date(date).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
+}

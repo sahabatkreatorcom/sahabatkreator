@@ -303,7 +303,7 @@ export default function StatusPage() {
                                                 </p>
                                                 <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{err.errorMessage}</p>
                                                 <p className="mt-1 text-xs text-muted-foreground">
-                                                    retry: {err.retryCount} Â· {new Date(err.createdAt).toLocaleString("id-ID")}
+                                                    retry: {err.retryCount} Â· {new Date(err.createdAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
                                                 </p>
                                             </div>
                                         </div>

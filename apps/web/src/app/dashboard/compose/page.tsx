@@ -649,7 +649,7 @@ export default function ComposePage() {
             <div className="flex items-center justify-between gap-2">
                 <Button variant="secondary" onClick={() => setScheduleOpen(true)}>
                     <CalendarClock className="h-4 w-4" />
-                    {scheduledAt ? `Terjadwal: ${new Date(scheduledAt).toLocaleString("id-ID")}` : "Jadwalkan"}
+                    {scheduledAt ? `Terjadwal: ${new Date(scheduledAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}` : "Jadwalkan"}
                 </Button>
                 <div className="flex gap-2">
                     <Button variant="ghost" loading={saving} onClick={() => handleSave("draft")}>

@@ -294,7 +294,7 @@ export default function InboxPage() {
                                         </span>
                                         <span className="text-sm font-medium">{thread.authorUsername}</span>
                                         <span className="text-xs text-muted-foreground">
-                                            {new Date(thread.createdAt).toLocaleString("id-ID")}
+                                            {new Date(thread.createdAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
                                         </span>
                                         {thread.isReplied && <span className="text-xs text-accent-green">Sudah dibalas</span>}
                                     </div>
@@ -312,7 +312,7 @@ export default function InboxPage() {
                                                     {r.authorId === "SELF" ? "Anda" : r.authorUsername}
                                                 </span>
                                                 <span className="text-muted-foreground">
-                                                    {new Date(r.createdAt).toLocaleString("id-ID")}
+                                                    {new Date(r.createdAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
                                                 </span>
                                             </div>
                                             <p className="mt-0.5 text-sm">{r.text}</p>

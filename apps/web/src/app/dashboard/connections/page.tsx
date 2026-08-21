@@ -69,7 +69,7 @@ function tokenStatus(account: Pick<Account, "platform" | "tokenExpiry" | "hasRef
     if (expiry < now) return { label: "Token kedaluwarsa — hubungkan ulang", tone: "expired" };
     const daysLeft = (expiry - now) / 86_400_000;
     if (daysLeft < 7) return { label: `Token hampir kedaluwarsa (${Math.max(0, Math.floor(daysLeft))} hari)`, tone: "warn" };
-    return { label: `Token valid hingga ${new Date(expiry).toLocaleDateString("id-ID")}`, tone: "ok" };
+    return { label: `Token valid hingga ${new Date(expiry).toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" })}`, tone: "ok" };
 }
 
 const TOKEN_TONE_STYLE: Record<string, string> = {

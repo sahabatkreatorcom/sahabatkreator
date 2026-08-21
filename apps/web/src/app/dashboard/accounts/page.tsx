@@ -194,7 +194,7 @@ export default function AccountsPage() {
 
                             {acc.tokenExpiry && (
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    Token berakhir: {new Date(acc.tokenExpiry).toLocaleDateString("id-ID")}
+                                    Token berakhir: {new Date(acc.tokenExpiry).toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" })}
                                 </p>
                             )}
 

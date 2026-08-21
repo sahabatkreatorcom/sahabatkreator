@@ -181,13 +181,13 @@ export default function PostsPage() {
                                         {post.scheduledAt && (
                                             <span className="inline-flex items-center gap-1">
                                                 <CalendarClock className="h-3 w-3" />
-                                                {new Date(post.scheduledAt).toLocaleString("id-ID")}
+                                                {new Date(post.scheduledAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
                                             </span>
                                         )}
                                         {post.publishedAt && (
                                             <span className="inline-flex items-center gap-1">
                                                 <CheckCircle2 className="h-3 w-3" />
-                                                Terbit {new Date(post.publishedAt).toLocaleString("id-ID")}
+                                                Terbit {new Date(post.publishedAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
                                             </span>
                                         )}
                                     </div>
