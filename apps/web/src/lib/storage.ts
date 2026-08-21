@@ -16,20 +16,40 @@ import { env } from "@sahabat-kreator/env/server";
 /**
  * Cloudflare R2 client for file storage (S3-compatible)
  * @see https://developers.cloudflare.com/r2/api/s3/api/
+ *
+ * Lazy init — hanya dibuat saat dipanggil pertama kali, sehingga build tidak
+ * gagal bila R2 env vars belum dikonfigurasi.
  */
-export const r2Client = new S3Client({
-  region: "auto",
-  endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: env.R2_ACCESS_KEY_ID,
-    secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+let _r2Client: S3Client | null = null;
+
+export function getR2Client(): S3Client {
+  if (!_r2Client) {
+    _r2Client = new S3Client({
+      region: "auto",
+      endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: env.R2_ACCESS_KEY_ID ?? "",
+        secretAccessKey: env.R2_SECRET_ACCESS_KEY ?? "",
+      },
+    });
+  }
+  return _r2Client;
+}
+
+/** @deprecated Gunakan getR2Client() */
+export const r2Client = new Proxy({} as S3Client, {
+  get(_, prop) {
+    return (getR2Client() as any)[prop];
   },
 });
 
-const BUCKET_NAME = env.R2_BUCKET_NAME;
+function getBucketName(): string {
+  return env.R2_BUCKET_NAME ?? "";
+}
 
-/** R2 custom domain (opsional) — dipakai untuk URL publik. */
-const CUSTOM_DOMAIN = env.R2_CUSTOM_DOMAIN;
+function getCustomDomain(): string | undefined {
+  return env.R2_CUSTOM_DOMAIN;
+}
 
 /** Storage utilities for common R2 operations */
 
@@ -45,7 +65,7 @@ export async function uploadFile(
   },
 ): Promise<{ key: string; etag?: string }> {
   const input: PutObjectCommandInput = {
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
     Body: body,
     ContentType: options?.contentType,
@@ -71,7 +91,7 @@ export async function downloadFile(key: string): Promise<{
   metadata?: Record<string, string>;
 }> {
   const input: GetObjectCommandInput = {
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
   };
 
@@ -91,7 +111,7 @@ export async function downloadFile(key: string): Promise<{
  */
 export async function downloadFileAsBuffer(key: string): Promise<Buffer> {
   const input: GetObjectCommandInput = {
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
   };
 
@@ -111,7 +131,7 @@ export async function downloadFileAsBuffer(key: string): Promise<Buffer> {
  */
 export async function deleteFile(key: string): Promise<void> {
   const command = new DeleteObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
   });
 
@@ -140,7 +160,7 @@ export async function listFiles(
   nextContinuationToken?: string;
 }> {
   const input: ListObjectsV2CommandInput = {
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Prefix: prefix,
     MaxKeys: options?.maxKeys ?? 1000,
     ContinuationToken: options?.continuationToken,
@@ -166,7 +186,7 @@ export async function listFiles(
 export async function fileExists(key: string): Promise<boolean> {
   try {
     const command = new HeadObjectCommand({
-      Bucket: BUCKET_NAME,
+      Bucket: getBucketName(),
       Key: key,
     });
 
@@ -188,7 +208,7 @@ export async function getFileMetadata(key: string): Promise<{
 } | null> {
   try {
     const command = new HeadObjectCommand({
-      Bucket: BUCKET_NAME,
+      Bucket: getBucketName(),
       Key: key,
     });
 
@@ -213,8 +233,8 @@ export async function copyFile(
   destinationKey: string,
 ): Promise<{ key: string; etag?: string }> {
   const command = new CopyObjectCommand({
-    Bucket: BUCKET_NAME,
-    CopySource: `${BUCKET_NAME}/${sourceKey}`,
+    Bucket: getBucketName(),
+    CopySource: `${getBucketName()}/${sourceKey}`,
     Key: destinationKey,
   });
 
@@ -249,7 +269,7 @@ export async function getUploadUrl(
   },
 ): Promise<string> {
   const command = new PutObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
     ContentType: options?.contentType,
   });
@@ -270,7 +290,7 @@ export async function getDownloadUrl(
   },
 ): Promise<string> {
   const command = new GetObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
     ResponseContentDisposition: options?.responseContentDisposition,
   });
@@ -286,10 +306,10 @@ export async function getDownloadUrl(
  * @param customDomain - Optional custom domain override; fallback ke R2_CUSTOM_DOMAIN env
  */
 export function getPublicUrl(key: string, customDomain?: string): string {
-  const domain = customDomain || CUSTOM_DOMAIN;
+  const domain = customDomain || getCustomDomain();
   if (domain) {
     return `https://${domain}/${key}`;
   }
   // R2 public buckets use the format: https://<bucket>.<account>.r2.dev/<key>
-  return `https://${BUCKET_NAME}.${env.R2_ACCOUNT_ID}.r2.dev/${key}`;
+  return `https://${getBucketName()}.${env.R2_ACCOUNT_ID ?? ""}.r2.dev/${key}`;
 }
