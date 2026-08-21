@@ -124,14 +124,17 @@ export async function createPosts(params: CreatePostParams): Promise<CreatePostR
         const platformAutoPublish = settings.autoPublish !== undefined ? settings.autoPublish : isAutoPublish;
 
         const postId = randomUUID();
+        // Untuk "Terbitkan" (autoPublish tanpa scheduledAt), set scheduledAt = now
+        // agar cron fallback bisa menemukan post (cron filter: scheduledAt IS NOT NULL).
+        const effectiveScheduledAt = scheduledDate ?? (platformAutoPublish ? new Date() : null);
 
         await db.transaction(async (tx) => {
             await tx.insert(schema.post).values({
                 id: postId,
                 organizationId,
                 caption: postCaption,
-                status: scheduledDate ? "SCHEDULED" : platformAutoPublish ? "SCHEDULED" : "DRAFT",
-                scheduledAt: scheduledDate,
+                status: effectiveScheduledAt ? "SCHEDULED" : "DRAFT",
+                scheduledAt: effectiveScheduledAt,
                 autoPublish: platformAutoPublish,
                 firstComment: settings.firstComment || firstComment || null,
                 platform: account.platform,
@@ -181,8 +184,9 @@ export async function createPosts(params: CreatePostParams): Promise<CreatePostR
 
         // Jadwalkan job publish di BullMQ (delay = selisih ke scheduledAt).
         // No-op bila REDIS_URL tidak dikonfigurasi — cron DB polling jadi fallback.
-        if (scheduledDate || platformAutoPublish) {
-            const dueAt = scheduledDate ?? new Date(Date.now() + 30_000);
+        if (effectiveScheduledAt) {
+            const delayMs = effectiveScheduledAt.getTime() - Date.now();
+            const dueAt = delayMs > 0 ? effectiveScheduledAt : new Date(Date.now() + 30_000);
             await enqueuePublishPost(organizationId, postId, account.platform, dueAt).catch((e) => {
                 console.error(`[queue] enqueue publish gagal (post=${postId}): ${e instanceof Error ? e.message : String(e)}`);
             });
@@ -191,8 +195,8 @@ export async function createPosts(params: CreatePostParams): Promise<CreatePostR
         createdPosts.push({
             id: postId,
             caption: postCaption,
-            status: scheduledDate ? "scheduled" : platformAutoPublish ? "scheduled" : "draft",
-            scheduledAt: scheduledDate?.toISOString() ?? null,
+            status: effectiveScheduledAt ? "scheduled" : "draft",
+            scheduledAt: effectiveScheduledAt?.toISOString() ?? null,
             createdAt: new Date().toISOString(),
             platform: account.platform,
             linkedGroupId,

@@ -41,7 +41,11 @@ interface HashtagCollection {
 
 type Tab = "pillars" | "templates" | "hashtags";
 
-const COLOR_OPTIONS = ["#D4A574", "#7C9A6E", "#5B7C99", "#A06E8C", "#C08B4C", "#6E8CA0", "#8C6E5B", "#B5A66E"];
+const COLOR_OPTIONS = [
+    "#D4A574", "#7C9A6E", "#5B7C99", "#A06E8C",
+    "#C08B4C", "#6E8CA0", "#8C6E5B", "#B5A66E",
+    "#E07B7B", "#7BB5E0", "#B5E07B", "#E0B57B",
+];
 
 export default function ContentToolsPage() {
     const [tab, setTab] = useState<Tab>("pillars");
@@ -385,12 +389,16 @@ export default function ContentToolsPage() {
                     </div>
                     <div>
                         <Label>Warna</Label>
-                        <div className="flex flex-wrap gap-2 pt-1">
+                        <div className="mt-2 grid grid-cols-6 gap-2">
                             {COLOR_OPTIONS.map((c) => (
                                 <button
                                     key={c}
+                                    type="button"
                                     onClick={() => setPillarColor(c)}
-                                    className={cn("h-7 w-7 rounded-full border-2", pillarColor === c ? "border-primary" : "border-transparent")}
+                                    className={cn(
+                                        "h-8 w-8 rounded-md border-2 transition-all",
+                                        pillarColor === c ? "border-primary scale-110 ring-2 ring-primary/30" : "border-transparent hover:scale-105",
+                                    )}
                                     style={{ background: c }}
                                 />
                             ))}
