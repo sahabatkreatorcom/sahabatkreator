@@ -33,8 +33,8 @@ export async function publishPost(
 
     if (!post) return { ok: false, error: "Post tidak ditemukan." };
     if (!post.socialAccount) return { ok: false, error: "Post tidak terhubung ke akun platform." };
-    if (post.status === "PUBLISHED" || post.status === "PUBLISHING") {
-        return { ok: false, error: "Post sudah terbit/sedang terbit." };
+    if (post.status === "PUBLISHED") {
+        return { ok: false, error: "Post sudah terbit." };
     }
 
     await db.update(schema.post)
