@@ -21,13 +21,38 @@ export async function publishToFacebook(
     if (payload.callToAction) params.set("call_to_action", payload.callToAction);
     if (payload.location) params.set("place", payload.location);
 
-    // Media: post dengan media URL
-    if (payload.mediaUrls.length > 0) {
-        params.set("url", payload.mediaUrls[0]);
-        if (payload.mediaUrls.length > 1) {
-            // Attached media for multi-image posts
-            payload.mediaUrls.slice(1).forEach((u, i) => params.set(`attached_media[${i}][media_fbid]`, u));
+    // Text-only: gunakan /feed endpoint
+    if (payload.mediaUrls.length === 0) {
+        const res = await fetch(`${GRAPH_URL}/${pageId}/feed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: params,
+        });
+        const data = await res.json();
+        if (data.error) {
+            return { success: false, error: data.error.message, errorCode: data.error.code?.toString() };
         }
+        if (data.id && payload.firstComment?.trim()) {
+            try {
+                await fetch(`${GRAPH_URL}/${data.id}/comments`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: new URLSearchParams({
+                        message: payload.firstComment.trim(),
+                        access_token: account.accessToken,
+                    }),
+                });
+            } catch {
+                // non-fatal
+            }
+        }
+        return { success: true, postId: data.id, postUrl: `https://facebook.com/${data.id}` };
+    }
+
+    // Media: post dengan media URL
+    params.set("url", payload.mediaUrls[0]);
+    if (payload.mediaUrls.length > 1) {
+        payload.mediaUrls.slice(1).forEach((u, i) => params.set(`attached_media[${i}][media_fbid]`, u));
     }
 
     const res = await fetch(`${GRAPH_URL}/${pageId}/photos`, {
