@@ -227,7 +227,9 @@ async function exchangeThreadsToken(
         body: new URLSearchParams({ grant_type: "th_exchange_token", client_secret: clientSecret, access_token: data.access_token }),
     });
     const longData = await longRes.json();
-    if (longData.error) return { accessToken: data.access_token, expiresIn: 3600 };
+    if (!longRes.ok || longData.error) {
+        throw new Error(longData.error?.message || "Gagal tukar token Threads ke long-lived. Token mungkin sudah expired.");
+    }
     return { accessToken: longData.access_token, expiresIn: longData.expires_in || 5184000 };
 }
 
