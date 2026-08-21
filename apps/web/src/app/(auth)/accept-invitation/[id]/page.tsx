@@ -5,6 +5,8 @@ import { AlertTriangle } from "lucide-react";
 import { AcceptInvitationActions } from "@/components/auth/accept-invitation-actions";
 import { initials, ringColorFor } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 export default async function AcceptInvitationPage({
     params,
 }: {
