@@ -66,14 +66,14 @@ const OBJECT_TO_PLATFORM: Record<MetaWebhookPayload["object"], Platform[]> = {
 const COMMENT_FIELDS = new Set(["comments", "comments_events", "mentions", "threads_replies"]);
 
 /** Verifikasi handshake GET dari Meta (hub.mode / hub.verify_token / hub.challenge). */
-export async function verifyMetaChallenge(searchParams: URLSearchParams): Promise<string | null> {
+export async function verifyMetaChallenge(searchParams: URLSearchParams, platform: Platform = "META"): Promise<string | null> {
     const mode = searchParams.get("hub.mode");
     const token = searchParams.get("hub.verify_token");
     const challenge = searchParams.get("hub.challenge");
 
     if (mode !== "subscribe" || !challenge) return null;
 
-    const secrets = await getWebhookSecretConfig("META");
+    const secrets = await getWebhookSecretConfig(platform);
     if (token !== secrets.webhookVerifyToken) return null;
     return challenge;
 }
@@ -184,8 +184,8 @@ export async function handleMetaWebhook(
 }
 
 /** Verifikasi signature payload webhook Meta (X-Hub-Signature-256 dari App Secret). */
-export async function verifyMetaSignature(rawBody: string, req: Request): Promise<boolean> {
-    const secrets = await getWebhookSecretConfig("META");
+export async function verifyMetaSignature(rawBody: string, req: Request, platform: Platform = "META"): Promise<boolean> {
+    const secrets = await getWebhookSecretConfig(platform);
     if (!secrets.clientSecret) return false;
     return verifyHmacSha256(secrets.clientSecret, req.headers.get(META_SIGNATURE_HEADER), rawBody);
 }

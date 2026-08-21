@@ -41,7 +41,7 @@ export interface PlatformOAuthConfig {
 
 /** Credential key di global_platform_credential (enum db). */
 export function credentialPlatform(p: Platform): Platform {
-    if (p === "INSTAGRAM_PAGE" || p === "FACEBOOK" || p === "THREADS") return "META";
+    if (p === "INSTAGRAM_PAGE" || p === "FACEBOOK") return "META";
     return p;
 }
 

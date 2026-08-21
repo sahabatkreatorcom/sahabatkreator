@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  * Setup di App Dashboard Meta → Webhooks → Threads, callback = URL ini.
  */
 export async function GET(req: NextRequest) {
-    const challenge = await verifyMetaChallenge(new URL(req.url).searchParams);
+    const challenge = await verifyMetaChallenge(new URL(req.url).searchParams, "THREADS");
     if (challenge === null) return webhookError("Challenge verification failed", 403);
     return new Response(challenge);
 }
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     const rawBody = await readWebhookBody(req);
     if (rawBody === null) return webhookError("Body too large", 413);
-    if (!(await verifyMetaSignature(rawBody, req))) return webhookError("Invalid signature", 401);
+    if (!(await verifyMetaSignature(rawBody, req, "THREADS"))) return webhookError("Invalid signature", 401);
     try {
         await handleMetaWebhook("threads", rawBody);
         return webhookAck();
