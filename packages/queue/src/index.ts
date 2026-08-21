@@ -113,7 +113,7 @@ export async function enqueuePublishPost(
             { postId, organizationId, platform } satisfies PublishPostJobData,
             {
                 delay: delayMs,
-                jobId: `post:${postId}`,
+                jobId: `post-${postId}`,
                 removeOnComplete: { count: 100 },
                 removeOnFail: { count: 100 },
                 attempts: 3,
@@ -132,7 +132,7 @@ export async function removePublishJob(postId: string): Promise<boolean> {
     const { Queue } = await import("bullmq");
     const queue = new Queue(QUEUE_PUBLISH, { connection: redisConnectionOptions() });
     try {
-        await queue.remove(`post:${postId}`);
+        await queue.remove(`post-${postId}`);
         return true;
     } finally {
         await queue.close();
