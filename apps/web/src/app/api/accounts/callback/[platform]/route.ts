@@ -76,8 +76,11 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
     try {
         const redirectUri = `${baseUrl}/api/accounts/callback/${platform.toLowerCase()}`;
         tokens = await exchangeCodeForToken(platform, code, redirectUri, credentials);
-    } catch {
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`[oauth-callback] token exchange failed for ${platform}:`, msg);
         accountsUrl.searchParams.set("error", "token_exchange_failed");
+        accountsUrl.searchParams.set("detail", msg.slice(0, 200));
         return NextResponse.redirect(accountsUrl);
     }
 
