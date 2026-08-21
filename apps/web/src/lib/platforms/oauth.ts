@@ -32,6 +32,10 @@ export function getAuthorizationUrl(
         params.set("prompt", "consent");
     }
 
+    if (platform === "INSTAGRAM") {
+        params.set("enable_fb_login", "0");
+    }
+
     return `${config.authUrl}?${params.toString()}`;
 }
 

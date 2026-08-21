@@ -30,7 +30,7 @@ export const CONNECTABLE_PLATFORMS: Platform[] = [
 
 /** URL dasar Graph API Instagram standalone vs yang tertaut Facebook Page. */
 export const INSTAGRAM_GRAPH_URL = "https://graph.instagram.com/v26.0";
-export const INSTAGRAM_OAUTH_URL = "https://api.instagram.com/oauth";
+export const INSTAGRAM_OAUTH_URL = "https://www.instagram.com/oauth";
 
 export interface PlatformOAuthConfig {
     authUrl: string;
