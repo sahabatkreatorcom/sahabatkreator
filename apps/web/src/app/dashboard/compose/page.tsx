@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarClock, ImagePlus, Send, X, LayoutTemplate, Hash, FolderTree, AlertCircle, Plus, Loader2 } from "lucide-react";
+import { CalendarClock, ImagePlus, Send, X, LayoutTemplate, Hash, FolderTree, AlertCircle, Plus, Loader2, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,6 +78,9 @@ export default function ComposePage() {
     const [pinterestBoardsLoading, setPinterestBoardsLoading] = useState<Record<string, boolean>>({});
     const [pinterestCreateBoard, setPinterestCreateBoard] = useState<Record<string, boolean>>({});
     const [pinterestNewBoardName, setPinterestNewBoardName] = useState<Record<string, string>>({});
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const loadAccounts = useCallback(async () => {
         setLoadingAccounts(true);
@@ -98,6 +101,38 @@ export default function ComposePage() {
             if (res.ok) setLibraryMedia(data.media ?? []);
         } catch { /* ignore */ }
     }, []);
+
+    const handleUploadFile = useCallback(async (files: FileList | File[]) => {
+        const fileArray = Array.from(files).filter((f) => !media.some((m) => m.url === f.name));
+        if (fileArray.length === 0) return;
+        setUploading(true);
+        setUploadError(null);
+        try {
+            const results = await Promise.all(
+                fileArray.map(async (file) => {
+                    const fd = new FormData();
+                    fd.set("file", file);
+                    const res = await fetch("/api/media", { method: "POST", body: fd });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(String(err?.error || "Upload gagal."));
+                    }
+                    return res.json();
+                })
+            );
+            const newMedia: MediaItem[] = results.map((item) => ({
+                id: item.id,
+                url: item.url,
+                thumbnailUrl: item.thumbnailUrl ?? item.url,
+                type: item.type,
+            }));
+            setMedia((prev) => [...prev, ...newMedia]);
+        } catch (e) {
+            setUploadError(e instanceof Error ? e.message : "Gagal mengunggah file.");
+        } finally {
+            setUploading(false);
+        }
+    }, [media]);
 
     const loadContentTools = useCallback(async () => {
         try {
@@ -732,8 +767,27 @@ export default function ComposePage() {
                         <Button variant="secondary" size="sm" onClick={() => setMediaPickerOpen(true)}>
                             Pustaka
                         </Button>
+                        <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} loading={uploading}>
+                            <UploadCloud className="h-4 w-4" />
+                            Upload
+                        </Button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            multiple
+                            hidden
+                            accept="image/*,video/*,audio/*"
+                            onChange={(e) => {
+                                if (e.target.files?.length) handleUploadFile(e.target.files);
+                                e.target.value = "";
+                            }}
+                        />
                     </div>
                 </div>
+
+                {uploadError && (
+                    <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{uploadError}</p>
+                )}
 
                 {media.length === 0 ? (
                     <p className="py-6 text-center text-sm text-muted-foreground">

@@ -40,6 +40,7 @@ export default function MediaLibraryPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [stockPickerOpen, setStockPickerOpen] = useState(false);
     const [newFolderOpen, setNewFolderOpen] = useState(false);
@@ -80,17 +81,34 @@ export default function MediaLibraryPage() {
     }, [loadMedia, search]);
 
     async function handleFiles(files: FileList | File[]) {
+        const fileArray = Array.from(files);
+        if (fileArray.length === 0) return;
         setUploading(true);
+        setUploadProgress({ done: 0, total: fileArray.length });
+        setActionError(null);
+        let failedCount = 0;
         try {
-            for (const file of Array.from(files)) {
-                const fd = new FormData();
-                fd.set("file", file);
-                if (activeFolder && activeFolder !== "root") fd.set("folderId", activeFolder);
-                await fetch("/api/media", { method: "POST", body: fd });
-            }
+            await Promise.all(fileArray.map(async (file, i) => {
+                try {
+                    const fd = new FormData();
+                    fd.set("file", file);
+                    if (activeFolder && activeFolder !== "root") fd.set("folderId", activeFolder);
+                    const res = await fetch("/api/media", { method: "POST", body: fd });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        setActionError(String(err?.error || "Upload gagal."));
+                        failedCount++;
+                    }
+                    setUploadProgress({ done: i + 1, total: fileArray.length });
+                } catch {
+                    failedCount++;
+                }
+            }));
+            if (failedCount === 0) setActionError(null);
             await Promise.all([loadMedia(), loadFolders()]);
         } finally {
             setUploading(false);
+            setUploadProgress(null);
         }
     }
 
@@ -170,6 +188,20 @@ export default function MediaLibraryPage() {
                     />
                 </div>
             </div>
+
+            {uploadProgress && (
+                <div className="space-y-1">
+                    <div className="h-1.5 w-full rounded-full bg-muted">
+                        <div
+                            className="h-1.5 rounded-full bg-primary transition-all"
+                            style={{ width: `${Math.round((uploadProgress.done / uploadProgress.total) * 100)}%` }}
+                        />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        Mengunggah {uploadProgress.done}/{uploadProgress.total} file…
+                    </p>
+                </div>
+            )}
 
             {/* Filter bar */}
             <div className="flex flex-wrap items-center gap-2">

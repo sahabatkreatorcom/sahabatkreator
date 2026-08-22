@@ -23,7 +23,7 @@ export const POST = async (req: NextRequest) => {
         return json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log(`[check-tiktok-pending] ${new Date().toISOString()} start`);
+    // silent — no per-run log unless there are posts to process
 
     // Ambil semua post PENDING TikTok — termasuk yang platformPostId kosong (stuck lama)
     const pending = await db.query.post.findMany({
@@ -46,7 +46,9 @@ export const POST = async (req: NextRequest) => {
         },
     });
 
-    console.log(`[check-tiktok-pending] found ${pending.length} pending TikTok posts`);
+    if (pending.length === 0) return json({ total: 0, resolved: 0, stillPending: 0, failed: 0 });
+
+    console.log(`[check-tiktok-pending] ${pending.length} pending TikTok posts found`);
 
     let resolved = 0;
     let stillPending = 0;
@@ -57,7 +59,6 @@ export const POST = async (req: NextRequest) => {
 
         // Post tanpa platformPostId = stuck lama, mark FAILED (perlu publish ulang manual)
         if (!post.platformPostId) {
-            console.log(`[check-tiktok-pending] post ${post.id} has no platformPostId, marking FAILED`);
             await db.update(schema.post)
                 .set({ status: "FAILED" })
                 .where(eq(schema.post.id, post.id));
@@ -131,13 +132,11 @@ export const POST = async (req: NextRequest) => {
                 stillPending++;
             }
         } catch (e) {
-            console.log(`[check-tiktok-pending] post ${post.id} error: ${e instanceof Error ? e.message : e}`);
             stillPending++;
         }
     }
 
     const result = { total: pending.length, resolved, stillPending, failed };
-    console.log(`[check-tiktok-pending] done: ${JSON.stringify(result)}`);
     return json(result);
 };
 
