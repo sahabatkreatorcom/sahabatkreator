@@ -31,8 +31,10 @@ export function LocaleSwitcher() {
     let path = pathname;
     for (const l of LOCALES) {
       const prefix = `/${l.code}/`;
-      if (path === prefix || path.startsWith(prefix)) {
-        path = path === prefix ? "/" : path.slice(prefix.length);
+      const exactPrefix = `/${l.code}`;
+      // Handle both exact match (/en) and subpath match (/en/xxx)
+      if (path === exactPrefix || path === prefix || path.startsWith(prefix)) {
+        path = path === exactPrefix || path === prefix ? "/" : path.slice(prefix.length);
         break;
       }
     }
@@ -40,7 +42,7 @@ export function LocaleSwitcher() {
     if (code === "id") {
       router.push(path || "/");
     } else {
-      router.push(`/en${path || "/"}`);
+      router.push(`/en${path}`);
     }
   }
 
