@@ -1,188 +1,123 @@
-/**
- * Service Worker for Sahabat Kreator
- * Handles caching, offline support, and push notifications
- */
-
-const CACHE_VERSION = "v1";
-const CACHE_NAME = `sahabat-${CACHE_VERSION}`;
-const OFFLINE_URL = "/offline.html";
-
-const PRECACHE_ASSETS = [
+// Sahabat Kreator Service Worker
+const CACHE_NAME = "sahabat-kreator-v1";
+const STATIC_ASSETS = [
+  "/",
+  "/dashboard",
+  "/dashboard/calendar",
+  "/dashboard/compose",
+  "/dashboard/posts",
+  "/dashboard/analytics",
+  "/dashboard/inbox",
+  "/dashboard/media",
+  "/dashboard/content-tools",
+  "/dashboard/pillars",
+  "/dashboard/connections",
+  "/dashboard/billing",
+  "/dashboard/team",
+  "/dashboard/activity",
+  "/dashboard/settings",
+  "/dashboard/settings/profile",
+  "/dashboard/settings/security",
+  "/dashboard/settings/teams",
+  "/dashboard/settings/sessions",
+  "/dashboard/settings/members",
+  "/dashboard/seb",
+  "/dashboard/competitors",
+  "/dashboard/listening",
+  "/dashboard/trends",
+  "/dashboard/engagement",
+  "/dashboard/status",
+  "/dashboard/inbox-automation",
+  "/dashboard/content-tools",
+  "/dashboard/seo-audit",
+  "/api/posts",
+  "/api/media",
+  "/api/caption-templates",
+  "/api/pillars",
+  "/api/hashtag-collections",
+  "/favicon/favicon.ico",
+  "/favicon/favicon.png",
+  "/favicon/favicon-192x192.png",
+  "/favicon/favicon-512x512.png",
   "/manifest.json",
-  "/offline.html",
-  "/favicon/icon-192.png",
-  "/favicon/icon-512.png",
-  "/favicon/icon-maskable-192.png",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    (async () => {
-      try {
-        const cache = await caches.open(CACHE_NAME);
-        await cache.addAll(PRECACHE_ASSETS);
-        if (navigator.storage && navigator.storage.persist) {
-          const isPersisted = await navigator.storage.persisted();
-          if (!isPersisted) {
-            await navigator.storage.persist();
-          }
-        }
-      } catch (error) {
-        console.error("[SW] Install failed:", error);
-        throw error;
-      }
-    })()
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    (async () => {
-      const cacheNames = await caches.keys();
-      await Promise.all(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
         cacheNames
-          .filter((name) => name.startsWith("sahabat-") && name !== CACHE_NAME)
+          .filter((name) => name !== CACHE_NAME)
           .map((name) => caches.delete(name))
-      );
-      await self.clients.claim();
-      const clients = await self.clients.matchAll({ type: "window" });
-      clients.forEach((client) => {
-        client.postMessage({ type: "SW_UPDATED", version: CACHE_VERSION });
-      });
-    })()
+      )
+    )
   );
+  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
+  // Skip non-GET requests
   if (event.request.method !== "GET") return;
-  if (!event.request.url.startsWith("http")) return;
-  if (event.request.url.includes("/api/")) return;
 
+  // Skip API calls and third-party URLs
   const url = new URL(event.request.url);
-  const isNavigation = event.request.mode === "navigate";
-  const isRscRequest =
-    event.request.headers.get("RSC") === "1" ||
-    url.searchParams.has("_rsc");
+  if (url.pathname.startsWith("/api/") || !url.pathname.startsWith("/")) return;
 
-  if (isNavigation) {
-    event.respondWith(navigationNetworkFirst(event.request));
-    return;
-  }
-  if (isRscRequest) return;
-
-  const isStaticAsset =
-    url.pathname.startsWith("/_next/static/") ||
-    url.pathname.match(/\.(js|css|woff2?|ttf|eot)$/);
-  if (isStaticAsset) {
-    event.respondWith(cacheFirst(event.request));
-    return;
-  }
-
-  const isImmutableAsset =
-    url.pathname.startsWith("/favicon/") ||
-    url.pathname.startsWith("/splash/") ||
-    url.pathname.match(/\.(png|jpg|jpeg|svg|gif|webp|ico)$/);
-  if (isImmutableAsset) {
-    event.respondWith(cacheFirst(event.request));
-    return;
-  }
-
-  event.respondWith(networkFirst(event.request));
-});
-
-async function navigationNetworkFirst(request) {
-  try {
-    return await fetch(request);
-  } catch {
-    const offlinePage = await caches.match(OFFLINE_URL);
-    return offlinePage || new Response("Offline", { status: 503 });
-  }
-}
-
-async function cacheFirst(request) {
-  const cache = await caches.open(CACHE_NAME);
-  const cachedResponse = await cache.match(request);
-  if (cachedResponse) return cachedResponse;
-  try {
-    const networkResponse = await fetch(request);
-    if (networkResponse.ok) {
-      await cache.put(request, networkResponse.clone());
-    }
-    return networkResponse;
-  } catch (e) {
-    if (request.mode === "navigate") {
-      return caches.match(OFFLINE_URL);
-    }
-    throw e;
-  }
-}
-
-async function networkFirst(request) {
-  const cache = await caches.open(CACHE_NAME);
-  try {
-    const networkResponse = await fetch(request);
-    if (networkResponse.ok) {
-      await cache.put(request, networkResponse.clone());
-    }
-    return networkResponse;
-  } catch (e) {
-    const cachedResponse = await cache.match(request);
-    if (cachedResponse) return cachedResponse;
-    if (request.mode === "navigate") {
-      const offlinePage = await caches.match(OFFLINE_URL);
-      if (offlinePage) return offlinePage;
-    }
-    return new Response("Offline", { status: 503 });
-  }
-}
-
-self.addEventListener("push", (event) => {
-  let data = {
-    title: "Sahabat Kreator",
-    body: "Notifikasi baru",
-    icon: "/favicon/icon-192.png",
-    badge: "/favicon/icon-72.png",
-    tag: "default",
-    data: { url: "/dashboard" },
-  };
-  if (event.data) {
-    try {
-      data = { ...data, ...event.data.json() };
-    } catch (e) {
-      data.body = event.data.text();
-    }
-  }
-  const options = {
-    body: data.body,
-    icon: data.icon || "/favicon/icon-192.png",
-    badge: data.badge || "/favicon/icon-72.png",
-    tag: data.tag || "default",
-    data: data.data || { url: "/dashboard" },
-  };
-  event.waitUntil(self.registration.showNotification(data.title, options));
-});
-
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  const urlToOpen = event.notification.data?.url || "/dashboard";
-  event.waitUntil(
-    clients.matchAll({ type: "window" }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && "focus" in client) {
-          client.navigate(urlToOpen);
-          return client.focus();
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request).then((response) => {
+        if (!response || response.status !== 200 || response.type !== "basic") {
+          return response;
         }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
+        });
+        return response;
+      }).catch(() => {
+        // If network fails, try offline fallback for key pages
+        if (event.request.destination === "document") {
+          return caches.match("/dashboard");
+        }
+      });
     })
   );
 });
 
-self.addEventListener("message", (event) => {
-  if (event.data?.type === "SKIP_WAITING") {
-    self.skipWaiting();
-  }
+// Handle push notifications
+self.addEventListener("push", (event) => {
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || "Sahabat Kreator";
+  const options = {
+    body: data.body || "Ada pembaruan baru",
+    icon: "/favicon/favicon-192x192.png",
+    badge: "/favicon/favicon-192x192.png",
+    data: data.url || "/dashboard",
+    actions: [
+      { action: "open", title: "Buka" },
+      { action: "close", title: "Tutup" },
+    ],
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  if (event.action === "close") return;
+  const urlToOpen = event.notification.data || "/dashboard";
+  event.waitUntil(
+    clients.openWindow(urlToOpen)
+  );
+});
+
+self.addEventListener("notificationclose", (event) => {
+  console.log("Notification closed:", event.notification.title);
 });

@@ -1,87 +1,102 @@
-import { NextRequest } from "next/server";
-import { and, eq } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@sahabat-kreator/auth";
 import { db, schema } from "@sahabat-kreator/db";
-import { withAuth, json } from "@/lib/api";
-
-export const dynamic = "force-dynamic";
-
-/**
- * GET /api/notification-settings — ambil pengaturan notifikasi user saat ini.
- */
-export const GET = withAuth(async (ctx) => {
-    const { activeOrganizationId, session } = ctx;
-    if (!activeOrganizationId) return json({ error: "Pilih workspace dulu." }, { status: 400 });
-
-    const userId = session?.user?.id;
-    if (!userId) return json({ error: "User tidak terotentikasi." }, { status: 401 });
-
-    const settings = await db.query.notificationSettings.findFirst({
-        where: and(
-            eq(schema.notificationSettings.organizationId, activeOrganizationId),
-            eq(schema.notificationSettings.userId, userId),
-        ),
-    });
-
-    return json(settings ?? {
-        postPublished: true,
-        postFailed: true,
-        postReadyToPublish: true,
-        tokenExpiring: true,
-        weeklyDigest: false,
-        newComment: true,
-        newDM: true,
-        newMention: true,
-        newReview: true,
-    });
-});
+import { eq, and } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { requireAuth } from "@/lib/api";
 
 /**
- * PATCH /api/notification-settings — perbarui pengaturan notifikasi.
- * Body: { postPublished?, postFailed?, tokenExpiring?, weeklyDigest?, newComment?, newDM?, newMention?, newReview? }
+ * GET    /api/notification-settings  - Ambil pengaturan notifikasi user saat ini
+ * PATCH  /api/notification-settings  - Simpan pengaturan notifikasi
  */
-export const PATCH = withAuth(async (ctx, req: NextRequest) => {
-    const { activeOrganizationId, session } = ctx;
-    if (!activeOrganizationId) return json({ error: "Pilih workspace dulu." }, { status: 400 });
 
-    const userId = session?.user?.id;
-    if (!userId) return json({ error: "User tidak terotentikasi." }, { status: 401 });
+export async function GET(req: NextRequest) {
+    const ctx = await requireAuth();
+    if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const body = (await req.json().catch(() => null)) as {
-        postPublished?: boolean;
-        postFailed?: boolean;
-        tokenExpiring?: boolean;
-        weeklyDigest?: boolean;
-        newComment?: boolean;
-        newDM?: boolean;
-        newMention?: boolean;
-        newReview?: boolean;
-    } | null;
+    try {
+        const setting = await db.query.notificationSettings.findFirst({
+            where: and(
+                eq(schema.notificationSettings.organizationId, ctx.activeOrganizationId!),
+                eq(schema.notificationSettings.userId, ctx.session.user.id),
+            ),
+        });
 
-    if (!body) return json({ error: "Body tidak valid." }, { status: 400 });
-
-    const existing = await db.query.notificationSettings.findFirst({
-        where: and(
-            eq(schema.notificationSettings.organizationId, activeOrganizationId),
-            eq(schema.notificationSettings.userId, userId),
-        ),
-        columns: { id: true },
-    });
-
-    if (existing) {
-        await db.update(schema.notificationSettings)
-            .set(body)
-            .where(eq(schema.notificationSettings.id, existing.id));
-        return json({ ok: true });
+        return NextResponse.json({
+            postPublished: setting?.postPublished ?? true,
+            postFailed: setting?.postFailed ?? true,
+            postReadyToPublish: setting?.postReadyToPublish ?? true,
+            tokenExpiring: setting?.tokenExpiring ?? true,
+            weeklyDigest: setting?.weeklyDigest ?? false,
+            newComment: setting?.newComment ?? true,
+            newDM: setting?.newDM ?? true,
+            newMention: setting?.newMention ?? true,
+            newReview: setting?.newReview ?? true,
+        });
+    } catch (e) {
+        return NextResponse.json({ error: e instanceof Error ? e.message : "Failed" }, { status: 500 });
     }
+}
 
-    // Upsert: insert baru kalau belum ada
-    await db.insert(schema.notificationSettings).values({
-        id: randomUUID(),
-        organizationId: activeOrganizationId,
-        userId,
-        ...body,
-    });
+export async function PATCH(req: NextRequest) {
+    const ctx = await requireAuth();
+    if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    return json({ ok: true });
-});
+    const body = await req.json();
+    const {
+        postPublished,
+        postFailed,
+        postReadyToPublish,
+        tokenExpiring,
+        weeklyDigest,
+        newComment,
+        newDM,
+        newMention,
+        newReview,
+    } = body;
+
+    try {
+        const existing = await db.query.notificationSettings.findFirst({
+            where: and(
+                eq(schema.notificationSettings.organizationId, ctx.activeOrganizationId!),
+                eq(schema.notificationSettings.userId, ctx.session.user.id),
+            ),
+        });
+
+        if (existing) {
+            await db.update(schema.notificationSettings)
+                .set({
+                    postPublished: postPublished ?? true,
+                    postFailed: postFailed ?? true,
+                    postReadyToPublish: postReadyToPublish ?? true,
+                    tokenExpiring: tokenExpiring ?? true,
+                    weeklyDigest: weeklyDigest ?? false,
+                    newComment: newComment ?? true,
+                    newDM: newDM ?? true,
+                    newMention: newMention ?? true,
+                    newReview: newReview ?? true,
+                    updatedAt: new Date(),
+                })
+                .where(eq(schema.notificationSettings.id, existing.id));
+        } else {
+            await db.insert(schema.notificationSettings).values({
+                id: randomUUID(),
+                organizationId: ctx.activeOrganizationId!,
+                userId: ctx.session.user.id,
+                postPublished: postPublished ?? true,
+                postFailed: postFailed ?? true,
+                postReadyToPublish: postReadyToPublish ?? true,
+                tokenExpiring: tokenExpiring ?? true,
+                weeklyDigest: weeklyDigest ?? false,
+                newComment: newComment ?? true,
+                newDM: newDM ?? true,
+                newMention: newMention ?? true,
+                newReview: newReview ?? true,
+            });
+        }
+
+        return NextResponse.json({ success: true });
+    } catch (e) {
+        return NextResponse.json({ error: e instanceof Error ? e.message : "Failed" }, { status: 500 });
+    }
+}

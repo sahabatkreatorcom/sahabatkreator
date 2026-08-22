@@ -9,7 +9,7 @@
 #   - `output: "standalone"` di next.config.ts: image runner hanya berisi hasil tracing
 #     (modul yang benar-benar dipakai), tanpa node_modules workspace utuh.
 
-FROM node:22-slim AS base
+FROM node:24-slim AS base
 RUN corepack enable
 WORKDIR /app
 

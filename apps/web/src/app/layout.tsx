@@ -1,6 +1,24 @@
+import type { Metadata } from "next";
 import { seo } from "@/lib/seo";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { CookieBanner } from "@/components/ui/cookie-banner";
+import { LocaleSwitcher } from "@/components/ui/locale-switcher";
+
+export const metadata: Metadata = {
+  title: {
+    default: seo.title,
+    template: `%s | ${seo.title}`,
+  },
+  description: seo.description,
+  alternates: {
+    canonical: seo.url,
+    languages: {
+      "id-ID": "https://sahabatkreator.com",
+      "en-US": "https://sahabatkreator.com/en",
+    },
+  },
+};
 
 export default function RootLayout({
   children,
@@ -32,9 +50,11 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/favicon/apple-touch-icon.png" />
         <link rel="alternate" type="application/rss+xml" title="Sahabat Kreator" href="/rss.xml" />
       </head>
-      <body>
+      <body className="min-h-screen bg-background font-sans antialiased">
         <ThemeProvider>
           {children}
+          <CookieBanner />
+          <LocaleSwitcher />
         </ThemeProvider>
       </body>
     </html>

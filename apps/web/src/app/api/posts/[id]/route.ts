@@ -41,6 +41,7 @@ export const GET = withAuth(async (ctx, _req: NextRequest, { params }: { params:
             type: pm.media.mimeType.startsWith("video/") ? "video" : "image",
         })),
         linkedGroupId: post.linkedGroupId,
+        viralityScore: post.viralityScore ?? null,
     });
 });
 

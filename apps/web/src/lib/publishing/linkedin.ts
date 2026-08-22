@@ -127,10 +127,16 @@ async function publishPost(
     }
 
     const postId = res.headers.get("x-restli-id") || "";
+    // LinkedIn post ID berbentuk URN: urn:li:share:1234567890
+    // Ekstrak numeric part untuk URL yang lebih clean
+    const shareIdMatch = postId.match(/share:(\d+)/);
+    const numericId = shareIdMatch ? shareIdMatch[1] : postId;
     return {
         success: true,
-        postId: postId || undefined,
-        postUrl: postId ? `https://linkedin.com/feed/update/${postId}` : undefined,
+        postId: numericId || postId || undefined,
+        postUrl: postId
+            ? `https://www.linkedin.com/feed/update/${postId}`
+            : undefined,
     };
 }
 

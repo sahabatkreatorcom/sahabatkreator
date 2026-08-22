@@ -5,7 +5,7 @@
 # pnpm 10 membutuhkan instalasi workspace penuh (--filter saat install tidak didukung),
 # jadi deps di-install untuk seluruh workspace.
 
-FROM node:22-slim AS deps
+FROM node:24-slim AS deps
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
     && rm -rf /var/lib/apt/lists/*

@@ -4,6 +4,47 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #33 — Perbaikan external_url, external_id, synced_at yang salah/NULL di Database
+
+**Gejala:** Setelah publish post ke berbagai platform (Instagram, TikTok, Threads, Pinterest, Facebook), field `external_url`, `external_id`, `synced_at` di database sering kosong (NULL) atau berisi URL yang salah format:
+- Instagram: `https://instagram.com/p/17941375140336574` ✅
+- TikTok: `https://tiktok.com/@syahidsyahdan1/video/completed` ❌ (ID "completed" tidak valid)
+- Threads: `https://threads.net/@10087882621329675/post/17886259941675306` ✅
+- Pinterest: `https://pinterest.com/pin/1072841942505620563` ✅
+- Facebook: `https://facebook.com/122183702720907803` ✅
+- LinkedIn: `https://linkedin.com/feed/update/urn:li:share:123` ❌ (salah format)
+
+**Akar Masalah:**
+1. **TikTok webhook** menyimpan `externalUrl` NULL karena tidak membangun URL dari `publicId`
+2. **TikTok polling** (`waitForPublishComplete`) mengembalikan string `"completed"` sebagai ID, padahal itu bukan ID valid
+3. **LinkedIn response** menggunakan format URN lengkap (`urn:li:share:123`) yang salah di-render sebagai URL
+4. **Function buildPostUrl** di routes API tidak menangani kasus-kasus edge case di atas
+5. Tidak ada mechanism untuk memperbaiki data lama yang sudah tersimpan salah
+
+**Fix:**
+1. **tiktok.ts** - Perbaiki `waitForPublishComplete` untuk tidak mengembalikan `"completed"` sebagai ID valid. Jika ID kosong/tidak valid, return `null` agar di-handling sebagai PUBLISH_PENDING.
+2. **linkedin.ts** - Ekstrak numeric part dari URN LinkedIn (`share:123` → `123`) untuk URL yang lebih clean.
+3. **route.ts** (API posts) - Perbaiki `buildPostUrl` function untuk:
+   - Handle TikTok ID `"completed"` → return null
+   - Handle LinkedIn URN format → extract numeric ID
+   - Tambah protocol `https://www.` untuk URL yang konsisten
+4. **tiktok webhook** - Tambahkan query account name dan set `externalUrl` saat webhook complete
+5. **Admin API** - Buat endpoint `/api/admin/fix-urls` untuk memperbaiki data yang sudah salah
+6. **Script** - Buat script `scripts/fix-external-urls.ts` untuk run manual fix
+
+**Verifikasi:** Perlu deploy dan test publish ke semua platform.
+
+| | |
+|---|---|
+| **File** | `src/lib/publishing/tiktok.ts`, `src/lib/publishing/linkedin.ts`, `src/app/api/posts/route.ts`, `src/lib/webhooks/tiktok.ts`, `scripts/fix-external-urls.ts`, `src/app/api/admin/fix-urls/route.ts` |
+| **Masalah** | external_url salah/NULL di database setelah publish |
+| **Akar** | Bug di TikTok webhook, LinkedIn URL format, dan buildPostUrl function |
+| **Fix** | Perbaiki URL construction di semua platform + tambahkan admin tool untuk fix data lama |
+| **Verifikasi** | **PENDING** — perlu test publish ke Instagram, TikTok, YouTube, LinkedIn, Pinterest, Threads, Facebook |
+| **Deploy** | **PENDING** |
+
+---
+
 ### Fix #32 — YouTube "Gagal mengambil profil platform" saat OAuth callback
 **Gejala:** Setelah selesai OAuth YouTube, tampilan erroret("Gagal mengambil profil platform.") di halaman connections.
 

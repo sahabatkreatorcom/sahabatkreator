@@ -41,14 +41,20 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
     function buildPostUrl(externalUrl: string | null, platform: string | null, platformPostId: string | null, accountName: string | null): string | null {
         if (externalUrl) return externalUrl;
         if (!platformPostId || !platform) return null;
+
+        // LinkedIn URN format: urn:li:share:1234567890 → ambil numeric part
+        let cleanId = platformPostId;
+        const urnMatch = platformPostId.match(/share:(\d+)/);
+        if (urnMatch) cleanId = urnMatch[1];
+
         switch (platform) {
-            case "INSTAGRAM": return `https://instagram.com/p/${platformPostId}`;
-            case "TIKTOK": return `https://tiktok.com/@${accountName ?? "user"}/video/${platformPostId}`;
-            case "FACEBOOK": return `https://facebook.com/${platformPostId}`;
-            case "YOUTUBE": return `https://youtube.com/watch?v=${platformPostId}`;
-            case "PINTEREST": return `https://pinterest.com/pin/${platformPostId}`;
-            case "LINKEDIN": return `https://linkedin.com/feed/update/${platformPostId}`;
-            case "THREADS": return `https://threads.net/@${accountName ?? "user"}/post/${platformPostId}`;
+            case "INSTAGRAM": return cleanId ? `https://instagram.com/p/${cleanId}` : null;
+            case "TIKTOK": return cleanId && cleanId !== "completed" ? `https://tiktok.com/@${accountName ?? "user"}/video/${cleanId}` : null;
+            case "FACEBOOK": return cleanId ? `https://facebook.com/${cleanId}` : null;
+            case "YOUTUBE": return cleanId ? `https://youtube.com/watch?v=${cleanId}` : null;
+            case "PINTEREST": return cleanId ? `https://pinterest.com/pin/${cleanId}` : null;
+            case "LINKEDIN": return cleanId ? `https://www.linkedin.com/feed/update/urn:li:share:${cleanId}` : null;
+            case "THREADS": return cleanId ? `https://threads.net/@${accountName ?? "user"}/post/${cleanId}` : null;
             default: return null;
         }
     }
@@ -73,6 +79,7 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
                 type: pm.media.mimeType.startsWith("video/") ? "video" : "image",
             })),
             linkedGroupId: p.linkedGroupId,
+            viralityScore: p.viralityScore ?? null,
         })),
         total,
         limit,

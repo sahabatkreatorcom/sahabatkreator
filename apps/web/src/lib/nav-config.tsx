@@ -18,6 +18,7 @@ import {
     Tag,
     CreditCard,
     Link2,
+    FileText,
     type LucideIcon,
 } from "lucide-react";
 
@@ -179,6 +180,22 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
+        href: "/seo-audit",
+        label: "SEO Audit",
+        shortLabel: "SEO",
+        icon: FileText,
+        group: "insight",
+        mobileTab: false,
+    },
+    {
+        href: "/blog-queue",
+        label: "Blog Queue",
+        shortLabel: "Blog",
+        icon: FileText,
+        group: "insight",
+        mobileTab: false,
+    },
+    {
         href: "/team",
         label: "Anggota tim",
         shortLabel: "Tim",
@@ -215,6 +232,14 @@ export const navItems: NavItem[] = [
         label: "Pengaturan workspace",
         shortLabel: "Pengaturan",
         icon: Settings,
+        group: "workspace",
+        mobileTab: false,
+    },
+    {
+        href: "/help",
+        label: "Pusat bantuan",
+        shortLabel: "Bantuan",
+        icon: Sparkles,
         group: "workspace",
         mobileTab: false,
     },

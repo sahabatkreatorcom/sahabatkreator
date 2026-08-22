@@ -95,7 +95,7 @@ export async function handleTikTokWebhook(rawBody: string): Promise<number> {
         const account = await db.query.socialAccount.findFirst({
             where: (t, { and: _and, eq: _eq }) =>
                 _and(_eq(t.platform, "TIKTOK"), _eq(t.platformId, userOpenId), _eq(t.isActive, true)),
-            columns: { id: true, organizationId: true },
+            columns: { id: true, organizationId: true, name: true },
         });
         if (!account) return;
 
@@ -108,17 +108,23 @@ export async function handleTikTokWebhook(rawBody: string): Promise<number> {
                     _eq(t.socialAccountId, account.id),
                     _in(t.status, ["SCHEDULED", "PUBLISHING", "PUBLISHED", "FAILED"]),
                 ),
-            columns: { id: true, status: true, platformPostId: true },
+            columns: { id: true, status: true, platformPostId: true, externalUrl: true },
         });
         if (!post) return;
 
         if (event === "post.publish.complete") {
+            // postId dari webhook adalah ID publik TikTok
+            const publicId = postId;
+            const accountName = account.name || "user";
+            const tiktokUrl = publicId ? `https://www.tiktok.com/@${accountName}/video/${publicId}` : null;
+
             await db
                 .update(schema.post)
                 .set({
                     status: "PUBLISHED",
                     publishedAt: new Date(),
-                    platformPostId: post.platformPostId || postId,
+                    platformPostId: post.platformPostId || publicId,
+                    externalUrl: tiktokUrl || post.externalUrl,
                 })
                 .where(eq(schema.post.id, post.id));
             updated++;

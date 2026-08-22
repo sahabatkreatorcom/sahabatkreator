@@ -29,6 +29,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { PushNotificationSettings } from "@/components/settings/push-notification-settings";
+import { ChangePasswordForm } from "@/components/settings/change-password-form";
+import { TwoFactorPanel } from "@/components/dashboard/security/two-factor-panel";
+import { EnableTwoFactorFlow } from "@/components/dashboard/security/enable-two-factor-flow";
 import { authClient } from "@/lib/auth-client";
 
 interface Organization {
@@ -102,7 +105,7 @@ export default function SettingsPage() {
     const [accentColorAlt, setAccentColorAlt] = useState("#E8B4B8");
     const [brandGuidelines, setBrandGuidelines] = useState("");
     const [brandSamples, setBrandSamples] = useState("");
-    const [currentUser, setCurrentUser] = useState({ name: "", email: "", emailVerified: false });
+    const [currentUser, setCurrentUser] = useState({ name: "", email: "", emailVerified: false, twoFactorEnabled: false });
 
     // Notification settings
     const [notifSettings, setNotifSettings] = useState({
@@ -169,6 +172,7 @@ export default function SettingsPage() {
                     name: u.name ?? "",
                     email: u.email ?? "",
                     emailVerified: u.emailVerified ?? false,
+                    twoFactorEnabled: (u as any).twoFactorEnabled ?? false,
                 });
             }
         });
@@ -501,26 +505,9 @@ export default function SettingsPage() {
                 )}
 
                 {activeTab === "security" && (
-                    <div className="space-y-4 rounded-lg border border-border bg-card p-5">
-                        <h2 className="text-sm font-semibold">Keamanan</h2>
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between rounded-md border border-border p-3">
-                                <div>
-                                    <p className="text-sm font-medium">Two-Factor Authentication</p>
-                                    <p className="text-xs text-muted-foreground">Tambahkan lapisan keamanan tambahan</p>
-                                </div>
-                                <Button size="sm" variant="secondary">Aktifkan</Button>
-                            </div>
-                            <div className="flex items-center justify-between rounded-md border border-border p-3">
-                                <div>
-                                    <p className="text-sm font-medium">Ubah Password</p>
-                                    <p className="text-xs text-muted-foreground">Keamanani akun Anda</p>
-                                </div>
-                                <a href="/auth/change-password">
-                                    <Button size="sm" variant="secondary">Ubah</Button>
-                                </a>
-                            </div>
-                        </div>
+                    <div className="space-y-4">
+                        <TwoFactorPanel enabled={currentUser.twoFactorEnabled} />
+                        <ChangePasswordForm />
                     </div>
                 )}
             </div>

@@ -61,12 +61,17 @@ export function Footer() {
             <ul className="mt-4 space-y-2 text-sm mb-4">
               <li>
                 <Link href="/kebijakan-privasi" className="text-muted-foreground hover:text-foreground">
-                  Privacy Policy
+                  Kebijakan Privasi
                 </Link>
               </li>
               <li>
                 <Link href="/syarat-ketentuan" className="text-muted-foreground hover:text-foreground">
-                  Terms of Service
+                  Syarat & Ketentuan
+                </Link>
+              </li>
+              <li>
+                <Link href="/penghapusan-data" className="text-muted-foreground hover:text-foreground">
+                  Penghapusan Data
                 </Link>
               </li>
             </ul>

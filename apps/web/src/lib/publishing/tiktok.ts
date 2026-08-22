@@ -241,10 +241,12 @@ async function waitForPublishComplete(
             // publiclyAvailablePostId bisa berbagai format — ambil apapun yang ada
             const ids = data.data?.publiclyAvailablePostId;
             if (Array.isArray(ids) && ids.length > 0) {
-                return String(ids[0]);
+                const id = String(ids[0]).trim();
+                // Validasi: TikTok ID harus bukan string "completed" atau kosong
+                if (id && id !== "completed") return id;
             }
-            // ID kosong tapi status COMPLETE — tetap return success
-            return "completed";
+            // Jika ID kosong/tidak valid, return null agar di-handling sebagai PUBLISH_PENDING
+            return null;
         }
         if (status === "FAILED") return null;
     }
