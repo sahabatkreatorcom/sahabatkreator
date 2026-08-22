@@ -195,7 +195,7 @@ export default function ConnectionsPage() {
             .then((data) => {
                 if (data.organization?.name) setOrgName(data.organization.name);
             })
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
     const didAutoRefresh = useRef(false);
@@ -223,7 +223,7 @@ export default function ConnectionsPage() {
                 }
                 loadAccounts();
             })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setAutoRefreshing(false));
     }, [accounts, loadAccounts]);
 
@@ -379,15 +379,14 @@ export default function ConnectionsPage() {
                                         >
                                             <div className="flex items-start justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <PlatformIconRow platform={account.platform} />
+                                                    <PlatformAvatar platform={account.platform} avatar={account.avatar} name={account.name} />
                                                     <div>
                                                         <p className="text-sm font-medium">{PLATFORM_LABELS[account.platform]}</p>
                                                         <span
-                                                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                                                needsReconnect
+                                                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${needsReconnect
                                                                     ? "bg-accent-amber/10 text-accent-amber"
                                                                     : "bg-accent-green/10 text-accent-green"
-                                                            }`}
+                                                                }`}
                                                         >
                                                             {needsReconnect ? "Needs reconnection" : "connected"}
                                                         </span>
@@ -423,7 +422,7 @@ export default function ConnectionsPage() {
                                             </div>
 
                                             <div className="mt-3 border-t border-border pt-3">
-                                                <p className="mb-2 text-[10px] text-muted-foreground">{orgName} Profile Update</p>
+                                                <p className="mb-2 text-[10px] text-muted-foreground">{orgName}</p>
                                                 <div className="flex gap-2">
                                                     {needsReconnect ? (
                                                         <>
