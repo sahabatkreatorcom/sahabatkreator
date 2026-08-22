@@ -204,7 +204,7 @@ export default function CalendarPage() {
                     <div className="grid grid-cols-7">
                         {days.map((date, i) => {
                             if (!date) return <div key={`empty-${i}`} className="min-h-24 border-b border-r border-border/60 bg-muted/30" />;
-                            const key = date.toISOString().slice(0, 10);
+                            const key = date.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
                             const dayPosts = postsByDay.get(key) ?? [];
                             const isToday = date.toDateString() === today.toDateString();
                             const isDragOver = dragOverDate === key;
