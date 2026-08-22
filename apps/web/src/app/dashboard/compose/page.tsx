@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, ImagePlus, Send, X, LayoutTemplate, Hash, FolderTree, AlertCircle } from "lucide-react";
+import { CalendarClock, ImagePlus, Send, X, LayoutTemplate, Hash, FolderTree, AlertCircle, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,6 +74,10 @@ export default function ComposePage() {
     const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
     const [collectionPickerOpen, setCollectionPickerOpen] = useState(false);
     const [platformSettings, setPlatformSettings] = useState<Record<string, Record<string, string | boolean | string[] | { username: string; x: number; y: number }[]>>>({});
+    const [pinterestBoards, setPinterestBoards] = useState<Record<string, { id: string; name: string; url: string; pinCount: number }[]>>({});
+    const [pinterestBoardsLoading, setPinterestBoardsLoading] = useState<Record<string, boolean>>({});
+    const [pinterestCreateBoard, setPinterestCreateBoard] = useState<Record<string, boolean>>({});
+    const [pinterestNewBoardName, setPinterestNewBoardName] = useState<Record<string, string>>({});
 
     const loadAccounts = useCallback(async () => {
         setLoadingAccounts(true);
@@ -107,6 +111,39 @@ export default function ComposePage() {
             setCollections(c.collections ?? []);
         } catch { /* ignore */ }
     }, []);
+
+    const loadPinterestBoards = useCallback(async (accountId: string) => {
+        if (pinterestBoards[accountId]?.length > 0) return;
+        setPinterestBoardsLoading((prev) => ({ ...prev, [accountId]: true }));
+        try {
+            const res = await fetch(`/api/accounts/${accountId}/boards`);
+            const data = await res.json();
+            if (res.ok) setPinterestBoards((prev) => ({ ...prev, [accountId]: data.boards ?? [] }));
+        } catch { /* ignore */ }
+        setPinterestBoardsLoading((prev) => ({ ...prev, [accountId]: false }));
+    }, [pinterestBoards]);
+
+    const createPinterestBoard = useCallback(async (accountId: string) => {
+        const name = pinterestNewBoardName[accountId]?.trim();
+        if (!name) return;
+        try {
+            const res = await fetch(`/api/accounts/${accountId}/boards`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name }),
+            });
+            const data = await res.json();
+            if (res.ok && data.board) {
+                setPinterestBoards((prev) => ({
+                    ...prev,
+                    [accountId]: [...(prev[accountId] ?? []), data.board],
+                }));
+                set("boardId", data.board.id);
+                setPinterestCreateBoard((prev) => ({ ...prev, [accountId]: false }));
+                setPinterestNewBoardName((prev) => ({ ...prev, [accountId]: "" }));
+            }
+        } catch { /* ignore */ }
+    }, [pinterestNewBoardName]);
 
     useEffect(() => {
         loadAccounts();
@@ -437,13 +474,60 @@ export default function ComposePage() {
                                         )}
                                         {account.platform === "PINTEREST" && (
                                             <div className="space-y-1 sm:col-span-2">
-                                                <Label className="text-xs">Board ID *</Label>
-                                                <Input
-                                                    value={(s.boardId as string) ?? ""}
-                                                    onChange={(e) => set("boardId", e.target.value)}
-                                                    placeholder="Contoh: 123456789012345678 (dari URL board Pinterest)"
-                                                    className="h-9"
-                                                />
+                                                <Label className="text-xs">Board *</Label>
+                                                {pinterestBoardsLoading[account.id] ? (
+                                                    <div className="flex items-center gap-2 h-9 text-sm text-muted-foreground">
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                        Memuat boards...
+                                                    </div>
+                                                ) : pinterestCreateBoard[account.id] ? (
+                                                    <div className="flex gap-2">
+                                                        <Input
+                                                            value={pinterestNewBoardName[account.id] ?? ""}
+                                                            onChange={(e) => setPinterestNewBoardName((prev) => ({ ...prev, [account.id]: e.target.value }))}
+                                                            placeholder="Nama board baru"
+                                                            className="h-9 flex-1"
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === "Enter") {
+                                                                    e.preventDefault();
+                                                                    createPinterestBoard(account.id);
+                                                                }
+                                                            }}
+                                                        />
+                                                        <Button size="sm" onClick={() => createPinterestBoard(account.id)}>
+                                                            Buat
+                                                        </Button>
+                                                        <Button size="sm" variant="ghost" onClick={() => setPinterestCreateBoard((prev) => ({ ...prev, [account.id]: false }))}>
+                                                            Batal
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex gap-2">
+                                                        <select
+                                                            value={(s.boardId as string) ?? ""}
+                                                            onChange={(e) => {
+                                                                if (e.target.value === "__create_new__") {
+                                                                    setPinterestCreateBoard((prev) => ({ ...prev, [account.id]: true }));
+                                                                } else {
+                                                                    set("boardId", e.target.value);
+                                                                }
+                                                            }}
+                                                            className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                            onFocus={() => loadPinterestBoards(account.id)}
+                                                        >
+                                                            <option value="">Pilih board...</option>
+                                                            {(pinterestBoards[account.id] ?? []).map((board) => (
+                                                                <option key={board.id} value={board.id}>
+                                                                    {board.name} ({board.pinCount} pin)
+                                                                </option>
+                                                            ))}
+                                                            <option value="__create_new__">+ Buat board baru</option>
+                                                        </select>
+                                                        <Button size="sm" variant="ghost" onClick={() => loadPinterestBoards(account.id)} loading={pinterestBoardsLoading[account.id]}>
+                                                            Muat ulang
+                                                        </Button>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                         {account.platform === "LINKEDIN" && (
