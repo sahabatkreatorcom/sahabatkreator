@@ -10,14 +10,7 @@ export const metadata: Metadata = {
   },
 };
 
-interface Props {
-  params: Promise<{ slug?: string[] }>;
-}
-
-export default async function EnglishNotFound({ params }: Props) {
-  const { slug = [] } = await params;
-  const path = slug.join("/");
-
+export default function EnglishNotFound() {
   return (
     <main className="container mx-auto flex min-h-[60vh] items-center justify-center px-4 py-12">
       <div className="text-center max-w-md">
@@ -30,7 +23,7 @@ export default async function EnglishNotFound({ params }: Props) {
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
-            href={path === "" ? "/" : `/${path}`}
+            href="/"
             className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <ArrowLeft className="h-4 w-4" />

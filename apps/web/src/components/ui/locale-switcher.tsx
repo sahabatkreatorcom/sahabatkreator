@@ -40,9 +40,9 @@ export function LocaleSwitcher() {
     }
 
     if (code === "id") {
-      router.push(path || "/");
+      router.push((path || "/") as any);
     } else {
-      router.push(`/en${path}`);
+      router.push(`/en${path}` as any);
     }
   }
 

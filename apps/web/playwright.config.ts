@@ -4,8 +4,6 @@ import { resolve } from "node:path";
 
 loadEnv({ path: resolve(__dirname, ".env.e2e") });
 
-const PORT = process.env.PORT || 3000;
-
 export default defineConfig({
     testDir: "./e2e",
     fullyParallel: true,
@@ -19,7 +17,7 @@ export default defineConfig({
         ["html", { outputFolder: "playwright-report", open: "never" }],
     ],
     use: {
-        baseURL: `http://localhost:${PORT}`,
+        baseURL: "https://sahabatkreator.com",
         trace: "on-first-retry",
         screenshot: "only-on-failure",
         video: "retain-on-failure",
@@ -30,10 +28,4 @@ export default defineConfig({
             use: { ...devices["Desktop Chrome"] },
         },
     ],
-    webServer: {
-        command: "pnpm dev",
-        url: `http://localhost:${PORT}/login`,
-        reuseExistingServer: true,
-        timeout: 120_000,
-    },
 });

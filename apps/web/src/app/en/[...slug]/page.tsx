@@ -1,42 +1,58 @@
-import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 
 interface Props {
   params: Promise<{ slug: string[] }>;
 }
 
-// Halaman yang benar-benar punya versi English
-const EN_PAGES = ["", "kebijakan-privasi", "penghapusan-data", "syarat-ketentuan"];
+// Halaman yang sudah punya versi English lengkap
+const EN_PAGES = ["kebijakan-privasi", "penghapusan-data", "syarat-ketentuan"];
 
-export default async function EnglishFallbackPage({ params }: Props) {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const path = slug.join("/");
+  
+  const titles: Record<string, string> = {
+    "kebijakan-privasi": "Privacy Policy | Sahabat Kreator",
+    "penghapusan-data": "Data Deletion Policy | Sahabat Kreator",
+    "syarat-ketentuan": "Terms & Conditions | Sahabat Kreator",
+  };
 
-  // Kalau path tersedia di list EN_PAGES, lanjut render
+  return {
+    title: titles[path] || "Page | Sahabat Kreator",
+    alternates: {
+      canonical: `https://sahabatkreator.com/en/${path}`,
+      languages: {
+        "id-ID": `https://sahabatkreator.com/${path}`,
+        "en-US": `https://sahabatkreator.com/en/${path}`,
+      },
+    },
+    robots: {
+      index: EN_PAGES.includes(path),
+      follow: true,
+    },
+  };
+}
+
+export default async function EnglishFallbackPage({ params }: Props) {
+  const { slug = [] } = await params;
+  const path = slug.join("/");
+
+  // Jika ini halaman legal yang sudah ada versi English-nya
   if (EN_PAGES.includes(path)) {
-    // Untuk halaman root /en, tampilkan landing page
-    if (path === "") {
-      const { default: ENLanding } = await import("../../page");
-      return <ENLanding />;
-    }
-    
-    // Untuk halaman legal, cari komponen yang sesuai
-    const moduleName = path.replace("-", "");
-    try {
-      const module = await import(`@/components/en/${path}/page`);
-      const Component = module.default;
-      return <Component />;
-    } catch {
-      // Jika komponen tidak ditemukan, fallback ke notFound
-      notFound();
-    }
+    // Render komponen dari folder app yang sesuai
+    const PageComponent = (await import(`../${path}/page`)).default;
+    return <PageComponent />;
   }
 
-  // Untuk halaman lain yang belum ada versi English, tampilkan pesan
+  // Untuk halaman lain yang belum diterjemahkan
   return (
-    <main className="container mx-auto max-w-4xl px-4 py-12">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight">Page Not Available in English</h1>
-        <p className="mt-4 text-lg text-muted-foreground">
+    <main className="container mx-auto flex min-h-[60vh] items-center justify-center px-4 py-12">
+      <div className="text-center max-w-md">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+          <span className="text-2xl font-bold text-primary">🌐</span>
+        </div>
+        <h1 className="mt-6 text-2xl font-bold tracking-tight">Not Available in English</h1>
+        <p className="mt-3 text-muted-foreground">
           This page is currently only available in Indonesian.
         </p>
         <div className="mt-8">
@@ -47,6 +63,9 @@ export default async function EnglishFallbackPage({ params }: Props) {
             View in Indonesian →
           </a>
         </div>
+        <p className="mt-6 text-xs text-muted-foreground">
+          We&apos;re working on translations. Thank you for your patience.
+        </p>
       </div>
     </main>
   );
