@@ -16,22 +16,14 @@ interface ActivityItem {
 }
 
 interface Summary {
-    total: number;
-    post: number;
-    media: number;
-    account: number;
-    team: number;
-    settings: number;
-    organization: number;
-    automation: number;
-    comment: number;
+    totalActions: number;
+    byAction: Record<string, number>;
 }
 
 interface ActivityResponse {
-    items: ActivityItem[];
+    logs: ActivityItem[];
     total: number;
-    limit: number;
-    offset: number;
+    hasMore: boolean;
     summary: Summary;
 }
 
@@ -43,6 +35,7 @@ const FILTERS: { value: string; label: string }[] = [
     { value: "account", label: "Akun" },
     { value: "media", label: "Media" },
     { value: "team", label: "Tim" },
+    { value: "settings", label: "Pengaturan" },
 ];
 
 function formatAction(action: string): { icon: string; label: string } {
@@ -62,6 +55,10 @@ function formatAction(action: string): { icon: string; label: string } {
         "account.disconnected": { icon: "🔌", label: "Akun diputus" },
         "media.uploaded": { icon: "📤", label: "Media diunggah" },
         "media.deleted": { icon: "🧹", label: "Media dihapus" },
+        "team.invited": { icon: "👤", label: "Anggota diundang" },
+        "team.removed": { icon: "👤", label: "Anggota dihapus" },
+        "team.role_changed": { icon: "👤", label: "Peran diubah" },
+        "settings.updated": { icon: "⚙️", label: "Pengaturan diubah" },
     };
     return map[action] ?? { icon: "🔹", label: action };
 }
@@ -83,9 +80,9 @@ export default function ActivityPage() {
             const res = await fetch(`/api/activity?${params}`);
             const data = (await res.json()) as ActivityResponse & { error?: string };
             if (!res.ok) throw new Error(data.error || "Gagal memuat activity log.");
-            setItems(data.items ?? []);
+            setItems(data.logs ?? []);
             setTotal(data.total ?? 0);
-            setSummary(data.summary);
+            setSummary(data.summary ?? null);
         } catch (e) {
             setError(e instanceof Error ? e.message : "Gagal memuat activity log.");
         } finally {
@@ -102,12 +99,12 @@ export default function ActivityPage() {
     }
 
     const summaryCards: { label: string; value: number; className: string }[] = [
-        { label: "Total aktivitas", value: summary?.total ?? 0, className: "" },
-        { label: "Post", value: summary?.post ?? 0, className: "" },
-        { label: "Komentar", value: summary?.comment ?? 0, className: "" },
-        { label: "Automation", value: summary?.automation ?? 0, className: "" },
-        { label: "Akun", value: summary?.account ?? 0, className: "" },
-        { label: "Media", value: summary?.media ?? 0, className: "" },
+        { label: "Total aktivitas", value: summary?.totalActions ?? 0, className: "" },
+        { label: "Post", value: summary?.byAction?.post ?? 0, className: "" },
+        { label: "Komentar", value: summary?.byAction?.comment ?? 0, className: "" },
+        { label: "Automation", value: summary?.byAction?.automation ?? 0, className: "" },
+        { label: "Akun", value: summary?.byAction?.account ?? 0, className: "" },
+        { label: "Tim", value: summary?.byAction?.team ?? 0, className: "" },
     ];
 
     return (
@@ -119,7 +116,7 @@ export default function ActivityPage() {
 
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                 {summaryCards.map((c) => (
                     <div key={c.label} className="rounded-lg border border-border bg-card p-3">
                         <p className="text-xs text-muted-foreground">{c.label}</p>
