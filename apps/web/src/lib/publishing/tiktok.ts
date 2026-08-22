@@ -157,39 +157,46 @@ async function publishPhoto(
 
 /**
  * TikTok photo mode HANYA terima JPEG/WEBP — PNG ditolak.
- * Download semua PNG, convert ke JPEG via sharp, upload ulang, return URL baru.
- * Juga validasi dimensi: TikTok minimum 360px.
+ * Download semua gambar, validasi dimensi (min 360px), convert PNG ke JPEG via sharp.
  */
 async function ensureJpegUrls(urls: string[]): Promise<string[]> {
     const results = await Promise.all(
-        urls.map(async (url) => {
+        urls.map(async (url, i) => {
             try {
                 const res = await fetch(url);
-                if (!res.ok) return url;
+                if (!res.ok) throw new Error(`Gagal download gambar #${i + 1}: HTTP ${res.status}`);
 
                 const buf = Buffer.from(await res.arrayBuffer());
                 const lower = url.toLowerCase();
                 const isPng = lower.endsWith(".png") || lower.includes(".png?");
 
-                // Validasi dimensi dulu
+                if (isPng) {
+                    // Convert PNG → JPEG, preserve dimensi
+                    const jpegBuf = await sharp(buf)
+                        .jpeg({ quality: 90 })
+                        .toBuffer();
+                    const meta = await sharp(jpegBuf).metadata();
+                    const w = meta.width ?? 0;
+                    const h = meta.height ?? 0;
+                    if (w < 360 || h < 360) {
+                        throw new Error(`Gambar #${i + 1} terlalu kecil (${w}x${h}px). TikTok minimum 360px.`);
+                    }
+                    const key = `tiktok-jpeg/${randomUUID()}.jpg`;
+                    await uploadFile(key, jpegBuf, { contentType: "image/jpeg" });
+                    return getPublicUrl(key);
+                }
+
+                // Bukan PNG — cek dimensi asli
                 const meta = await sharp(buf).metadata();
                 const w = meta.width ?? 0;
                 const h = meta.height ?? 0;
                 if (w < 360 || h < 360) {
-                    throw new Error(`Gambar terlalu kecil (${w}x${h}px). TikTok minimum 360px.`);
+                    throw new Error(`Gambar #${i + 1} terlalu kecil (${w}x${h}px). TikTok minimum 360px.`);
                 }
-
-                if (!isPng) return url;
-
-                // Convert PNG → JPEG
-                const jpegBuf = await sharp(buf).jpeg({ quality: 90 }).toBuffer();
-                const key = `tiktok-jpeg/${randomUUID()}.jpg`;
-                await uploadFile(key, jpegBuf, { contentType: "image/jpeg" });
-                return getPublicUrl(key);
-            } catch (e) {
-                // Re-throw validasi error, skip conversion error
-                if (e instanceof Error && e.message.includes("terlalu kecil")) throw e;
                 return url;
+            } catch (e) {
+                if (e instanceof Error && e.message.includes("terlalu kecil")) throw e;
+                throw new Error(`Gagal memproses gambar #${i + 1}: ${e instanceof Error ? e.message : "unknown error"}`);
             }
         }),
     );
