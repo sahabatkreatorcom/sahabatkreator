@@ -7,16 +7,18 @@ import { Button } from "@/components/ui/button";
 
 interface HealthStatus {
     status: "healthy" | "degraded" | "unhealthy";
-    uptime: number;
-    memoryUsage: number;
-    cpuUsage: number;
-    database: {
+    uptimeSeconds: number;
+    version: string;
+    nodeVersion: string;
+    components: Array<{
+        name: string;
         status: "healthy" | "degraded" | "unhealthy";
-        latency: number;
-    };
-    api: {
-        status: "healthy" | "degraded" | "unhealthy";
-        latency: number;
+        message: string;
+    }>;
+    metrics: {
+        memoryRssMb: number;
+        memoryHeapUsedMb: number;
+        cpuTimeMs: number;
     };
     lastCheck: string;
 }
@@ -84,8 +86,9 @@ export default function AdminHealthPage() {
                         {health?.status ?? "unknown"}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                        Uptime: {Math.floor((health?.uptime ?? 0) / 86400)} hari
+                        Uptime: {Math.floor((health?.uptimeSeconds ?? 0) / 86400)} hari
                     </p>
+                    <p className="text-xs text-muted-foreground">v{health?.version ?? "-"}</p>
                 </div>
 
                 <div className="rounded-lg border border-border bg-card p-4">
@@ -93,50 +96,67 @@ export default function AdminHealthPage() {
                         <Database className="h-5 w-5 text-accent-blue" />
                         <h3 className="text-sm font-semibold">Database</h3>
                     </div>
-                    <p className={`text-2xl font-semibold ${getStatusColor(health?.database?.status ?? "healthy")}`}>
-                        {health?.database?.status ?? "unknown"}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Latency: {health?.database?.latency ?? 0}ms
-                    </p>
+                    {(() => {
+                        const db = health?.components?.find(c => c.name === "Database");
+                        return (
+                            <>
+                                <p className={`text-2xl font-semibold ${getStatusColor(db?.status ?? "healthy")}`}>
+                                    {db?.status ?? "unknown"}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Latency: {db?.message ?? "-"}
+                                </p>
+                            </>
+                        );
+                    })()}
                 </div>
 
                 <div className="rounded-lg border border-border bg-card p-4">
                     <div className="flex items-center gap-2 mb-2">
                         <Cpu className="h-5 w-5 text-accent-green" />
-                        <h3 className="text-sm font-semibold">API</h3>
+                        <h3 className="text-sm font-semibold">Memory</h3>
                     </div>
-                    <p className={`text-2xl font-semibold ${getStatusColor(health?.api?.status ?? "healthy")}`}>
-                        {health?.api?.status ?? "unknown"}
+                    <p className="text-2xl font-semibold text-primary">
+                        {health?.metrics?.memoryRssMb ?? 0} MB
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                        Latency: {health?.api?.latency ?? 0}ms
+                        Heap: {health?.metrics?.memoryHeapUsedMb ?? 0} MB
                     </p>
                 </div>
             </div>
 
             <div className="rounded-lg border border-border bg-card p-4">
                 <h3 className="text-sm font-semibold mb-3">Resource Usage</h3>
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Memory Usage</span>
-                        <span className="text-sm font-medium">{health?.memoryUsage ?? 0}%</span>
+                <div className="space-y-3">
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-muted-foreground">Memory RSS</span>
+                            <span className="text-sm font-medium">{health?.metrics?.memoryRssMb ?? 0} MB</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-muted">
+                            <div
+                                className="h-2 rounded-full bg-primary transition-all"
+                                style={{ width: `${Math.min(100, (health?.metrics?.memoryRssMb ?? 0) / 10)}%` }}
+                            />
+                        </div>
                     </div>
-                    <div className="h-2 rounded-full bg-muted">
-                        <div
-                            className="h-2 rounded-full bg-primary transition-all"
-                            style={{ width: `${health?.memoryUsage ?? 0}%` }}
-                        />
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-muted-foreground">Memory Heap</span>
+                            <span className="text-sm font-medium">{health?.metrics?.memoryHeapUsedMb ?? 0} MB</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-muted">
+                            <div
+                                className="h-2 rounded-full bg-accent-green transition-all"
+                                style={{ width: `${Math.min(100, (health?.metrics?.memoryHeapUsedMb ?? 0) / 10)}%` }}
+                            />
+                        </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">CPU Usage</span>
-                        <span className="text-sm font-medium">{health?.cpuUsage ?? 0}%</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted">
-                        <div
-                            className="h-2 rounded-full bg-accent-green transition-all"
-                            style={{ width: `${health?.cpuUsage ?? 0}%` }}
-                        />
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-muted-foreground">CPU Time</span>
+                            <span className="text-sm font-medium">{Math.round(health?.metrics?.cpuTimeMs ?? 0)} ms</span>
+                        </div>
                     </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">
