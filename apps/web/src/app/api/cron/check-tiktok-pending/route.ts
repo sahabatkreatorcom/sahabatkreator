@@ -57,8 +57,10 @@ export const POST = async (req: NextRequest) => {
     for (const post of pending) {
         if (!post.socialAccount) continue;
 
-        // Post tanpa platformPostId = stuck lama, mark FAILED (perlu publish ulang manual)
-        if (!post.platformPostId) {
+        // Post tanpa platformPostId = belum pernah di-publish (bukan stuck lama).
+        // Hanya process jika punya tiktok_pending: prefix.
+        if (!post.platformPostId || !post.platformPostId.startsWith("tiktok_pending:")) {
+            // Post tanpa ID sama sekali — tandai FAILED (publish gagal total)
             await db.update(schema.post)
                 .set({ status: "FAILED" })
                 .where(eq(schema.post.id, post.id));
@@ -67,7 +69,7 @@ export const POST = async (req: NextRequest) => {
                 postId: post.id,
                 platform: "TIKTOK",
                 errorCode: "MISSING_PUBLISH_ID",
-                errorRaw: "Post PUBLISHING tanpa platformPostId — kemungkinan publish sebelum fix PUBLISH_PENDING.",
+                errorRaw: "Post PUBLISHING tanpa platformPostId — publish awal gagal atau belum sempat kirim.",
                 errorHuman: "Post tidak memiliki ID publish TikTok. Perlu publish ulang manual.",
                 occurredAt: new Date(),
             });
@@ -90,7 +92,10 @@ export const POST = async (req: NextRequest) => {
             if (status === "PUBLISH_COMPLETE") {
                 const ids = data.data?.publiclyAvailablePostId;
                 const publicId = Array.isArray(ids) && ids.length > 0 ? String(ids[0]) : null;
-                const tiktokUrl = publicId ? `https://www.tiktok.com/@user/video/${publicId}` : null;
+                const accountName = post.socialAccount.name || "user";
+                const tiktokUrl = publicId
+                    ? `https://www.tiktok.com/@${accountName}/video/${publicId}`
+                    : null;
 
                 await db.update(schema.post)
                     .set({

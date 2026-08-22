@@ -37,7 +37,13 @@ export async function publishPost(
         return { ok: false, error: "Post sudah terbit." };
     }
     if (post.status === "PUBLISHING") {
-        return { ok: false, error: "Post sedang diproses oleh platform." };
+        // Stuck > 5 menit = izinkan retry (reset dulu)
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+        if (post.updatedAt < fiveMinAgo) {
+            await db.update(schema.post).set({ status: "DRAFT", updatedAt: new Date() }).where(eq(schema.post.id, postId));
+        } else {
+            return { ok: false, error: "Post sedang diproses oleh platform." };
+        }
     }
 
     await db.update(schema.post)
@@ -131,7 +137,7 @@ export async function publishPost(
         .set({
             status: "PUBLISHED",
             publishedAt: new Date(),
-            platformPostId: result.postId !== "completed" ? result.postId ?? null : post.platformPostId,
+            platformPostId: result.postId || post.platformPostId || null,
             externalUrl: result.postUrl ?? null,
         })
         .where(eq(schema.post.id, postId));

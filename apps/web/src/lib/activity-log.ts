@@ -32,7 +32,8 @@ export type ActivityAction =
     | "seb.media_analyzed"
     | "listening.created"
     | "listening.deleted"
-    | "listening.synced";
+    | "listening.synced"
+    | "post.stale_reset";
 
 export const ACTION_LABELS: Record<ActivityAction, string> = {
     "post.created": "membuat post",
@@ -41,6 +42,7 @@ export const ACTION_LABELS: Record<ActivityAction, string> = {
     "post.published": "menerbitkan post",
     "post.failed": "post gagal terbit",
     "post.deleted": "menghapus post",
+    "post.stale_reset": "reset post stuck PUBLISHING",
     "media.uploaded": "mengunggah media",
     "media.deleted": "menghapus media",
     "account.connected": "menghubungkan akun",
