@@ -105,6 +105,11 @@ export default function ComposePage() {
     const handleUploadFile = useCallback(async (files: FileList | File[]) => {
         const fileArray = Array.from(files).filter((f) => !media.some((m) => m.url === f.name));
         if (fileArray.length === 0) return;
+        const oversized = fileArray.find((f) => f.size > 100 * 1024 * 1024);
+        if (oversized) {
+            setUploadError(`File "${oversized.name}" terlalu besar (maks 100MB).`);
+            return;
+        }
         setUploading(true);
         setUploadError(null);
         try {

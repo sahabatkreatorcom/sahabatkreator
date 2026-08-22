@@ -83,6 +83,11 @@ export default function MediaLibraryPage() {
     async function handleFiles(files: FileList | File[]) {
         const fileArray = Array.from(files);
         if (fileArray.length === 0) return;
+        const oversized = fileArray.find((f) => f.size > 100 * 1024 * 1024);
+        if (oversized) {
+            setActionError(`File "${oversized.name}" terlalu besar (maks 100MB).`);
+            return;
+        }
         setUploading(true);
         setUploadProgress({ done: 0, total: fileArray.length });
         setActionError(null);
