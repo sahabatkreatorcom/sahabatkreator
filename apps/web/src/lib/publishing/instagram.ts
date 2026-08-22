@@ -32,7 +32,7 @@ export async function publishToInstagram(
     // dan dilakukan SETELAH publish (API tidak mendukung saat buat container).
     if (result.success && result.postId && payload.firstComment?.trim()) {
         await addInstagramFirstComment(base, result.postId, account.accessToken, payload.firstComment.trim())
-            .catch(() => {});
+            .catch((err) => console.error(`[instagram] firstComment gagal post=${result.postId}: ${err instanceof Error ? err.message : err}`));
     }
 
     return result;
