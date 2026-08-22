@@ -132,6 +132,7 @@ export async function publishPost(
             status: "PUBLISHED",
             publishedAt: new Date(),
             platformPostId: result.postId !== "completed" ? result.postId ?? null : post.platformPostId,
+            externalUrl: result.postUrl ?? null,
         })
         .where(eq(schema.post.id, postId));
 

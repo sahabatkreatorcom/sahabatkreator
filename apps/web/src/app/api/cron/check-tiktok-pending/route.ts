@@ -89,12 +89,14 @@ export const POST = async (req: NextRequest) => {
             if (status === "PUBLISH_COMPLETE") {
                 const ids = data.data?.publiclyAvailablePostId;
                 const publicId = Array.isArray(ids) && ids.length > 0 ? String(ids[0]) : null;
+                const tiktokUrl = publicId ? `https://www.tiktok.com/@user/video/${publicId}` : null;
 
                 await db.update(schema.post)
                     .set({
                         status: "PUBLISHED",
                         publishedAt: new Date(),
                         platformPostId: publicId || post.platformPostId,
+                        externalUrl: tiktokUrl,
                     })
                     .where(eq(schema.post.id, post.id));
                 await logActivity(
