@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { PlatformIcon } from "@/components/ui/platform-icon";
@@ -23,6 +23,7 @@ interface CalendarPost {
     scheduledAt: string | null;
     publishedAt: string | null;
     platform: string;
+    postUrl: string | null;
     account: AccountRef | null;
 }
 
@@ -349,6 +350,20 @@ export default function CalendarPage() {
                                             timeZone: "Asia/Jakarta",
                                         })}
                                     </span>
+                                </div>
+                            )}
+                            {detailPost.postUrl && (
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Link</span>
+                                    <a
+                                        href={detailPost.postUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                                    >
+                                        <ExternalLink className="h-3 w-3" />
+                                        Lihat post
+                                    </a>
                                 </div>
                             )}
                         </div>

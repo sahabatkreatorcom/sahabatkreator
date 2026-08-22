@@ -47,6 +47,7 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
             publishedAt: p.publishedAt?.toISOString() ?? null,
             createdAt: p.createdAt.toISOString(),
             platform: p.platform,
+            postUrl: p.externalUrl ?? null,
             account: p.socialAccount
                 ? { id: p.socialAccount.id, platform: p.socialAccount.platform, name: p.socialAccount.name, avatar: p.socialAccount.avatar }
                 : null,

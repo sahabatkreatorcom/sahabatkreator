@@ -216,7 +216,7 @@ export default function StatusPage() {
                                                               day: "numeric",
                                                               month: "short",
                                                           })
-                                                        : "â€”"}
+                                                        : "—"}
                                                 </p>
                                             </div>
                                         </div>
@@ -237,7 +237,7 @@ export default function StatusPage() {
                                 {data.published.map((p) => (
                                     <li key={p.id} className="flex items-center gap-3 p-4">
                                         <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">
-                                            {PLATFORM_LABELS[p.platform as Platform] ?? p.platform ?? "â€”"}
+                                            {PLATFORM_LABELS[p.platform as Platform] ?? p.platform ?? "—"}
                                         </span>
                                         <span className="flex-1 truncate text-sm">{p.caption}</span>
                                         <span className="text-xs text-muted-foreground">
@@ -268,7 +268,7 @@ export default function StatusPage() {
                                 {data.scheduled.map((p) => (
                                     <li key={p.id} className="flex items-center gap-3 p-4">
                                         <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">
-                                            {PLATFORM_LABELS[p.platform as Platform] ?? p.platform ?? "â€”"}
+                                            {PLATFORM_LABELS[p.platform as Platform] ?? p.platform ?? "—"}
                                         </span>
                                         <span className="flex-1 truncate text-sm">{p.caption}</span>
                                         <span className="text-xs text-muted-foreground">

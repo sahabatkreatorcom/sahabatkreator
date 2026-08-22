@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, CheckCircle2, Send, Trash2, XCircle, Loader2 } from "lucide-react";
+import { CalendarClock, CheckCircle2, ExternalLink, Send, Trash2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
@@ -30,6 +30,7 @@ interface Post {
     publishedAt: string | null;
     createdAt: string;
     platform: string;
+    postUrl: string | null;
     account: AccountRef | null;
     media: MediaRef[];
     linkedGroupId: string | null;
@@ -189,6 +190,17 @@ export default function PostsPage() {
                                                 <CheckCircle2 className="h-3 w-3" />
                                                 Terbit {new Date(post.publishedAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
                                             </span>
+                                        )}
+                                        {post.postUrl && (
+                                            <a
+                                                href={post.postUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 text-primary hover:underline"
+                                            >
+                                                <ExternalLink className="h-3 w-3" />
+                                                Lihat post
+                                            </a>
                                         )}
                                     </div>
                                     {post.media.length > 0 && (

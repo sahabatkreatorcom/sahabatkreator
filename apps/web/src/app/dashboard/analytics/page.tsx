@@ -187,7 +187,7 @@ export default function AnalyticsPage() {
             {liveOnlyPlatforms.length > 0 && (
                 <p className="rounded-md bg-accent-amber/10 px-3 py-2 text-sm text-accent-amber">
                     Platform {liveOnlyPlatforms.map((p) => PLATFORM_LABELS[p]).join(", ")} tidak menyimpan metrik karena
-                    kebijakan platform â€” data ditampilkan langsung (live) dari platform.
+                    kebijakan platform — data ditampilkan langsung (live) dari platform.
                 </p>
             )}
 
@@ -272,7 +272,7 @@ export default function AnalyticsPage() {
                                     <p className="truncate text-sm font-medium">{PLATFORM_LABELS[p]}</p>
                                 </div>
                                 <p className="mt-3 text-xs text-muted-foreground">
-                                    Metrik tidak disimpan (kebijakan platform) â€” tampilkan langsung dari platform.
+                                    Metrik tidak disimpan (kebijakan platform) — tampilkan langsung dari platform.
                                 </p>
                             </div>
                         ))}

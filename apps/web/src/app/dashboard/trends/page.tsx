@@ -303,7 +303,7 @@ export default function TrendsPage() {
                                         <div className="min-w-0 flex-1">
                                             <p className="line-clamp-1 text-sm font-medium">{post.caption || "(tanpa caption)"}</p>
                                             <p className="text-xs text-muted-foreground">
-                                                {post.platform ? PLATFORM_LABELS[post.platform as Platform] ?? post.platform : "â€”"}
+                                                {post.platform ? PLATFORM_LABELS[post.platform as Platform] ?? post.platform : "—"}
                                                 {post.publishedAt
                                                     ? ` · ${new Date(post.publishedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`
                                                     : ""}
