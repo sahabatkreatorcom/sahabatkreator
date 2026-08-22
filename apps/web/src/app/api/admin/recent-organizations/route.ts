@@ -10,7 +10,7 @@ export const GET = withAdmin(async (ctx, request: Request) => {
             headers: ctx.headers,
             query: { limit, sortBy: "createdAt", sortOrder: "desc" }
         });
-        const organizations = (res as any)?.organizations ?? [];
+        const organizations = (res as { organizations?: { id: string; name: string; slug: string }[] } | undefined)?.organizations ?? [];
         return json({ organizations });
     } catch (e) {
         return json({ error: "Failed to fetch organizations" }, { status: 500 });

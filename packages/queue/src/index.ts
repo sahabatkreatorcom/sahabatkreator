@@ -198,6 +198,34 @@ export async function checkRedisHealth(): Promise<boolean> {
 }
 
 /**
+ * Ambil status (active/pending/failed/delayed) dari sebuah BullMQ queue.
+ * No-op bila REDIS_URL belum dikonfigurasi.
+ */
+export async function getQueueStatus(name: string): Promise<{
+    active: number;
+    pending: number;
+    failed: number;
+    delayed: number;
+}> {
+    if (!isRedisConfigured()) {
+        return { active: 0, pending: 0, failed: 0, delayed: 0 };
+    }
+    const { Queue } = await import("bullmq");
+    const queue = new Queue(name, { connection: redisConnectionOptions() });
+    try {
+        const [active, waiting, failed, delayed] = await Promise.all([
+            queue.getActiveCount(),
+            queue.getWaitingCount(),
+            queue.getFailedCount(),
+            queue.getDelayedCount(),
+        ]);
+        return { active, pending: waiting, failed, delayed };
+    } finally {
+        await queue.close();
+    }
+}
+
+/**
  * Enqueue stale-post cleanup sebagai repeatable job (setiap 60 detik).
  * Cukup panggil sekali saat app start — BullMQ menyimpan repeat schedule di Redis.
  * No-op bila REDIS_URL belum dikonfigurasi.

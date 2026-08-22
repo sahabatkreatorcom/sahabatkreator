@@ -21,14 +21,14 @@ export const GET = withAuth(async (_ctx, req: NextRequest) => {
     const [published, scheduled, failed, accounts, publishErrors, activities] = await Promise.all([
         db.query.post.findMany({
             where: (t, { and: _and, eq: _eq, gte: _gte }) =>
-                _and(_eq(t.organizationId, activeOrganizationId), _eq(t.status, "PUBLISHED"), _gte(t.publishedAt as any, since)),
+                _and(_eq(t.organizationId, activeOrganizationId), _eq(t.status, "PUBLISHED"), _gte(t.publishedAt, since)),
             columns: { id: true, caption: true, platform: true, status: true, publishedAt: true, externalUrl: true, externalId: true },
             orderBy: [desc(schema.post.publishedAt)],
             limit: 20,
         }),
         db.query.post.findMany({
             where: (t, { and: _and, eq: _eq, gte: _gte }) =>
-                _and(_eq(t.organizationId, activeOrganizationId), _eq(t.status, "SCHEDULED"), _gte(t.scheduledAt as any, since)),
+                _and(_eq(t.organizationId, activeOrganizationId), _eq(t.status, "SCHEDULED"), _gte(t.scheduledAt, since)),
             columns: { id: true, caption: true, platform: true, status: true, scheduledAt: true },
             orderBy: [desc(schema.post.scheduledAt)],
             limit: 20,

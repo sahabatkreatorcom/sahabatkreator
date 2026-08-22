@@ -5,6 +5,25 @@ import { chatWithSeb, listSebSessions, getSebSessionMessages } from "@/lib/seb-a
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
+/** Simple in-memory rate limiter per IP for Seb chat (10 requests per 60 seconds). */
+const RATE_WINDOW_MS = 60_000;
+const RATE_MAX = 10;
+const _rateLimiter = new Map<string, { count: number; windowStart: number }>();
+
+function checkRateLimit(ip: string): boolean {
+    const now = Date.now();
+    const entry = _rateLimiter.get(ip);
+    if (!entry || now - entry.windowStart > RATE_WINDOW_MS) {
+        _rateLimiter.set(ip, { count: 1, windowStart: now });
+        return true;
+    }
+    if (entry.count >= RATE_MAX) {
+        return false;
+    }
+    entry.count += 1;
+    return true;
+}
+
 /** POST /api/seb/chat — kirim pesan ke Seb. Body: { message, sessionId? } */
 export const POST = withAuth(async (ctx, req: NextRequest) => {
     const { activeOrganizationId } = ctx;
@@ -14,6 +33,12 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
     const message = body?.message?.trim();
     if (!message) return json({ error: "Pesan wajib." }, { status: 400 });
     const sessionId = body?.sessionId;
+
+    // Rate limit per client IP (10 req/60s)
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    if (!checkRateLimit(clientIp)) {
+        return json({ error: "Terlalu banyak permintaan. Tunggu beberapa saat." }, { status: 429 });
+    }
 
     try {
         const result = await chatWithSeb({

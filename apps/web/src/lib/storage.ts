@@ -36,13 +36,6 @@ export function getR2Client(): S3Client {
   return _r2Client;
 }
 
-/** @deprecated Gunakan getR2Client() */
-export const r2Client = new Proxy({} as S3Client, {
-  get(_, prop) {
-    return (getR2Client() as any)[prop];
-  },
-});
-
 function getBucketName(): string {
   return env.R2_BUCKET_NAME ?? "";
 }
@@ -73,7 +66,7 @@ export async function uploadFile(
   };
 
   const command = new PutObjectCommand(input);
-  const response = await r2Client.send(command);
+  const response = await getR2Client().send(command);
 
   return {
     key,
@@ -96,7 +89,7 @@ export async function downloadFile(key: string): Promise<{
   };
 
   const command = new GetObjectCommand(input);
-  const response = await r2Client.send(command);
+  const response = await getR2Client().send(command);
 
   return {
     body: response.Body?.transformToWebStream() ?? null,
@@ -116,7 +109,7 @@ export async function downloadFileAsBuffer(key: string): Promise<Buffer> {
   };
 
   const command = new GetObjectCommand(input);
-  const response = await r2Client.send(command);
+  const response = await getR2Client().send(command);
 
   if (!response.Body) {
     throw new Error(`File not found: ${key}`);
@@ -135,7 +128,7 @@ export async function deleteFile(key: string): Promise<void> {
     Key: key,
   });
 
-  await r2Client.send(command);
+  await getR2Client().send(command);
 }
 
 /**
@@ -167,7 +160,7 @@ export async function listFiles(
   };
 
   const command = new ListObjectsV2Command(input);
-  const response = await r2Client.send(command);
+  const response = await getR2Client().send(command);
 
   return {
     files: (response.Contents ?? []).map((item) => ({
@@ -190,7 +183,7 @@ export async function fileExists(key: string): Promise<boolean> {
       Key: key,
     });
 
-    await r2Client.send(command);
+    await getR2Client().send(command);
     return true;
   } catch {
     return false;
@@ -212,7 +205,7 @@ export async function getFileMetadata(key: string): Promise<{
       Key: key,
     });
 
-    const response = await r2Client.send(command);
+    const response = await getR2Client().send(command);
 
     return {
       contentType: response.ContentType,
@@ -238,7 +231,7 @@ export async function copyFile(
     Key: destinationKey,
   });
 
-  const response = await r2Client.send(command);
+  const response = await getR2Client().send(command);
 
   return {
     key: destinationKey,
@@ -274,7 +267,7 @@ export async function getUploadUrl(
     ContentType: options?.contentType,
   });
 
-  return getSignedUrl(r2Client, command, {
+  return getSignedUrl(getR2Client(), command, {
     expiresIn: options?.expiresIn ?? 3600,
   });
 }
@@ -295,7 +288,7 @@ export async function getDownloadUrl(
     ResponseContentDisposition: options?.responseContentDisposition,
   });
 
-  return getSignedUrl(r2Client, command, {
+  return getSignedUrl(getR2Client(), command, {
     expiresIn: options?.expiresIn ?? 3600,
   });
 }

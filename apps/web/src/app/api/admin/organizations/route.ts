@@ -12,8 +12,8 @@ export const GET = withAdmin(async (ctx, request: Request) => {
             headers: ctx.headers,
             query: { limit, offset, search }
         });
-        const organizations = (res as any)?.organizations ?? [];
-        const total = (res as any)?.total ?? 0;
+        const organizations = (res as { organizations?: { id: string; name: string; slug: string }[] } | undefined)?.organizations ?? [];
+        const total = (res as { total?: number } | undefined)?.total ?? 0;
         return json({ organizations, total });
     } catch (e) {
         return json({ error: "Failed to fetch organizations" }, { status: 500 });

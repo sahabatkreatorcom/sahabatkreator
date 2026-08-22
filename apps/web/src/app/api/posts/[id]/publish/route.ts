@@ -22,8 +22,9 @@ export const POST = withAuth(async (ctx, req: NextRequest, { params }: { params:
             "Post sedang diproses oleh platform.": 409,
             "Post sudah gagal sebelumnya.": 409,
         };
-        const status = statusMap[result.error] ?? (result.errorCode === "TOKEN_EXPIRED" ? 400 : 500);
-        return json({ error: result.error }, { status });
+        const err = result.error ?? "Gagal mempublikasikan post.";
+        const status = statusMap[err] ?? (result.errorCode === "TOKEN_EXPIRED" ? 400 : 500);
+        return json({ error: err }, { status });
     }
 
     return json({ success: true, postId: result.postId, postUrl: result.postUrl });

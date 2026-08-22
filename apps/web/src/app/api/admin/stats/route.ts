@@ -22,8 +22,8 @@ export const GET = withAdmin(async (ctx) => {
             ]);
 
         return json({
-            totalUsers: (usersRes as any)?.total ?? 0,
-            totalOrganizations: (orgsRes as any)?.total ?? 0,
+            totalUsers: (usersRes as { total?: number } | undefined)?.total ?? 0,
+            totalOrganizations: (orgsRes as { total?: number } | undefined)?.total ?? 0,
             totalPosts,
             totalInboxMessages,
             usersThisWeek,

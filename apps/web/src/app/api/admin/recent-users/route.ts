@@ -10,7 +10,7 @@ export const GET = withAdmin(async (ctx, request: Request) => {
             headers: ctx.headers,
             query: { limit }
         });
-        const users = (res as any)?.users ?? [];
+        const users = (res as { users?: { id: string; name: string | null; email: string }[] } | undefined)?.users ?? [];
         return json({ users });
     } catch (e) {
         return json({ error: "Failed to fetch users" }, { status: 500 });

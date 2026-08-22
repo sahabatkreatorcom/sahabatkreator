@@ -104,6 +104,18 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
         columns: { id: true },
     });
 
+    // Batas maksimal 10 subscription aktif per user per workspace (mencegah abuse).
+    const activeCount = await db.$count(
+        schema.pushSubscription,
+        and(
+            eq(schema.pushSubscription.userId, userId),
+            eq(schema.pushSubscription.organizationId, activeOrganizationId),
+        ),
+    );
+    if (activeCount >= 10 && !existing) {
+        return json({ error: "Maksimal 10 subscription per workspace." }, { status: 400 });
+    }
+
     if (existing) {
         await db.update(schema.pushSubscription)
             .set({

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { and, lte, eq, or, isNull } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
+import type { Platform } from "@/lib/platforms/config";
 import { json, verifyCronSecret } from "@/lib/api";
 import { refreshAccountTokenIfNeeded } from "@/lib/platforms/token-refresh";
 import { notifyTokenExpiring } from "@/lib/push-notification";
@@ -62,7 +63,7 @@ export const POST = async (req: NextRequest) => {
             const result = await refreshAccountTokenIfNeeded(
                 {
                     id: account.id,
-                    platform: account.platform as any,
+                    platform: account.platform as Platform,
                     accessToken: account.accessToken,
                     refreshToken: account.refreshToken,
                     tokenExpiry: account.tokenExpiry,

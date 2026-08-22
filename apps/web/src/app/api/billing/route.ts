@@ -4,6 +4,7 @@ import { db, schema } from "@sahabat-kreator/db";
 import { withOrgOwnerAdmin, json } from "@/lib/api";
 import { sumopodService } from "@sahabat-kreator/payment";
 import { PLAN_DISPLAY, PLAN_PRICES, getPlanLimits } from "@sahabat-kreator/payment";
+import { env } from "@sahabat-kreator/env/server";
 
 export const dynamic = "force-dynamic";
 
@@ -119,8 +120,8 @@ export const POST = withOrgOwnerAdmin(async (authCtx, req: NextRequest) => {
         customerEmail: session.user.email,
         metadata: {
             planId: tier,
-            successReturnUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?status=completed`,
-            cancelReturnUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?status=failed`,
+            successReturnUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://sahabatkreator.com"}/dashboard/billing?status=completed`,
+            cancelReturnUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://sahabatkreator.com"}/dashboard/billing?status=failed`,
             paymentMethod: "QRIS",
         },
     });

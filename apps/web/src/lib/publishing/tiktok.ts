@@ -5,6 +5,23 @@ import { randomUUID } from "node:crypto";
 
 const TIKTOK_API_URL = "https://open.tiktokapis.com/v2";
 
+/** TikTok error-reason code → pesan yang mudah dipahami pengguna berbahasa Indonesia. */
+export function humanizeTikTokError(reason: string): string {
+    const map: Record<string, string> = {
+        url_ownership_unverified: "Domain gambar belum diverifikasi di TikTok Developer Portal. Verifikasi domain di bagian URL Properties.",
+        photo_pull_failed: "TikTok gagal mengunduh gambar. Pastikan URL gambar bisa diakses publik tanpa redirect.",
+        picture_size_check_failed: "Ukuran gambar terlalu kecil (minimum 360px).",
+        file_format_check_failed: "Format gambar tidak didukung. Gunakan JPG, JPEG, atau PNG.",
+        spam_risk_too_many_posts: "Batas post harian tercapai.",
+        spam_risk_user_banned_from_posting: "Akun diblokir dari posting.",
+        spam_risk_too_many_pending_share: "Terlalu banyak post pending (maks 5 per 24 jam).",
+        unaudited_client_can_only_post_to_private_accounts: "App belum di-audit TikTok. Hanya bisa post ke akun private.",
+        access_token_invalid: "Token akses tidak valid atau sudah expired.",
+        scope_not_authorized: "App belum mendapat izin video.publish.",
+    };
+    return map[reason] || `TikTok error: ${reason}`;
+}
+
 /**
  * TikTok Publisher — video & photo (PULL_FROM_URL).
  * Media kami di R2 selalu publik, jadi cukup pakai source PULL_FROM_URL
