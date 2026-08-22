@@ -11,9 +11,8 @@ import { randomUUID } from "node:crypto";
 
 let webPush: typeof import("web-push") | null = null;
 
-function getWebPush() {
+function getWebPush(): typeof import("web-push") | null {
     if (!webPush) {
-        // Lazy load — menghindari error bila web-push belum ter-install
         try {
             // eslint-disable-next-line @typescript-eslint/no-require-imports
             webPush = require("web-push");
@@ -22,6 +21,17 @@ function getWebPush() {
         }
     }
     return webPush;
+}
+
+async function getWebPushAsync(): Promise<typeof import("web-push") | null> {
+    if (webPush) return webPush;
+    try {
+        const mod = await import("web-push");
+        webPush = mod.default ?? mod;
+        return webPush;
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -35,7 +45,7 @@ export async function sendPushNotification(opts: {
     link?: string;
     type?: string;
 }): Promise<{ sent: number; failed: number }> {
-    const webPushLib = getWebPush();
+    const webPushLib = await getWebPushAsync();
     if (!webPushLib) {
         console.warn("[push] web-push tidak tersedia, lewati pengiriman notifikasi");
         return { sent: 0, failed: 0 };
@@ -151,13 +161,13 @@ export async function notifyPostFailed(opts: {
  */
 export async function notifyTokenExpiring(opts: {
     organizationId: string;
-    userId: string;
+    userId?: string;
     platform: string;
     accountName: string;
 }) {
     return sendPushNotification({
         organizationId: opts.organizationId,
-        userId: opts.userId,
+        userId: opts.userId ?? null,
         title: "Token Sosial Hampir Expired",
         message: `Token ${opts.platform} (${opts.accountName}) akan expired. Silakan refresh token.`,
         link: "/dashboard/accounts",

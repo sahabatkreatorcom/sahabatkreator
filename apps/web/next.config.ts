@@ -15,9 +15,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   output: "standalone",
   outputFileTracingRoot: workspaceRoot,
-  turbopack: {
-    root: turbopackRoot,
-  },
+  turbopack: {},
   async headers() {
     return [
       {

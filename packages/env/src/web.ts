@@ -1,10 +1,11 @@
-import { loadRootEnv } from "./load";
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
 
-// Single file of truth: baca .env dari root workspace.
-loadRootEnv();
-
+// NOTE: This module is used on the CLIENT side. It must NOT import load.ts
+// (which uses node:fs/node:path/node:url) or any other Node.js builtin,
+// otherwise turbopack/webpack will fail when bundling this for the browser.
+// The runtimeEnv object below is populated by Next.js from process.env,
+// which is already loaded server-side by the API routes / server.ts.
 export const env = createEnv({
   client: {
     NEXT_PUBLIC_APP_URL: z

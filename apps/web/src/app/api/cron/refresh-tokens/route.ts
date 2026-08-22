@@ -3,6 +3,7 @@ import { and, lte, eq, or, isNull } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { json, verifyCronSecret } from "@/lib/api";
 import { refreshAccountTokenIfNeeded } from "@/lib/platforms/token-refresh";
+import { notifyTokenExpiring } from "@/lib/push-notification";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -27,12 +28,13 @@ export const POST = async (req: NextRequest) => {
     const SEVEN_DAYS = 7 * 86_400_000;
     const THREE_DAYS = 3 * 86_400_000;
 
-    // Ambil semua akun yang punya tokenExpiry
+    // Ambil semua akun yang punya tokenExpiry (termasuk organizationId untuk notifikasi)
     const accounts = await db.query.socialAccount.findMany({
         where: (t, { and: _and, isNotNull: _isNotNull }) =>
             _isNotNull(t.tokenExpiry),
         columns: {
             id: true,
+            organizationId: true,
             platform: true,
             name: true,
             accessToken: true,
@@ -78,6 +80,12 @@ export const POST = async (req: NextRequest) => {
                     name: account.name,
                     error: result.error || "Perlu reconnect.",
                 });
+                // Kirim notifikasi push bahwa token perlu di-refresh
+                notifyTokenExpiring({
+                    organizationId: account.organizationId,
+                    platform: account.platform,
+                    accountName: account.name,
+                }).catch(console.error);
             } else {
                 skipped++;
             }

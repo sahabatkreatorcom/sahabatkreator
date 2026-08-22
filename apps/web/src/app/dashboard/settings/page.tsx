@@ -104,6 +104,14 @@ export default function SettingsPage() {
     const [brandSamples, setBrandSamples] = useState("");
     const [currentUser, setCurrentUser] = useState({ name: "", email: "", emailVerified: false });
 
+    // Notification settings
+    const [notifSettings, setNotifSettings] = useState({
+        postPublished: true,
+        postFailed: true,
+        tokenExpiring: true,
+    });
+    const [notifLoading, setNotifLoading] = useState(false);
+
     const load = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -127,9 +135,30 @@ export default function SettingsPage() {
         }
     }, []);
 
+    // Load notification settings
+    const loadNotifSettings = useCallback(async () => {
+        try {
+            const res = await fetch("/api/notification-settings");
+            const json = await res.json();
+            if (res.ok && json) {
+                setNotifSettings({
+                    postPublished: json.postPublished ?? true,
+                    postFailed: json.postFailed ?? true,
+                    tokenExpiring: json.tokenExpiring ?? true,
+                });
+            }
+        } catch {
+            // ignore
+        }
+    }, []);
+
     useEffect(() => {
         load();
     }, [load]);
+
+    useEffect(() => {
+        loadNotifSettings();
+    }, [loadNotifSettings]);
 
     // Load current user from auth client
     React.useEffect(() => {
@@ -187,6 +216,22 @@ export default function SettingsPage() {
             setError(e instanceof Error ? e.message : "Gagal menyimpan.");
         } finally {
             setSaving(false);
+        }
+    }
+
+    async function handleSaveNotificationSettings() {
+        setNotifLoading(true);
+        try {
+            const res = await fetch("/api/notification-settings", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(notifSettings),
+            });
+            if (!res.ok) throw new Error("Gagal menyimpan.");
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Gagal menyimpan pengaturan notifikasi.");
+        } finally {
+            setNotifLoading(false);
         }
     }
 
@@ -335,30 +380,6 @@ export default function SettingsPage() {
                     </div>
                 )}
 
-                {activeTab === "notifications" && (
-                    <div className="space-y-4 rounded-lg border border-border bg-card p-5">
-                        <h2 className="text-sm font-semibold">Pengaturan Notifikasi</h2>
-                        <p className="text-sm text-muted-foreground">
-                            Kelola notifikasi untuk postingan, error, dan akun.
-                        </p>
-                        <div className="space-y-3">
-                            {["post_published", "post_failed", "token_expiring"].map((type) => (
-                                <div key={type} className="flex items-center justify-between rounded-md border border-border p-3">
-                                    <div>
-                                        <p className="text-sm font-medium capitalize">{type.replace(/_/g, " ")}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {type === "post_published" && "Notifikasi saat postingan terbit"}
-                                            {type === "post_failed" && "Notifikasi saat postingan gagal"}
-                                            {type === "token_expiring" && "Notifikasi saat token mendekati kadaluarsa"}
-                                        </p>
-                                    </div>
-                                    <Switch defaultChecked />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
                 {activeTab === "brand-tone" && (
                     <div className="space-y-4 rounded-lg border border-border bg-card p-5">
                         <h2 className="text-sm font-semibold">Brand Voice</h2>
@@ -397,6 +418,73 @@ export default function SettingsPage() {
                 )}
 
                 {activeTab === "push" && <PushNotificationSettings />}
+
+                {activeTab === "notifications" && (
+                    <div className="space-y-6 rounded-lg border border-border bg-card p-5">
+                        <div>
+                            <h2 className="text-sm font-semibold">Pengaturan Notifikasi</h2>
+                            <p className="text-sm text-muted-foreground">
+                                Pilih notifikasi apa saja yang ingin Anda terima.
+                            </p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between rounded-md border border-border p-3">
+                                <div>
+                                    <p className="text-sm font-medium">Postingan Berhasil Terbit</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Dapatkan notifikasi saat postingan berhasil dipublikasikan.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={notifSettings.postPublished}
+                                    onCheckedChange={(v) => setNotifSettings((s) => ({ ...s, postPublished: v }))}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between rounded-md border border-border p-3">
+                                <div>
+                                    <p className="text-sm font-medium">Postingan Gagal</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Dapatkan notifikasi saat postingan gagal dipublikasikan.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={notifSettings.postFailed}
+                                    onCheckedChange={(v) => setNotifSettings((s) => ({ ...s, postFailed: v }))}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between rounded-md border border-border p-3">
+                                <div>
+                                    <p className="text-sm font-medium">Token Hampir Expired</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Dapatkan notifikasi saat token sosial hampir expired.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={notifSettings.tokenExpiring}
+                                    onCheckedChange={(v) => setNotifSettings((s) => ({ ...s, tokenExpiring: v }))}
+                                />
+                            </div>
+                        </div>
+
+                        <Button
+                            size="sm"
+                            disabled={notifLoading}
+                            onClick={handleSaveNotificationSettings}
+                        >
+                            {notifLoading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <>
+                                    <Save className="h-4 w-4" />
+                                    Simpan Pengaturan
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                )}
 
                 {activeTab === "billing" && (
                     <a href="/dashboard/billing" className="block">
