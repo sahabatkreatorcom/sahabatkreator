@@ -107,6 +107,15 @@ Satu sumber kebenaran: `.env.example` di **root** (dibaca semua app via `package
 
 Lihat [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) untuk panduan lengkap VPS Docker, migrasi, cron, dan job queue.
 
+## Dokumentasi
+
+| Dokumen | Deskripsi |
+|---------|-----------|
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Panduan deploy ke VPS (Docker, nginx, SSL, backup) |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arsitektur sistem, alur data, skema database |
+| [API_REFERENCE.md](docs/API_REFERENCE.md) | Referensi lengkap semua endpoint API |
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Panduan pengembangan, menambah platform baru, testing |
+
 ## Keamanan
 
 - Semua route API tulis memakai `withAuth`/`requireAuth` (sesi), route admin memakai `withAdmin`, aksi billing memakai `withOrgOwnerAdmin`.
