@@ -7,7 +7,7 @@
  * - Menyimpan subscription ke server via POST /api/push
  * - Menghapus subscription via DELETE /api/push
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { env } from "@sahabat-kreator/env/web";
 
 interface PushSubscriptionData {
@@ -37,12 +37,12 @@ export function usePushNotification(): UsePushNotificationReturn {
         "vapidPublicKey" in PushManager.prototype;
 
     // Cek permission saat init
-    useState(() => {
+    useEffect(() => {
         if ("Notification" in window) {
             const perm = Notification.permission;
             setIsPermissionGranted(perm === "granted");
         }
-    });
+    }, []);
 
     const subscribe = useCallback(async () => {
         if (!isSupported) {
