@@ -53,3 +53,5 @@ temp
 # pribadi
 origin.crt
 origin.key
+# Next.js build output
+.next
