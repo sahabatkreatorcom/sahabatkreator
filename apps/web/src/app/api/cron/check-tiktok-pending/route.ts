@@ -61,6 +61,15 @@ export const POST = async (req: NextRequest) => {
             await db.update(schema.post)
                 .set({ status: "FAILED" })
                 .where(eq(schema.post.id, post.id));
+            await db.insert(schema.publishError).values({
+                id: randomUUID(),
+                postId: post.id,
+                platform: "TIKTOK",
+                errorCode: "MISSING_PUBLISH_ID",
+                errorRaw: "Post PUBLISHING tanpa platformPostId — kemungkinan publish sebelum fix PUBLISH_PENDING.",
+                errorHuman: "Post tidak memiliki ID publish TikTok. Perlu publish ulang manual.",
+                occurredAt: new Date(),
+            });
             failed++;
             continue;
         }
