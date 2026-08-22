@@ -71,7 +71,7 @@ const faqs = [
 
 const CATEGORIES = ["Semua", ...Array.from(new Set(faqs.map((f) => f.category)))];
 
-export default function DashboardFAQPage() {
+export default function AdminHelpPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Semua");
   const [openId, setOpenId] = useState<string | null>(null);

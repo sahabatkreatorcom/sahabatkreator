@@ -34,7 +34,7 @@ interface BlogPost {
     wordCount: number;
 }
 
-export default function BlogQueuePage() {
+export default function AdminBlogQueuePage() {
     const [posts, setPosts] = useState<BlogPost[]>([]);
     const [loading, setLoading] = useState(true);
     const [busyId, setBusyId] = useState<string | null>(null);

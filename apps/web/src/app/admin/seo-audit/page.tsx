@@ -65,7 +65,7 @@ const CATEGORY_LABELS: Record<string, string> = {
     mobile: "Mobile-Friendly",
 };
 
-export default function SeoAuditPage() {
+export default function AdminSeoAuditPage() {
     const [url, setUrl] = useState("");
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<SeoResult | null>(null);
@@ -77,7 +77,7 @@ export default function SeoAuditPage() {
     // Load history from localStorage
     useEffect(() => {
         try {
-            const stored = localStorage.getItem("seo_audit_history");
+            const stored = localStorage.getItem("admin_seo_audit_history");
             if (stored) setAuditHistory(JSON.parse(stored));
         } catch { /* ignore */ }
     }, []);
@@ -103,7 +103,7 @@ export default function SeoAuditPage() {
             setResult(data);
             const newHistory = [data, ...auditHistory.filter((h) => h.url !== data.url)].slice(0, 20);
             setAuditHistory(newHistory);
-            localStorage.setItem("seo_audit_history", JSON.stringify(newHistory));
+            localStorage.setItem("admin_seo_audit_history", JSON.stringify(newHistory));
         } catch (e) {
             setError(e instanceof Error ? e.message : "Terjadi kesalahan.");
         } finally {
@@ -113,7 +113,7 @@ export default function SeoAuditPage() {
 
     function clearHistory() {
         setAuditHistory([]);
-        localStorage.removeItem("seo_audit_history");
+        localStorage.removeItem("admin_seo_audit_history");
     }
 
     function filteredIssues() {

@@ -12,6 +12,9 @@ import {
     Server,
     Plug,
     FileText,
+    BarChart3,
+    CalendarClock,
+    HelpCircle,
     type LucideIcon,
 } from "lucide-react";
 
@@ -29,6 +32,9 @@ const adminNavItems: AdminNavItem[] = [
     { href: "/admin/platforms", label: "Platform Credentials", icon: Plug },
     { href: "/admin/blog", label: "Blog", icon: FileText },
     { href: "/admin/health", label: "System Health", icon: Server },
+    { href: "/admin/seo-audit", label: "SEO Audit", icon: BarChart3 },
+    { href: "/admin/blog-queue", label: "Blog Queue", icon: CalendarClock },
+    { href: "/admin/help", label: "Bantuan", icon: HelpCircle },
 ];
 
 function isActive(href: string, pathname: string): boolean {
