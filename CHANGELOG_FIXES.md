@@ -4,6 +4,55 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #35 — SEO Audit HTTP 500 saat build & response parsing
+
+**Gejala:** Endpoint `/api/seo/audit` mengembalikan HTTP 500. Bisa disebabkan:
+1. Route di-prerender oleh Next.js karena tidak ada `dynamic = "force-dynamic"`, sehingga error handling default Next.js mengembalikan body kosong pada 500
+2. `req.json()` dipanggil di luar try/catch — jika body tidak valid, Next.js mengembalikan 500 tanpa JSON body
+3. Error dari `runAudit()` tidak di-log, sehingga sulit debug
+
+**Akar Masalah:**
+1. Tidak ada `export const dynamic = "force-dynamic"` di route handler
+2. `req.json()` dipanggil langsung tanpa try/catch wrapper
+3. Catch block tidak memiliki logging
+
+**Fix:**
+1. Tambah `export const dynamic = "force-dynamic"` agar route selalu di-render dinamis
+2. Bungkus `req.json()` dengan try/catch, return 400 dengan pesan "Body tidak valid" jika parse gagal
+3. Tambah `console.error()` di catch block untuk debugging
+
+| | |
+|---|---|
+| **File** | `apps/web/src/app/api/seo/audit/route.ts` |
+| **Masalah** | HTTP 500 saat audit SEO, body response kosong |
+| **Akar** | No force-dynamic + req.json() unprotected + no error logging |
+| **Fix** | Add dynamic export, wrap req.json() in try/catch, add console.error |
+| **Verifikasi** | `pnpm --filter web build` lolos. Perlu test live di VPS. |
+| **Log Keyword** | seo-audit, HTTP 500, force-dynamic, req.json, NextResponse |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
+### Fix #34 — SEO Audit "Unexpected end of JSON input" saat API response kosong
+
+**Gejala:** Halaman `/admin/seo-audit` menampilkan error browser "Failed to execute 'json' on 'Response': Unexpected end of JSON input" saat klik tombol "Audit Sekarang".
+
+**Akar:** Client-side `fetch()` di `seo-audit/page.tsx` memanggil `res.json()` SEBELUM mengecek `res.ok`. Ketika server mengembalikan response kosong (misal timeout, connection reset, atau middleware intercept), browser throw pada `JSON.parse("")`.
+
+**Fix:** Bungkus `res.json()` dalam try/catch, set `data = null` kalau parse gagal, baru setelah itu cek `res.ok`. Tambah guard `if (data)` sebelum `setResult`.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/app/admin/seo-audit/page.tsx` |
+| **Masalah** | "Unexpected end of JSON input" saat audit SEO |
+| **Akar** | `res.json()` dipanggil sebelum cek `res.ok`; response kosong throw JSON parse error |
+| **Fix** | Defensive try/catch pada `res.json()`, check `res.ok` setelah parse, guard `if (data)` sebelum setState |
+| **Verifikasi** | `pnpm --filter web build` lolos. Perlu deploy & test di VPS. |
+| **Log Keyword** | seo-audit, JSON parse, Unexpected end of JSON input, res.json |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #34 — SEO Audit "Unexpected end of JSON input" saat API response kosong
 
 **Gejala:** Halaman `/admin/seo-audit` menampilkan error browser "Failed to execute 'json' on 'Response': Unexpected end of JSON input" saat klik tombol "Audit Sekarang".
