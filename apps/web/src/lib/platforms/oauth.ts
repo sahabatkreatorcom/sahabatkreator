@@ -83,7 +83,7 @@ export async function refreshAccessToken(
 
     switch (platform) {
         case "INSTAGRAM":
-            return refreshMetaLongLivedToken(refreshToken, "ig_refresh_token");
+            return refreshInstagramStandaloneToken(refreshToken, credentials);
         case "INSTAGRAM_PAGE":
             return refreshFacebookToken(refreshToken, clientId, clientSecret);
         case "THREADS":
@@ -173,6 +173,31 @@ async function exchangeFacebookToken(
         accessToken: longData.access_token || data.access_token,
         expiresIn: longData.expires_in || data.expires_in || 5184000,
     };
+}
+
+async function refreshInstagramStandaloneToken(
+    accessToken: string,
+    credentials?: { clientId: string; clientSecret: string },
+): Promise<TokenResponse> {
+    // Instagram standalone long-lived tokens are refreshed via ig_exchange_token
+    // using the current access token + client credentials.
+    const { clientId, clientSecret } = credentials || {
+        clientId: process.env.INSTAGRAM_CLIENT_ID || "",
+        clientSecret: process.env.INSTAGRAM_CLIENT_SECRET || "",
+    };
+    const res = await fetch(`${INSTAGRAM_GRAPH_URL}/access_token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            grant_type: "ig_exchange_token",
+            client_id: clientId,
+            client_secret: clientSecret,
+            access_token: accessToken,
+        }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error?.message || data.error || "Gagal refresh token Instagram.");
+    return { accessToken: data.access_token, expiresIn: data.expires_in || 5184000 };
 }
 
 async function refreshFacebookToken(
