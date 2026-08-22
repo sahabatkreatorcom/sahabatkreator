@@ -180,22 +180,6 @@ export const navItems: NavItem[] = [
         mobileTab: false,
     },
     {
-        href: "/seo-audit",
-        label: "SEO Audit",
-        shortLabel: "SEO",
-        icon: FileText,
-        group: "insight",
-        mobileTab: false,
-    },
-    {
-        href: "/blog-queue",
-        label: "Blog Queue",
-        shortLabel: "Blog",
-        icon: FileText,
-        group: "insight",
-        mobileTab: false,
-    },
-    {
         href: "/team",
         label: "Anggota tim",
         shortLabel: "Tim",
