@@ -8,9 +8,36 @@ import { env } from "@sahabat-kreator/env/server";
 export const dynamic = "force-dynamic";
 
 /**
+ * Detect push notification support dari User-Agent (server-side).
+ * Push notification didukung oleh: Chrome 42+, Firefox 44+, Safari 16.4+, Edge 17+,
+ * iOS Safari 16.4+, Samsung Internet 18+.
+ */
+function isPushSupportedByUserAgent(userAgent: string): boolean {
+    const ua = userAgent.toLowerCase();
+    // Chrome / Chromium-based (termasuk Edge, Opera)
+    if (/chrome\//.test(ua) && !/android/.test(ua) && /safari\//.test(ua)) return true;
+    if (/chromium\//.test(ua)) return true;
+    // Firefox
+    if (/firefox\//.test(ua)) return true;
+    // Safari desktop
+    if (/safari\//.test(ua) && !/chrome/.test(ua) && !/android/.test(ua)) return true;
+    // Edge
+    if (/edge\//.test(ua)) return true;
+    // Android Chrome
+    if (/android/.test(ua) && /chrome\//.test(ua)) return true;
+    // Samsung Internet
+    if (/samsung\s[sS]afari/.test(ua) || /sm-[gn]\d/.test(ua) && /chrome/.test(ua)) return true;
+    // iOS Safari (iPad/iPhone)
+    if (/iphone|ipad/.test(ua) && /safari/.test(ua)) return true;
+    // Opera
+    if (/opr\//.test(ua) || /\bopera\b/.test(ua)) return true;
+    return false;
+}
+
+/**
  * GET /api/push — cek status VAPID dan daftar subscription.
  */
-export const GET = withAuth(async (ctx) => {
+export const GET = withAuth(async (ctx, req: NextRequest) => {
     const { activeOrganizationId, session } = ctx;
     if (!activeOrganizationId) return json({ error: "Pilih workspace dulu." }, { status: 400 });
 
@@ -31,8 +58,12 @@ export const GET = withAuth(async (ctx) => {
         env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_ADMIN_EMAIL,
     );
 
+    // Detect push notification support dari User-Agent (server-side).
+    const userAgent = req.headers.get("user-agent") ?? "";
+    const supported = isPushSupportedByUserAgent(userAgent);
+
     return json({
-        isSupported: typeof window !== "undefined" && "Notification" in window,
+        isSupported: supported,
         isVapidConfigured,
         vapidPublicKey: isVapidConfigured ? env.VAPID_PUBLIC_KEY : null,
         subscriptions: subscriptions.map((s) => ({
