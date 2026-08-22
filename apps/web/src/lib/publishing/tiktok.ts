@@ -110,6 +110,7 @@ async function publishPhoto(
             photo_cover_index: 0,
             photo_images: payload.mediaUrls,
         },
+        post_mode: "DIRECT_POST",
         media_type: "PHOTO",
     };
 
