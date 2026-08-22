@@ -47,7 +47,7 @@ export function workspaceRootDir(startDir?: string): string {
   const root = findWorkspaceRoot(startDir);
   if (!root) {
     // Fallback: asumsi CWD sudah root.
-    return resolve(startDir ?? process.cwd());
+    return resolve(/*turbopackIgnore: true*/ startDir ?? process.cwd());
   }
   return root;
 }

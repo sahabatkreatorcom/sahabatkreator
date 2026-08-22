@@ -36,7 +36,7 @@ import { decryptToken } from "@/lib/token-encryption";
 const LOG = (message: string) => console.log(`[queue-worker] ${new Date().toISOString()} ${message}`);
 const TIKTOK_PENDING_PREFIX = "tiktok_pending:";
 
-export function startQueueWorkers(): () => Promise<void> {
+export async function startQueueWorkers(): Promise<() => Promise<void>> {
     const workers: Worker[] = [];
 
     const publishWorker = new Worker(

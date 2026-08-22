@@ -14,7 +14,7 @@ export async function register() {
 
     try {
         const { startQueueWorkers } = await import("./lib/queue-worker");
-        const stop = startQueueWorkers();
+        const stop = await startQueueWorkers();
         console.log("[instrumentation] BullMQ workers started");
 
         // Tutup worker pada sinyal shutdown tanpa memanggil process.exit —
