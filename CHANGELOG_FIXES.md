@@ -4,6 +4,34 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #38 — Calendar Grid UX - Platform Badge & Status Indicators
+
+**Gejala:** Grid view di halaman `/dashboard/calendar` tab "Grid" hanya menampilkan thumbnail/media tanpa penanda platform dan status yang jelas. User sulit membedakan post dari platform berbeda dan status publish.
+
+**Akar Masalah:**
+GridView component tidak menampilkan badge platform atau status dengan visual yang jelas.
+
+**Fix:** Tambah penanda visual di setiap tile grid:
+1. **Platform badge** — icon platform (20x20px) dengan warna brand di pojok kiri atas
+2. **Status badge** — label "DRAFT", "TERJADWAL", "TERBIT", dll dengan warna sesuai status di pojok kanan atas
+3. **Hover overlay** — menampilkan nama account dan virality score saat di-hover
+4. **Placeholder** — jika tidak ada thumbnail, tampilkan icon platform dengan background warna platform
+
+**Perubahan:**
+- `apps/web/src/components/calendar/grid-view.tsx` — tambahkan badge platform, status, dan hover overlay
+
+| | |
+|---|---|
+| **File** | `apps/web/src/components/calendar/grid-view.tsx` |
+| **Masalah** | Grid view tidak informatif, user sulit bedakan platform & status |
+| **Akar** | Tidak ada badge/indicator visual di tile grid |
+| **Fix** | Tambah platform badge, status badge, hover overlay |
+| **Verifikasi** | `pnpm --filter web build` lolos. Perlu test live di VPS. |
+| **Log Keyword** | calendar, grid, platform badge, status indicator |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #36 — Admin Health "unknown" - mismatch struktur data API dan frontend
 
 **Gejala:** Halaman `/admin/health` menampilkan "unknown" untuk semua status (server, database, API).
