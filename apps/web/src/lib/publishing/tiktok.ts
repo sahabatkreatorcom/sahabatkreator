@@ -99,8 +99,13 @@ async function publishPhoto(
         return { success: false, error: "TikTok photo mode maksimal 35 gambar." };
     }
 
-    // TikTok HANYA terima JPEG/WEBP — convert PNG ke JPEG
-    const photoImages = await ensureJpegUrls(payload.mediaUrls);
+    // TikTok HANYA terima JPEG/WEBP — convert PNG ke JPEG + validasi dimensi
+    let photoImages: string[];
+    try {
+        photoImages = await ensureJpegUrls(payload.mediaUrls);
+    } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : "Gagal memproses gambar.", errorCode: "INVALID_IMAGE" };
+    }
 
     const initBody = {
         post_info: {
@@ -153,25 +158,37 @@ async function publishPhoto(
 /**
  * TikTok photo mode HANYA terima JPEG/WEBP — PNG ditolak.
  * Download semua PNG, convert ke JPEG via sharp, upload ulang, return URL baru.
+ * Juga validasi dimensi: TikTok minimum 360px.
  */
 async function ensureJpegUrls(urls: string[]): Promise<string[]> {
     const results = await Promise.all(
         urls.map(async (url) => {
             try {
-                const lower = url.toLowerCase();
-                // Cek apakah PNG berdasarkan extension
-                if (!lower.endsWith(".png") && !lower.includes(".png?")) return url;
-
                 const res = await fetch(url);
                 if (!res.ok) return url;
 
                 const buf = Buffer.from(await res.arrayBuffer());
-                const jpegBuf = await sharp(buf).jpeg({ quality: 90 }).toBuffer();
+                const lower = url.toLowerCase();
+                const isPng = lower.endsWith(".png") || lower.includes(".png?");
 
+                // Validasi dimensi dulu
+                const meta = await sharp(buf).metadata();
+                const w = meta.width ?? 0;
+                const h = meta.height ?? 0;
+                if (w < 360 || h < 360) {
+                    throw new Error(`Gambar terlalu kecil (${w}x${h}px). TikTok minimum 360px.`);
+                }
+
+                if (!isPng) return url;
+
+                // Convert PNG → JPEG
+                const jpegBuf = await sharp(buf).jpeg({ quality: 90 }).toBuffer();
                 const key = `tiktok-jpeg/${randomUUID()}.jpg`;
                 await uploadFile(key, jpegBuf, { contentType: "image/jpeg" });
                 return getPublicUrl(key);
-            } catch {
+            } catch (e) {
+                // Re-throw validasi error, skip conversion error
+                if (e instanceof Error && e.message.includes("terlalu kecil")) throw e;
                 return url;
             }
         }),
