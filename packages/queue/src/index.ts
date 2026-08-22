@@ -171,6 +171,33 @@ export async function enqueueSync(organizationId: string, type: SyncJobType): Pr
 }
 
 /**
+ * Check koneksi Redis. Returns true bila Redis tersedia atau tidak dikonfigurasi (opsional).
+ * Dipakai oleh /api/health untuk monitoring readiness.
+ */
+export async function checkRedisHealth(): Promise<boolean> {
+    if (!isRedisConfigured()) return true;
+    try {
+        const opts = redisConnectionOptions();
+        const { default: IORedis } = await import("ioredis");
+        const client = new IORedis({
+            host: opts.host,
+            port: opts.port,
+            username: opts.username,
+            password: opts.password,
+            maxRetriesPerRequest: 1,
+            connectTimeout: 3000,
+            lazyConnect: true,
+        });
+        await client.connect();
+        await client.ping();
+        await client.quit();
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Enqueue stale-post cleanup sebagai repeatable job (setiap 60 detik).
  * Cukup panggil sekali saat app start — BullMQ menyimpan repeat schedule di Redis.
  * No-op bila REDIS_URL belum dikonfigurasi.

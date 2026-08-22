@@ -53,7 +53,7 @@ export async function startQueueWorkers(): Promise<() => Promise<void>> {
         },
         {
             connection: redisConnectionOptions(),
-            concurrency: 1,
+            concurrency: 3,
         },
     );
 
@@ -71,7 +71,7 @@ export async function startQueueWorkers(): Promise<() => Promise<void>> {
         },
         {
             connection: redisConnectionOptions(),
-            concurrency: 1,
+            concurrency: 2,
         },
     );
 
@@ -139,8 +139,6 @@ export async function startQueueWorkers(): Promise<() => Promise<void>> {
 // ---------------------------------------------------------------------------
 // TikTok pending resolver — called by the stale-cleanup worker
 // ---------------------------------------------------------------------------
-
-const TIKTOK_PENDING_PREFIX = "tiktok_pending:";
 
 async function checkAndResolveTikTokPost(post: {
     id: string;

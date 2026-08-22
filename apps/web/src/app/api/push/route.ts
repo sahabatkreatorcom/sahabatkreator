@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { withAuth, json } from "@/lib/api";
+import { env } from "@sahabat-kreator/env/server";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,15 @@ export const GET = withAuth(async (ctx) => {
         orderBy: desc(schema.pushSubscription.createdAt),
     });
 
+    // VAPID diaktifkan bila key publik + email admin ada di env.
+    const isVapidConfigured = Boolean(
+        env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_ADMIN_EMAIL,
+    );
+
     return json({
         isSupported: typeof window !== "undefined" && "Notification" in window,
-        isVapidConfigured: false, // TODO: config via env
+        isVapidConfigured,
+        vapidPublicKey: isVapidConfigured ? env.VAPID_PUBLIC_KEY : null,
         subscriptions: subscriptions.map((s) => ({
             id: s.id,
             userAgent: s.userAgent,
