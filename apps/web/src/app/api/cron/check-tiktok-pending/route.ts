@@ -57,37 +57,23 @@ export const POST = async (req: NextRequest) => {
             const status = data.data?.status;
 
             if (status === "PUBLISH_COMPLETE") {
-                const publicId = data.data?.publiclyAvailablePostId?.[0];
-                if (publicId && /^\d+$/.test(String(publicId))) {
-                    await db.update(schema.post)
-                        .set({
-                            status: "PUBLISHED",
-                            publishedAt: new Date(),
-                            platformPostId: String(publicId),
-                        })
-                        .where(eq(schema.post.id, post.id));
-                    await logActivity(
-                        post.organizationId,
-                        "post.published",
-                        { type: "post", id: post.id, name: (post.caption || "").slice(0, 100) },
-                        { platform: "TIKTOK" },
-                    );
-                    resolved++;
-                } else {
-                    await db.update(schema.post)
-                        .set({ status: "FAILED" })
-                        .where(eq(schema.post.id, post.id));
-                    await db.insert(schema.publishError).values({
-                        id: randomUUID(),
-                        postId: post.id,
-                        platform: "TIKTOK",
-                        errorCode: "INVALID_POST_ID",
-                        errorRaw: "TikTok publish complete tapi public ID tidak valid.",
-                        errorHuman: "TikTok selesai publish tapi ID post tidak dikenali.",
-                        occurredAt: new Date(),
-                    });
-                    failed++;
-                }
+                const ids = data.data?.publiclyAvailablePostId;
+                const publicId = Array.isArray(ids) && ids.length > 0 ? String(ids[0]) : null;
+
+                await db.update(schema.post)
+                    .set({
+                        status: "PUBLISHED",
+                        publishedAt: new Date(),
+                        platformPostId: publicId || post.platformPostId,
+                    })
+                    .where(eq(schema.post.id, post.id));
+                await logActivity(
+                    post.organizationId,
+                    "post.published",
+                    { type: "post", id: post.id, name: (post.caption || "").slice(0, 100) },
+                    { platform: "TIKTOK", platformPostId: publicId },
+                );
+                resolved++;
             } else if (status === "FAILED") {
                 const failedReason = data.data?.fail_reason || "unknown";
                 await db.update(schema.post)

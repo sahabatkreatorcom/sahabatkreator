@@ -220,9 +220,13 @@ async function waitForPublishComplete(
         const status = data.data?.status;
 
         if (status === "PUBLISH_COMPLETE") {
-            const publicId = data.data?.publiclyAvailablePostId?.[0];
-            // Hanya ID numerik asli yang valid; publish_id (v_pub_file~...) tidak dipakai.
-            if (publicId && /^\d+$/.test(String(publicId))) return String(publicId);
+            // publiclyAvailablePostId bisa berbagai format — ambil apapun yang ada
+            const ids = data.data?.publiclyAvailablePostId;
+            if (Array.isArray(ids) && ids.length > 0) {
+                return String(ids[0]);
+            }
+            // ID kosong tapi status COMPLETE — tetap return success
+            return "completed";
         }
         if (status === "FAILED") return null;
     }
