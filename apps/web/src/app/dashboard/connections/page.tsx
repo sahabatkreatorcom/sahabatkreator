@@ -2,19 +2,13 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link2, Link2Off, Loader2, ChevronDown, AlertTriangle, RefreshCw } from "lucide-react";
+import { Link2, Link2Off, Loader2, ChevronDown, AlertTriangle, RefreshCw, Plus, Info } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 
-/**
- * Platform yang access token-nya berumur pendek TAPI punya refresh token
- * (YouTube 1 jam, TikTok ±24 jam, Pinterest/LinkedIn/Google Business). Untuk
- * platform ini, expiry access token yang dekat adalah hal NORMAL — bukan
- * sinyal "hampir kedaluwarsa" selama refresh token tersedia.
- */
 const REFRESH_TOKEN_PLATFORMS: Platform[] = ["YOUTUBE", "GOOGLE_BUSINESS", "TIKTOK", "PINTEREST", "LINKEDIN"];
 
 interface Account {
@@ -39,24 +33,23 @@ interface PageChoice {
     avatar?: string | null;
 }
 
-const PLATFORM_ORDER = [
+const PLATFORM_ORDER: Platform[] = [
+    "BLUESKY",
+    "PINTEREST",
+    "TIKTOK",
     "INSTAGRAM",
     "INSTAGRAM_PAGE",
     "FACEBOOK",
-    "TIKTOK",
     "YOUTUBE",
     "THREADS",
-    "PINTEREST",
     "LINKEDIN",
     "GOOGLE_BUSINESS",
-] as Platform[];
+];
 
 function tokenStatus(account: Pick<Account, "platform" | "tokenExpiry" | "hasRefreshToken" | "lastRefreshError">): {
     label: string;
     tone: "ok" | "warn" | "expired" | "none";
 } {
-    // Platform ber-refresh token: access token pendek itu normal, selama ada
-    // refresh token dan belum ada error refresh, anggap valid.
     if (REFRESH_TOKEN_PLATFORMS.includes(account.platform) && account.hasRefreshToken && !account.lastRefreshError) {
         return { label: "Token aktif (refresh otomatis)", tone: "ok" };
     }
@@ -90,14 +83,16 @@ export default function ConnectionsPage() {
     const [autoRefreshing, setAutoRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
+    const [orgName, setOrgName] = useState<string>("");
     const activeOrgRef = useRef<string | null>(null);
 
-    // Pilihan halaman (dialog FACEBOOK / INSTAGRAM_PAGE)
     const [pendingChoices, setPendingChoices] = useState<{ platform: Platform; pages: PageChoice[] } | null>(null);
     const [pendingLoading, setPendingLoading] = useState(false);
     const [pendingSaving, setPendingSaving] = useState(false);
 
-    // Tangani parameter query dari callback OAuth
+    const [showConnectDialog, setShowConnectDialog] = useState(false);
+    const [showInfoDialog, setShowInfoDialog] = useState<Account | null>(null);
+
     useEffect(() => {
         const success = searchParams.get("success");
         const err = searchParams.get("error");
@@ -194,8 +189,15 @@ export default function ConnectionsPage() {
         loadAccounts();
     }, [loadAccounts]);
 
-    // Auto-refresh senyap untuk akun yang tokennya hampir kedaluwarsa / bermasalah.
-    // Hanya dijalankan sekali saat halaman dimuat (bukan saat navigasi balik).
+    useEffect(() => {
+        fetch("/api/organization")
+            .then((res) => res.json())
+            .then((data) => {
+                if (data.organization?.name) setOrgName(data.organization.name);
+            })
+            .catch(() => {});
+    }, []);
+
     const didAutoRefresh = useRef(false);
     useEffect(() => {
         if (didAutoRefresh.current) return;
@@ -319,6 +321,10 @@ export default function ConnectionsPage() {
                         Hubungkan akun sosial untuk menjadwalkan & menerbitkan konten.
                     </p>
                 </div>
+                <Button onClick={() => setShowConnectDialog(true)}>
+                    <Plus className="h-4 w-4" />
+                    Hubungkan
+                </Button>
             </div>
 
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
@@ -362,69 +368,95 @@ export default function ConnectionsPage() {
                             <p className="pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                 Akun terhubung
                             </p>
-                            <div className="grid gap-3 lg:grid-cols-2">
+                            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                                 {accounts.map((account) => {
                                     const status = tokenStatus(account);
+                                    const needsReconnect = status.tone === "expired" || account.lastRefreshError;
                                     return (
                                         <div
                                             key={account.id}
-                                            className="flex items-center gap-3 rounded-lg border border-border bg-card p-4"
+                                            className="flex flex-col rounded-lg border border-border bg-card p-4"
                                         >
-                                            <PlatformAvatar platform={account.platform} avatar={account.avatar} name={account.name} />
-                                            <div className="min-w-0 flex-1">
+                                            <div className="flex items-start justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <p className="truncate text-sm font-medium">{account.name}</p>
-                                                    {!account.isActive && (
-                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                                            Tidak aktif
+                                                    <PlatformIconRow platform={account.platform} />
+                                                    <div>
+                                                        <p className="text-sm font-medium">{PLATFORM_LABELS[account.platform]}</p>
+                                                        <span
+                                                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                                                needsReconnect
+                                                                    ? "bg-accent-amber/10 text-accent-amber"
+                                                                    : "bg-accent-green/10 text-accent-green"
+                                                            }`}
+                                                        >
+                                                            {needsReconnect ? "Needs reconnection" : "connected"}
                                                         </span>
-                                                    )}
+                                                    </div>
                                                 </div>
-                                                <p className="truncate text-xs text-muted-foreground">
-                                                    {PLATFORM_LABELS[account.platform]}
-                                                    {account.username ? ` · @${account.username}` : ""}
-                                                </p>
-                                                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
-                                                    <span className={TOKEN_TONE_STYLE[status.tone]}>{status.label}</span>
-                                                    {account.lastRefreshError && (
-                                                        <span className="flex items-center gap-1 text-accent-amber">
-                                                            <AlertTriangle className="h-3 w-3" />
-                                                            Refresh gagal
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    loading={disconnecting === account.id}
-                                                    onClick={() => handleDisconnect(account.id)}
+                                                <button
+                                                    onClick={() => setShowInfoDialog(account)}
+                                                    className="rounded-md p-1 text-muted-foreground hover:bg-muted"
                                                 >
-                                                    <Link2Off className="h-4 w-4" />
-                                                    Putus
-                                                </Button>
-                                                {(status.tone === "expired" || account.lastRefreshError) ? (
-                                                    <Button
-                                                        variant="secondary"
-                                                        size="sm"
-                                                        loading={connecting === account.platform}
-                                                        onClick={() => handleReconnect(account.platform)}
-                                                    >
-                                                        <Link2 className="h-4 w-4" />
-                                                        Hubungkan ulang
-                                                    </Button>
-                                                ) : (status.tone === "warn" || status.tone === "none") && (
-                                                    <Button
-                                                        variant="secondary"
-                                                        size="sm"
-                                                        loading={refreshing === account.id}
-                                                        onClick={() => handleRefresh(account.id)}
-                                                    >
-                                                        <RefreshCw className="h-4 w-4" />
-                                                        Perbarui
-                                                    </Button>
-                                                )}
+                                                    <Info className="h-4 w-4" />
+                                                </button>
+                                            </div>
+
+                                            {needsReconnect && (
+                                                <p className="mt-2 flex items-center gap-1 text-xs text-accent-amber">
+                                                    <AlertTriangle className="h-3 w-3" />
+                                                    Needs reconnection
+                                                </p>
+                                            )}
+
+                                            <div className="mt-3 flex-1">
+                                                <p className="truncate text-sm font-medium">
+                                                    {account.username ? `@${account.username}` : account.name}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {new Date(account.createdAt).toLocaleDateString("id-ID", {
+                                                        day: "numeric",
+                                                        month: "numeric",
+                                                        year: "numeric",
+                                                        timeZone: "Asia/Jakarta",
+                                                    })}
+                                                </p>
+                                            </div>
+
+                                            <div className="mt-3 border-t border-border pt-3">
+                                                <p className="mb-2 text-[10px] text-muted-foreground">{orgName} Profile Update</p>
+                                                <div className="flex gap-2">
+                                                    {needsReconnect ? (
+                                                        <>
+                                                            <Button
+                                                                variant="destructive"
+                                                                size="sm"
+                                                                loading={connecting === account.platform}
+                                                                onClick={() => handleReconnect(account.platform)}
+                                                                className="flex-1"
+                                                            >
+                                                                Reconnect
+                                                            </Button>
+                                                            <Button
+                                                                variant="secondary"
+                                                                size="sm"
+                                                                onClick={() => handleDisconnect(account.id)}
+                                                                loading={disconnecting === account.id}
+                                                            >
+                                                                Disconnect
+                                                            </Button>
+                                                        </>
+                                                    ) : (
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            className="w-full"
+                                                            onClick={() => handleDisconnect(account.id)}
+                                                            loading={disconnecting === account.id}
+                                                        >
+                                                            Disconnect
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     );
@@ -432,44 +464,93 @@ export default function ConnectionsPage() {
                             </div>
                         </div>
                     )}
-
-                    {/* Hubungkan platform */}
-                    <div>
-                        <p className="pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            Hubungkan platform
-                        </p>
-                        <div className="grid gap-3 md:grid-cols-2">
-                            {PLATFORM_ORDER.map((platform) => (
-                                <div
-                                    key={platform}
-                                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-muted-foreground/30"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <PlatformAvatar platform={platform} name={PLATFORM_LABELS[platform]} />
-                                        <div>
-                                            <span className="text-sm font-medium">{PLATFORM_LABELS[platform]}</span>
-                                            <p className="text-xs text-muted-foreground">
-                                                {countByPlatform[platform] > 0
-                                                    ? `${countByPlatform[platform]} akun terhubung`
-                                                    : "Belum terhubung"}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        variant={connected.has(platform) ? "secondary" : "primary"}
-                                        loading={connecting === platform}
-                                        onClick={() => handleConnect(platform)}
-                                    >
-                                        <Link2 className="h-4 w-4" />
-                                        {connected.has(platform) ? "Tambah akun" : "Hubungkan"}
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
                 </div>
             )}
+
+            {/* Dialog Hubungkan Platform */}
+            <Dialog
+                open={showConnectDialog}
+                onClose={() => setShowConnectDialog(false)}
+                title="Hubungkan platform"
+                description="Pilih platform yang ingin dihubungkan ke akun Anda."
+            >
+                <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                    {PLATFORM_ORDER.map((platform) => (
+                        <button
+                            key={platform}
+                            onClick={() => {
+                                setShowConnectDialog(false);
+                                handleConnect(platform);
+                            }}
+                            disabled={connecting === platform}
+                            className="flex w-full items-center gap-3 rounded-md border border-border bg-background p-3 text-left transition-colors hover:bg-muted disabled:opacity-50"
+                        >
+                            <PlatformIconRow platform={platform} />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium">{PLATFORM_LABELS[platform]}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {countByPlatform[platform] > 0
+                                        ? `${countByPlatform[platform]} akun terhubung`
+                                        : "Belum terhubung"}
+                                </p>
+                            </div>
+                            {connecting === platform ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                                <ChevronDown className="h-4 w-4 -rotate-90 text-muted-foreground" />
+                            )}
+                        </button>
+                    ))}
+                </div>
+            </Dialog>
+
+            {/* Dialog Info Akun */}
+            <Dialog
+                open={showInfoDialog !== null}
+                onClose={() => setShowInfoDialog(null)}
+                title="Detail akun"
+                description={showInfoDialog ? `${PLATFORM_LABELS[showInfoDialog.platform]}` : ""}
+            >
+                {showInfoDialog && (
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                            <PlatformAvatar platform={showInfoDialog.platform} avatar={showInfoDialog.avatar} name={showInfoDialog.name} />
+                            <div>
+                                <p className="font-medium">{showInfoDialog.name}</p>
+                                {showInfoDialog.username && (
+                                    <p className="text-sm text-muted-foreground">@{showInfoDialog.username}</p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="rounded-md bg-muted p-3 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Status</span>
+                                <span className={TOKEN_TONE_STYLE[tokenStatus(showInfoDialog).tone]}>
+                                    {tokenStatus(showInfoDialog).label}
+                                </span>
+                            </div>
+                            <div className="mt-1 flex justify-between">
+                                <span className="text-muted-foreground">Terhubung sejak</span>
+                                <span>
+                                    {new Date(showInfoDialog.createdAt).toLocaleDateString("id-ID", {
+                                        day: "numeric",
+                                        month: "long",
+                                        year: "numeric",
+                                        timeZone: "Asia/Jakarta",
+                                    })}
+                                </span>
+                            </div>
+                        </div>
+                        <Button
+                            variant="secondary"
+                            className="w-full"
+                            onClick={() => setShowInfoDialog(null)}
+                        >
+                            Tutup
+                        </Button>
+                    </div>
+                )}
+            </Dialog>
 
             {/* Dialog pilihan halaman (FACEBOOK / INSTAGRAM_PAGE) */}
             <Dialog
@@ -527,6 +608,17 @@ export default function ConnectionsPage() {
                     </div>
                 )}
             </Dialog>
+        </div>
+    );
+}
+
+function PlatformIconRow({ platform }: { platform: Platform }) {
+    return (
+        <div
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white"
+            style={{ background: PLATFORM_COLORS[platform] }}
+        >
+            <PlatformIcon platform={platform} size={16} />
         </div>
     );
 }
