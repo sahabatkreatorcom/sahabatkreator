@@ -1,83 +1,53 @@
-import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import Link from "next/link";
+import { notFound } from "next/navigation";
 
 interface Props {
   params: Promise<{ slug: string[] }>;
 }
 
-// Halaman-halaman yang sudah punya terjemahan English
-const EN_PAGES = new Set([
-  "",                    // root /en
-  "kebijakan-privasi",
-  "penghapusan-data",
-  "syarat-ketentuan",
-]);
-
-export async function generateStaticParams() {
-  // Generate semua path marketing untuk SSG
-  return [
-    { slug: [] },
-    { slug: ["tentang"] },
-    { slug: ["fitur"] },
-    { slug: ["harga"] },
-    { slug: ["blog"] },
-    { slug: ["faq"] },
-    { slug: ["karir"] },
-    { slug: ["kontak"] },
-    { slug: ["kebijakan-privasi"] },
-    { slug: ["penghapusan-data"] },
-    { slug: ["syarat-ketentuan"] },
-  ];
-}
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
-  const path = slug.join("/");
-  const isRoot = slug.length === 0;
-  
-  const titles: Record<string, string> = {
-    "": "Sahabat Kreator | AI-Powered Social Media Management Platform",
-    "tentang": "About Us | Sahabat Kreator",
-    "fitur": "Features | Sahabat Kreator",
-    "harga": "Pricing | Sahabat Kreator",
-    "blog": "Blog | Sahabat Kreator",
-    "faq": "FAQ | Sahabat Kreator",
-    "karir": "Careers | Sahabat Kreator",
-    "kontak": "Contact Us | Sahabat Kreator",
-    "kebijakan-privasi": "Privacy Policy | Sahabat Kreator",
-    "penghapusan-data": "Data Deletion Policy | Sahabat Kreator",
-    "syarat-ketentuan": "Terms & Conditions | Sahabat Kreator",
-  };
-
-  const title = titles[path] || `Page | Sahabat Kreator`;
-
-  return {
-    title,
-    alternates: {
-      canonical: `https://sahabatkreator.com${isRoot ? "/en" : `/en/${path}`}`,
-      languages: {
-        "id-ID": `https://sahabatkreator.com${isRoot ? "/" : `/${path}`}`,
-        "en-US": `https://sahabatkreator.com${isRoot ? "/en" : `/en/${path}`}`,
-      },
-    },
-  };
-}
+// Halaman yang benar-benar punya versi English
+const EN_PAGES = ["", "kebijakan-privasi", "penghapusan-data", "syarat-ketentuan"];
 
 export default async function EnglishFallbackPage({ params }: Props) {
   const { slug } = await params;
   const path = slug.join("/");
 
-  // Redirect ke halaman English jika tersedia
-  if (!EN_PAGES.has(path)) {
-    // Halaman ini belum punya terjemahan - redirect ke versi Indonesia
-    // dengan hint bahwa ini tidak tersedia dalam English
-    redirect(path === "" ? "/" : `/${path}`);
+  // Kalau path tersedia di list EN_PAGES, lanjut render
+  if (EN_PAGES.includes(path)) {
+    // Untuk halaman root /en, tampilkan landing page
+    if (path === "") {
+      const { default: ENLanding } = await import("../../page");
+      return <ENLanding />;
+    }
+    
+    // Untuk halaman legal, cari komponen yang sesuai
+    const moduleName = path.replace("-", "");
+    try {
+      const module = await import(`@/components/en/${path}/page`);
+      const Component = module.default;
+      return <Component />;
+    } catch {
+      // Jika komponen tidak ditemukan, fallback ke notFound
+      notFound();
+    }
   }
 
-  // Render halaman English yang sudah tersedia
-  // Untuk halaman legal (privacy, terms, etc), kita render dari folder yang sesuai
-  const pageComponent = await import(`@/components/en/${path}/page`);
-  
-  return pageComponent.default();
+  // Untuk halaman lain yang belum ada versi English, tampilkan pesan
+  return (
+    <main className="container mx-auto max-w-4xl px-4 py-12">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold tracking-tight">Page Not Available in English</h1>
+        <p className="mt-4 text-lg text-muted-foreground">
+          This page is currently only available in Indonesian.
+        </p>
+        <div className="mt-8">
+          <a
+            href={`/${path}`}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            View in Indonesian →
+          </a>
+        </div>
+      </div>
+    </main>
+  );
 }
