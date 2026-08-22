@@ -73,8 +73,6 @@ const nextConfig: NextConfig = {
       { source: '/status', destination: '/dashboard/status' },
       { source: '/pillars', destination: '/dashboard/pillars' },
       { source: '/billing', destination: '/dashboard/billing' },
-      { source: '/blog-queue', destination: '/admin/blog-queue' },
-      { source: '/seo-audit', destination: '/admin/seo-audit' },
       { source: '/help', destination: '/dashboard/help' },
     ];
   },
