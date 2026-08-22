@@ -113,7 +113,7 @@ export async function createPosts(params: CreatePostParams): Promise<CreatePostR
             const mediaItems = await db.query.media.findMany({
                 where: (t, { and: _and, eq: _eq, inArray: _in }) =>
                     _and(_eq(t.organizationId, organizationId), _in(t.id, mediaIds)),
-                columns: { id: true, url: true, mimeType: true },
+                columns: { id: true, url: true, mimeType: true, filename: true },
             });
             for (const m of mediaItems) {
                 // Cek format: TikTok hanya terima JPEG/WEBP
