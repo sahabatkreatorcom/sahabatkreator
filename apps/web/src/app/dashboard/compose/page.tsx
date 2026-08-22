@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import * as React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarClock, ImagePlus, Send, X, LayoutTemplate, Hash, FolderTree, AlertCircle, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,8 +112,11 @@ export default function ComposePage() {
         } catch { /* ignore */ }
     }, []);
 
+    const loadedPinterestBoardsRef = useRef<Set<string>>(new Set());
+
     const loadPinterestBoards = useCallback(async (accountId: string, force = false) => {
-        if (!force && pinterestBoards[accountId]?.length > 0) return;
+        if (!force && loadedPinterestBoardsRef.current.has(accountId)) return;
+        loadedPinterestBoardsRef.current.add(accountId);
         setPinterestBoardsLoading((prev) => ({ ...prev, [accountId]: true }));
         try {
             const res = await fetch(`/api/accounts/${accountId}/boards`);
@@ -121,7 +124,7 @@ export default function ComposePage() {
             if (res.ok) setPinterestBoards((prev) => ({ ...prev, [accountId]: data.boards ?? [] }));
         } catch { /* ignore */ }
         setPinterestBoardsLoading((prev) => ({ ...prev, [accountId]: false }));
-    }, [pinterestBoards]);
+    }, []);
 
     const createPinterestBoard = useCallback(async (accountId: string) => {
         const name = pinterestNewBoardName[accountId]?.trim();
