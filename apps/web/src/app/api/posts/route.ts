@@ -38,6 +38,21 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
         db.$count(schema.post, and(...where)),
     ]);
 
+    function buildPostUrl(externalUrl: string | null, platform: string, platformPostId: string | null, accountName: string | null): string | null {
+        if (externalUrl) return externalUrl;
+        if (!platformPostId) return null;
+        switch (platform) {
+            case "INSTAGRAM": return `https://instagram.com/p/${platformPostId}`;
+            case "TIKTOK": return `https://tiktok.com/@${accountName ?? "user"}/video/${platformPostId}`;
+            case "FACEBOOK": return `https://facebook.com/${platformPostId}`;
+            case "YOUTUBE": return `https://youtube.com/watch?v=${platformPostId}`;
+            case "PINTEREST": return `https://pinterest.com/pin/${platformPostId}`;
+            case "LINKEDIN": return `https://linkedin.com/feed/update/${platformPostId}`;
+            case "THREADS": return `https://threads.net/@${accountName ?? "user"}/post/${platformPostId}`;
+            default: return null;
+        }
+    }
+
     return json({
         posts: posts.map((p) => ({
             id: p.id,
@@ -47,7 +62,7 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
             publishedAt: p.publishedAt?.toISOString() ?? null,
             createdAt: p.createdAt.toISOString(),
             platform: p.platform,
-            postUrl: p.externalUrl ?? null,
+            postUrl: buildPostUrl(p.externalUrl, p.platform, p.platformPostId, p.socialAccount?.name ?? null),
             account: p.socialAccount
                 ? { id: p.socialAccount.id, platform: p.socialAccount.platform, name: p.socialAccount.name, avatar: p.socialAccount.avatar }
                 : null,

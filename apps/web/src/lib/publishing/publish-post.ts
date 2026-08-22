@@ -100,7 +100,7 @@ export async function publishPost(
         // PUBLISH_PENDING: TikTok masih memproses — jangan mark FAILED, simpan sebagai PUBLISHING
         if (result.errorCode === "PUBLISH_PENDING" && result.postId) {
             await db.update(schema.post)
-                .set({ status: "PUBLISHING", platformPostId: result.postId })
+                .set({ status: "PUBLISHING", platformPostId: result.postId, externalUrl: result.postUrl ?? null })
                 .where(eq(schema.post.id, postId));
             return { ok: false, error: result.error, errorCode: result.errorCode };
         }
