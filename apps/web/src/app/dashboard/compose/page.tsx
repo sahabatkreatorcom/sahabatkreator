@@ -154,15 +154,6 @@ export default function ComposePage() {
         loadContentTools();
     }, [loadAccounts, loadLibrary, loadContentTools]);
 
-    // Auto-load Pinterest boards when Pinterest account is selected
-    useEffect(() => {
-        for (const account of selectedAccounts) {
-            if (account.platform === "PINTEREST") {
-                loadPinterestBoards(account.id);
-            }
-        }
-    }, [selectedAccounts, loadPinterestBoards]);
-
     function applyTemplate(t: CaptionTemplate) {
         setCaption(t.caption);
         if (t.hashtags.length > 0) setCaption((prev) => prev + (prev ? "\n\n" : "") + t.hashtags.map((h) => `#${h}`).join(" "));
@@ -235,6 +226,16 @@ export default function ComposePage() {
     const charCount = caption.length;
 
     const selectedAccounts = accounts.filter((a) => selectedAccountIds.includes(a.id));
+
+    // Auto-load Pinterest boards when Pinterest account is selected
+    useEffect(() => {
+        for (const account of selectedAccounts) {
+            if (account.platform === "PINTEREST") {
+                loadPinterestBoards(account.id);
+            }
+        }
+    }, [selectedAccounts, loadPinterestBoards]);
+
     const selectedPlatforms = selectedAccounts.map((a) => a.platform);
     const captionLimit = strictestCaptionLimit(selectedPlatforms);
 
