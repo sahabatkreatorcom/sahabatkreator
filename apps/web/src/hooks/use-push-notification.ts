@@ -63,13 +63,18 @@ export function usePushNotification(): UsePushNotificationReturn {
             }
             setIsPermissionGranted(true);
 
-            // 2. Dapatkan registration service worker
-            const registration = await navigator.serviceWorker.ready;
+            // 2. Dapatkan registration service worker dengan timeout
+            const registration = await Promise.race([
+                navigator.serviceWorker.ready,
+                new Promise<ServiceWorkerRegistration>((_, reject) =>
+                    setTimeout(() => reject(new Error("Service Worker registration timeout")), 10000)
+                ),
+            ]);
 
             // 3. Subscribe dengan VAPID key dari env
             const vapidPublicKey = env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
             if (!vapidPublicKey) {
-                setError("VAPID key tidak dikonfigurasi di server. Hubungi admin.");
+                setError("VAPID key tidak dikonfigurasi. Hubungi admin.");
                 setIsLoading(false);
                 return;
             }
