@@ -4,6 +4,26 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #32 — YouTube "Gagal mengambil profil platform" saat OAuth callback
+**Gejala:** Setelah selesai OAuth YouTube, tampilan erroret("Gagal mengambil profil platform.") di halaman connections.
+
+**Akar:** `fetchYouTubeChannel()` di `profile.ts` memanggil YouTube Data API v3 dengan header `Authorization: Bearer <token>` saja. Beberapa konfigurasi kredensial Google API (mis. service account / web app client) memerlukan access_token juga sebagai query parameter agar endpoint `channels?mine=true` merespons dengan data channel. Tanpa query param, API bisa mengembalikan 401/403 atau items kosong, sehingga fungsi return `null` dan callback menampilkan error.
+
+**Fix:** Tambahkan `access_token=<token>` sebagai query parameter pada request ke `https://www.googleapis.com/youtube/v3/channels`. Error response sekarang di-log ke console untuk debugging. Fungsi `fetchYouTubeMetrics()` di `analytics/metrics.ts` juga diperbaiki dengan pola yang sama.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/lib/platforms/profile.ts`, `apps/web/src/lib/analytics/metrics.ts` |
+| **Masalah** | OAuth callback YouTube gagal ambil profil → error "Gagal mengambil profil platform" |
+| **Akar** | YouTube Data API v3 kadang tolak Bearer-only, perlu access_token query param |
+| **Fix** | Tambah `access_token=` query param; tambahkan error logging |
+| **Verifikasi** | `pnpm --filter web exec tsc --noEmit` lolos. **PENDING verifikasi live** — OAuth YouTube harus berhasil simpan akun tanpa error profil. |
+| **Pelajaran** | Google API v3 memiliki inkonsistensi autentikasi antar endpoint; beberapa endpoint menerima Bearer header, beberapa memerlukan query param. Untuk endpoint `?mine=true`, pastikan access_token tersedia. |
+| **Log Keyword** | youtube, profile, oauth, fetchYouTubeChannel, access_token, query param, google api |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #31 — "Pilih workspace dulu." setelah login tanpa org switcher
 **Gejala:** Setelah login (email/password), semua API route mengembalikan `{ error: "Pilih workspace dulu." }` (HTTP 400). User harus klik org switcher lalu memilih workspace secara manual agar dashboard normal kembali. Setelah pilih manual + refresh, error hilang.
 
