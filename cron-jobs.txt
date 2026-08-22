@@ -13,3 +13,9 @@
 
 # Token refresh — proactive refresh social tokens (tiap hari jam 02:00)
 0 2 * * * root curl -fsS -X POST http://localhost/api/cron/refresh-tokens -H "Authorization: Bearer ${CRON_SECRET}" >> /var/log/sahabat-kreator-cron.log 2>&1
+
+# Analytics sync — sinkron metrik semua org (setiap 6 jam)
+0 */6 * * * root curl -fsS -X POST http://localhost/api/analytics/sync -H "Authorization: Bearer ${CRON_SECRET}" -H "x-organization-id: ALL" >> /var/log/sahabat-kreator-cron.log 2>&1
+
+# Inbox sync — sinkron komentar semua org (setiap 30 menit)
+*/30 * * * * root curl -fsS -X POST http://localhost/api/inbox/sync -H "Authorization: Bearer ${CRON_SECRET}" -H "x-organization-id: ALL" >> /var/log/sahabat-kreator-cron.log 2>&1
