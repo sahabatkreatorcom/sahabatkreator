@@ -34,7 +34,7 @@ export function usePushNotification(): UsePushNotificationReturn {
         typeof navigator !== "undefined" &&
         "serviceWorker" in navigator &&
         "PushManager" in window &&
-        "vapidPublicKey" in PushManager.prototype;
+        typeof PushManager.prototype?.subscribe === "function";
 
     // Cek permission saat init
     useEffect(() => {
