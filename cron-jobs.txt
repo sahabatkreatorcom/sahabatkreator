@@ -1,0 +1,15 @@
+# Sahabat Kreator — Cron Jobs
+# Copy baris sesuai jadwal ke /etc/cron.d/sahabat-kreator di VPS
+#
+# Contoh jadwal:
+#   0 * * * * = setiap jam pada menit ke-0
+#   0 2 * * * = setiap hari jam 02:00
+#   */15 * * * * = setiap 15 menit
+#
+# Pastikan CRON_SECRET sudah di-set di .env VPS.
+
+# Billing — downgrade org expired (tiap jam)
+0 * * * * root curl -fsS -X POST http://localhost/api/cron/billing -H "Authorization: Bearer ${CRON_SECRET}" >> /var/log/sahabat-kreator-cron.log 2>&1
+
+# Token refresh — proactive refresh social tokens (tiap hari jam 02:00)
+0 2 * * * root curl -fsS -X POST http://localhost/api/cron/refresh-tokens -H "Authorization: Bearer ${CRON_SECRET}" >> /var/log/sahabat-kreator-cron.log 2>&1
