@@ -67,7 +67,7 @@ export default function CalendarPage() {
             const res = await fetch(`/api/posts/${id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ scheduledAt: `${newDate}T09:00:00.000Z` }),
+                body: JSON.stringify({ scheduledAt: new Date(`${newDate}T09:00:00`).toISOString() }),
             });
             if (res.ok) loadPosts();
         } catch {
@@ -121,8 +121,9 @@ export default function CalendarPage() {
     const postsByDay = useMemo(() => {
         const map = new Map<string, CalendarPost[]>();
         for (const p of posts) {
-            const key = p.scheduledAt ? p.scheduledAt.slice(0, 10) : p.publishedAt ? p.publishedAt.slice(0, 10) : "";
-            if (!key) continue;
+            const raw = p.scheduledAt ?? p.publishedAt ?? "";
+            if (!raw) continue;
+            const key = new Date(raw).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
             if (!map.has(key)) map.set(key, []);
             map.get(key)!.push(p);
         }
