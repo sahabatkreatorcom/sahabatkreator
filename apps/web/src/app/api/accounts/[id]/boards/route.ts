@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { withAuth, json } from "@/lib/api";
+import { decryptToken } from "@/lib/token-encryption";
 import { PINTEREST_API_BASE } from "@/lib/platforms/pinterest-config";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,8 @@ export const GET = withAuth(async (ctx, req: NextRequest, { params }: RouteParam
     if (account.organizationId !== activeOrganizationId) return json({ error: "Akses ditolak." }, { status: 403 });
     if (account.platform !== "PINTEREST") return json({ error: "Akun ini bukan Pinterest." }, { status: 400 });
 
+    const accessToken = decryptToken(account.accessToken);
+
     try {
         const boards: { id: string; name: string; url: string; pinCount: number }[] = [];
         let bookmark: string | undefined;
@@ -33,10 +36,11 @@ export const GET = withAuth(async (ctx, req: NextRequest, { params }: RouteParam
         while (hasMore) {
             const url = new URL(`${PINTEREST_API_BASE}/boards`);
             url.searchParams.set("page_size", "100");
+            url.searchParams.set("include_secret", "true");
             if (bookmark) url.searchParams.set("bookmark", bookmark);
 
             const res = await fetch(url.toString(), {
-                headers: { Authorization: `Bearer ${account.accessToken}` },
+                headers: { Authorization: `Bearer ${accessToken}` },
             });
             const data = await res.json();
 
@@ -82,10 +86,12 @@ export const POST = withAuth(async (ctx, req: NextRequest, { params }: RoutePara
     const body = (await req.json().catch(() => null)) as { name?: string } | null;
     if (!body?.name?.trim()) return json({ error: "Nama board wajib diisi." }, { status: 400 });
 
+    const accessToken = decryptToken(account.accessToken);
+
     try {
         const res = await fetch(`${PINTEREST_API_BASE}/boards`, {
             method: "POST",
-            headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },
+            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
             body: JSON.stringify({ name: body.name.trim() }),
         });
         const data = await res.json();
