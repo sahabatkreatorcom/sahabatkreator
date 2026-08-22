@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
     const ctx = await requireAuth();
     if (!ctx) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { url } = await req.json();
+    let url: string;
+    try {
+        const body = await req.json();
+        url = body?.url;
+    } catch {
+        return NextResponse.json({ error: "Body tidak valid" }, { status: 400 });
+    }
     if (!url || typeof url !== "string") {
         return NextResponse.json({ error: "URL diperlukan" }, { status: 400 });
     }
@@ -21,6 +29,7 @@ export async function POST(req: NextRequest) {
         const result = await runAudit(url);
         return NextResponse.json(result);
     } catch (e) {
+        console.error("[seo-audit] error:", e instanceof Error ? e.message : e);
         return NextResponse.json({ error: e instanceof Error ? e.message : "Audit gagal" }, { status: 500 });
     }
 }
