@@ -112,8 +112,8 @@ export default function ComposePage() {
         } catch { /* ignore */ }
     }, []);
 
-    const loadPinterestBoards = useCallback(async (accountId: string) => {
-        if (pinterestBoards[accountId]?.length > 0) return;
+    const loadPinterestBoards = useCallback(async (accountId: string, force = false) => {
+        if (!force && pinterestBoards[accountId]?.length > 0) return;
         setPinterestBoardsLoading((prev) => ({ ...prev, [accountId]: true }));
         try {
             const res = await fetch(`/api/accounts/${accountId}/boards`);
@@ -153,6 +153,15 @@ export default function ComposePage() {
         loadLibrary();
         loadContentTools();
     }, [loadAccounts, loadLibrary, loadContentTools]);
+
+    // Auto-load Pinterest boards when Pinterest account is selected
+    useEffect(() => {
+        for (const account of selectedAccounts) {
+            if (account.platform === "PINTEREST") {
+                loadPinterestBoards(account.id);
+            }
+        }
+    }, [selectedAccounts, loadPinterestBoards]);
 
     function applyTemplate(t: CaptionTemplate) {
         setCaption(t.caption);
@@ -526,7 +535,7 @@ export default function ComposePage() {
                                                             ))}
                                                             <option value="__create_new__">+ Buat board baru</option>
                                                         </select>
-                                                        <Button size="sm" variant="ghost" onClick={() => loadPinterestBoards(account.id)} loading={pinterestBoardsLoading[account.id]}>
+                                                        <Button size="sm" variant="ghost" onClick={() => loadPinterestBoards(account.id, true)} loading={pinterestBoardsLoading[account.id]}>
                                                             Muat ulang
                                                         </Button>
                                                     </div>
