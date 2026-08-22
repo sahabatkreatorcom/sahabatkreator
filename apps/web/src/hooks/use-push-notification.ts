@@ -82,7 +82,7 @@ export function usePushNotification(): UsePushNotificationReturn {
             } catch (swError) {
                 console.warn("[Push] default scope gagal, coba /sw.js:", swError);
                 // Fallback: coba ambil registration dengan scope /sw.js
-                registration = await navigator.serviceWorker.getRegistration("/sw.js");
+                registration = (await navigator.serviceWorker.getRegistration("/sw.js")) ?? null;
             }
 
             // Jika masih belum dapat, coba semua registrasi
