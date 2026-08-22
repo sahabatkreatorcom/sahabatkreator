@@ -1,4 +1,7 @@
+import sharp from "sharp";
 import type { PlatformAccount, PublishPayload, PublishResponse } from "./types";
+import { getPublicUrl, uploadFile } from "@/lib/storage";
+import { randomUUID } from "node:crypto";
 
 const TIKTOK_API_URL = "https://open.tiktokapis.com/v2";
 
@@ -96,6 +99,9 @@ async function publishPhoto(
         return { success: false, error: "TikTok photo mode maksimal 35 gambar." };
     }
 
+    // TikTok HANYA terima JPEG/WEBP — convert PNG ke JPEG
+    const photoImages = await ensureJpegUrls(payload.mediaUrls);
+
     const initBody = {
         post_info: {
             title: payload.caption,
@@ -108,7 +114,7 @@ async function publishPhoto(
         source_info: {
             source: "PULL_FROM_URL",
             photo_cover_index: 0,
-            photo_images: payload.mediaUrls,
+            photo_images: photoImages,
         },
         post_mode: "DIRECT_POST",
         media_type: "PHOTO",
@@ -142,6 +148,35 @@ async function publishPhoto(
         postId,
         postUrl: `https://tiktok.com/@${account.accountName}/video/${postId}`,
     };
+}
+
+/**
+ * TikTok photo mode HANYA terima JPEG/WEBP — PNG ditolak.
+ * Download semua PNG, convert ke JPEG via sharp, upload ulang, return URL baru.
+ */
+async function ensureJpegUrls(urls: string[]): Promise<string[]> {
+    const results = await Promise.all(
+        urls.map(async (url) => {
+            try {
+                const lower = url.toLowerCase();
+                // Cek apakah PNG berdasarkan extension
+                if (!lower.endsWith(".png") && !lower.includes(".png?")) return url;
+
+                const res = await fetch(url);
+                if (!res.ok) return url;
+
+                const buf = Buffer.from(await res.arrayBuffer());
+                const jpegBuf = await sharp(buf).jpeg({ quality: 90 }).toBuffer();
+
+                const key = `tiktok-jpeg/${randomUUID()}.jpg`;
+                await uploadFile(key, jpegBuf, { contentType: "image/jpeg" });
+                return getPublicUrl(key);
+            } catch {
+                return url;
+            }
+        }),
+    );
+    return results;
 }
 
 /** Poll status publish TikTok sampai selesai (maks ±45 dtk). */

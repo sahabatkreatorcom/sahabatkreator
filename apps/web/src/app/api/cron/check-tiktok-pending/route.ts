@@ -74,7 +74,6 @@ export const POST = async (req: NextRequest) => {
                     );
                     resolved++;
                 } else {
-                    // Complete tapi ID tidak valid
                     await db.update(schema.post)
                         .set({ status: "FAILED" })
                         .where(eq(schema.post.id, post.id));
@@ -90,6 +89,7 @@ export const POST = async (req: NextRequest) => {
                     failed++;
                 }
             } else if (status === "FAILED") {
+                const failedReason = data.data?.failed_reason || "unknown";
                 await db.update(schema.post)
                     .set({ status: "FAILED" })
                     .where(eq(schema.post.id, post.id));
@@ -97,26 +97,41 @@ export const POST = async (req: NextRequest) => {
                     id: randomUUID(),
                     postId: post.id,
                     platform: "TIKTOK",
-                    errorCode: "TIKTOK_FAILED",
-                    errorRaw: data.data?.failed_reason || "TikTok report status FAILED.",
-                    errorHuman: "TikTok gagal memproses foto.",
+                    errorCode: `TIKTOK_FAILED:${failedReason}`,
+                    errorRaw: JSON.stringify(data),
+                    errorHuman: humanizeTikTokError(failedReason),
                     occurredAt: new Date(),
                 });
                 await logActivity(
                     post.organizationId,
                     "post.failed",
                     { type: "post", id: post.id, name: (post.caption || "").slice(0, 100) },
-                    { platform: "TIKTOK", error: "TikTok status FAILED" },
+                    { platform: "TIKTOK", error: failedReason },
                 );
                 failed++;
             } else {
-                // Masih diproses, biarkan
                 stillPending++;
             }
-        } catch {
+        } catch (e) {
             stillPending++;
         }
     }
 
     return json({ total: pending.length, resolved, stillPending, failed });
 };
+
+function humanizeTikTokError(reason: string): string {
+    const map: Record<string, string> = {
+        url_ownership_unverified: "Domain gambar belum diverifikasi di TikTok Developer Portal. Verifikasi domain di bagian URL Properties.",
+        photo_pull_failed: "TikTok gagal mengunduh gambar. Pastikan URL gambar bisa diakses publik tanpa redirect.",
+        picture_size_check_failed: "Ukuran gambar terlalu kecil (minimum 360px).",
+        file_format_check_failed: "Format gambar tidak didukung. Gunakan JPG, JPEG, atau PNG.",
+        spam_risk_too_many_posts: "Batas post harian tercapai.",
+        spam_risk_user_banned_from_posting: "Akun diblokir dari posting.",
+        spam_risk_too_many_pending_share: "Terlalu banyak post pending (maks 5 per 24 jam).",
+        unaudited_client_can_only_post_to_private_accounts: "App belum di-audit TikTok. Hanya bisa post ke akun private.",
+        access_token_invalid: "Token akses tidak valid atau sudah expired.",
+        scope_not_authorized: "App belum mendapat izin video.publish.",
+    };
+    return map[reason] || `TikTok error: ${reason}`;
+}
