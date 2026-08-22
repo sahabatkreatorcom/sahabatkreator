@@ -30,9 +30,14 @@ export interface TeamInvitation {
 export async function listTeamMembers(
     headers: RequestHeaders,
 ): Promise<{ members: TeamMember[]; role: string }> {
-    const result = await auth.api.listMembers({ headers });
+    let result;
+    try {
+        result = await auth.api.listMembers({ headers });
+    } catch (e) {
+        throw new Error(e instanceof Error ? e.message : "Gagal mengambil data anggota tim.");
+    }
 
-    const members: TeamMember[] = result.members.map((m) => ({
+    const members: TeamMember[] = (result.members || []).map((m) => ({
         id: m.id,
         userId: m.userId,
         name: m.user.name || m.user.email,
@@ -52,7 +57,12 @@ export async function inviteTeamMember(
     headers: RequestHeaders,
     input: { email: string; role?: string },
 ): Promise<{ invitation: TeamInvitation }> {
-    const result = await authClientLikeInvite(headers, input);
+    let result;
+    try {
+        result = await authClientLikeInvite(headers, input);
+    } catch (e) {
+        throw new Error(e instanceof Error ? e.message : "Gagal mengundang anggota.");
+    }
     return {
         invitation: {
             id: result.id,
@@ -84,9 +94,14 @@ async function authClientLikeInvite(headers: RequestHeaders, input: { email: str
 }
 
 export async function listTeamInvitations(headers: RequestHeaders): Promise<TeamInvitation[]> {
-    const result = await auth.api.listInvitations({ headers });
+    let result;
+    try {
+        result = await auth.api.listInvitations({ headers });
+    } catch (e) {
+        throw new Error(e instanceof Error ? e.message : "Gagal mengambil data undangan.");
+    }
 
-    return result.map((inv) => ({
+    return (result || []).map((inv) => ({
         id: inv.id,
         email: inv.email,
         role: inv.role,
@@ -97,28 +112,40 @@ export async function listTeamInvitations(headers: RequestHeaders): Promise<Team
 }
 
 export async function cancelTeamInvitation(headers: RequestHeaders, invitationId: string): Promise<void> {
-    await auth.api.cancelInvitation({
-        headers,
-        body: { invitationId },
-    });
+    try {
+        await auth.api.cancelInvitation({
+            headers,
+            body: { invitationId },
+        });
+    } catch (e) {
+        throw new Error(e instanceof Error ? e.message : "Gagal membatalkan undangan.");
+    }
 }
 
 export async function updateTeamMemberRole(
     headers: RequestHeaders,
     input: { memberId: string; role: string },
 ): Promise<void> {
-    await auth.api.updateMemberRole({
-        headers,
-        body: {
-            memberId: input.memberId,
-            role: input.role,
-        },
-    });
+    try {
+        await auth.api.updateMemberRole({
+            headers,
+            body: {
+                memberId: input.memberId,
+                role: input.role,
+            },
+        });
+    } catch (e) {
+        throw new Error(e instanceof Error ? e.message : "Gagal mengubah role.");
+    }
 }
 
 export async function removeTeamMember(headers: RequestHeaders, memberId: string): Promise<void> {
-    await auth.api.removeMember({
-        headers,
-        body: { memberIdOrEmail: memberId },
-    });
+    try {
+        await auth.api.removeMember({
+            headers,
+            body: { memberIdOrEmail: memberId },
+        });
+    } catch (e) {
+        throw new Error(e instanceof Error ? e.message : "Gagal menghapus anggota.");
+    }
 }
