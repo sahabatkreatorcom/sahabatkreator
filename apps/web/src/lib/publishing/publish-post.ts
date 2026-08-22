@@ -5,6 +5,7 @@ import { publishToPlatform } from "./orchestrator";
 import type { PublishPayload } from "./types";
 import { decryptToken } from "@/lib/token-encryption";
 import { logActivity } from "@/lib/activity-log";
+import { notifyPostPublished, notifyPostFailed } from "@/lib/push-notification";
 
 export interface PublishPostResult {
     ok: boolean;
@@ -130,6 +131,12 @@ export async function publishPost(
             { type: "post", id: postId, name: post.caption.slice(0, 100) },
             { platform: post.socialAccount.platform, error: result.error },
         );
+        // Kirim notifikasi push ke user
+        notifyPostFailed({
+            organizationId,
+            platform: post.socialAccount.platform,
+            error: result.error || "Publikasi gagal.",
+        }).catch(console.error);
         return { ok: false, error: result.error, errorCode: result.errorCode };
     }
 
@@ -148,6 +155,12 @@ export async function publishPost(
         { type: "post", id: postId, name: post.caption.slice(0, 100) },
         { platform: post.socialAccount.platform },
     );
+    // Kirim notifikasi push ke user
+    notifyPostPublished({
+        organizationId,
+        postUrl: result.postUrl,
+        platform: post.socialAccount.platform,
+    }).catch(console.error);
     return { ok: true, postId: result.postId, postUrl: result.postUrl };
 }
 

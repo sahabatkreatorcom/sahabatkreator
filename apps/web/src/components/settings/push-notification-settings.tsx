@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { usePushNotification } from "@/hooks/use-push-notification";
 
 interface PushSub {
     id: string;
@@ -32,9 +33,10 @@ export function PushNotificationSettings() {
     const [data, setData] = useState<PushData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [enabled, setEnabled] = useState(false);
-    const [requesting, setRequesting] = useState(false);
     const [revoking, setRevoking] = useState<string | null>(null);
+    const [requesting, setRequesting] = useState(false);
+
+    const { isSupported, isLoading: subscribing, subscribe, unsubscribe } = usePushNotification();
 
     const load = React.useCallback(async () => {
         setLoading(true);
@@ -44,7 +46,6 @@ export function PushNotificationSettings() {
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || "Gagal memuat notifikasi.");
             setData(json);
-            setEnabled(json.isSupported && json.subscriptions.length > 0);
         } catch (e) {
             setError(e instanceof Error ? e.message : "Gagal memuat notifikasi.");
         } finally {
@@ -56,24 +57,14 @@ export function PushNotificationSettings() {
         load();
     }, [load]);
 
-    async function requestPermission() {
-        if (!("Notification" in window)) {
-            setError("Browser tidak mendukung notifikasi push.");
-            return;
-        }
+    async function handleSubscribe() {
         setRequesting(true);
         setError(null);
         try {
-            const permission = await Notification.requestPermission();
-            if (permission !== "granted") {
-                setError("Izin notifikasi ditolak.");
-                setRequesting(false);
-                return;
-            }
-            // Subscribe to VAPID (placeholder — needs server key)
-            setError("Notifikasi push belum tersedia. Hubungi admin untuk mengonfigurasi VAPID.");
+            await subscribe();
+            await load();
         } catch (e) {
-            setError(e instanceof Error ? e.message : "Gagal meminta izin.");
+            setError(e instanceof Error ? e.message : "Gagal mensubscribe.");
         } finally {
             setRequesting(false);
         }
@@ -104,6 +95,8 @@ export function PushNotificationSettings() {
         );
     }
 
+    const hasSubscription = (data?.subscriptions.length ?? 0) > 0;
+
     return (
         <div className="space-y-6 rounded-lg border border-border bg-card p-5">
             <div>
@@ -119,7 +112,7 @@ export function PushNotificationSettings() {
             <div className="space-y-3">
                 <div className="flex items-center justify-between rounded-md border border-border p-3">
                     <div className="flex items-center gap-3">
-                        {data?.isSupported ? (
+                        {isSupported ? (
                             <Bell className="h-5 w-5 text-emerald-500" />
                         ) : (
                             <BellOff className="h-5 w-5 text-muted-foreground" />
@@ -127,11 +120,13 @@ export function PushNotificationSettings() {
                         <div>
                             <p className="text-sm font-medium">Dukungan Browser</p>
                             <p className="text-xs text-muted-foreground">
-                                {data?.isSupported ? "Browser Anda mendukung notifikasi push" : "Browser tidak mendukung notifikasi"}
+                                {isSupported
+                                    ? "Browser Anda mendukung notifikasi push"
+                                    : "Browser tidak mendukung notifikasi push"}
                             </p>
                         </div>
                     </div>
-                    {data?.isSupported ? (
+                    {isSupported ? (
                         <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                     ) : (
                         <AlertCircle className="h-5 w-5 text-muted-foreground" />
@@ -168,13 +163,13 @@ export function PushNotificationSettings() {
                 </div>
                 <Button
                     size="sm"
-                    variant={data?.subscriptions.length ? "secondary" : "default" as any}
-                    disabled={requesting || !data?.isSupported}
-                    onClick={requestPermission}
+                    variant={hasSubscription ? "secondary" : undefined}
+                    disabled={subscribing || !isSupported}
+                    onClick={handleSubscribe}
                 >
-                    {requesting ? (
+                    {subscribing ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : data?.subscriptions.length ? (
+                    ) : hasSubscription ? (
                         <>Sudah Izin</>
                     ) : (
                         "Izinkan"
@@ -200,7 +195,9 @@ export function PushNotificationSettings() {
                                 <div>
                                     <p className="text-sm font-medium">
                                         {sub.userAgent
-                                            ? (sub.userAgent.includes("Mobile") ? "Handphone" : "Desktop")
+                                            ? sub.userAgent.includes("Mobile")
+                                                ? "Handphone"
+                                                : "Desktop"
                                             : "Perangkat"}
                                     </p>
                                     <p className="text-xs text-muted-foreground">

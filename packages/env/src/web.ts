@@ -12,9 +12,14 @@ export const env = createEnv({
       .url()
       .default("http://localhost:3000")
       .describe("Base URL publik aplikasi (dipakai auth client & sitemap)."),
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: z
+      .string()
+      .optional()
+      .describe("VAPID public key untuk push notification."),
   },
   runtimeEnv: {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY,
   },
   emptyStringAsUndefined: true,
 });
