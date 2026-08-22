@@ -4,6 +4,26 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #34 — SEO Audit "Unexpected end of JSON input" saat API response kosong
+
+**Gejala:** Halaman `/admin/seo-audit` menampilkan error browser "Failed to execute 'json' on 'Response': Unexpected end of JSON input" saat klik tombol "Audit Sekarang".
+
+**Akar:** Client-side `fetch()` di `seo-audit/page.tsx` memanggil `res.json()` SEBELUM mengecek `res.ok`. Ketika server mengembalikan response kosong (misal timeout, connection reset, atau middleware intercept), browser throw pada `JSON.parse("")`.
+
+**Fix:** Bungkus `res.json()` dalam try/catch, set `data = null` kalau parse gagal, baru setelah itu cek `res.ok`. Tambah guard `if (data)` sebelum `setResult`.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/app/admin/seo-audit/page.tsx` |
+| **Masalah** | "Unexpected end of JSON input" saat audit SEO |
+| **Akar** | `res.json()` dipanggil sebelum cek `res.ok`; response kosong throw JSON parse error |
+| **Fix** | Defensive try/catch pada `res.json()`, check `res.ok` setelah parse, guard `if (data)` sebelum setState |
+| **Verifikasi** | `pnpm --filter web build` lolos. Perlu deploy & test di VPS. |
+| **Log Keyword** | seo-audit, JSON parse, Unexpected end of JSON input, res.json |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #33 — Perbaikan external_url, external_id, synced_at yang salah/NULL di Database
 
 **Gejala:** Setelah publish post ke berbagai platform (Instagram, TikTok, Threads, Pinterest, Facebook), field `external_url`, `external_id`, `synced_at` di database sering kosong (NULL) atau berisi URL yang salah format:
