@@ -4,6 +4,34 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #40 — Media Library - Full Preview Dialog
+
+**Gejala:** Halaman `/dashboard/media` hanya menampilkan thumbnail grid tanpa kemampuan preview full-size. User harus membuka file terpisah untuk melihat detail media.
+
+**Akar Masalah:**
+MediaCard component hanya menampilkan thumbnail tanpa interaksi preview.
+
+**Fix:**
+1. Tambah preview dialog fullscreen saat klik media
+2. Support preview untuk semua tipe: image (full), video (with controls), audio (with player)
+3. Tambah panel info: filename, mimeType, size, dimensions, duration, tags, altText
+4. Tambah tombol download untuk unduh file
+5. Tambah hover overlay dengan icon Maximize2
+6. Tambah keyboard shortcut (Escape) untuk tutup preview
+7. Perbaiki MediaCard dengan state selected yang lebih baik
+
+| | |
+|---|---|
+| **File** | `apps/web/src/app/dashboard/media/page.tsx` |
+| **Masalah** | Tidak ada preview full-size untuk media |
+| **Akar** | Hanya thumbnail grid tanpa dialog preview |
+| **Fix** | Tambah preview dialog fullscreen dengan info panel |
+| **Verifikasi** | `pnpm --filter web build` lolos. Perlu test live di VPS. |
+| **Log Keyword** | media, preview, dialog, full-size |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #39 — Week View - Post Count & Expandable Items
 
 **Gejala:** Tab "Minggu" di halaman `/dashboard/calendar` tidak menampilkan jumlah post per hari dan tidak bisa expand seperti tab "Bulan".
