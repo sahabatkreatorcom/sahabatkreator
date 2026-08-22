@@ -25,6 +25,11 @@ export const POST = async (req: NextRequest) => {
         return json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Skip cron publish jika BullMQ worker aktif
+    if (process.env.REDIS_URL && process.env.QUEUE_WORKER_ENABLED !== "false") {
+        return json({ error: "Cron publish di-skip: BullMQ worker aktif. Gunakan queue." }, { status: 503 });
+    }
+
     const now = new Date();
 
     // 1. Ambil batch post yang jatuh tempo

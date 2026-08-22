@@ -1,6 +1,7 @@
 import { db, schema } from "@sahabat-kreator/db";
 import { processWebhookEvent } from "./index";
 import { getWebhookSecretConfig } from "./secrets";
+import { randomUUID } from "node:crypto";
 
 /**
  * YouTube — PubSubHubbub push notifications.
@@ -93,7 +94,7 @@ export async function handleYoutubeFeed(xml: string): Promise<number> {
             await db
                 .insert(schema.activity)
                 .values({
-                    id: crypto.randomUUID(),
+                    id: randomUUID(),
                     organizationId: account.organizationId,
                     action: "post.published",
                     resourceType: "post",
