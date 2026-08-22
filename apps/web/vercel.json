@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/publish",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/check-tiktok-pending",
+      "schedule": "*/2 * * * *"
     }
   ]
 }
