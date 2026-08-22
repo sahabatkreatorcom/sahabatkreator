@@ -16,6 +16,7 @@
  * job; hanya satu worker yang memproses tiap job).
  */
 import { Queue, Worker } from "bullmq";
+import { randomUUID } from "node:crypto";
 import {
     QUEUE_PUBLISH,
     QUEUE_SYNC,
@@ -101,6 +102,17 @@ export async function startQueueWorkers(): Promise<() => Promise<void>> {
                     }
 
                     // Other platforms: reset to FAILED after threshold
+                    await db.insert(schema.publishError)
+                        .values({
+                            id: randomUUID(),
+                            postId: post.id,
+                            platform: (post.platform ?? "MANUAL") as "INSTAGRAM" | "INSTAGRAM_PAGE" | "FACEBOOK" | "TIKTOK" | "YOUTUBE" | "PINTEREST" | "GOOGLE_BUSINESS" | "LINKEDIN" | "BLUESKY" | "THREADS" | "MANUAL",
+                            errorCode: "STALE_PUBLISHING_TIMEOUT",
+                            errorRaw: `Post stuck di status PUBLISHING selama >10 menit (${post.platform}).`,
+                            errorHuman: `Publikasi ${post.platform} gagal (timeout).`,
+                            suggestion: "Coba publish ulang dari dashboard.",
+                            occurredAt: new Date(),
+                        });
                     await db.update(schema.post)
                         .set({ status: "FAILED", updatedAt: new Date() })
                         .where(eq(schema.post.id, post.id));
