@@ -132,10 +132,12 @@ async function fetchTikTokMetrics(accessToken: string): Promise<AccountMetrics |
 
 async function fetchYouTubeMetrics(accessToken: string): Promise<AccountMetrics | null> {
     try {
-        const res = await fetch("https://www.googleapis.com/youtube/v3/channels?part=statistics&mine=true", {
-            headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        const stats = res.ok ? (await res.json()).items?.[0]?.statistics : null;
+        const res = await fetch(
+            "https://www.googleapis.com/youtube/v3/channels?part=statistics&mine=true&access_token=" +
+            encodeURIComponent(accessToken),
+        );
+        const data = res.ok ? await res.json() : null;
+        const stats = data?.items?.[0]?.statistics ?? null;
         if (!stats) return null;
         return {
             followers: parseInt(stats.subscriberCount, 10) || 0,

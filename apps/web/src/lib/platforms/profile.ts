@@ -180,10 +180,19 @@ export async function fetchTikTokProfile(accessToken: string): Promise<OAuthProf
 
 export async function fetchYouTubeChannel(accessToken: string): Promise<OAuthProfile | null> {
     try {
-        const res = await fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", {
-            headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        // YouTube Data API v3 memerlukan access_token sebagai query param selain header Authorization
+        const res = await fetch(
+            "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true&access_token=" +
+            encodeURIComponent(accessToken),
+        );
         const data = await res.json();
+
+        // Debug: tampilkan error response jika ada
+        if (data.error) {
+            console.error("[fetchYouTubeChannel] API error:", JSON.stringify(data.error));
+            return null;
+        }
+
         const channel = data.items?.[0];
         if (!channel) return null;
         return {
@@ -192,7 +201,8 @@ export async function fetchYouTubeChannel(accessToken: string): Promise<OAuthPro
             username: channel.snippet.customUrl ?? "",
             profilePicture: channel.snippet.thumbnails?.default?.url,
         };
-    } catch {
+    } catch (err) {
+        console.error("[fetchYouTubeChannel] Fetch error:", err);
         return null;
     }
 }
