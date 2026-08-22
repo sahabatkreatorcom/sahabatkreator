@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
-import { and, eq, like } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { json, verifyCronSecret } from "@/lib/api";
 import { logActivity } from "@/lib/activity-log";
+import { decryptToken } from "@/lib/token-encryption";
 import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export const POST = async (req: NextRequest) => {
         if (!post.socialAccount || !post.platformPostId) continue;
 
         const publishId = post.platformPostId.replace("tiktok_pending:", "");
-        const accessToken = post.socialAccount.accessToken;
+        const accessToken = decryptToken(post.socialAccount.accessToken);
 
         try {
             const res = await fetch(`${TIKTOK_API_URL}/post/publish/status/fetch/`, {
