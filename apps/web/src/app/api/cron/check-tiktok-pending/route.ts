@@ -89,7 +89,7 @@ export const POST = async (req: NextRequest) => {
                     failed++;
                 }
             } else if (status === "FAILED") {
-                const failedReason = data.data?.failed_reason || "unknown";
+                const failedReason = data.data?.fail_reason || "unknown";
                 await db.update(schema.post)
                     .set({ status: "FAILED" })
                     .where(eq(schema.post.id, post.id));
