@@ -40,6 +40,7 @@ export interface PublishPayload {
     tiktokComments?: boolean;
     tiktokDuets?: boolean;
     tiktokStitches?: boolean;
+    tiktokAutoAddMusic?: boolean;
     instagramShareToFeed?: boolean;
     instagramComments?: boolean;
     instagramLocationId?: string;

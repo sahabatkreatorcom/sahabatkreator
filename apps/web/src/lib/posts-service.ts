@@ -40,6 +40,7 @@ export interface PlatformSettingsInput {
     tiktokComments?: boolean;
     tiktokDuets?: boolean;
     tiktokStitches?: boolean;
+    tiktokAutoAddMusic?: boolean;
     tiktokBrandOrganic?: boolean;
     tiktokBrandContent?: boolean;
     tiktokIsAigc?: boolean;
@@ -192,6 +193,7 @@ export async function createPosts(params: CreatePostParams): Promise<CreatePostR
                 tiktokComments: settings.tiktokComments,
                 tiktokDuets: settings.tiktokDuets,
                 tiktokStitches: settings.tiktokStitches,
+                tiktokAutoAddMusic: settings.tiktokAutoAddMusic,
                 tiktokBrandOrganic: settings.tiktokBrandOrganic,
                 tiktokBrandContent: settings.tiktokBrandContent,
                 tiktokIsAigc: settings.tiktokIsAigc,

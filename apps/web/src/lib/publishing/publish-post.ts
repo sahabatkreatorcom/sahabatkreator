@@ -36,6 +36,9 @@ export async function publishPost(
     if (post.status === "PUBLISHED") {
         return { ok: false, error: "Post sudah terbit." };
     }
+    if (post.status === "PUBLISHING") {
+        return { ok: false, error: "Post sedang diproses oleh platform." };
+    }
 
     await db.update(schema.post)
         .set({ status: "PUBLISHING" })
@@ -70,6 +73,7 @@ export async function publishPost(
         tiktokComments: post.tiktokComments,
         tiktokDuets: post.tiktokDuets,
         tiktokStitches: post.tiktokStitches,
+        tiktokAutoAddMusic: post.tiktokAutoAddMusic,
         instagramShareToFeed: post.instagramShareToFeed,
         instagramComments: post.instagramComments,
         instagramLocationId: post.instagramLocationId ?? undefined,

@@ -1,0 +1,1 @@
+ALTER TABLE "post" ADD COLUMN "tiktok_auto_add_music" boolean DEFAULT true NOT NULL;

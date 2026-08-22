@@ -115,6 +115,7 @@ async function publishPhoto(
             brand_organic_toggle: payload.tiktokBrandOrganic ?? false,
             brand_content_toggle: payload.tiktokBrandContent ?? false,
             is_aigc: payload.tiktokIsAigc ?? false,
+            auto_add_music: payload.tiktokAutoAddMusic ?? true,
         },
         source_info: {
             source: "PULL_FROM_URL",
