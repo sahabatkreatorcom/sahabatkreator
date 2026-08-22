@@ -4,6 +4,29 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #36 — Admin Health "unknown" - mismatch struktur data API dan frontend
+
+**Gejala:** Halaman `/admin/health` menampilkan "unknown" untuk semua status (server, database, API).
+
+**Akar Masalah:**
+Interface `HealthStatus` di halaman frontend tidak match dengan struktur response API:
+- API mengembalikan: `uptimeSeconds`, `components` (array), `metrics` (memory/CPU)
+- Frontend mengharapkan: `uptime`, `database.status`, `api.status`, `memoryUsage`, `cpuUsage`
+
+**Fix:** Update interface `HealthStatus` dan rendering di halaman untuk match dengan struktur API response yang sebenarnya.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/app/admin/health/page.tsx` |
+| **Masalah** | Status "unknown" untuk semua komponen |
+| **Akar** | Mismatch interface vs API response structure |
+| **Fix** | Align interface dengan response API: components array, metrics object |
+| **Verifikasi** | `pnpm --filter web build` lolos. Perlu test live di VPS. |
+| **Log Keyword** | admin/health, unknown, interface mismatch |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #35 — SEO Audit HTTP 500 saat build & response parsing
 
 **Gejala:** Endpoint `/api/seo/audit` mengembalikan HTTP 500. Bisa disebabkan:
