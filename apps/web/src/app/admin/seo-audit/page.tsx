@@ -98,12 +98,18 @@ export default function AdminSeoAuditPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Audit gagal.");
-            setResult(data);
-            const newHistory = [data, ...auditHistory.filter((h) => h.url !== data.url)].slice(0, 20);
-            setAuditHistory(newHistory);
-            localStorage.setItem("admin_seo_audit_history", JSON.stringify(newHistory));
+            let data: SeoResult | null = null;
+            try {
+                data = await res.json();
+            } catch { /* empty body */ }
+            const err = data ? (data as unknown as Record<string, unknown>)?.error : undefined;
+            if (!res.ok) throw new Error(typeof err === "string" ? err : `HTTP ${res.status}`);
+            if (data) {
+                setResult(data);
+                const newHistory = [data, ...auditHistory.filter((h) => h.url !== data.url)].slice(0, 20);
+                setAuditHistory(newHistory);
+                localStorage.setItem("admin_seo_audit_history", JSON.stringify(newHistory));
+            }
         } catch (e) {
             setError(e instanceof Error ? e.message : "Terjadi kesalahan.");
         } finally {
