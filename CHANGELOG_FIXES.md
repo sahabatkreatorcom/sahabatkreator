@@ -4,6 +4,33 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #39 — Week View - Post Count & Expandable Items
+
+**Gejala:** Tab "Minggu" di halaman `/dashboard/calendar` tidak menampilkan jumlah post per hari dan tidak bisa expand seperti tab "Bulan".
+
+**Akar Masalah:**
+WeekView component tidak memiliki fitur:
+1. Menampilkan jumlah post di header hari
+2. Membatasi tampilan post (max 3) dengan opsi expand/collapse
+
+**Fix:**
+1. Tambah counter jumlah post di header setiap hari
+2. Implementasi expandable logic dengan `useState` untuk expanded days
+3. Tambah tombol "+N lainnya" dan "Lebih sedikit" untuk expand/collapse
+4. Konstanta `MAX_VISIBLE = 3` seperti di MonthView
+
+| | |
+|---|---|
+| **File** | `apps/web/src/components/calendar/week-view.tsx` |
+| **Masalah** | Week view tidak informatif, tidak ada expand/collapse |
+| **Akar** | Tidak ada logic untuk membatasi dan expand post |
+| **Fix** | Tambah post count, max visible 3, expand/collapse button |
+| **Verifikasi** | `pnpm --filter web build` lolos. Perlu test live di VPS. |
+| **Log Keyword** | calendar, week view, expand, post count |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #38 — Calendar Grid UX - Platform Badge & Status Indicators
 
 **Gejala:** Grid view di halaman `/dashboard/calendar` tab "Grid" hanya menampilkan thumbnail/media tanpa penanda platform dan status yang jelas. User sulit membedakan post dari platform berbeda dan status publish.
