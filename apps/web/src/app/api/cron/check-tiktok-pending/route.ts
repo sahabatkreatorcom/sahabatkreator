@@ -23,10 +23,19 @@ export const POST = async (req: NextRequest) => {
         return json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Ambil semua post PENDING TikTok
+    console.log(`[check-tiktok-pending] ${new Date().toISOString()} start`);
+
+    // Ambil semua post PENDING TikTok — termasuk yang platformPostId kosong (stuck lama)
     const pending = await db.query.post.findMany({
-        where: (t, { and: _and, eq: _eq, like: _like }) =>
-            _and(_eq(t.status, "PUBLISHING"), _like(t.platformPostId, "tiktok_pending:%")),
+        where: (t, { and: _and, eq: _eq, like: _like, or: _or, isNull: _isNull }) =>
+            _and(
+                _eq(t.status, "PUBLISHING"),
+                _eq(t.platform, "TIKTOK"),
+                _or(
+                    _like(t.platformPostId, "tiktok_pending:%"),
+                    _isNull(t.platformPostId),
+                ),
+            ),
         with: { socialAccount: true },
         columns: {
             id: true,
@@ -37,12 +46,24 @@ export const POST = async (req: NextRequest) => {
         },
     });
 
+    console.log(`[check-tiktok-pending] found ${pending.length} pending TikTok posts`);
+
     let resolved = 0;
     let stillPending = 0;
     let failed = 0;
 
     for (const post of pending) {
-        if (!post.socialAccount || !post.platformPostId) continue;
+        if (!post.socialAccount) continue;
+
+        // Post tanpa platformPostId = stuck lama, mark FAILED (perlu publish ulang manual)
+        if (!post.platformPostId) {
+            console.log(`[check-tiktok-pending] post ${post.id} has no platformPostId, marking FAILED`);
+            await db.update(schema.post)
+                .set({ status: "FAILED" })
+                .where(eq(schema.post.id, post.id));
+            failed++;
+            continue;
+        }
 
         const publishId = post.platformPostId.replace("tiktok_pending:", "");
         const accessToken = decryptToken(post.socialAccount.accessToken);
@@ -99,11 +120,14 @@ export const POST = async (req: NextRequest) => {
                 stillPending++;
             }
         } catch (e) {
+            console.log(`[check-tiktok-pending] post ${post.id} error: ${e instanceof Error ? e.message : e}`);
             stillPending++;
         }
     }
 
-    return json({ total: pending.length, resolved, stillPending, failed });
+    const result = { total: pending.length, resolved, stillPending, failed };
+    console.log(`[check-tiktok-pending] done: ${JSON.stringify(result)}`);
+    return json(result);
 };
 
 function humanizeTikTokError(reason: string): string {
