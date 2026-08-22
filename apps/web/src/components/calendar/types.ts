@@ -15,4 +15,10 @@ export interface CalendarPost {
     postUrl: string | null;
     viralityScore: number | null;
     account: AccountRef | null;
+    media: Array<{
+        id: string;
+        url: string;
+        thumbnailUrl: string | null;
+        type: "image" | "video";
+    }>;
 }

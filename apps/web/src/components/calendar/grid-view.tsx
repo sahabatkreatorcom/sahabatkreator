@@ -43,19 +43,29 @@ export function GridView({
             <h2 className="text-sm font-medium mb-3 text-muted-foreground">Grid Preview (21 post terbaru)</h2>
             <div className="grid grid-cols-3 gap-1 rounded-lg overflow-hidden border border-border">
                 {gridPosts.map((p, i) => (
-                    <div key={p.id}
+                    <div
+                        key={p.id}
                         className={cn(
-                            "aspect-square relative cursor-pointer group",
+                            "aspect-square relative cursor-pointer group overflow-hidden",
                             i >= 18 ? "border-b-0" : "",
                             "border border-border/30"
                         )}
                         onClick={() => setDetailPost(p)}
                     >
-                        <div className="absolute inset-0 bg-muted flex items-center justify-center">
-                            <span className="text-[10px] text-muted-foreground text-center px-1">
-                                {PLATFORM_LABELS[p.account?.platform as keyof typeof PLATFORM_LABELS] ?? p.platform}
-                            </span>
-                        </div>
+                        {p.media?.[0]?.thumbnailUrl ? (
+                            <img
+                                src={p.media[0].thumbnailUrl}
+                                alt=""
+                                className="absolute inset-0 w-full h-full object-cover"
+                                loading="lazy"
+                            />
+                        ) : (
+                            <div className="absolute inset-0 bg-muted flex items-center justify-center">
+                                <span className="text-[10px] text-muted-foreground text-center px-1">
+                                    {PLATFORM_LABELS[p.account?.platform as keyof typeof PLATFORM_LABELS] ?? p.platform}
+                                </span>
+                            </div>
+                        )}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                             <span className="text-white text-xs font-medium">{STATUS_LABEL[p.status]}</span>
                         </div>

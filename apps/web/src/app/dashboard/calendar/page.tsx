@@ -22,24 +22,7 @@ import { WeekView } from "@/components/calendar/week-view";
 import { TimelineView } from "@/components/calendar/timeline-view";
 import { GridView } from "@/components/calendar/grid-view";
 
-interface AccountRef {
-    id: string;
-    platform: string;
-    name: string;
-    avatar: string | null;
-}
-
-interface CalendarPost {
-    id: string;
-    caption: string;
-    status: "draft" | "scheduled" | "publishing" | "published" | "failed";
-    scheduledAt: string | null;
-    publishedAt: string | null;
-    platform: string;
-    postUrl: string | null;
-    viralityScore: number | null;
-    account: AccountRef | null;
-}
+import type { CalendarPost } from "@/components/calendar/types";
 
 const STATUS_LABEL: Record<string, string> = {
     draft: "Draft",
