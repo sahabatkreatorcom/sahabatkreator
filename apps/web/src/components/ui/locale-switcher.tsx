@@ -27,18 +27,20 @@ export function LocaleSwitcher() {
     localStorage.setItem("locale", code);
     setLocale(code);
 
+    // Strip current locale prefix if present
     let path = pathname;
     for (const l of LOCALES) {
-      if (path.startsWith(`/${l.code}/`)) {
-        path = path.slice(l.code.length + 1);
+      const prefix = `/${l.code}/`;
+      if (path === prefix || path.startsWith(prefix)) {
+        path = path === prefix ? "/" : path.slice(prefix.length);
         break;
       }
     }
 
     if (code === "id") {
-      (router as unknown as { push: (path: string) => void }).push(path || "/");
+      router.push(path || "/");
     } else {
-      (router as unknown as { push: (path: string) => void }).push(`/en${path}`);
+      router.push(`/en${path || "/"}`);
     }
   }
 
