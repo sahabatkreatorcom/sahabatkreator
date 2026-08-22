@@ -4,6 +4,26 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #31 — "Pilih workspace dulu." setelah login tanpa org switcher
+**Gejala:** Setelah login (email/password), semua API route mengembalikan `{ error: "Pilih workspace dulu." }` (HTTP 400). User harus klik org switcher lalu memilih workspace secara manual agar dashboard normal kembali. Setelah pilih manual + refresh, error hilang.
+
+**Akar:** `requireAuth()` di `api.ts` membaca `session.session.activeOrganizationId` secara langsung tanpa fallback. Setelah login email/password, sesi baru belum memiliki `activeOrganizationId` yang tersimpan (client-side belum panggil `organization.setActive`). Sementara itu, `dashboard/layout.tsx:15` sudah punya fallback `?? organizations[0]?.id`, jadi halaman render normal, tapi API route tetap gagal karena `requireAuth()` tidak punya fallback yang sama.
+
+**Fix:** `requireAuth()` sekarang mengambil organisasi pertama user sebagai fallback bila `session.session.activeOrganizationId` kosong, menyamakan perilaku dengan `dashboard/layout.tsx`.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/lib/api.ts` |
+| **Masalah** | Semua API route mengembalikan 400 "Pilih workspace dulu." setelah login |
+| **Akar** | `requireAuth()` tidak memiliki fallback aktifOrganizationId; beda dengan dashboard layout |
+| **Fix** | Tambah fallback `auth.api.listOrganizations().at(0)?.id` saat activeOrganizationId kosong |
+| **Verifikasi** | `pnpm --filter web exec tsc --noEmit` ✅. **PENDING verifikasi live** — login email/password harus langsung akses dashboard tanpa perlu klik org switcher dulu. |
+| **Pelajaran** | Selalu sinkronkan fallback logic antara client-side layout dan server-side API helper; perbedaan kecil menyebabkan inconsistency yang terlihat saat login. |
+| **Log Keyword** | workspace, pilih workspace dulu, activeOrganizationId, requireAuth, login, fallback, org switcher |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #30 — Bahasa Mandarin di /listening + status token misleading + tombol hubungkan ulang + 502/503 SEB
 **Gejala:** (1) Halaman `/listening` masih berbahasa Mandarin ("新增監控", "監控中", "載入中", dll). (2) Konsol error `502 ()` & `503 ()` saat memakai Seb. (3) TikTok tampil "Token hampir kedaluwarsa (0 hari)" tapi klik "Perbarui" menjawab "Token masih valid" — kontradiktif. (4) Threads "Token kedaluwarsa — hubungkan ulang" TANPA tombol hubungkan ulang. (5) YouTube "Token berhasil diperbarui" tapi status tetap "Token hampir kedaluwarsa (0 hari)".
 

@@ -8,6 +8,10 @@ import { eq } from "drizzle-orm";
 /**
  * Mendapatkan session + activeOrganizationId untuk route handler server.
  * Mengembalikan null kalau tidak login.
+ *
+ * Fallback: kalau sesi belum punya activeOrganizationId (mis. baru login),
+ * ambil organisasi pertama user sebagai default — sama seperti
+ * dashboard/layout.tsx agar semua API route konsisten.
  */
 export async function requireAuth() {
     const h = await headers();
@@ -15,7 +19,10 @@ export async function requireAuth() {
 
     if (!session) return null;
 
-    const activeOrganizationId = session.session.activeOrganizationId;
+    const activeOrganizationId =
+        session.session.activeOrganizationId ??
+        (await auth.api.listOrganizations({ headers: h })).at(0)?.id ??
+        null;
 
     return {
         session,

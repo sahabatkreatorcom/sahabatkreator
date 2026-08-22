@@ -26,10 +26,5 @@
     "turbo": "^2.10.0",
     "typescript": "^6.0.3"
   },
-  "packageManager": "pnpm@10.14.0",
-  "pnpm": {
-    "overrides": {
-      "kysely": "0.28.17"
-    }
-  }
+  "packageManager": "pnpm@10.14.0"
 }
