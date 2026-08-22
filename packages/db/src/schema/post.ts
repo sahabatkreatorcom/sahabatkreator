@@ -71,6 +71,7 @@ export const post = pgTable(
     tiktokComments: boolean("tiktok_comments").default(true).notNull(),
     tiktokDuets: boolean("tiktok_duets").default(true).notNull(),
     tiktokStitches: boolean("tiktok_stitches").default(true).notNull(),
+    tiktokAutoAddMusic: boolean("tiktok_auto_add_music").default(true).notNull(),
     instagramShareToFeed: boolean("instagram_share_to_feed").default(true).notNull(),
     instagramComments: boolean("instagram_comments").default(true).notNull(),
     instagramLocationId: text("instagram_location_id"),
