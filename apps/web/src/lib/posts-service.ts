@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 import { db, schema } from "@sahabat-kreator/db";
 import { and, eq } from "drizzle-orm";
 import { enqueuePublishPost, removePublishJob } from "@sahabat-kreator/queue";
@@ -102,6 +103,39 @@ export async function createPosts(params: CreatePostParams): Promise<CreatePostR
         });
         if (media.length !== mediaIds.length) {
             return { status: 400, error: "Satu atau lebih media tidak ditemukan." };
+        }
+    }
+
+    // Validasi dimensi gambar untuk TikTok (minimum 360px, HANYA JPEG/WEBP)
+    if (mediaIds?.length) {
+        const tiktokAccounts = socialAccounts.filter((a) => a.platform === "TIKTOK");
+        if (tiktokAccounts.length > 0) {
+            const mediaItems = await db.query.media.findMany({
+                where: (t, { and: _and, eq: _eq, inArray: _in }) =>
+                    _and(_eq(t.organizationId, organizationId), _in(t.id, mediaIds)),
+                columns: { id: true, url: true, mimeType: true },
+            });
+            for (const m of mediaItems) {
+                // Cek format: TikTok hanya terima JPEG/WEBP
+                if (m.mimeType === "image/png") {
+                    return { status: 400, error: `Gambar "${m.filename}" format PNG tidak didukung TikTok. Gunakan JPG atau WEBP.` };
+                }
+                // Cek dimensi
+                try {
+                    const res = await fetch(m.url);
+                    if (res.ok) {
+                        const buf = Buffer.from(await res.arrayBuffer());
+                        const meta = await sharp(buf).metadata();
+                        const w = meta.width ?? 0;
+                        const h = meta.height ?? 0;
+                        if (w < 360 || h < 360) {
+                            return { status: 400, error: `Gambar "${m.filename}" terlalu kecil (${w}x${h}px). TikTok minimum 360px.` };
+                        }
+                    }
+                } catch {
+                    // Skip validasi kalau gagal fetch — biarkan publish time yang handle
+                }
+            }
         }
     }
 
