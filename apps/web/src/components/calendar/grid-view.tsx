@@ -16,6 +16,14 @@ const STATUS_LABEL: Record<string, string> = {
     failed: "Gagal",
 };
 
+const STATUS_BADGE: Record<string, { bg: string; text: string }> = {
+    draft: { bg: "bg-muted/80", text: "text-muted-foreground" },
+    scheduled: { bg: "bg-blue-500/80", text: "text-white" },
+    publishing: { bg: "bg-amber-500/80", text: "text-white" },
+    published: { bg: "bg-green-500/80", text: "text-white" },
+    failed: { bg: "bg-red-500/80", text: "text-white" },
+};
+
 interface Props {
     gridPosts: CalendarPost[];
     setDetailPost: (p: CalendarPost | null) => void;
@@ -42,44 +50,70 @@ export function GridView({
         <div>
             <h2 className="text-sm font-medium mb-3 text-muted-foreground">Grid Preview (21 post terbaru)</h2>
             <div className="grid grid-cols-3 gap-1 rounded-lg overflow-hidden border border-border">
-                {gridPosts.map((p, i) => (
-                    <div
-                        key={p.id}
-                        className={cn(
-                            "aspect-square relative cursor-pointer group overflow-hidden",
-                            i >= 18 ? "border-b-0" : "",
-                            "border border-border/30"
-                        )}
-                        onClick={() => setDetailPost(p)}
-                    >
-                        {p.media?.[0]?.thumbnailUrl ? (
-                            <img
-                                src={p.media[0].thumbnailUrl}
-                                alt=""
-                                className="absolute inset-0 w-full h-full object-cover"
-                                loading="lazy"
-                            />
-                        ) : (
-                            <div className="absolute inset-0 bg-muted flex items-center justify-center">
-                                <span className="text-[10px] text-muted-foreground text-center px-1">
-                                    {PLATFORM_LABELS[p.account?.platform as keyof typeof PLATFORM_LABELS] ?? p.platform}
-                                </span>
+                {gridPosts.map((p, i) => {
+                    const platform = p.account?.platform || p.platform;
+                    const platformLabel = PLATFORM_LABELS[platform as keyof typeof PLATFORM_LABELS] || platform;
+                    const platformColor = PLATFORM_COLORS[platform as keyof typeof PLATFORM_COLORS] || "#6B7280";
+                    const statusBadge = STATUS_BADGE[p.status] || STATUS_BADGE.draft;
+
+                    return (
+                        <div
+                            key={p.id}
+                            className={cn(
+                                "aspect-square relative cursor-pointer group overflow-hidden",
+                                i >= 18 ? "border-b-0" : "",
+                                "border border-border/30"
+                            )}
+                            onClick={() => setDetailPost(p)}
+                        >
+                            {p.media?.[0]?.thumbnailUrl ? (
+                                <img
+                                    src={p.media[0].thumbnailUrl}
+                                    alt=""
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    loading="lazy"
+                                />
+                            ) : (
+                                <div className="absolute inset-0 flex items-center justify-center" style={{ background: `${platformColor}15` }}>
+                                    <PlatformIcon platform={platform} size={24} />
+                                </div>
+                            )}
+
+                            {/* Platform badge — top left */}
+                            <div
+                                className="absolute top-1 left-1 w-5 h-5 rounded-md flex items-center justify-center shadow-sm"
+                                style={{ background: platformColor }}
+                            >
+                                <PlatformIcon platform={platform} size={12} />
                             </div>
-                        )}
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                            <span className="text-white text-xs font-medium">{STATUS_LABEL[p.status]}</span>
-                        </div>
-                        {p.viralityScore !== null && (
+
+                            {/* Status badge — top right */}
                             <div className={cn(
-                                "absolute bottom-1 right-1 rounded px-1 py-0.5 text-[9px] font-bold",
-                                getViralityLevel(p.viralityScore).bg,
-                                getViralityLevel(p.viralityScore).color
+                                "absolute top-1 right-1 px-1.5 py-0.5 rounded text-[8px] font-medium uppercase tracking-wide",
+                                statusBadge.bg,
+                                statusBadge.text
                             )}>
-                                {p.viralityScore}
+                                {STATUS_LABEL[p.status]}
                             </div>
-                        )}
-                    </div>
-                ))}
+
+                            {/* Hover overlay */}
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-end justify-between p-1 opacity-0 group-hover:opacity-100">
+                                <span className="text-white text-[9px] font-medium truncate max-w-[90%]">
+                                    {p.account?.name || platformLabel}
+                                </span>
+                                {p.viralityScore !== null && (
+                                    <div className={cn(
+                                        "rounded px-1 py-0.5 text-[8px] font-bold",
+                                        getViralityLevel(p.viralityScore).bg,
+                                        getViralityLevel(p.viralityScore).color
+                                    )}>
+                                        {p.viralityScore}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
