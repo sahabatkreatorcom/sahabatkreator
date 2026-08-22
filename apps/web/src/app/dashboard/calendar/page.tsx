@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_COLORS } from "@/lib/platforms/config";
@@ -34,6 +34,8 @@ export default function CalendarPage() {
     const [posts, setPosts] = useState<CalendarPost[]>([]);
     const [loading, setLoading] = useState(true);
     const [busyId, setBusyId] = useState<string | null>(null);
+    const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+    const [draggingId, setDraggingId] = useState<string | null>(null);
 
     const loadPosts = useCallback(async () => {
         setLoading(true);
@@ -58,6 +60,50 @@ export default function CalendarPage() {
         } finally {
             setBusyId(null);
         }
+    }
+
+    async function handleReschedule(id: string, newDate: string) {
+        try {
+            const res = await fetch(`/api/posts/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ scheduledAt: `${newDate}T09:00:00.000Z` }),
+            });
+            if (res.ok) loadPosts();
+        } catch {
+            // silent
+        }
+    }
+
+    function handleDragStart(e: React.DragEvent, postId: string) {
+        e.dataTransfer.setData("text/plain", postId);
+        e.dataTransfer.effectAllowed = "move";
+        setDraggingId(postId);
+    }
+
+    function handleDragEnd() {
+        setDraggingId(null);
+        setDragOverDate(null);
+    }
+
+    function handleDragOver(e: React.DragEvent, dateKey: string) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setDragOverDate(dateKey);
+    }
+
+    function handleDragLeave() {
+        setDragOverDate(null);
+    }
+
+    function handleDrop(e: React.DragEvent, dateKey: string) {
+        e.preventDefault();
+        const postId = e.dataTransfer.getData("text/plain");
+        if (postId) {
+            handleReschedule(postId, dateKey);
+        }
+        setDraggingId(null);
+        setDragOverDate(null);
     }
 
     const monthLabel = new Date(year, month, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
@@ -94,7 +140,7 @@ export default function CalendarPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-lg font-semibold">Kalender konten</h1>
-                    <p className="text-sm text-muted-foreground">Lihat jadwal & konten yang sudah terbit per hari.</p>
+                    <p className="text-sm text-muted-foreground">Lihat jadwal & konten yang sudah terbit per hari. Seret post untuk menjadwalkan ulang.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="secondary" size="sm" onClick={() => changeMonth(-1)}>
@@ -127,10 +173,18 @@ export default function CalendarPage() {
                             const key = date.toISOString().slice(0, 10);
                             const dayPosts = postsByDay.get(key) ?? [];
                             const isToday = date.toDateString() === today.toDateString();
+                            const isDragOver = dragOverDate === key;
                             return (
                                 <div
                                     key={key}
-                                    className={cn("min-h-24 border-b border-r border-border/60 p-1.5", isToday && "bg-primary/5")}
+                                    className={cn(
+                                        "min-h-24 border-b border-r border-border/60 p-1.5 transition-colors",
+                                        isToday && "bg-primary/5",
+                                        isDragOver && "bg-primary/10 ring-2 ring-inset ring-primary/30"
+                                    )}
+                                    onDragOver={(e) => handleDragOver(e, key)}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={(e) => handleDrop(e, key)}
                                 >
                                     <div className="flex items-center justify-between">
                                         <span
@@ -146,35 +200,44 @@ export default function CalendarPage() {
                                         )}
                                     </div>
                                     <div className="mt-1 space-y-1">
-                                        {dayPosts.slice(0, 3).map((p) => (
-                                            <div
-                                                key={p.id}
-                                                className={cn(
-                                                    "group flex cursor-pointer items-center gap-1 rounded px-1.5 py-1 text-[11px] leading-tight transition-colors",
-                                                    p.status === "published"
-                                                        ? "bg-accent-green/10 text-accent-green"
-                                                        : p.status === "failed"
-                                                          ? "bg-accent-red/10 text-accent-red"
-                                                          : p.status === "publishing"
-                                                            ? "bg-primary/15 text-primary"
-                                                            : "bg-muted text-foreground"
-                                                )}
-                                                title={p.caption || "(tanpa caption)"}
-                                                onClick={() => {
-                                                    if (p.status === "draft" || p.status === "scheduled" || p.status === "failed") {
-                                                        handlePublish(p.id);
-                                                    }
-                                                }}
-                                            >
-                                                <span
-                                                    className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full text-white"
-                                                    style={{ background: PLATFORM_COLORS[p.account?.platform as keyof typeof PLATFORM_COLORS] ?? "#888" }}
+                                        {dayPosts.slice(0, 3).map((p) => {
+                                            const isDragging = draggingId === p.id;
+                                            const canDrag = p.status === "draft" || p.status === "scheduled" || p.status === "failed";
+                                            return (
+                                                <div
+                                                    key={p.id}
+                                                    draggable={canDrag}
+                                                    onDragStart={(e) => handleDragStart(e, p.id)}
+                                                    onDragEnd={handleDragEnd}
+                                                    className={cn(
+                                                        "flex items-center gap-1 rounded px-1.5 py-1 text-[11px] leading-tight transition-all",
+                                                        canDrag && "cursor-grab active:cursor-grabbing",
+                                                        isDragging && "opacity-40 scale-95",
+                                                        p.status === "published"
+                                                            ? "bg-accent-green/10 text-accent-green cursor-default"
+                                                            : p.status === "failed"
+                                                              ? "bg-accent-red/10 text-accent-red"
+                                                              : p.status === "publishing"
+                                                                ? "bg-primary/15 text-primary cursor-default"
+                                                                : "bg-muted text-foreground"
+                                                    )}
+                                                    title={canDrag ? `${p.caption || "(tanpa caption)"} \u2014 seret untuk jadwalkan ulang` : p.caption || "(tanpa caption)"}
+                                                    onClick={() => {
+                                                        if (p.status === "draft" || p.status === "scheduled" || p.status === "failed") {
+                                                            handlePublish(p.id);
+                                                        }
+                                                    }}
                                                 >
-                                                    <PlatformIcon platform={p.account?.platform ?? ""} size={8} />
-                                                </span>
-                                                <span className="truncate">{p.caption || p.account?.name || "Post"}</span>
-                                            </div>
-                                        ))}
+                                                    <span
+                                                        className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full text-white"
+                                                        style={{ background: PLATFORM_COLORS[p.account?.platform as keyof typeof PLATFORM_COLORS] ?? "#888" }}
+                                                    >
+                                                        <PlatformIcon platform={p.account?.platform ?? ""} size={8} />
+                                                    </span>
+                                                    <span className="truncate">{p.caption || p.account?.name || "Post"}</span>
+                                                </div>
+                                            );
+                                        })}
                                         {dayPosts.length > 3 && (
                                             <p className="px-1 text-[10px] text-muted-foreground">+{dayPosts.length - 3} lainnya</p>
                                         )}
