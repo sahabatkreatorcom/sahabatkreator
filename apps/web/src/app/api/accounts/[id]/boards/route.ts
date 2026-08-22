@@ -6,10 +6,14 @@ import { PINTEREST_API_BASE } from "@/lib/platforms/pinterest-config";
 
 export const dynamic = "force-dynamic";
 
+interface RouteParams {
+    params: Promise<{ id: string }>;
+}
+
 /**
  * GET /api/accounts/[id]/boards — list Pinterest boards untuk akun tertentu.
  */
-export const GET = withAuth(async (ctx, req: NextRequest, params: Promise<{ id: string }>) => {
+export const GET = withAuth(async (ctx, req: NextRequest, { params }: RouteParams) => {
     const { id } = await params;
     const { activeOrganizationId } = ctx;
     if (!activeOrganizationId) return json({ error: "Pilih workspace dulu." }, { status: 400 });
@@ -63,7 +67,7 @@ export const GET = withAuth(async (ctx, req: NextRequest, params: Promise<{ id: 
 /**
  * POST /api/accounts/[id]/boards — create Pinterest board.
  */
-export const POST = withAuth(async (ctx, req: NextRequest, params: Promise<{ id: string }>) => {
+export const POST = withAuth(async (ctx, req: NextRequest, { params }: RouteParams) => {
     const { id } = await params;
     const { activeOrganizationId } = ctx;
     if (!activeOrganizationId) return json({ error: "Pilih workspace dulu." }, { status: 400 });

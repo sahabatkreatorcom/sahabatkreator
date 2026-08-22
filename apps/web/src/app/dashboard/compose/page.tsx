@@ -138,7 +138,10 @@ export default function ComposePage() {
                     ...prev,
                     [accountId]: [...(prev[accountId] ?? []), data.board],
                 }));
-                set("boardId", data.board.id);
+                setPlatformSettings((prev) => ({
+                    ...prev,
+                    [accountId]: { ...(prev[accountId] ?? {}), boardId: data.board.id },
+                }));
                 setPinterestCreateBoard((prev) => ({ ...prev, [accountId]: false }));
                 setPinterestNewBoardName((prev) => ({ ...prev, [accountId]: "" }));
             }
