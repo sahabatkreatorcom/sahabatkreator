@@ -4,6 +4,7 @@
  * Memproses job dari queue `@sahabat-kreator/queue`:
  *   - publish-post : publish post terjadwal (delay-based)
  *   - sync         : sinkronkan analytics / inbox sebuah org
+ *   - stale-post-cleanup: reset post stuck PUBLISHING > 10 menit
  *
  * Dengan worker di dalam proses yang sama, semua logic existing
  * (`publishPost`, `syncOrganizationAnalytics`, `syncOrganizationComments`)
@@ -18,22 +19,21 @@ import { Queue, Worker } from "bullmq";
 import {
     QUEUE_PUBLISH,
     QUEUE_SYNC,
+    QUEUE_STALE_CLEANUP,
     redisConnectionOptions,
     type PublishPostJobData,
     type SyncJobData,
+    type StaleCleanupJobData,
+    enqueueStaleCleanup,
 } from "@sahabat-kreator/queue";
 import { publishPost } from "@/lib/publishing/publish-post";
 import { syncOrganizationAnalytics } from "@/lib/analytics";
 import { syncOrganizationComments } from "@/lib/inbox";
 import { db, schema } from "@sahabat-kreator/db";
-import { and, eq, sql, lte } from "drizzle-orm";
+import { and, eq, lte } from "drizzle-orm";
 import { decryptToken } from "@/lib/token-encryption";
 
 const LOG = (message: string) => console.log(`[queue-worker] ${new Date().toISOString()} ${message}`);
-
-/** Posts stuck in PUBLISHING > 10 min are considered stale. */
-const STALE_THRESHOLD_MINUTES = 10;
-const TICK_INTERVAL_MS = 60_000; // run every 60s
 const TIKTOK_PENDING_PREFIX = "tiktok_pending:";
 
 export function startQueueWorkers(): () => Promise<void> {
@@ -75,17 +75,61 @@ export function startQueueWorkers(): () => Promise<void> {
         },
     );
 
+    // Stale post cleanup — repeatable every 60s via BullMQ scheduler
+    const staleCleanupWorker = new Worker(
+        QUEUE_STALE_CLEANUP,
+        async () => {
+            LOG("stale-cleanup tick");
+            try {
+                const cutoff = new Date(Date.now() - 10 * 60 * 1000);
+                const stale = await db.query.post.findMany({
+                    where: and(
+                        eq(schema.post.status, "PUBLISHING"),
+                        lte(schema.post.updatedAt, cutoff),
+                    ),
+                    with: { socialAccount: true },
+                });
+
+                for (const post of stale) {
+                    // Skip TikTok pending — those are async and need much longer
+                    if (
+                        post.platform === "TIKTOK" &&
+                        post.platformPostId?.startsWith(TIKTOK_PENDING_PREFIX)
+                    ) {
+                        await checkAndResolveTikTokPost(post);
+                        continue;
+                    }
+
+                    // Other platforms: reset to FAILED after threshold
+                    await db.update(schema.post)
+                        .set({ status: "FAILED", updatedAt: new Date() })
+                        .where(eq(schema.post.id, post.id));
+                    LOG(`stale-reset post=${post.id} platform=${post.platform}`);
+                }
+            } catch (e) {
+                LOG(`stale-cleanup error: ${e instanceof Error ? e.message : e}`);
+            }
+        },
+        {
+            connection: redisConnectionOptions(),
+            concurrency: 1,
+        },
+    );
+
     publishWorker.on("failed", (job, err) => {
         LOG(`publish job failed post=${job?.data.postId}: ${err.message}`);
     });
     syncWorker.on("failed", (job, err) => {
         LOG(`sync job failed org=${job?.data.organizationId}: ${err.message}`);
     });
+    staleCleanupWorker.on("failed", (job, err) => {
+        LOG(`stale-cleanup job failed: ${err.message}`);
+    });
 
-    workers.push(publishWorker, syncWorker);
+    workers.push(publishWorker, syncWorker, staleCleanupWorker);
 
-    // Stale cleanup runs independently (no shutdown needed — setInterval survives)
-    startStalePostCleanup();
+    // Start the repeatable stale-cleanup job (once — BullMQ keeps the schedule)
+    await enqueueStaleCleanup();
 
     return async () => {
         await Promise.all(workers.map((w) => w.close()));
@@ -93,48 +137,10 @@ export function startQueueWorkers(): () => Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Stale post cleanup — background scheduler (not a BullMQ job, just a timer)
+// TikTok pending resolver — called by the stale-cleanup worker
 // ---------------------------------------------------------------------------
 
-/** Run stale-post cleanup every TICK_INTERVAL_MS inside the same process. */
-function startStalePostCleanup() {
-    const run = async () => {
-        try {
-            const cutoff = new Date(Date.now() - STALE_THRESHOLD_MINUTES * 60 * 1000);
-            const stale = await db.query.post.findMany({
-                where: and(
-                    eq(schema.post.status, "PUBLISHING"),
-                    lte(schema.post.updatedAt, cutoff),
-                ),
-                with: { socialAccount: true },
-            });
-
-            for (const post of stale) {
-                // Skip TikTok pending — those are async and need much longer
-                if (
-                    post.platform === "TIKTOK" &&
-                    post.platformPostId?.startsWith(TIKTOK_PENDING_PREFIX)
-                ) {
-                    await checkAndResolveTikTokPost(post);
-                    continue;
-                }
-
-                // Other platforms: reset to FAILED after threshold
-                await db.update(schema.post)
-                    .set({ status: "FAILED", updatedAt: new Date() })
-                    .where(eq(schema.post.id, post.id));
-                LOG(`stale-reset post=${post.id} platform=${post.platform}`);
-            }
-        } catch (e) {
-            LOG(`stale-cleanup error: ${e instanceof Error ? e.message : e}`);
-        }
-    };
-
-    // Run immediately on start, then on interval
-    run();
-    setInterval(run, TICK_INTERVAL_MS);
-    LOG(`stale-post cleanup started (interval ${TICK_INTERVAL_MS}ms)`);
-}
+const TIKTOK_PENDING_PREFIX = "tiktok_pending:";
 
 async function checkAndResolveTikTokPost(post: {
     id: string;

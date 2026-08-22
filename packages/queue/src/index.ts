@@ -13,6 +13,7 @@
 
 export const QUEUE_PUBLISH = "publish-post";
 export const QUEUE_SYNC = "sync";
+export const QUEUE_STALE_CLEANUP = "stale-post-cleanup";
 
 export interface PublishPostJobData {
     postId: string;
@@ -25,6 +26,10 @@ export type SyncJobType = "analytics" | "inbox";
 export interface SyncJobData {
     organizationId: string;
     type: SyncJobType;
+}
+
+export interface StaleCleanupJobData {
+    type: "stale-cleanup";
 }
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
@@ -157,6 +162,33 @@ export async function enqueueSync(organizationId: string, type: SyncJobType): Pr
                 removeOnFail: { count: 100 },
                 attempts: 2,
                 backoff: { type: "exponential", delay: 10_000 },
+            },
+        );
+        return true;
+    } finally {
+        await queue.close();
+    }
+}
+
+/**
+ * Enqueue stale-post cleanup sebagai repeatable job (setiap 60 detik).
+ * Cukup panggil sekali saat app start — BullMQ menyimpan repeat schedule di Redis.
+ * No-op bila REDIS_URL belum dikonfigurasi.
+ */
+export async function enqueueStaleCleanup(): Promise<boolean> {
+    if (!isRedisConfigured()) return false;
+    const { Queue } = await import("bullmq");
+    const queue = new Queue(QUEUE_STALE_CLEANUP, { connection: redisConnectionOptions() });
+    try {
+        await queue.add(
+            "stale-cleanup",
+            { type: "stale-cleanup" } satisfies StaleCleanupJobData,
+            {
+                jobId: "stale-cleanup",
+                repeat: { pattern: "*/60 * * * * *" }, // every 60 seconds
+                removeOnComplete: { count: 10 },
+                removeOnFail: { count: 10 },
+                attempts: 1,
             },
         );
         return true;
