@@ -3,7 +3,6 @@ import { seo } from "@/lib/seo";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { CookieBanner } from "@/components/ui/cookie-banner";
-import { LocaleSwitcher } from "@/components/ui/locale-switcher";
 
 export const metadata: Metadata = {
   title: {
@@ -13,10 +12,6 @@ export const metadata: Metadata = {
   description: seo.description,
   alternates: {
     canonical: seo.url,
-    languages: {
-      "id-ID": "https://sahabatkreator.com",
-      "en-US": "https://sahabatkreator.com/en",
-    },
   },
 };
 
@@ -54,7 +49,6 @@ export default function RootLayout({
         <ThemeProvider>
           {children}
           <CookieBanner />
-          <LocaleSwitcher />
         </ThemeProvider>
       </body>
     </html>

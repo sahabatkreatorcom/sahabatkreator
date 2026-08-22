@@ -39,5 +39,10 @@
       "form_factor": "wide",
       "label": "Dashboard Sahabat Kreator"
     }
-  ]
+  ],
+  "serviceworker": {
+    "src": "/sw.js",
+    "scope": "/",
+    "update_via_cache": false
+  }
 }
