@@ -68,13 +68,36 @@ export function usePushNotification(): UsePushNotificationReturn {
             setIsPermissionGranted(true);
 
             // 2. Dapatkan registration service worker dengan timeout
-            const registration = await Promise.race([
-                navigator.serviceWorker.ready,
-                new Promise<ServiceWorkerRegistration>((_, reject) =>
-                    setTimeout(() => reject(new Error("Service Worker registration timeout")), 10000)
-                ),
-            ]);
-            console.log("[Push] SW registered:", registration.scope);
+            // Coba dengan scope default terlebih dahulu, fallback ke /sw.js jika gagal
+            let registration: ServiceWorkerRegistration | null = null;
+            try {
+                console.log("[Push] Menunggu serviceWorker.ready...");
+                registration = await Promise.race([
+                    navigator.serviceWorker.ready,
+                    new Promise<ServiceWorkerRegistration>((_, reject) =>
+                        setTimeout(() => reject(new Error("Service Worker ready timeout")), 5000)
+                    ),
+                ]);
+                console.log("[Push] SW registered (default scope):", registration.scope);
+            } catch (swError) {
+                console.warn("[Push] default scope gagal, coba /sw.js:", swError);
+                // Fallback: coba ambil registration dengan scope /sw.js
+                registration = await navigator.serviceWorker.getRegistration("/sw.js");
+            }
+
+            // Jika masih belum dapat, coba semua registrasi
+            if (!registration) {
+                const allRegistrations = await navigator.serviceWorker.getRegistrations();
+                console.log("[Push] Semua SW registrations:", allRegistrations.map(r => r.scope));
+                registration = allRegistrations.find(r => r.scope.includes("/sw.js") || r.scope === "/") ?? null;
+            }
+
+            if (!registration) {
+                setError("Service Worker tidak ditemukan. Coba refresh halaman (Ctrl+F5).");
+                setIsLoading(false);
+                return;
+            }
+            console.log("[Push] SW active:", registration.active?.scriptURL);
 
             // 3. Subscribe dengan VAPID key dari env
             const vapidPublicKey = env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
