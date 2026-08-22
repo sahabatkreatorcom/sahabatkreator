@@ -38,9 +38,9 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
         db.$count(schema.post, and(...where)),
     ]);
 
-    function buildPostUrl(externalUrl: string | null, platform: string, platformPostId: string | null, accountName: string | null): string | null {
+    function buildPostUrl(externalUrl: string | null, platform: string | null, platformPostId: string | null, accountName: string | null): string | null {
         if (externalUrl) return externalUrl;
-        if (!platformPostId) return null;
+        if (!platformPostId || !platform) return null;
         switch (platform) {
             case "INSTAGRAM": return `https://instagram.com/p/${platformPostId}`;
             case "TIKTOK": return `https://tiktok.com/@${accountName ?? "user"}/video/${platformPostId}`;
