@@ -54,11 +54,8 @@ export function usePushNotification(): UsePushNotificationReturn {
         setError(null);
 
         try {
-            console.log("[Push] Memulai subscribe...");
-
             // 1. Minta permission notifikasi
             const permission = await Notification.requestPermission();
-            console.log("[Push] Permission:", permission);
 
             if (permission !== "granted") {
                 setError("Izin notifikasi ditolak oleh pengguna.");
@@ -67,28 +64,21 @@ export function usePushNotification(): UsePushNotificationReturn {
             }
             setIsPermissionGranted(true);
 
-            // 2. Dapatkan registration service worker dengan timeout
-            // Coba dengan scope default terlebih dahulu, fallback ke /sw.js jika gagal
+            // 2. Dapatkan registration service worker
             let registration: ServiceWorkerRegistration | null = null;
             try {
-                console.log("[Push] Menunggu serviceWorker.ready...");
                 registration = await Promise.race([
                     navigator.serviceWorker.ready,
                     new Promise<ServiceWorkerRegistration>((_, reject) =>
                         setTimeout(() => reject(new Error("Service Worker ready timeout")), 5000)
                     ),
                 ]);
-                console.log("[Push] SW registered (default scope):", registration.scope);
-            } catch (swError) {
-                console.warn("[Push] default scope gagal, coba /sw.js:", swError);
-                // Fallback: coba ambil registration dengan scope /sw.js
+            } catch {
                 registration = (await navigator.serviceWorker.getRegistration("/sw.js")) ?? null;
             }
 
-            // Jika masih belum dapat, coba semua registrasi
             if (!registration) {
                 const allRegistrations = await navigator.serviceWorker.getRegistrations();
-                console.log("[Push] Semua SW registrations:", allRegistrations.map(r => r.scope));
                 registration = allRegistrations.find(r => r.scope.includes("/sw.js") || r.scope === "/") ?? null;
             }
 
@@ -97,11 +87,9 @@ export function usePushNotification(): UsePushNotificationReturn {
                 setIsLoading(false);
                 return;
             }
-            console.log("[Push] SW active:", registration.active?.scriptURL);
 
             // 3. Subscribe dengan VAPID key dari env
             const vapidPublicKey = env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-            console.log("[Push] VAPID key ada:", !!vapidPublicKey);
 
             if (!vapidPublicKey) {
                 setError("VAPID key tidak dikonfigurasi. Hubungi admin.");
@@ -124,7 +112,6 @@ export function usePushNotification(): UsePushNotificationReturn {
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource,
             });
-            console.log("[Push] Subscription created:", subscription.endpoint);
 
             // 4. Kirim subscription ke server
             const subscriptionData: PushSubscriptionData = {
@@ -136,7 +123,6 @@ export function usePushNotification(): UsePushNotificationReturn {
                     ? btoa(String.fromCharCode(...new Uint8Array(subscription.getKey("auth")!)))
                     : "",
             };
-            console.log("[Push] Sending to server...", subscriptionData.endpoint);
 
             const res = await fetch("/api/push", {
                 method: "POST",
@@ -146,24 +132,19 @@ export function usePushNotification(): UsePushNotificationReturn {
                     userAgent: navigator.userAgent,
                 }),
             });
-            console.log("[Push] Response status:", res.status, res.statusText);
 
             let data;
             try {
                 data = await res.json();
-                console.log("[Push] Response data:", data);
-            } catch (parseErr) {
-                console.error("[Push] Failed to parse JSON:", parseErr);
+            } catch {
                 data = null;
             }
 
             if (!res.ok) {
-                console.error("[Push] API returned error:", data);
                 throw new Error(data?.error ?? `Server returned ${res.status}: ${res.statusText}`);
             }
 
             if (!data?.ok) {
-                console.error("[Push] Unexpected response:", data);
                 throw new Error("Server returned invalid response.");
             }
 
