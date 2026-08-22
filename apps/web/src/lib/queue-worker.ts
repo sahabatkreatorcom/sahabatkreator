@@ -47,8 +47,10 @@ export async function startQueueWorkers(): Promise<() => Promise<void>> {
             LOG(`publish start post=${data.postId} (${data.platform})`);
             const result = await publishPost(data.organizationId, data.postId);
             if (!result.ok) {
+                // publishPost sudah set FAILED + insert publish_error sendiri.
+                // Jangan throw — itu akan memicu retry berkali-kali yang sia-sia.
                 LOG(`publish fail post=${data.postId}: ${result.error}`);
-                throw new Error(result.error || "Publish gagal.");
+                return;
             }
             LOG(`publish done post=${data.postId} → ${result.postUrl || "ok"}`);
         },

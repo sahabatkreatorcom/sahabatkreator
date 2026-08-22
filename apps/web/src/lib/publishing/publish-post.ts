@@ -37,6 +37,10 @@ export async function publishPost(
     if (post.status === "PUBLISHED") {
         return { ok: false, error: "Post sudah terbit." };
     }
+    if (post.status === "FAILED") {
+        // Sudah di-finalize oleh proses lain (queue retry / stale cleanup), abaikan.
+        return { ok: false, error: "Post sudah gagal sebelumnya." };
+    }
     if (post.status === "PUBLISHING") {
         // Stuck > 5 menit = izinkan retry (reset dulu)
         const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
