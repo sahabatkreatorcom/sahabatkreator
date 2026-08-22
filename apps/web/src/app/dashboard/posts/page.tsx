@@ -46,7 +46,7 @@ const STATUS_FILTERS = [
 const STATUS_BADGE: Record<Post["status"], { label: string; className: string }> = {
     draft: { label: "Draft", className: "bg-muted text-muted-foreground" },
     scheduled: { label: "Terjadwal", className: "bg-accent-amber/15 text-accent-amber" },
-    publishing: { label: "Menerbitkanâ€¦", className: "bg-primary/15 text-primary" },
+    publishing: { label: "Menerbitkan…", className: "bg-primary/15 text-primary" },
     published: { label: "Terbit", className: "bg-accent-green/15 text-accent-green" },
     failed: { label: "Gagal", className: "bg-accent-red/15 text-accent-red" },
 };
@@ -144,7 +144,7 @@ export default function PostsPage() {
             {loading ? (
                 <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat postâ€¦
+                    Memuat post…
                 </div>
             ) : posts.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted-foreground">Belum ada post.</p>

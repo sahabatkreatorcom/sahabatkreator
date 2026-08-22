@@ -130,7 +130,7 @@ export default function AnalyticsPage() {
                 setError(data.error || "Gagal menyinkronkan.");
             } else {
                 setSyncResult(
-                    `Tersinkron: ${data.synced ?? 0} akun Â· dilewati kebijakan: ${data.skippedByPolicy ?? 0} Â· gagal: ${data.failed ?? 0} Â· dihapus (retensi): ${data.purged ?? 0}`
+                    `Tersinkron: ${data.synced ?? 0} akun · dilewati kebijakan: ${data.skippedByPolicy ?? 0} · gagal: ${data.failed ?? 0} · dihapus (retensi): ${data.purged ?? 0}`
                 );
                 load();
             }
@@ -194,7 +194,7 @@ export default function AnalyticsPage() {
             {loading && !overview ? (
                 <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat analitikâ€¦
+                    Memuat analitik…
                 </div>
             ) : (
                 <div className="space-y-4">

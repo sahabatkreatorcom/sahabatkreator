@@ -138,7 +138,7 @@ export default function AccountsPage() {
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
 
             {loading ? (
-                <p className="py-12 text-sm text-muted-foreground">Memuat akunâ€¦</p>
+                <p className="py-12 text-sm text-muted-foreground">Memuat akun…</p>
             ) : accounts.length === 0 ? (
                 <div className="rounded-lg border border-border bg-card p-8 text-center">
                     <Link2 className="mx-auto h-8 w-8 text-muted-foreground/50" />

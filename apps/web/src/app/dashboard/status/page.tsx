@@ -126,7 +126,7 @@ export default function StatusPage() {
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
 
             {loading ? (
-                <p className="py-12 text-sm text-muted-foreground">Memuat statusâ€¦</p>
+                <p className="py-12 text-sm text-muted-foreground">Memuat status…</p>
             ) : !data ? null : (
                 <>
                     <div className="grid gap-3 sm:grid-cols-4">
@@ -303,7 +303,7 @@ export default function StatusPage() {
                                                 </p>
                                                 <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{err.errorMessage}</p>
                                                 <p className="mt-1 text-xs text-muted-foreground">
-                                                    retry: {err.retryCount} Â· {new Date(err.createdAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
+                                                    retry: {err.retryCount} · {new Date(err.createdAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
                                                 </p>
                                             </div>
                                         </div>

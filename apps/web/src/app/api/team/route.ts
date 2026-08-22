@@ -19,11 +19,15 @@ export const GET = withAuth(async (ctx) => {
     const { activeOrganizationId } = ctx;
     if (!activeOrganizationId) return json({ error: "Pilih workspace dulu." }, { status: 400 });
 
-    const [team, invitations] = await Promise.all([
-        listTeamMembers(ctx.headers),
-        listTeamInvitations(ctx.headers),
-    ]);
-    return json({ ...team, invitations });
+    try {
+        const [team, invitations] = await Promise.all([
+            listTeamMembers(ctx.headers),
+            listTeamInvitations(ctx.headers),
+        ]);
+        return json({ ...team, invitations });
+    } catch (e) {
+        return json({ error: e instanceof Error ? e.message : "Gagal memuat tim.", members: [], invitations: [] });
+    }
 });
 
 /** POST /api/team — undang anggota baru. Body: { email, role? } */

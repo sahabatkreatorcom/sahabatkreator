@@ -190,7 +190,7 @@ export default function CalendarPage() {
             {loading ? (
                 <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat kalenderâ€¦
+                    Memuat kalender…
                 </div>
             ) : (
                 <div className="rounded-lg border border-border bg-card">

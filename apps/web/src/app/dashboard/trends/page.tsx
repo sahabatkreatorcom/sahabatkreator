@@ -168,7 +168,7 @@ export default function TrendsPage() {
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
 
             {loading ? (
-                <p className="py-12 text-sm text-muted-foreground">Memuatâ€¦</p>
+                <p className="py-12 text-sm text-muted-foreground">Memuat…</p>
             ) : !data || data.platformTrends.length === 0 ? (
                 <div className="rounded-lg border border-border bg-card p-8 text-center">
                     <BarChart3 className="mx-auto h-8 w-8 text-muted-foreground/50" />
@@ -188,7 +188,7 @@ export default function TrendsPage() {
                                     </div>
                                     <p className="mt-1 text-sm font-medium">
                                         {PLATFORM_LABELS[bestGrower.platform as Platform] ?? bestGrower.platform}
-                                        {bestGrower.accountName ? ` Â· ${bestGrower.accountName}` : ""}
+                                        {bestGrower.accountName ? ` · ${bestGrower.accountName}` : ""}
                                     </p>
                                     <p className="mt-1 text-lg font-semibold text-primary">
                                         +{formatNumber(bestGrower.delta.followers)} pengikut
@@ -230,7 +230,7 @@ export default function TrendsPage() {
                                     <div>
                                         <p className="text-sm font-medium">{PLATFORM_LABELS[p.platform as Platform] ?? p.platform}</p>
                                         <p className="text-xs text-muted-foreground">
-                                            {formatNumber(p.latest.followers)} pengikut Â· {formatNumber(p.latest.impressions)} tayangan
+                                            {formatNumber(p.latest.followers)} pengikut · {formatNumber(p.latest.impressions)} tayangan
                                         </p>
                                     </div>
                                     <div className="ml-auto flex items-center gap-3 text-xs">
@@ -305,7 +305,7 @@ export default function TrendsPage() {
                                             <p className="text-xs text-muted-foreground">
                                                 {post.platform ? PLATFORM_LABELS[post.platform as Platform] ?? post.platform : "â€”"}
                                                 {post.publishedAt
-                                                    ? ` Â· ${new Date(post.publishedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`
+                                                    ? ` · ${new Date(post.publishedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`
                                                     : ""}
                                             </p>
                                         </div>

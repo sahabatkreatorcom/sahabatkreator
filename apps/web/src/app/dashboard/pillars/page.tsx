@@ -107,7 +107,7 @@ export default function PillarsPage() {
         }
     }
 
-    const totalPosts = pillars.reduce((sum, p) => sum + p.posts, 0);
+    const totalPosts = pillars.reduce((sum, p) => sum + (Number(p.posts) || 0), 0);
 
     return (
         <div className="space-y-4">

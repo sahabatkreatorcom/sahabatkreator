@@ -5,10 +5,29 @@ import { db, schema } from "@sahabat-kreator/db";
 // ─── Content Pillars ───────────────────────────────────────────────────────
 
 export async function listPillars(organizationId: string) {
-    return db.query.contentPillar.findMany({
+    const pillars = await db.query.contentPillar.findMany({
         where: eq(schema.contentPillar.organizationId, organizationId),
         orderBy: [desc(schema.contentPillar.createdAt)],
     });
+
+    // Hitung jumlah post per pilar
+    const postCounts = new Map<string, number>();
+    const allPosts = await db.query.post.findMany({
+        where: eq(schema.post.organizationId, organizationId),
+        columns: { pillarId: true },
+    });
+    for (const p of allPosts) {
+        if (p.pillarId) {
+            postCounts.set(p.pillarId, (postCounts.get(p.pillarId) || 0) + 1);
+        }
+    }
+
+    const totalPosts = allPosts.length || 1;
+    return pillars.map((p) => ({
+        ...p,
+        posts: postCounts.get(p.id) || 0,
+        percentage: Math.round(((postCounts.get(p.id) || 0) / totalPosts) * 100),
+    }));
 }
 
 export async function createPillar(organizationId: string, data: { name: string; description?: string; color?: string; icon?: string }) {
