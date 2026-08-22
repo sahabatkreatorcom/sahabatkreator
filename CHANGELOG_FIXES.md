@@ -4,6 +4,30 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #41 — Inbox Page Build Error - Corrupted .next Cache
+
+**Gejala:** Halaman `/inbox` menampilkan error "This page couldn't load". Build process gagal dengan error TypeScript di `.next/dev/types/`.
+
+**Akar Masalah:**
+File TypeScript declarations di `.next/dev/types/` corrupted setelah perubahan kode sebelumnya.
+
+**Fix:**
+1. Hapus direktori `.next` yang corrupted
+2. Rebuild project dengan `pnpm --filter web build`
+3. Build berhasil tanpa error TypeScript
+
+| | |
+|---|---|
+| **File** | `.next/` (cache build) |
+| **Masalah** | Corrupted TypeScript declarations di .next cache |
+| **Akar** | Cache build tidak sinkron dengan source code |
+| **Fix** | Clear .next cache dan rebuild ulang |
+| **Verifikasi** | `pnpm --filter web build` lolos. Inbox page siap diakses. |
+| **Log Keyword** | inbox, build error, corrupted cache |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #40 — Media Library - Full Preview Dialog
 
 **Gejala:** Halaman `/dashboard/media` hanya menampilkan thumbnail grid tanpa kemampuan preview full-size. User harus membuka file terpisah untuk melihat detail media.
