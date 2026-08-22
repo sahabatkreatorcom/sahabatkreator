@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { FolderPlus, ImagePlus, Search, Trash2, UploadCloud } from "lucide-react";
+import { FolderPlus, ImagePlus, Search, Trash2, UploadCloud, X, Download, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
@@ -46,6 +46,7 @@ export default function MediaLibraryPage() {
     const [newFolderOpen, setNewFolderOpen] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
     const [actionError, setActionError] = useState<string | null>(null);
+    const [previewItem, setPreviewItem] = useState<MediaItem | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     const loadFolders = useCallback(async () => {
@@ -153,6 +154,23 @@ export default function MediaLibraryPage() {
             await loadFolders();
         }
     }
+
+    function openPreview(item: MediaItem) {
+        setPreviewItem(item);
+    }
+
+    function closePreview() {
+        setPreviewItem(null);
+    }
+
+    // Close preview on Escape key
+    useEffect(() => {
+        function handleKeyDown(e: KeyboardEvent) {
+            if (e.key === "Escape") closePreview();
+        }
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
 
     return (
         <div className="space-y-4">
@@ -287,7 +305,9 @@ export default function MediaLibraryPage() {
                                     key={item.id}
                                     item={item}
                                     selected={selected.has(item.id)}
-                                    onToggle={() => {
+                                    onClick={() => openPreview(item)}
+                                    onToggle={(e) => {
+                                        e.stopPropagation();
                                         setSelected((prev) => {
                                             const next = new Set(prev);
                                             if (next.has(item.id)) next.delete(item.id);
@@ -301,6 +321,102 @@ export default function MediaLibraryPage() {
                     )}
                 </div>
             </div>
+
+            {/* Preview Dialog */}
+            {previewItem && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+                    onClick={closePreview}
+                >
+                    <div
+                        className="relative max-h-[90vh] max-w-[90vw] overflow-hidden rounded-lg bg-card shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Close button */}
+                        <button
+                            onClick={closePreview}
+                            className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+
+                        {/* Preview content */}
+                        <div className="flex flex-col">
+                            <div className="flex items-center justify-center bg-black/20 p-4">
+                                {previewItem.type === "video" ? (
+                                    <video
+                                        src={previewItem.url}
+                                        controls
+                                        className="max-h-[60vh] max-w-full rounded-md"
+                                        autoPlay
+                                    />
+                                ) : previewItem.type === "audio" ? (
+                                    <div className="flex flex-col items-center gap-4 p-8">
+                                        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10">
+                                            <span className="text-4xl">🎵</span>
+                                        </div>
+                                        <audio src={previewItem.url} controls className="w-full max-w-md" autoPlay />
+                                    </div>
+                                ) : (
+                                    <img
+                                        src={previewItem.url}
+                                        alt={previewItem.altText ?? previewItem.filename}
+                                        className="max-h-[60vh] max-w-full object-contain rounded-md"
+                                    />
+                                )}
+                            </div>
+
+                            {/* Info panel */}
+                            <div className="border-t border-border p-4">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-medium truncate">{previewItem.filename}</h3>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            {previewItem.mimeType} · {formatBytes(previewItem.size)}
+                                            {previewItem.dimensions && (
+                                                <span className="ml-2">
+                                                    · {previewItem.dimensions.width}×{previewItem.dimensions.height}
+                                                </span>
+                                            )}
+                                            {previewItem.duration && (
+                                                <span className="ml-2">
+                                                    · {formatDuration(previewItem.duration)}
+                                                </span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <a
+                                        href={previewItem.url}
+                                        download={previewItem.filename}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+                                    >
+                                        <Download className="h-4 w-4" />
+                                        Unduh
+                                    </a>
+                                </div>
+
+                                {previewItem.tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mt-3">
+                                        {previewItem.tags.map((tag) => (
+                                            <span key={tag} className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+                                                {tag}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {previewItem.altText && (
+                                    <p className="text-xs text-muted-foreground mt-3 italic">
+                                        {previewItem.altText}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <StockMediaPicker
                 open={stockPickerOpen}
@@ -352,21 +468,29 @@ function formatBytes(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatDuration(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
 function MediaCard({
     item,
     selected,
+    onClick,
     onToggle,
 }: {
     item: MediaItem;
     selected: boolean;
-    onToggle: () => void;
+    onClick: () => void;
+    onToggle: (e: React.MouseEvent) => void;
 }) {
     return (
         <button
-            onClick={onToggle}
+            onClick={onClick}
             className={cn(
                 "group relative aspect-square overflow-hidden rounded-lg border bg-muted text-left",
-                selected ? "border-primary ring-2 ring-primary" : "border-border"
+                selected ? "border-primary ring-2 ring-primary" : "border-border hover:border-primary/50"
             )}
         >
             {item.type === "video" ? (
@@ -381,9 +505,15 @@ function MediaCard({
                     src={item.thumbnailUrl ?? item.url}
                     alt={item.altText ?? item.filename}
                     loading="lazy"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
                 />
             )}
+
+            {/* Preview overlay on hover */}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <Maximize2 className="h-6 w-6 text-white" />
+            </div>
+
             {selected && (
                 <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                     ✓
@@ -395,6 +525,23 @@ function MediaCard({
             <span className="absolute left-1.5 top-1.5 rounded bg-black/50 px-1 py-0.5 text-[9px] text-white">
                 {formatBytes(item.size)}
             </span>
+
+            {/* Toggle select button */}
+            <button
+                onClick={onToggle}
+                className={cn(
+                    "absolute right-1.5 bottom-1.5 flex h-5 w-5 items-center justify-center rounded border transition-colors",
+                    selected
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : "bg-black/50 border-transparent text-white opacity-0 group-hover:opacity-100 hover:bg-black/70"
+                )}
+            >
+                {selected ? (
+                    <span className="text-[10px]">✓</span>
+                ) : (
+                    <span className="text-[10px]">+</span>
+                )}
+            </button>
         </button>
     );
 }
