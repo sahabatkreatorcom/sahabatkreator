@@ -54,8 +54,12 @@ export function usePushNotification(): UsePushNotificationReturn {
         setError(null);
 
         try {
+            console.log("[Push] Memulai subscribe...");
+
             // 1. Minta permission notifikasi
             const permission = await Notification.requestPermission();
+            console.log("[Push] Permission:", permission);
+
             if (permission !== "granted") {
                 setError("Izin notifikasi ditolak oleh pengguna.");
                 setIsLoading(false);
@@ -70,9 +74,12 @@ export function usePushNotification(): UsePushNotificationReturn {
                     setTimeout(() => reject(new Error("Service Worker registration timeout")), 10000)
                 ),
             ]);
+            console.log("[Push] SW registered:", registration.scope);
 
             // 3. Subscribe dengan VAPID key dari env
             const vapidPublicKey = env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+            console.log("[Push] VAPID key ada:", !!vapidPublicKey);
+
             if (!vapidPublicKey) {
                 setError("VAPID key tidak dikonfigurasi. Hubungi admin.");
                 setIsLoading(false);
@@ -94,6 +101,7 @@ export function usePushNotification(): UsePushNotificationReturn {
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource,
             });
+            console.log("[Push] Subscription created:", subscription.endpoint);
 
             // 4. Kirim subscription ke server
             const subscriptionData: PushSubscriptionData = {
@@ -105,6 +113,7 @@ export function usePushNotification(): UsePushNotificationReturn {
                     ? btoa(String.fromCharCode(...new Uint8Array(subscription.getKey("auth")!)))
                     : "",
             };
+            console.log("[Push] Sending to server...", subscriptionData.endpoint);
 
             const res = await fetch("/api/push", {
                 method: "POST",
@@ -114,15 +123,31 @@ export function usePushNotification(): UsePushNotificationReturn {
                     userAgent: navigator.userAgent,
                 }),
             });
+            console.log("[Push] Response status:", res.status, res.statusText);
+
+            let data;
+            try {
+                data = await res.json();
+                console.log("[Push] Response data:", data);
+            } catch (parseErr) {
+                console.error("[Push] Failed to parse JSON:", parseErr);
+                data = null;
+            }
 
             if (!res.ok) {
-                const data = await res.json().catch(() => null);
-                throw new Error(data?.error ?? "Gagal menyimpan subscription.");
+                console.error("[Push] API returned error:", data);
+                throw new Error(data?.error ?? `Server returned ${res.status}: ${res.statusText}`);
+            }
+
+            if (!data?.ok) {
+                console.error("[Push] Unexpected response:", data);
+                throw new Error("Server returned invalid response.");
             }
 
             setError(null);
         } catch (e) {
             const msg = e instanceof Error ? e.message : "Gagal subscribe push notification.";
+            console.error("[Push] Error:", e);
             setError(msg);
         } finally {
             setIsLoading(false);

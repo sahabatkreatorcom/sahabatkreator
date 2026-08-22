@@ -61,9 +61,13 @@ export function PushNotificationSettings() {
         setRequesting(true);
         setError(null);
         try {
+            console.log("[Settings] Calling subscribe...");
             await subscribe();
+            console.log("[Settings] Subscribe done, reloading...");
             await load();
+            console.log("[Settings] Reload done");
         } catch (e) {
+            console.error("[Settings] Error:", e);
             setError(e instanceof Error ? e.message : "Gagal mensubscribe.");
         } finally {
             setRequesting(false);
