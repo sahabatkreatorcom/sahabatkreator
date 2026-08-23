@@ -37,6 +37,15 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
         offset,
     });
 
+    // Debug: log struktur data
+    if (comments.length > 0) {
+        console.log("[Inbox API] Sample comment:", JSON.stringify({
+            id: comments[0].id,
+            account: comments[0].socialAccount,
+            post: comments[0].post,
+        }, null, 2));
+    }
+
     // Filter platform & pencarian teks — dilakukan di memori karena kueri
     // relasional drizzle belum punya contains bawaan yang sederhana.
     let filtered = comments;
