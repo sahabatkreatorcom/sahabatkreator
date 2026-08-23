@@ -308,9 +308,9 @@ export default function InboxPage() {
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span
                                             className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium text-white"
-                                            style={{ background: PLATFORM_COLORS[thread.account.platform] }}
+                                            style={{ background: thread.account?.platform ? PLATFORM_COLORS[thread.account.platform] : '#6B7280' }}
                                         >
-                                            <PlatformIcon platform={thread.account.platform} size={14} />
+                                            <PlatformIcon platform={thread.account?.platform || "MANUAL"} size={14} />
                                         </span>
                                         <span className="text-sm font-medium">{thread.authorUsername}</span>
                                         <span className="text-xs text-muted-foreground">
@@ -319,11 +319,11 @@ export default function InboxPage() {
                                         {thread.isReplied && <span className="text-xs text-accent-green">Sudah dibalas</span>}
                                     </div>
                                     <p className="mt-1 text-sm text-foreground">{thread.text}</p>
-                                    {thread.post?.caption && (
-                                        <p className="mt-1 truncate text-xs text-muted-foreground">
-                                            pada: {thread.post.caption}
-                                        </p>
-                                    )}
+                            {thread.post?.caption && (
+                                <p className="mt-1 truncate text-xs text-muted-foreground">
+                                    pada: {thread.post.caption}
+                                </p>
+                            )}
 
                                     {replies.map((r) => (
                                         <div key={r.id} className="mt-2 rounded-md bg-muted/50 p-2.5">
