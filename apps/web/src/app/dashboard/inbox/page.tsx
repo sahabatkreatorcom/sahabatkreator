@@ -9,6 +9,9 @@ import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
 
+// Debug: log saat komponen di-mount
+console.log("[Inbox] Component mounted");
+
 interface SavedResponse {
     id: string;
     name: string;
@@ -65,6 +68,23 @@ const PLATFORM_FILTERS = [
 ];
 
 export default function InboxPage() {
+    // Error state untuk fallback
+    const [renderError, setRenderError] = useState<string | null>(null);
+
+    // Catch render errors
+    const [, forceUpdate] = useState(0);
+    React.useEffect(() => {
+        const originalConsoleError = console.error;
+        console.error = (...args) => {
+            originalConsoleError.apply(console, args);
+            if (args[0]?.toString()?.includes("Error") || args[0] instanceof Error) {
+                console.warn("[Inbox] Caught error:", args);
+            }
+        };
+        return () => { console.error = originalConsoleError; };
+    }, []);
+
+    console.log("[Inbox] Rendering...");
     const [comments, setComments] = useState<InboxComment[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(true);
