@@ -39,11 +39,12 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
 
     // Debug: log struktur data
     if (comments.length > 0) {
-        console.log("[Inbox API] Sample comment:", JSON.stringify({
-            id: comments[0].id,
-            account: comments[0].socialAccount,
-            post: comments[0].post,
-        }, null, 2));
+        const first = comments[0];
+        console.log("[Inbox API] First comment id:", first.id);
+        console.log("[Inbox API] socialAccount:", JSON.stringify(first.socialAccount, null, 2));
+        console.log("[Inbox API] post:", JSON.stringify(first.post, null, 2));
+        console.log("[Inbox API] authorUsername:", first.authorUsername);
+        console.log("[Inbox API] platformPostId:", first.platformPostId);
     }
 
     // Filter platform & pencarian teks — dilakukan di memori karena kueri
