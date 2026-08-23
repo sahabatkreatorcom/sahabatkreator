@@ -37,11 +37,17 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
         offset,
     });
 
+    // Transform socialAccount -> account untuk frontend
+    const transformed = comments.map((c) => ({
+        ...c,
+        account: c.socialAccount,
+    }));
+
     // Debug: log struktur data
-    if (comments.length > 0) {
-        const first = comments[0];
+    if (transformed.length > 0) {
+        const first = transformed[0];
         console.log("[Inbox API] First comment id:", first.id);
-        console.log("[Inbox API] socialAccount:", JSON.stringify(first.socialAccount, null, 2));
+        console.log("[Inbox API] account (from socialAccount):", JSON.stringify(first.account, null, 2));
         console.log("[Inbox API] post:", JSON.stringify(first.post, null, 2));
         console.log("[Inbox API] authorUsername:", first.authorUsername);
         console.log("[Inbox API] platformPostId:", first.platformPostId);
@@ -49,9 +55,9 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
 
     // Filter platform & pencarian teks — dilakukan di memori karena kueri
     // relasional drizzle belum punya contains bawaan yang sederhana.
-    let filtered = comments;
+    let filtered = transformed;
     if (platform) {
-        filtered = filtered.filter((c) => c.socialAccount.platform === platform);
+        filtered = filtered.filter((c) => c.account?.platform === platform);
     }
     if (q) {
         const needle = q.toLowerCase();

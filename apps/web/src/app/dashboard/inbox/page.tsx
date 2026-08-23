@@ -124,15 +124,14 @@ export default function InboxPage() {
             const res = await fetch(`/api/inbox?${params}`);
             const data = await res.json();
             if (res.ok) {
-                setComments(data.comments ?? []);
-                setUnreadCount(data.unreadCount ?? 0);
-                
                 // Debug: log platform values dari API
                 const sample = data.comments?.[0];
-                if (sample?.account?.platform) {
-                    console.log(`[Inbox] Platform sample:`, sample.account.platform);
-                    console.log(`[Inbox] Account object:`, JSON.stringify(sample.account, null, 2));
+                if (sample?.socialAccount?.platform) {
+                    console.log(`[Inbox] Platform sample:`, sample.socialAccount.platform);
+                    console.log(`[Inbox] Account object:`, JSON.stringify(sample.socialAccount, null, 2));
                 }
+                setComments(data.comments ?? []);
+                setUnreadCount(data.unreadCount ?? 0);
             } else {
                 setError(data.error || "Gagal memuat inbox.");
             }
