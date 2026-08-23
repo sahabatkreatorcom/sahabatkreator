@@ -33,6 +33,19 @@ const ICONS: Partial<Record<Platform, SimpleIcon>> = {
     THREADS: siThreads,
 };
 
+/** Platform yang mungkin masuk tapi tidak ada ikon - mapping ke fallback */
+const ICON_FALLBACKS: Record<string, SimpleIcon | null> = {
+    INSTAGRAM: siInstagram,
+    FACEBOOK: siFacebook,
+    META: siMeta,
+    TIKTOK: siTiktok,
+    YOUTUBE: siYoutube,
+    PINTEREST: siPinterest,
+    GOOGLE_BUSINESS: siGoogle,
+    BLUESKY: siBluesky,
+    THREADS: siThreads,
+};
+
 function fallbackLabel(platform: Platform): string {
     switch (platform) {
         case "LINKEDIN":
@@ -60,7 +73,7 @@ interface PlatformIconProps {
  */
 export function PlatformIcon({ platform, size = 16, className, showFallback = true }: PlatformIconProps) {
     const p = platform as Platform;
-    const icon = ICONS[p];
+    const icon = ICONS[p] ?? ICON_FALLBACKS[p];
 
     if (!icon) {
         if (!showFallback) return null;
