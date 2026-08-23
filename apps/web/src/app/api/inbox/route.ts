@@ -43,16 +43,6 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
         account: c.socialAccount,
     }));
 
-    // Debug: log struktur data
-    if (transformed.length > 0) {
-        const first = transformed[0];
-        console.log("[Inbox API] First comment id:", first.id);
-        console.log("[Inbox API] account (from socialAccount):", JSON.stringify(first.account, null, 2));
-        console.log("[Inbox API] post:", JSON.stringify(first.post, null, 2));
-        console.log("[Inbox API] authorUsername:", first.authorUsername);
-        console.log("[Inbox API] platformPostId:", first.platformPostId);
-    }
-
     // Filter platform & pencarian teks — dilakukan di memori karena kueri
     // relasional drizzle belum punya contains bawaan yang sederhana.
     let filtered = transformed;
