@@ -126,6 +126,13 @@ export default function InboxPage() {
             if (res.ok) {
                 setComments(data.comments ?? []);
                 setUnreadCount(data.unreadCount ?? 0);
+                
+                // Debug: log platform values dari API
+                const sample = data.comments?.[0];
+                if (sample?.account?.platform) {
+                    console.log(`[Inbox] Platform sample:`, sample.account.platform);
+                    console.log(`[Inbox] Account object:`, JSON.stringify(sample.account, null, 2));
+                }
             } else {
                 setError(data.error || "Gagal memuat inbox.");
             }
@@ -297,9 +304,9 @@ export default function InboxPage() {
                                     ) : (
                                         <span
                                             className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white"
-                                            style={{ background: PLATFORM_COLORS[thread.account.platform] }}
+                                            style={{ background: thread.account?.platform ? PLATFORM_COLORS[thread.account.platform] : '#6B7280' }}
                                         >
-                                            <PlatformIcon platform={thread.account.platform} size={14} />
+                                            <PlatformIcon platform={thread.account?.platform || "MANUAL"} size={14} />
                                         </span>
                                     )}
                                 </button>
