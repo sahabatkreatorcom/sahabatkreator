@@ -140,9 +140,16 @@ async function publishPhoto(
         brand_content_toggle: payload.tiktokBrandContent ?? false,
         auto_add_music: payload.tiktokAutoAddMusic ?? true,
     };
-    // TikTok: title opsional, kirim hanya jika ada isi (empty string ditolak)
+    // TikTok photo post: title max 90 UTF-16 runes, sisa masuk description
     if (payload.caption?.trim()) {
-        postInfo.title = payload.caption;
+        const maxTitle = 90;
+        const caption = payload.caption.trim();
+        if (caption.length <= maxTitle) {
+            postInfo.title = caption;
+        } else {
+            postInfo.title = caption.slice(0, maxTitle);
+            postInfo.description = caption;
+        }
     }
 
     const initBody = {
