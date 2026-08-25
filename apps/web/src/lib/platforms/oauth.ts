@@ -143,16 +143,12 @@ async function exchangeInstagramStandaloneToken(
     }
 
     // STEP 2: short-lived → long-lived token (60 hari)
-    const longRes = await fetch(`${INSTAGRAM_GRAPH_URL}/access_token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-            grant_type: "ig_exchange_token",
-            client_id: clientId,
-            client_secret: clientSecret,
-            access_token: data.access_token as string,
-        }),
-    });
+    // PENTING: ig_exchange_token HANYA menerima GET (POST → error 100 subcode 33).
+    const longUrl = new URL(`${INSTAGRAM_GRAPH_URL}/access_token`);
+    longUrl.searchParams.set("grant_type", "ig_exchange_token");
+    longUrl.searchParams.set("client_secret", clientSecret);
+    longUrl.searchParams.set("access_token", data.access_token as string);
+    const longRes = await fetch(longUrl.toString(), { method: "GET" });
     let longData: Record<string, unknown> = {};
     try {
         longData = (await longRes.json()) as Record<string, unknown>;
@@ -221,20 +217,16 @@ async function refreshInstagramStandaloneToken(
 ): Promise<TokenResponse> {
     // Instagram standalone long-lived tokens are refreshed via ig_exchange_token
     // using the current access token + client credentials.
+    // PENTING: ig_exchange_token HANYA menerima GET (POST → error 100 subcode 33).
     const { clientId, clientSecret } = credentials || {
         clientId: process.env.INSTAGRAM_CLIENT_ID || "",
         clientSecret: process.env.INSTAGRAM_CLIENT_SECRET || "",
     };
-    const res = await fetch(`${INSTAGRAM_GRAPH_URL}/access_token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-            grant_type: "ig_exchange_token",
-            client_id: clientId,
-            client_secret: clientSecret,
-            access_token: accessToken,
-        }),
-    });
+    const url = new URL(`${INSTAGRAM_GRAPH_URL}/access_token`);
+    url.searchParams.set("grant_type", "ig_exchange_token");
+    url.searchParams.set("client_secret", clientSecret);
+    url.searchParams.set("access_token", accessToken);
+    const res = await fetch(url.toString(), { method: "GET" });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error?.message || data.error || "Gagal refresh token Instagram.");
     if (!data.access_token) throw new Error("Gagal refresh token Instagram: tidak ada access_token baru.");
