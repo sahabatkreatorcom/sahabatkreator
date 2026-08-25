@@ -50,20 +50,70 @@ export async function publishToFacebook(
         return { success: true, postId: data.id, postUrl: `https://www.facebook.com/${data.id}` };
     }
 
-    // Media: post dengan media URL
-    params.set("url", payload.mediaUrls[0]);
-    if (payload.mediaUrls.length > 1) {
-        payload.mediaUrls.slice(1).forEach((u, i) => params.set(`attached_media[${i}][media_fbid]`, u));
-    }
+    // Media: upload pertama via /photos untuk mendapatkan media_fbid
+    const firstUrl = payload.mediaUrls[0];
+    console.log(`[facebook] uploading photo: ${firstUrl}`);
+    params.set("url", firstUrl);
+    params.set("published", "false"); // upload dulu, publish nanti
 
-    const res = await fetch(`${GRAPH_URL}/${pageId}/photos`, {
+    const uploadRes = await fetch(`${GRAPH_URL}/${pageId}/photos`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: params,
     });
+    const uploadData = await uploadRes.json();
+    if (uploadData.error) {
+        console.error(`[facebook] /photos upload error:`, JSON.stringify(uploadData.error));
+        return { success: false, error: uploadData.error.message, errorCode: uploadData.error.code?.toString() };
+    }
+
+    const firstMediaId = uploadData.id;
+
+    // Multi-image: upload semua image, kumpulkan media_fbid
+    const attachedMedia: string[] = [firstMediaId];
+    for (let i = 1; i < payload.mediaUrls.length; i++) {
+        const url = payload.mediaUrls[i];
+        console.log(`[facebook] uploading photo ${i + 1}: ${url}`);
+        const multiParams = new URLSearchParams({
+            access_token: account.accessToken,
+            url,
+            published: "false",
+        });
+        const multiRes = await fetch(`${GRAPH_URL}/${pageId}/photos`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: multiParams,
+        });
+        const multiData = await multiRes.json();
+        if (multiData.error) {
+            console.error(`[facebook] /photos upload ${i + 1} error:`, JSON.stringify(multiData.error));
+            // Skip gambar yang gagal, lanjut dengan yang berhasil
+            continue;
+        }
+        if (multiData.id) attachedMedia.push(multiData.id);
+    }
+
+    // Publish semua sekaligus
+    const publishParams = new URLSearchParams({
+        access_token: account.accessToken,
+        message: payload.caption,
+    });
+    if (payload.location) publishParams.set("place", payload.location);
+
+    // Facebook: attached_media[0][media_fbid]=xxx
+    attachedMedia.forEach((mediaId, i) => {
+        publishParams.set(`attached_media[${i}][media_fbid]`, mediaId);
+    });
+
+    console.log(`[facebook] publishing ${attachedMedia.length} photos to /feed`);
+    const res = await fetch(`${GRAPH_URL}/${pageId}/feed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: publishParams,
+    });
     const data = await res.json();
     if (data.error) {
-        console.error(`[facebook] /photos error:`, JSON.stringify(data.error));
+        console.error(`[facebook] /feed publish error:`, JSON.stringify(data.error));
         return { success: false, error: data.error.message, errorCode: data.error.code?.toString() };
     }
 

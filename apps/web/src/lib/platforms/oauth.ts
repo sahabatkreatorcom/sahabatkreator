@@ -136,8 +136,14 @@ async function exchangeInstagramStandaloneToken(
     });
     const longData = await longRes.json();
 
+    // Jika exchange gagal, JANGAN fallback ke short-lived token
+    // (short-lived token hanya ~1 jam, expiry yang disimpan akan salah)
+    if (!longData.access_token) {
+        throw new Error(longData.error?.message || "Gagal menukar ke long-lived token Instagram. Silakan hubungkan ulang.");
+    }
+
     return {
-        accessToken: longData.access_token || data.access_token,
+        accessToken: longData.access_token,
         expiresIn: longData.expires_in || 5184000,
     };
 }
@@ -169,8 +175,12 @@ async function exchangeFacebookToken(
     });
     const longData = await longRes.json();
 
+    if (!longData.access_token) {
+        throw new Error(longData.error?.message || "Gagal menukar ke long-lived token Facebook. Silakan hubungkan ulang.");
+    }
+
     return {
-        accessToken: longData.access_token || data.access_token,
+        accessToken: longData.access_token,
         expiresIn: longData.expires_in || data.expires_in || 5184000,
     };
 }
@@ -197,6 +207,7 @@ async function refreshInstagramStandaloneToken(
     });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error?.message || data.error || "Gagal refresh token Instagram.");
+    if (!data.access_token) throw new Error("Gagal refresh token Instagram: tidak ada access_token baru.");
     return { accessToken: data.access_token, expiresIn: data.expires_in || 5184000 };
 }
 
