@@ -82,8 +82,13 @@ export async function sendPushNotification(opts: {
         console.warn("[push] VAPID keys tidak tersedia, lewati pengiriman notifikasi");
         return { sent: 0, failed: 0 };
     }
+    // VAPID subject harus URL — jika email, tambah prefix mailto:
+    const rawSubject = env.VAPID_ADMIN_EMAIL ?? "admin@sahabatkreator.com";
+    const vapidSubject = rawSubject.includes("@") && !rawSubject.startsWith("mailto:")
+        ? `mailto:${rawSubject}`
+        : rawSubject;
     webPushLib.setVapidDetails(
-        env.VAPID_ADMIN_EMAIL ?? "admin@sahabatkreator.com",
+        vapidSubject,
         env.VAPID_PUBLIC_KEY,
         env.VAPID_PRIVATE_KEY,
     );

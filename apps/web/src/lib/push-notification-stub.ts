@@ -63,12 +63,17 @@ export async function sendNotification(
 
     let sent = 0;
     let failed = 0;
+    // VAPID subject harus URL — jika email, tambah prefix mailto:
+    const rawSubject = env.VAPID_ADMIN_EMAIL;
+    const vapidSubject = rawSubject?.includes("@") && !rawSubject.startsWith("mailto:")
+        ? `mailto:${rawSubject}`
+        : rawSubject;
 
     for (const sub of subs) {
         try {
             if (webPushLib) {
                 webPushLib.setVapidDetails(
-                    env.VAPID_ADMIN_EMAIL,
+                    vapidSubject ?? "",
                     env.VAPID_PUBLIC_KEY,
                     env.VAPID_PRIVATE_KEY,
                 );
@@ -77,7 +82,7 @@ export async function sendNotification(
                     notificationBody,
                     {
                         vapidDetails: {
-                            subject: env.VAPID_ADMIN_EMAIL,
+                            subject: vapidSubject ?? "",
                             publicKey: env.VAPID_PUBLIC_KEY,
                             privateKey: env.VAPID_PRIVATE_KEY,
                         },
@@ -93,7 +98,7 @@ export async function sendNotification(
                 await fetch(sub.endpoint, {
                     method: "POST",
                     headers: {
-                        Authorization: `vapid t=${env.VAPID_ADMIN_EMAIL},k=${env.VAPID_PUBLIC_KEY}`,
+                        Authorization: `vapid t=${vapidSubject},k=${env.VAPID_PUBLIC_KEY}`,
                         "Content-Type": "application/octet-stream",
                         URGENCY: "high",
                     },
