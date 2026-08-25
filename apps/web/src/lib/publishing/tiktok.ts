@@ -183,7 +183,7 @@ async function publishPhoto(
 
 /**
  * TikTok photo mode HANYA terima JPEG/WEBP — PNG ditolak.
- * Download semua gambar, validasi dimensi (min 360px), convert PNG ke JPEG via sharp.
+ * Download semua gambar, validasi dimensi (min 360px), convert non-JPEG/WEBP ke JPEG via sharp.
  */
 async function ensureJpegUrls(urls: string[]): Promise<string[]> {
     const results = await Promise.all(
@@ -193,33 +193,25 @@ async function ensureJpegUrls(urls: string[]): Promise<string[]> {
                 if (!res.ok) throw new Error(`Gagal download gambar #${i + 1}: HTTP ${res.status}`);
 
                 const buf = Buffer.from(await res.arrayBuffer());
-                const lower = url.toLowerCase();
-                const isPng = lower.endsWith(".png") || lower.includes(".png?");
-
-                if (isPng) {
-                    // Convert PNG → JPEG, preserve dimensi
-                    const jpegBuf = await sharp(buf)
-                        .jpeg({ quality: 90 })
-                        .toBuffer();
-                    const meta = await sharp(jpegBuf).metadata();
-                    const w = meta.width ?? 0;
-                    const h = meta.height ?? 0;
-                    if (w < 360 || h < 360) {
-                        throw new Error(`Gambar #${i + 1} terlalu kecil (${w}x${h}px). TikTok minimum 360px.`);
-                    }
-                    const key = `tiktok-jpeg/${randomUUID()}.jpg`;
-                    await uploadFile(key, jpegBuf, { contentType: "image/jpeg" });
-                    return getPublicUrl(key);
-                }
-
-                // Bukan PNG — cek dimensi asli
                 const meta = await sharp(buf).metadata();
+                const format = meta.format; // "jpeg" | "png" | "webp" | "gif" | "tiff" | etc.
                 const w = meta.width ?? 0;
                 const h = meta.height ?? 0;
+
                 if (w < 360 || h < 360) {
                     throw new Error(`Gambar #${i + 1} terlalu kecil (${w}x${h}px). TikTok minimum 360px.`);
                 }
-                return url;
+
+                // TikTok hanya terima JPEG/WEBP — convert lainnya ke JPEG
+                if (format === "jpeg" || format === "webp") {
+                    return url;
+                }
+
+                // Convert PNG/GIF/TIFF/etc → JPEG
+                const jpegBuf = await sharp(buf).jpeg({ quality: 90 }).toBuffer();
+                const key = `tiktok-jpeg/${randomUUID()}.jpg`;
+                await uploadFile(key, jpegBuf, { contentType: "image/jpeg" });
+                return getPublicUrl(key);
             } catch (e) {
                 if (e instanceof Error && e.message.includes("terlalu kecil")) throw e;
                 throw new Error(`Gagal memproses gambar #${i + 1}: ${e instanceof Error ? e.message : "unknown error"}`);
