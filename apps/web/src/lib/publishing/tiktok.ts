@@ -151,6 +151,8 @@ async function publishPhoto(
         media_type: "PHOTO",
     };
 
+    console.log(`[tiktok] initBody:`, JSON.stringify(initBody, null, 2));
+
     const init = await fetch(`${TIKTOK_API_URL}/post/publish/content/init/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json; charset=UTF-8" },
@@ -198,6 +200,8 @@ async function ensureJpegUrls(urls: string[]): Promise<string[]> {
                 const w = meta.width ?? 0;
                 const h = meta.height ?? 0;
 
+                console.log(`[tiktok] gambar #${i + 1}: format=${format}, ${w}x${h}px, url=${url.slice(0, 80)}`);
+
                 if (w < 360 || h < 360) {
                     throw new Error(`Gambar #${i + 1} terlalu kecil (${w}x${h}px). TikTok minimum 360px.`);
                 }
@@ -208,10 +212,13 @@ async function ensureJpegUrls(urls: string[]): Promise<string[]> {
                 }
 
                 // Convert PNG/GIF/TIFF/etc → JPEG
+                console.log(`[tiktok] convert ${format} → jpeg`);
                 const jpegBuf = await sharp(buf).jpeg({ quality: 90 }).toBuffer();
                 const key = `tiktok-jpeg/${randomUUID()}.jpg`;
                 await uploadFile(key, jpegBuf, { contentType: "image/jpeg" });
-                return getPublicUrl(key);
+                const newUrl = getPublicUrl(key);
+                console.log(`[tiktok] uploaded to: ${newUrl}`);
+                return newUrl;
             } catch (e) {
                 if (e instanceof Error && e.message.includes("terlalu kecil")) throw e;
                 throw new Error(`Gagal memproses gambar #${i + 1}: ${e instanceof Error ? e.message : "unknown error"}`);
