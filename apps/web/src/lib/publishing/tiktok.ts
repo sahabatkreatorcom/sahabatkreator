@@ -133,15 +133,20 @@ async function publishPhoto(
         return { success: false, error: e instanceof Error ? e.message : "Gagal memproses gambar.", errorCode: "INVALID_IMAGE" };
     }
 
+    const postInfo: Record<string, unknown> = {
+        privacy_level: payload.tiktokPrivacyLevel,
+        disable_comment: payload.tiktokComments !== true,
+        brand_organic_toggle: payload.tiktokBrandOrganic ?? false,
+        brand_content_toggle: payload.tiktokBrandContent ?? false,
+        auto_add_music: payload.tiktokAutoAddMusic ?? true,
+    };
+    // TikTok: title opsional, kirim hanya jika ada isi (empty string ditolak)
+    if (payload.caption?.trim()) {
+        postInfo.title = payload.caption;
+    }
+
     const initBody = {
-        post_info: {
-            title: payload.caption,
-            privacy_level: payload.tiktokPrivacyLevel,
-            disable_comment: payload.tiktokComments !== true,
-            brand_organic_toggle: payload.tiktokBrandOrganic ?? false,
-            brand_content_toggle: payload.tiktokBrandContent ?? false,
-            auto_add_music: payload.tiktokAutoAddMusic ?? true,
-        },
+        post_info: postInfo,
         source_info: {
             source: "PULL_FROM_URL",
             photo_cover_index: 0,
@@ -159,6 +164,7 @@ async function publishPhoto(
         body: JSON.stringify(initBody),
     });
     const initData = await init.json();
+    console.log(`[tiktok] response status=${init.status}, body=`, JSON.stringify(initData, null, 2));
     if (initData.error && initData.error.code !== "ok") {
         return { success: false, error: initData.error.message || "Gagal init foto TikTok.", errorCode: initData.error.code };
     }
@@ -191,34 +197,59 @@ async function ensureJpegUrls(urls: string[]): Promise<string[]> {
     const results = await Promise.all(
         urls.map(async (url, i) => {
             try {
+                // Skip URL yang sudah di-convert sebelumnya (path /tiktok-jpeg/)
+                if (url.includes("/tiktok-jpeg/")) return url;
+
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`Gagal download gambar #${i + 1}: HTTP ${res.status}`);
 
                 const buf = Buffer.from(await res.arrayBuffer());
+
+                // Deteksi format dari ekstensi URL (cepat)
+                const lower = url.toLowerCase();
+                const isPngByUrl = lower.endsWith(".png") || lower.includes(".png?");
+                const isJpegByUrl = lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.includes(".jpg?") || lower.includes(".jpeg?");
+                const isWebpByUrl = lower.endsWith(".webp") || lower.includes(".webp?");
+
+                // Fallback: deteksi dari sharp metadata
+                let format: string | undefined;
+                if (!isJpegByUrl && !isWebpByUrl) {
+                    const meta = await sharp(buf).metadata();
+                    format = meta.format;
+                }
+
+                const needsConvert = !isJpegByUrl && !isWebpByUrl && format !== "jpeg" && format !== "webp";
+                const detectedFormat = isPngByUrl ? "png" : (format ?? "unknown");
+
+                console.log(`[tiktok] gambar #${i + 1}: url_format=${isPngByUrl ? "png" : isJpegByUrl ? "jpeg" : isWebpByUrl ? "webp" : "?"}, sharp_format=${format}, needsConvert=${needsConvert}, url=${url.slice(0, 100)}`);
+
+                if (needsConvert) {
+                    // Validasi dimensi
+                    const meta = await sharp(buf).metadata();
+                    const w = meta.width ?? 0;
+                    const h = meta.height ?? 0;
+                    if (w < 360 || h < 360) {
+                        throw new Error(`Gambar #${i + 1} terlalu kecil (${w}x${h}px). TikTok minimum 360px.`);
+                    }
+
+                    // Convert → JPEG
+                    console.log(`[tiktok] convert ${detectedFormat} → jpeg`);
+                    const jpegBuf = await sharp(buf).jpeg({ quality: 90 }).toBuffer();
+                    const key = `tiktok-jpeg/${randomUUID()}.jpg`;
+                    await uploadFile(key, jpegBuf, { contentType: "image/jpeg" });
+                    const newUrl = getPublicUrl(key);
+                    console.log(`[tiktok] uploaded to: ${newUrl}`);
+                    return newUrl;
+                }
+
+                // Sudah JPEG/WEBP — cek dimensi
                 const meta = await sharp(buf).metadata();
-                const format = meta.format; // "jpeg" | "png" | "webp" | "gif" | "tiff" | etc.
                 const w = meta.width ?? 0;
                 const h = meta.height ?? 0;
-
-                console.log(`[tiktok] gambar #${i + 1}: format=${format}, ${w}x${h}px, url=${url.slice(0, 80)}`);
-
                 if (w < 360 || h < 360) {
                     throw new Error(`Gambar #${i + 1} terlalu kecil (${w}x${h}px). TikTok minimum 360px.`);
                 }
-
-                // TikTok hanya terima JPEG/WEBP — convert lainnya ke JPEG
-                if (format === "jpeg" || format === "webp") {
-                    return url;
-                }
-
-                // Convert PNG/GIF/TIFF/etc → JPEG
-                console.log(`[tiktok] convert ${format} → jpeg`);
-                const jpegBuf = await sharp(buf).jpeg({ quality: 90 }).toBuffer();
-                const key = `tiktok-jpeg/${randomUUID()}.jpg`;
-                await uploadFile(key, jpegBuf, { contentType: "image/jpeg" });
-                const newUrl = getPublicUrl(key);
-                console.log(`[tiktok] uploaded to: ${newUrl}`);
-                return newUrl;
+                return url;
             } catch (e) {
                 if (e instanceof Error && e.message.includes("terlalu kecil")) throw e;
                 throw new Error(`Gagal memproses gambar #${i + 1}: ${e instanceof Error ? e.message : "unknown error"}`);
