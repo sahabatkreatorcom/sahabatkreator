@@ -238,7 +238,20 @@ async function publishContainer(
         return { success: false, error: result.error.message, errorCode: result.error.code?.toString() };
     }
 
-    return { success: true, postId: result.id, postUrl: `https://instagram.com/p/${result.id}` };
+    const mediaId = result.id;
+    // Fetch shortcode untuk build URL yang valid (media ID ≠ shortcode)
+    let shortcode = mediaId;
+    try {
+        const metaRes = await fetch(`${base}/${mediaId}?fields=shortcode`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        const meta = await metaRes.json();
+        if (meta.shortcode) shortcode = meta.shortcode;
+    } catch {
+        // fallback: gunakan mediaId
+    }
+
+    return { success: true, postId: mediaId, postUrl: `https://www.instagram.com/p/${shortcode}/` };
 }
 
 /**

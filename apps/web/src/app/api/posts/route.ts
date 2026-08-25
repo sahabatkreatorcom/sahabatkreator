@@ -48,13 +48,13 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
         if (urnMatch) cleanId = urnMatch[1];
 
         switch (platform) {
-            case "INSTAGRAM": return cleanId ? `https://instagram.com/p/${cleanId}` : null;
-            case "TIKTOK": return cleanId && cleanId !== "completed" ? `https://tiktok.com/@${accountName ?? "user"}/video/${cleanId}` : null;
-            case "FACEBOOK": return cleanId ? `https://facebook.com/${cleanId}` : null;
-            case "YOUTUBE": return cleanId ? `https://youtube.com/watch?v=${cleanId}` : null;
-            case "PINTEREST": return cleanId ? `https://pinterest.com/pin/${cleanId}` : null;
+            case "INSTAGRAM": return cleanId ? `https://www.instagram.com/p/${cleanId}/` : null;
+            case "TIKTOK": return cleanId && cleanId !== "completed" ? `https://www.tiktok.com/@${accountName ?? "user"}/video/${cleanId}` : null;
+            case "FACEBOOK": return cleanId ? `https://www.facebook.com/${cleanId}` : null;
+            case "YOUTUBE": return cleanId ? `https://www.youtube.com/watch?v=${cleanId}` : null;
+            case "PINTEREST": return cleanId ? `https://www.pinterest.com/pin/${cleanId}/` : null;
             case "LINKEDIN": return cleanId ? `https://www.linkedin.com/feed/update/urn:li:share:${cleanId}` : null;
-            case "THREADS": return cleanId ? `https://threads.net/@${accountName ?? "user"}/post/${cleanId}` : null;
+            case "THREADS": return cleanId ? `https://www.threads.net/@${accountName ?? "user"}/post/${cleanId}` : null;
             default: return null;
         }
     }

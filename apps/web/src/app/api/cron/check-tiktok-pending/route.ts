@@ -44,6 +44,7 @@ export const POST = async (req: NextRequest) => {
             platformPostId: true,
             caption: true,
             socialAccountId: true,
+            postType: true,
         },
     });
 
@@ -94,8 +95,9 @@ export const POST = async (req: NextRequest) => {
                 const ids = data.data?.publiclyAvailablePostId;
                 const publicId = Array.isArray(ids) && ids.length > 0 ? String(ids[0]) : null;
                 const accountName = post.socialAccount.name || "user";
+                const isPhoto = post.postType === "CAROUSEL";
                 const tiktokUrl = publicId
-                    ? `https://www.tiktok.com/@${accountName}/video/${publicId}`
+                    ? `https://www.tiktok.com/@${accountName}/${isPhoto ? "photo" : "video"}/${publicId}`
                     : null;
 
                 await db.update(schema.post)

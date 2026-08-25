@@ -47,7 +47,7 @@ export async function publishToFacebook(
                 // non-fatal
             }
         }
-        return { success: true, postId: data.id, postUrl: `https://facebook.com/${data.id}` };
+        return { success: true, postId: data.id, postUrl: `https://www.facebook.com/${data.id}` };
     }
 
     // Media: post dengan media URL
@@ -83,5 +83,5 @@ export async function publishToFacebook(
         }
     }
 
-    return { success: true, postId: data.id, postUrl: `https://facebook.com/${data.id}` };
+    return { success: true, postId: data.id, postUrl: `https://www.facebook.com/${data.id}` };
 }

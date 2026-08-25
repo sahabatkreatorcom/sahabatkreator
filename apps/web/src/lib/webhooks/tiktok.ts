@@ -108,7 +108,7 @@ export async function handleTikTokWebhook(rawBody: string): Promise<number> {
                     _eq(t.socialAccountId, account.id),
                     _in(t.status, ["SCHEDULED", "PUBLISHING", "PUBLISHED", "FAILED"]),
                 ),
-            columns: { id: true, status: true, platformPostId: true, externalUrl: true },
+            columns: { id: true, status: true, platformPostId: true, externalUrl: true, postType: true },
         });
         if (!post) return;
 
@@ -116,7 +116,8 @@ export async function handleTikTokWebhook(rawBody: string): Promise<number> {
             // postId dari webhook adalah ID publik TikTok
             const publicId = postId;
             const accountName = account.name || "user";
-            const tiktokUrl = publicId ? `https://www.tiktok.com/@${accountName}/video/${publicId}` : null;
+            const isPhoto = post.postType === "CAROUSEL";
+            const tiktokUrl = publicId ? `https://www.tiktok.com/@${accountName}/${isPhoto ? "photo" : "video"}/${publicId}` : null;
 
             await db
                 .update(schema.post)

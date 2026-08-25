@@ -138,7 +138,21 @@ async function publishContainer(
         return { success: false, error: err.error?.message || "Gagal publish Threads.", errorCode: err.error?.code?.toString() };
     }
     const data = await res.json();
-    return { success: true, postId: data.id, postUrl: `https://threads.net/@${userId}/post/${data.id}` };
+    const mediaId = data.id;
+
+    // Fetch shortcode untuk build URL yang valid (media ID ≠ shortcode)
+    let shortcode = mediaId;
+    try {
+        const metaRes = await fetch(`${THREADS_API}/${mediaId}?fields=shortcode`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const meta = await metaRes.json();
+        if (meta.shortcode) shortcode = meta.shortcode;
+    } catch {
+        // fallback: gunakan mediaId
+    }
+
+    return { success: true, postId: mediaId, postUrl: `https://www.threads.net/@${userId}/post/${shortcode}` };
 }
 
 function isVideoUrl(url: string): boolean {

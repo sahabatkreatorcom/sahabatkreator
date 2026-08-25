@@ -159,6 +159,7 @@ async function checkAndResolveTikTokPost(post: {
     platformPostId: string | null;
     organizationId: string;
     caption: string | null;
+    postType: string | null;
     socialAccount: { accessToken: string; name: string | null } | null;
 }) {
     if (!post.platformPostId?.startsWith(TIKTOK_PENDING_PREFIX) || !post.socialAccount) return;
@@ -179,13 +180,14 @@ async function checkAndResolveTikTokPost(post: {
             const ids = data.data?.publiclyAvailablePostId;
             const publicId = Array.isArray(ids) && ids.length > 0 ? String(ids[0]) : null;
             const accountName = post.socialAccount.name || "user";
+            const isPhoto = post.postType === "CAROUSEL";
             await db.update(schema.post)
                 .set({
                     status: "PUBLISHED",
                     publishedAt: new Date(),
                     platformPostId: publicId || post.platformPostId,
                     externalUrl: publicId
-                        ? `https://www.tiktok.com/@${accountName}/video/${publicId}`
+                        ? `https://www.tiktok.com/@${accountName}/${isPhoto ? "photo" : "video"}/${publicId}`
                         : null,
                 })
                 .where(eq(schema.post.id, post.id));

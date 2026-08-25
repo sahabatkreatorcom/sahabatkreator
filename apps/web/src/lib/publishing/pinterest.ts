@@ -65,7 +65,7 @@ export async function publishToPinterest(
             return { success: false, error: data.message || "Publish Pinterest gagal." };
         }
 
-        return { success: true, postId: data.id, postUrl: `https://pinterest.com/pin/${data.id}` };
+        return { success: true, postId: data.id, postUrl: `https://www.pinterest.com/pin/${data.id}/` };
     } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
         return { success: false, error: message };
@@ -99,7 +99,7 @@ async function publishCarousel(
             return { success: false, error: data.message || "Publish carousel Pinterest gagal." };
         }
 
-        return { success: true, postId: data.id, postUrl: `https://pinterest.com/pin/${data.id}` };
+        return { success: true, postId: data.id, postUrl: `https://www.pinterest.com/pin/${data.id}/` };
     } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
         return { success: false, error: message };

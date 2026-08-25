@@ -5,6 +5,15 @@ import { randomUUID } from "node:crypto";
 
 const TIKTOK_API_URL = "https://open.tiktokapis.com/v2";
 
+/**
+ * Build TikTok post URL berdasarkan jenis konten.
+ * Photo posts: /photo/  |  Video posts: /video/
+ */
+export function buildTikTokUrl(accountName: string, postId: string, isPhoto: boolean): string {
+    const slug = isPhoto ? "photo" : "video";
+    return `https://www.tiktok.com/@${accountName}/${slug}/${postId}`;
+}
+
 /** TikTok error-reason code → pesan yang mudah dipahami pengguna berbahasa Indonesia. */
 export function humanizeTikTokError(reason: string): string {
     const map: Record<string, string> = {
@@ -101,7 +110,7 @@ async function publishVideo(
     return {
         success: true,
         postId,
-        postUrl: `https://tiktok.com/@${account.accountName}/video/${postId}`,
+        postUrl: buildTikTokUrl(account.accountName, postId, false),
     };
 }
 
@@ -168,7 +177,7 @@ async function publishPhoto(
     return {
         success: true,
         postId,
-        postUrl: `https://tiktok.com/@${account.accountName}/video/${postId}`,
+        postUrl: buildTikTokUrl(account.accountName, postId, true),
     };
 }
 

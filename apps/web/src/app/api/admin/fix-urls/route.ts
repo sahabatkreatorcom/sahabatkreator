@@ -39,19 +39,21 @@ function buildCorrectUrl(platform: string | null, platformPostId: string | null,
     switch (platform) {
         case "INSTAGRAM":
         case "INSTAGRAM_PAGE":
-            return cleanId ? `https://instagram.com/p/${cleanId}` : null;
+            return cleanId ? `https://www.instagram.com/p/${cleanId}/` : null;
         case "TIKTOK":
+            // Note: fix-urls tidak bisa tentukan photo/video tanpa postType, default ke /video/
             return cleanId ? `https://www.tiktok.com/@${accountName ?? "user"}/video/${cleanId}` : null;
         case "FACEBOOK":
-            return cleanId ? `https://facebook.com/${cleanId}` : null;
+            return cleanId ? `https://www.facebook.com/${cleanId}` : null;
         case "YOUTUBE":
-            return cleanId ? `https://youtube.com/watch?v=${cleanId}` : null;
+            return cleanId ? `https://www.youtube.com/watch?v=${cleanId}` : null;
         case "PINTEREST":
-            return cleanId ? `https://pinterest.com/pin/${cleanId}` : null;
+            return cleanId ? `https://www.pinterest.com/pin/${cleanId}/` : null;
         case "LINKEDIN":
             return cleanId ? `https://www.linkedin.com/feed/update/urn:li:share:${cleanId}` : null;
         case "THREADS":
-            return cleanId ? `https://threads.net/@${accountName ?? "user"}/post/${cleanId}` : null;
+            // Note: fix-urls tidak bisa resolve shortcode tanpa API call, gunakan mediaId
+            return cleanId ? `https://www.threads.net/@${accountName ?? "user"}/post/${cleanId}` : null;
         default:
             return null;
     }
