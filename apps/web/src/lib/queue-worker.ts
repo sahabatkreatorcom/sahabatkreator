@@ -21,11 +21,14 @@ import {
     QUEUE_PUBLISH,
     QUEUE_SYNC,
     QUEUE_STALE_CLEANUP,
+    QUEUE_TIKTOK_CHECK,
     redisConnectionOptions,
     type PublishPostJobData,
     type SyncJobData,
     type StaleCleanupJobData,
+    type TikTokCheckJobData,
     enqueueStaleCleanup,
+    enqueueTikTokStatusCheck,
 } from "@sahabat-kreator/queue";
 import { publishPost } from "@/lib/publishing/publish-post";
 import { syncOrganizationAnalytics } from "@/lib/analytics";
@@ -33,9 +36,12 @@ import { syncOrganizationComments } from "@/lib/inbox";
 import { db, schema } from "@sahabat-kreator/db";
 import { and, eq, lte } from "drizzle-orm";
 import { decryptToken } from "@/lib/token-encryption";
+import { humanizeTikTokError } from "@/lib/publishing/tiktok";
+import { logActivity } from "@/lib/activity-log";
 
 const LOG = (message: string) => console.log(`[queue-worker] ${new Date().toISOString()} ${message}`);
 const TIKTOK_PENDING_PREFIX = "tiktok_pending:";
+const TIKTOK_API_URL = "https://open.tiktokapis.com/v2";
 
 export async function startQueueWorkers(): Promise<() => Promise<void>> {
     const workers: Worker[] = [];
@@ -140,7 +146,131 @@ export async function startQueueWorkers(): Promise<() => Promise<void>> {
         LOG(`stale-cleanup job failed: ${err.message}`);
     });
 
-    workers.push(publishWorker, syncWorker, staleCleanupWorker);
+    const MAX_TIKTOK_CHECK_ATTEMPTS = 5;
+
+// ---------------------------------------------------------------------------
+// TikTok status check worker — delayed job setelah publish photo
+// ---------------------------------------------------------------------------
+
+const tiktokCheckWorker = new Worker(
+    QUEUE_TIKTOK_CHECK,
+    async (job) => {
+        const data = job.data as TikTokCheckJobData;
+        LOG(`tiktok-check start post=${data.postId} attempt=${data.attempt}`);
+
+        const post = await db.query.post.findFirst({
+            where: eq(schema.post.id, data.postId),
+            with: {
+                socialAccount: true,
+                media: { with: { media: true }, orderBy: (pm, { asc }) => [asc(pm.order)] },
+            },
+        });
+
+        if (!post || !post.socialAccount) {
+            LOG(`tiktok-check post=${data.postId} not found or no social account`);
+            return;
+        }
+
+        // Sudah resolved oleh proses lain (mis. user manual / stale cleanup)
+        if (post.status !== "PUBLISHING") {
+            LOG(`tiktok-check post=${data.postId} status=${post.status} — skipping`);
+            return;
+        }
+
+        const accessToken = decryptToken(post.socialAccount.accessToken);
+
+        try {
+            const res = await fetch(`${TIKTOK_API_URL}/post/publish/status/fetch/`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ publish_id: data.publishId }),
+            });
+            const resData = await res.json();
+            const status = resData.data?.status;
+
+            if (status === "PUBLISH_COMPLETE") {
+                const ids = resData.data?.publiclyAvailablePostId;
+                const publicId = Array.isArray(ids) && ids.length > 0 ? String(ids[0]).trim() : null;
+                const accountName = post.socialAccount.name || "user";
+                const hasVideo = post.media.some((pm) => pm.media.mimeType?.startsWith("video/"));
+                const tiktokUrl = publicId
+                    ? `https://www.tiktok.com/@${accountName}/${hasVideo ? "video" : "photo"}/${publicId}`
+                    : null;
+
+                await db.update(schema.post)
+                    .set({
+                        status: "PUBLISHED",
+                        publishedAt: new Date(),
+                        platformPostId: publicId || post.platformPostId,
+                        externalUrl: tiktokUrl,
+                    })
+                    .where(eq(schema.post.id, post.id));
+                await logActivity(
+                    post.organizationId,
+                    "post.published",
+                    { type: "post", id: post.id, name: (post.caption || "").slice(0, 100) },
+                    { platform: "TIKTOK", platformPostId: publicId },
+                );
+                LOG(`tiktok-check resolved post=${data.postId} publicId=${publicId}`);
+            } else if (status === "FAILED") {
+                const failedReason = resData.data?.fail_reason || "unknown";
+                await db.update(schema.post)
+                    .set({ status: "FAILED" })
+                    .where(eq(schema.post.id, post.id));
+                await db.insert(schema.publishError).values({
+                    id: randomUUID(),
+                    postId: post.id,
+                    platform: "TIKTOK",
+                    errorCode: `TIKTOK_FAILED:${failedReason}`,
+                    errorRaw: JSON.stringify(resData),
+                    errorHuman: humanizeTikTokError(failedReason),
+                    occurredAt: new Date(),
+                });
+                await logActivity(
+                    post.organizationId,
+                    "post.failed",
+                    { type: "post", id: post.id, name: (post.caption || "").slice(0, 100) },
+                    { platform: "TIKTOK", error: failedReason },
+                );
+                LOG(`tiktok-check failed post=${data.postId} reason=${failedReason}`);
+            } else {
+                // Masih pending — enqueue lagi jika belum max attempts
+                if (data.attempt < MAX_TIKTOK_CHECK_ATTEMPTS) {
+                    await enqueueTikTokStatusCheck(
+                        data.postId,
+                        data.organizationId,
+                        data.publishId,
+                        data.attempt + 1,
+                    );
+                    LOG(`tiktok-check still pending post=${data.postId} — retry attempt ${data.attempt + 1}`);
+                } else {
+                    LOG(`tiktok-check max attempts reached post=${data.postId} — leaving as PUBLISHING`);
+                }
+            }
+        } catch (e) {
+            LOG(`tiktok-check error post=${data.postId}: ${e instanceof Error ? e.message : e}`);
+            // Network error — enqueue lagi jika belum max attempts
+            if (data.attempt < MAX_TIKTOK_CHECK_ATTEMPTS) {
+                await enqueueTikTokStatusCheck(
+                    data.postId,
+                    data.organizationId,
+                    data.publishId,
+                    data.attempt + 1,
+                );
+            }
+        }
+    },
+    {
+        connection: redisConnectionOptions(),
+        concurrency: 2,
+    },
+);
+
+tiktokCheckWorker.on("failed", (job, err) => {
+    LOG(`tiktok-check job failed post=${job?.data.postId}: ${err.message}`);
+});
+
+workers.push(publishWorker, syncWorker, staleCleanupWorker, tiktokCheckWorker);
 
     // Start the repeatable stale-cleanup job (once — BullMQ keeps the schedule)
     await enqueueStaleCleanup();

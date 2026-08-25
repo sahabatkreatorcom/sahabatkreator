@@ -14,6 +14,7 @@
 export const QUEUE_PUBLISH = "publish-post";
 export const QUEUE_SYNC = "sync";
 export const QUEUE_STALE_CLEANUP = "stale-post-cleanup";
+export const QUEUE_TIKTOK_CHECK = "tiktok-check";
 
 export interface PublishPostJobData {
     postId: string;
@@ -30,6 +31,13 @@ export interface SyncJobData {
 
 export interface StaleCleanupJobData {
     type: "stale-cleanup";
+}
+
+export interface TikTokCheckJobData {
+    postId: string;
+    organizationId: string;
+    publishId: string;
+    attempt: number;
 }
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
@@ -243,6 +251,40 @@ export async function enqueueStaleCleanup(): Promise<boolean> {
                 repeat: { pattern: "*/60 * * * * *" }, // every 60 seconds
                 removeOnComplete: { count: 10 },
                 removeOnFail: { count: 10 },
+                attempts: 1,
+            },
+        );
+        return true;
+    } finally {
+        await queue.close();
+    }
+}
+
+/**
+ * Enqueue pengecekan status TikTok setelah publish Photo/Carousel.
+ * Delayed job: pertama kali 90 detik (sesuai polling timeout baru),
+ * lalu retry dengan backoff eksponensial sampai maks 5 kali.
+ * No-op bila REDIS_URL belum dikonfigurasi.
+ */
+export async function enqueueTikTokStatusCheck(
+    postId: string,
+    organizationId: string,
+    publishId: string,
+    attempt = 1,
+): Promise<boolean> {
+    if (!isRedisConfigured()) return false;
+    const { Queue } = await import("bullmq");
+    const queue = new Queue(QUEUE_TIKTOK_CHECK, { connection: redisConnectionOptions() });
+    try {
+        const delayMs = attempt === 1 ? 90_000 : Math.min(60_000 * attempt, 300_000);
+        await queue.add(
+            "tiktok-check",
+            { postId, organizationId, publishId, attempt } satisfies TikTokCheckJobData,
+            {
+                delay: delayMs,
+                jobId: `tiktok-check-${postId}-attempt-${attempt}`,
+                removeOnComplete: { count: 50 },
+                removeOnFail: { count: 50 },
                 attempts: 1,
             },
         );

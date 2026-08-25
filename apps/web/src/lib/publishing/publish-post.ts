@@ -6,6 +6,7 @@ import type { PublishPayload } from "./types";
 import { decryptToken } from "@/lib/token-encryption";
 import { logActivity } from "@/lib/activity-log";
 import { notifyPostPublished, notifyPostFailed } from "@/lib/push-notification";
+import { enqueueTikTokStatusCheck } from "@sahabat-kreator/queue";
 
 export interface PublishPostResult {
     ok: boolean;
@@ -110,9 +111,12 @@ export async function publishPost(
     if (!result.success) {
         // PUBLISH_PENDING: TikTok masih memproses — jangan mark FAILED, simpan sebagai PUBLISHING
         if (result.errorCode === "PUBLISH_PENDING" && result.postId) {
+            const publishId = result.postId.replace("tiktok_pending:", "");
             await db.update(schema.post)
                 .set({ status: "PUBLISHING", platformPostId: result.postId, externalUrl: result.postUrl ?? null })
                 .where(eq(schema.post.id, postId));
+            // Enqueue delayed job untuk cek status TikTok (90 detik pertama, lalu retry)
+            await enqueueTikTokStatusCheck(postId, organizationId, publishId, 1);
             return { ok: false, error: result.error, errorCode: result.errorCode };
         }
 
