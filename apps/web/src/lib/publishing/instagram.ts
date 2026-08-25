@@ -80,6 +80,7 @@ async function publishFeed(
     });
     const container = await containerRes.json();
     if (container.error) {
+        console.error(`[instagram] publishFeed container error:`, JSON.stringify(container.error));
         return { success: false, error: container.error.message, errorCode: container.error.code?.toString() };
     }
 
@@ -160,6 +161,7 @@ async function publishReel(
     });
     const container = await res.json();
     if (container.error) {
+        console.error(`[instagram] publishReel container error:`, JSON.stringify(container.error));
         return { success: false, error: container.error.message, errorCode: container.error.code?.toString() };
     }
 
@@ -232,6 +234,7 @@ async function publishContainer(
     });
     const result = await publishRes.json();
     if (result.error) {
+        console.error(`[instagram] publishContainer publish error:`, JSON.stringify(result.error));
         return { success: false, error: result.error.message, errorCode: result.error.code?.toString() };
     }
 

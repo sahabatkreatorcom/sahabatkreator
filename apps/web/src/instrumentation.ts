@@ -26,8 +26,10 @@ export async function register() {
                 console.error("[instrumentation] gagal menutup worker:", err);
             }
         };
-        process.on("SIGTERM", shutdown);
-        process.on("SIGINT", shutdown);
+        if (typeof process !== "undefined" && typeof process.on === "function") {
+            process.on("SIGTERM", shutdown);
+            process.on("SIGINT", shutdown);
+        }
     } catch (err) {
         console.error("[instrumentation] gagal start queue worker:", err);
     }

@@ -50,6 +50,17 @@ export async function refreshAccountTokenIfNeeded(
 
     if (!needsRefresh) return { refreshed: false, token: accessToken };
 
+    // Meta: token yang sudah expired TIDAK bisa di-refresh (Graph API tolak error 190).
+    // Langsung tampilkan reconnect, jangan coba refresh sia-sia.
+    if (isMeta && expiry !== null && expiry < Date.now()) {
+        return {
+            refreshed: false,
+            token: accessToken,
+            error: "Token akses Instagram/Facebook sudah kedaluwarsa. Hubungkan ulang akun.",
+            needReconnect: true,
+        };
+    }
+
     // Meta memakai access token itu sendiri sebagai sumber refresh;
     // platform lain memakai refreshToken (long-lived).
     const source = isMeta ? accessToken : account.refreshToken ? decryptToken(account.refreshToken) : null;
@@ -64,7 +75,9 @@ export async function refreshAccountTokenIfNeeded(
 
     try {
         const credentials = (await getCredentialsForPlatform(account.platform)) || undefined;
+        console.log(`[token-refresh] refreshing ${account.platform} account=${account.id} source=${source ? "present" : "none"}`);
         const refreshed = await refreshAccessToken(account.platform, source, credentials);
+        console.log(`[token-refresh] success ${account.platform} account=${account.id} newExpiry=${new Date(Date.now() + refreshed.expiresIn * 1000).toISOString()}`);
 
         await db.update(schema.socialAccount)
             .set({
@@ -78,6 +91,7 @@ export async function refreshAccountTokenIfNeeded(
         return { refreshed: true, token: refreshed.accessToken };
     } catch (e) {
         const message = e instanceof Error ? e.message : "Unknown error";
+        console.error(`[token-refresh] failed ${account.platform} account=${account.id}: ${message}`);
         await db.update(schema.socialAccount)
             .set({ lastRefreshError: message.slice(0, 500) })
             .where(eq(schema.socialAccount.id, account.id));

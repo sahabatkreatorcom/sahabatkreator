@@ -18,7 +18,7 @@ export async function publishToFacebook(
     });
 
     if (payload.link) params.set("link", payload.link);
-    if (payload.callToAction) params.set("call_to_action", payload.callToAction);
+    // call_to_action bukan parameter standar Graph API /feed — dihapus agar tidak erro 100.
     if (payload.location) params.set("place", payload.location);
 
     // Text-only: gunakan /feed endpoint
@@ -30,6 +30,7 @@ export async function publishToFacebook(
         });
         const data = await res.json();
         if (data.error) {
+            console.error(`[facebook] /feed error:`, JSON.stringify(data.error));
             return { success: false, error: data.error.message, errorCode: data.error.code?.toString() };
         }
         if (data.id && payload.firstComment?.trim()) {
@@ -62,6 +63,7 @@ export async function publishToFacebook(
     });
     const data = await res.json();
     if (data.error) {
+        console.error(`[facebook] /photos error:`, JSON.stringify(data.error));
         return { success: false, error: data.error.message, errorCode: data.error.code?.toString() };
     }
 

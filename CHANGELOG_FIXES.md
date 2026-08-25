@@ -4,6 +4,31 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #42 — Instagram Error 190 (token expired) + Facebook Error 100 (invalid parameter)
+
+**Gejala:**
+1. **Instagram standalone**: posting video/reel gagal dengan `Error validating access token: Session has expired on Saturday, 22-Aug-26 12:00:00 PDT. The current time is Sunday, 23-Aug-26 14:47:43 PDT. kode 190`. Akun terhubung sejak 23 Agustus 2026, token valid hingga 22 Oktober 2026 — tapi saat publish, token dianggap expired.
+2. **Facebook**: posting caption/link/photo/video gagal dengan `kode 100, Invalid parameter`.
+
+**Akar Masalah:**
+1. **Instagram Error 190**: `token-refresh.ts` menjalankan refresh preemptif (<7 hari dari expiry) bahkan ketika token **sudah expired**. Meta Graph API menolak refresh untuk token yang sudah expired → throw error → `needReconnect: true` → publish batal. Alurnya: akun terhubung 23 Agu → token expire 22 Okt → cron/refresh preemptif jalan sebelum tanggal itu → token masih valid →一切正常。Tapi jika waktunya pas (token baru saja expired), preemptive refresh mencoba memperpanjang token yang sudah mati → GAGAL → user dipaksa reconnect padahal seharusnya masih bisa publish sebentar lagi.
+2. **Facebook Error 100**: `facebook.ts` mengirim parameter `call_to_action` sebagai stringPlain ke endpoint `/feed` dan `/photos`. Facebook Graph API v26 tidak mengenali parameter `call_to_action` — parameter ini sudah deprecated di API versi modern. Value-nya harus berupa objek JSON `{type: "...", web_url: "..."}` atau tidak dikirim sama sekali.
+
+**Fix:**
+1. **`token-refresh.ts`**: Tambah pengecekan eksplisit — jika token Meta sudah expired (`expiry < Date.now()`), skip refresh dan langsung return `needReconnect: true`. Preemptive refresh hanya untuk token yang **masih valid tapi hampir expired**.
+2. **`facebook.ts`**: Hapus pengiriman parameter `call_to_action` yang tidak dikenali. Parameter ini tidak ada di dokumentasi Facebook Graph API untuk post creation — hapus agar tidak memicu error 100.
+3. **Logging**: Tambah `console.error` di `facebook.ts` untuk setiap error API (feed + photos), dan `console.log/error` di `token-refresh.ts` untuk setiap attempt refresh.
+
+| | |
+|---|---|
+| **File** | `apps/web/src/lib/platforms/token-refresh.ts` (+check expiry sebelum refresh Meta), `apps/web/src/lib/publishing/facebook.ts` (-hapus call_to_action param +error logging), `apps/web/src/lib/publishing/instagram.ts` (+error logging container & publish) |
+| **Masalah** | Instagram Error 190 (token expired saat publish), Facebook Error 100 (invalid parameter call_to_action) |
+| **Akar** | 1. Preemptive refresh mencoba perpanjang token yang sudah expired — Meta tolak. 2. Parameter `call_to_action` bukan parameter valid Facebook Graph API v26. |
+| **Fix** | 1. Skip refresh jika token sudah expired, langsung needReconnect. 2. Hapus parameter `call_to_action`. |
+| **Verifikasi** | **PENDING** — perlu test publish video/reel Instagram dan post Facebook di VPS. TypeScript compile lolos (`pnpm --filter web exec tsc --noEmit`). |
+| **Log Keyword** | instagram, error 190, token expired, facebook, error 100, invalid parameter, call_to_action, preemptive refresh |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
 ### Fix #41 — Inbox Page Build Error - Corrupted .next Cache
 
 **Gejala:** Halaman `/inbox` menampilkan error "This page couldn't load". Build process gagal dengan error TypeScript di `.next/dev/types/`.
