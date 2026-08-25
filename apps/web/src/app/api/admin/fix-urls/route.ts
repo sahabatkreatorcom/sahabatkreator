@@ -70,13 +70,13 @@ function buildCorrectUrl(platform: string | null, platformPostId: string | null,
 }
 
 function buildExternalId(platform: string | null, platformPostId: string | null, externalUrl: string | null): string | null {
-    if (platformPostId) return platformPostId;
-    // Ekstrak dari URL jika ada
-    if (externalUrl) {
-        const match = externalUrl.match(/\/([a-zA-Z0-9_-]+)$/);
-        if (match) return match[1];
-    }
-    return null;
+    if (!platformPostId) return null;
+
+    // TikTok: jangan set externalId untuk pending prefix
+    if (platform === "TIKTOK" && platformPostId.startsWith("tiktok_pending:")) return null;
+    if (platform === "TIKTOK" && platformPostId === "completed") return null;
+
+    return platformPostId;
 }
 
 function buildThumbnailUrl(platform: string | null, platformPostId: string | null): string | null {
