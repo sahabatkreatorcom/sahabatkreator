@@ -191,6 +191,20 @@ const tiktokCheckWorker = new Worker(
             if (status === "PUBLISH_COMPLETE") {
                 const ids = resData.data?.publiclyAvailablePostId;
                 const publicId = Array.isArray(ids) && ids.length > 0 ? String(ids[0]).trim() : null;
+
+                // TikTok photo: publicId bisa kosong meski PUBLISH_COMPLETE
+                // → re-enqueue agar stale-cleanup nanti bisa resolve dengan ID
+                if (!publicId && data.attempt < MAX_TIKTOK_CHECK_ATTEMPTS) {
+                    await enqueueTikTokStatusCheck(
+                        data.postId,
+                        data.organizationId,
+                        data.publishId,
+                        data.attempt + 1,
+                    );
+                    LOG(`tiktok-check post=${data.postId} PUBLISH_COMPLETE but no publicId — retry attempt ${data.attempt + 1}`);
+                    return;
+                }
+
                 const accountName = post.socialAccount.name || "user";
                 const hasVideo = post.media.some((pm) => pm.media.mimeType?.startsWith("video/"));
                 const tiktokUrl = publicId
@@ -310,14 +324,15 @@ async function checkAndResolveTikTokPost(post: {
             const ids = data.data?.publiclyAvailablePostId;
             const publicId = Array.isArray(ids) && ids.length > 0 ? String(ids[0]) : null;
             const accountName = post.socialAccount.name || "user";
-            const isPhoto = post.postType === "CAROUSEL";
+            // Determine /photo/ vs /video/ by checking postType (stale cleanup doesn't have media loaded)
+            const isVideo = post.postType === "VIDEO";
             await db.update(schema.post)
                 .set({
                     status: "PUBLISHED",
                     publishedAt: new Date(),
                     platformPostId: publicId || post.platformPostId,
                     externalUrl: publicId
-                        ? `https://www.tiktok.com/@${accountName}/${isPhoto ? "photo" : "video"}/${publicId}`
+                        ? `https://www.tiktok.com/@${accountName}/${isVideo ? "video" : "photo"}/${publicId}`
                         : null,
                 })
                 .where(eq(schema.post.id, post.id));
