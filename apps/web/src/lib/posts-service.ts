@@ -107,7 +107,7 @@ export async function createPosts(params: CreatePostParams): Promise<CreatePostR
         }
     }
 
-    // Validasi dimensi gambar untuk TikTok (minimum 360px, HANYA JPEG/WEBP)
+    // Validasi dimensi gambar untuk TikTok (minimum 360px; PNG otomatis di-convert ke JPEG)
     if (mediaIds?.length) {
         const tiktokAccounts = socialAccounts.filter((a) => a.platform === "TIKTOK");
         if (tiktokAccounts.length > 0) {
@@ -117,10 +117,6 @@ export async function createPosts(params: CreatePostParams): Promise<CreatePostR
                 columns: { id: true, url: true, mimeType: true, filename: true },
             });
             for (const m of mediaItems) {
-                // Cek format: TikTok hanya terima JPEG/WEBP
-                if (m.mimeType === "image/png") {
-                    return { status: 400, error: `Gambar "${m.filename}" format PNG tidak didukung TikTok. Gunakan JPG atau WEBP.` };
-                }
                 // Cek dimensi
                 try {
                     const res = await fetch(m.url);

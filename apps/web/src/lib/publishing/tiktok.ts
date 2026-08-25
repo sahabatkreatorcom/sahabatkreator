@@ -11,7 +11,7 @@ export function humanizeTikTokError(reason: string): string {
         url_ownership_unverified: "Domain gambar belum diverifikasi di TikTok Developer Portal. Verifikasi domain di bagian URL Properties.",
         photo_pull_failed: "TikTok gagal mengunduh gambar. Pastikan URL gambar bisa diakses publik tanpa redirect.",
         picture_size_check_failed: "Ukuran gambar terlalu kecil (minimum 360px).",
-        file_format_check_failed: "Format gambar tidak didukung. Gunakan JPG, JPEG, atau PNG.",
+        file_format_check_failed: "Format gambar tidak didukung. Gunakan JPG atau WEBP.",
         spam_risk_too_many_posts: "Batas post harian tercapai.",
         spam_risk_user_banned_from_posting: "Akun diblokir dari posting.",
         spam_risk_too_many_pending_share: "Terlalu banyak post pending (maks 5 per 24 jam).",
