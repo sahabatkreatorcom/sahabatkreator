@@ -802,7 +802,16 @@ export default function ComposePage() {
                     <div className="grid grid-cols-4 gap-2">
                         {media.map((m) => (
                             <div key={m.id} className="group relative aspect-square overflow-hidden rounded-md border border-border">
-                                <img src={m.thumbnailUrl ?? m.url} alt="" className="h-full w-full object-cover" />
+                                {m.type === "video" ? (
+                                    <video src={m.url} poster={m.thumbnailUrl ?? undefined} className="h-full w-full object-cover" muted preload="metadata" />
+                                ) : m.type === "audio" ? (
+                                    <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-card p-2">
+                                        <span className="text-[10px] font-medium uppercase text-muted-foreground">Audio</span>
+                                        <span className="line-clamp-2 text-center text-[11px]">{m.url.split("/").pop()}</span>
+                                    </div>
+                                ) : (
+                                    <img src={m.thumbnailUrl ?? m.url} alt="" className="h-full w-full object-cover" />
+                                )}
                                 <button
                                     onClick={() => setMedia((prev) => prev.filter((x) => x.id !== m.id))}
                                     className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
@@ -945,7 +954,16 @@ function MediaLibraryPicker({
                         }}
                         className="group relative aspect-square overflow-hidden rounded-md border border-border bg-muted"
                     >
-                        <img src={item.thumbnailUrl ?? item.url} alt={item.filename} loading="lazy" className="h-full w-full object-cover" />
+                        {item.type === "video" ? (
+                            <video src={item.url} poster={item.thumbnailUrl ?? undefined} className="h-full w-full object-cover" muted preload="metadata" />
+                        ) : item.type === "audio" ? (
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2">
+                                <span className="text-[10px] font-medium uppercase text-muted-foreground">Audio</span>
+                                <span className="line-clamp-2 text-center text-[11px]">{item.filename}</span>
+                            </div>
+                        ) : (
+                            <img src={item.thumbnailUrl ?? item.url} alt={item.filename} loading="lazy" className="h-full w-full object-cover" />
+                        )}
                     </button>
                 ))}
                 {items.length === 0 && (
