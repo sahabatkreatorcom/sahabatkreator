@@ -24,7 +24,7 @@ interface PostRow {
     status: string;
 }
 
-function buildCorrectUrl(platform: string | null, platformPostId: string | null, accountName: string | null): string | null {
+function buildCorrectUrl(platform: string | null, platformPostId: string | null, accountName: string | null, mediaTypes?: string[]): string | null {
     if (!platform || !platformPostId) return null;
 
     let cleanId = platformPostId;
@@ -33,16 +33,26 @@ function buildCorrectUrl(platform: string | null, platformPostId: string | null,
     const urnMatch = platformPostId.match(/share:(\d+)/);
     if (urnMatch) cleanId = urnMatch[1];
 
-    // TikTok ID "completed" tidak valid
-    if (platform === "TIKTOK" && cleanId === "completed") return null;
+    // TikTok ID "completed" atau "tiktok_pending:" prefix tidak valid
+    if (platform === "TIKTOK") {
+        if (cleanId === "completed") return null;
+        if (cleanId.startsWith("tiktok_pending:")) return null;
+    }
 
     switch (platform) {
         case "INSTAGRAM":
-        case "INSTAGRAM_PAGE":
-            return cleanId ? `https://www.instagram.com/p/${cleanId}/` : null;
-        case "TIKTOK":
-            // Note: fix-urls tidak bisa tentukan photo/video tanpa postType, default ke /video/
-            return cleanId ? `https://www.tiktok.com/@${accountName ?? "user"}/video/${cleanId}` : null;
+        case "INSTAGRAM_PAGE": {
+            // Instagram: platformPostId = media ID (numeric), tapi URL pakai shortcode
+            // Jika externalUrl sudah punya shortcode yang valid, JANGAN diubah
+            // Kita tidak bisa resolve shortcode dari media ID tanpa API call
+            return null; // Skip — Instagram URL harus di-handle manual atau via publish flow
+        }
+        case "TIKTOK": {
+            if (!cleanId) return null;
+            // Tentukan /photo/ vs /video/ berdasarkan media type
+            const hasVideo = mediaTypes?.some((mt) => mt.startsWith("video/")) ?? false;
+            return `https://www.tiktok.com/@${accountName ?? "user"}/${hasVideo ? "video" : "photo"}/${cleanId}`;
+        }
         case "FACEBOOK":
             return cleanId ? `https://www.facebook.com/${cleanId}` : null;
         case "YOUTUBE":
@@ -103,20 +113,27 @@ export async function GET(req: NextRequest) {
     const dryRun = searchParams.get("dry-run") === "true";
 
     try {
-        const posts = await db.select({
-            id: schema.post.id,
-            platform: schema.post.platform,
-            platformPostId: schema.post.platformPostId,
-            externalUrl: schema.post.externalUrl,
-            externalId: schema.post.externalId,
-            externalThumbnailUrl: schema.post.externalThumbnailUrl,
-            syncedAt: schema.post.syncedAt,
-            publishedAt: schema.post.publishedAt,
-            socialAccountId: schema.post.socialAccountId,
-            status: schema.post.status,
-        })
-        .from(schema.post)
-        .where(isNotNull(schema.post.platformPostId));
+        const posts = await db.query.post.findMany({
+            where: isNotNull(schema.post.platformPostId),
+            with: {
+                media: {
+                    with: { media: { columns: { mimeType: true } } },
+                    orderBy: (pm, { asc }) => [asc(pm.order)],
+                },
+            },
+            columns: {
+                id: true,
+                platform: true,
+                platformPostId: true,
+                externalUrl: true,
+                externalId: true,
+                externalThumbnailUrl: true,
+                syncedAt: true,
+                publishedAt: true,
+                socialAccountId: true,
+                status: true,
+            },
+        });
 
         const fixes: Array<{
             postId: string;
@@ -128,7 +145,8 @@ export async function GET(req: NextRequest) {
 
         for (const post of posts) {
             const accountName = await fetchAccountName(post.socialAccountId);
-            const correctUrl = buildCorrectUrl(post.platform, post.platformPostId, accountName);
+            const mediaTypes = post.media.map((pm) => pm.media.mimeType ?? "");
+            const correctUrl = buildCorrectUrl(post.platform, post.platformPostId, accountName, mediaTypes);
             const correctId = buildExternalId(post.platform, post.platformPostId, post.externalUrl);
             const correctThumb = buildThumbnailUrl(post.platform, post.platformPostId);
 
@@ -173,20 +191,27 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const posts = await db.select({
-            id: schema.post.id,
-            platform: schema.post.platform,
-            platformPostId: schema.post.platformPostId,
-            externalUrl: schema.post.externalUrl,
-            externalId: schema.post.externalId,
-            externalThumbnailUrl: schema.post.externalThumbnailUrl,
-            syncedAt: schema.post.syncedAt,
-            publishedAt: schema.post.publishedAt,
-            socialAccountId: schema.post.socialAccountId,
-            status: schema.post.status,
-        })
-        .from(schema.post)
-        .where(isNotNull(schema.post.platformPostId));
+        const posts = await db.query.post.findMany({
+            where: isNotNull(schema.post.platformPostId),
+            with: {
+                media: {
+                    with: { media: { columns: { mimeType: true } } },
+                    orderBy: (pm, { asc }) => [asc(pm.order)],
+                },
+            },
+            columns: {
+                id: true,
+                platform: true,
+                platformPostId: true,
+                externalUrl: true,
+                externalId: true,
+                externalThumbnailUrl: true,
+                syncedAt: true,
+                publishedAt: true,
+                socialAccountId: true,
+                status: true,
+            },
+        });
 
         let fixed = 0;
         let skipped = 0;
@@ -195,7 +220,8 @@ export async function POST(req: NextRequest) {
         for (const post of posts) {
             try {
                 const accountName = await fetchAccountName(post.socialAccountId);
-                const correctUrl = buildCorrectUrl(post.platform, post.platformPostId, accountName);
+                const mediaTypes = post.media.map((pm) => pm.media.mimeType ?? "");
+                const correctUrl = buildCorrectUrl(post.platform, post.platformPostId, accountName, mediaTypes);
                 const correctId = buildExternalId(post.platform, post.platformPostId, post.externalUrl);
                 const correctThumb = buildThumbnailUrl(post.platform, post.platformPostId);
 
