@@ -117,34 +117,64 @@ async function exchangeInstagramStandaloneToken(
     clientId: string,
     clientSecret: string,
 ): Promise<TokenResponse> {
+    // STEP 1: kode → short-lived token
     const res = await fetch(`${INSTAGRAM_OAUTH_URL}/access_token`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "authorization_code", redirect_uri: redirectUri, code }),
     });
-    const data = await res.json();
-    if (!res.ok || data.error) throw new Error(data.error_message || data.error || "Gagal tukar kode Instagram.");
+    let data: Record<string, unknown> = {};
+    try {
+        data = (await res.json()) as Record<string, unknown>;
+    } catch {
+        // response bukan JSON — jangan biarkan res.json() throw sintaks
+    }
+    console.error(`[instagram-oauth] step1 (code→short) url=${INSTAGRAM_OAUTH_URL}/access_token status=${res.status} body=`, JSON.stringify(data));
+    const step1Err = data.error as { message?: string } | string | undefined;
+    if (!res.ok || data.error) {
+        throw new Error(
+            (data.error_message as string) ||
+            (typeof step1Err === "string" ? step1Err : step1Err?.message) ||
+            `Gagal tukar kode Instagram (status ${res.status}).`,
+        );
+    }
+    if (!data.access_token) {
+        throw new Error("Gagal tukar kode Instagram: tidak ada access_token di respons.");
+    }
 
+    // STEP 2: short-lived → long-lived token (60 hari)
     const longRes = await fetch(`${INSTAGRAM_GRAPH_URL}/access_token`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
             grant_type: "ig_exchange_token",
+            client_id: clientId,
             client_secret: clientSecret,
-            access_token: data.access_token,
+            access_token: data.access_token as string,
         }),
     });
-    const longData = await longRes.json();
+    let longData: Record<string, unknown> = {};
+    try {
+        longData = (await longRes.json()) as Record<string, unknown>;
+    } catch {
+        // response bukan JSON
+    }
+    console.error(`[instagram-oauth] step2 (short→long) url=${INSTAGRAM_GRAPH_URL}/access_token status=${longRes.status} body=`, JSON.stringify(longData));
 
     // Jika exchange gagal, JANGAN fallback ke short-lived token
     // (short-lived token hanya ~1 jam, expiry yang disimpan akan salah)
+    const step2Err = longData.error as { message?: string } | string | undefined;
     if (!longData.access_token) {
-        throw new Error(longData.error?.message || "Gagal menukar ke long-lived token Instagram. Silakan hubungkan ulang.");
+        throw new Error(
+            (typeof step2Err === "string" ? step2Err : step2Err?.message) ||
+            (longData.error_message as string) ||
+            `Gagal menukar ke long-lived token Instagram (status ${longRes.status}). Silakan hubungkan ulang.`,
+        );
     }
 
     return {
-        accessToken: longData.access_token,
-        expiresIn: longData.expires_in || 5184000,
+        accessToken: longData.access_token as string,
+        expiresIn: (longData.expires_in as number) || 5184000,
     };
 }
 
