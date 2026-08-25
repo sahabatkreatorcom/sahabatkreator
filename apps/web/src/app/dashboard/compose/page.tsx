@@ -486,8 +486,8 @@ export default function ComposePage() {
                                                         className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                                     >
                                                         <option value="SELF_ONLY">Hanya saya</option>
-                                                        <option value="PRIVATE_TO_FRIENDS">Teman</option>
-                                                        <option value="PUBLIC">Publik</option>
+                                                        <option value="MUTUAL_FOLLOW_FRIENDS">Teman</option>
+                                                        <option value="PUBLIC_TO_EVERYONE">Publik</option>
                                                     </select>
                                                 </div>
                                                 <div className="space-y-1">

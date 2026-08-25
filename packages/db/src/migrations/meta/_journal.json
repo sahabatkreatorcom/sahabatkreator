@@ -43,6 +43,13 @@
       "when": 1787374818142,
       "tag": "0005_eminent_king_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787800000000,
+      "tag": "0006_fix_tiktok_privacy_level",
+      "breakpoints": true
     }
   ]
 }

@@ -131,7 +131,6 @@ async function publishPhoto(
             disable_comment: payload.tiktokComments !== true,
             brand_organic_toggle: payload.tiktokBrandOrganic ?? false,
             brand_content_toggle: payload.tiktokBrandContent ?? false,
-            is_aigc: payload.tiktokIsAigc ?? false,
             auto_add_music: payload.tiktokAutoAddMusic ?? true,
         },
         source_info: {
