@@ -37,7 +37,10 @@ export const POST = async (req: NextRequest) => {
                     _isNull(t.platformPostId),
                 ),
             ),
-        with: { socialAccount: true },
+        with: {
+            socialAccount: true,
+            media: { with: { media: true }, orderBy: (pm, { asc }) => [asc(pm.order)] },
+        },
         columns: {
             id: true,
             organizationId: true,
@@ -95,9 +98,10 @@ export const POST = async (req: NextRequest) => {
                 const ids = data.data?.publiclyAvailablePostId;
                 const publicId = Array.isArray(ids) && ids.length > 0 ? String(ids[0]) : null;
                 const accountName = post.socialAccount.name || "user";
-                const isPhoto = post.postType === "CAROUSEL";
+                // Tentukan /photo/ vs /video/ berdasarkan media type
+                const hasVideo = post.media.some((pm) => pm.media.mimeType?.startsWith("video/"));
                 const tiktokUrl = publicId
-                    ? `https://www.tiktok.com/@${accountName}/${isPhoto ? "photo" : "video"}/${publicId}`
+                    ? `https://www.tiktok.com/@${accountName}/${hasVideo ? "video" : "photo"}/${publicId}`
                     : null;
 
                 await db.update(schema.post)

@@ -266,12 +266,12 @@ async function ensureJpegUrls(urls: string[]): Promise<string[]> {
     return results;
 }
 
-/** Poll status publish TikTok sampai selesai (maks ±45 dtk). */
+/** Poll status publish TikTok sampai selesai (maks ±90 dtk). */
 async function waitForPublishComplete(
     accessToken: string,
     publishId: string,
 ): Promise<string | null> {
-    for (let attempt = 0; attempt < 15; attempt++) {
+    for (let attempt = 0; attempt < 30; attempt++) {
         await new Promise((r) => setTimeout(r, 3000));
 
         const res = await fetch(`${TIKTOK_API_URL}/post/publish/status/fetch/`, {
