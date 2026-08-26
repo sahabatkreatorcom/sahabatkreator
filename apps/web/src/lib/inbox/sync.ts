@@ -40,6 +40,10 @@ export async function syncOrganizationComments(organizationId: string): Promise<
                 result.postsChecked++;
                 if (!post.socialAccount || !post.platformPostId) return;
 
+                // TikTok sandbox: post ditandai PUBLISHED tapi belum punya video ID asli
+                // (platformPostId = tiktok_pending:...). Skip sampai ID asli ada.
+                if (post.platformPostId.startsWith("tiktok_pending:")) return;
+
                 try {
                     const account = await resolveAccount(post.socialAccount);
                     const { comments, error } = await fetchComments(account, post.platformPostId);

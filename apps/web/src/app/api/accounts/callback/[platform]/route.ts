@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { exchangeCodeForToken, getCredentialsForPlatform, fetchPlatformProfile, CONNECTABLE_PLATFORMS, type Platform } from "@/lib/platforms";
 import { encryptToken } from "@/lib/token-encryption";
 import { logActivity } from "@/lib/activity-log";
+import { subscribeInstagramCommentWebhook } from "@/lib/webhooks/meta";
 
 export const dynamic = "force-dynamic";
 
@@ -162,6 +163,12 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
             { type: "account", id: existing?.id ?? "new", name: profile.name },
             { platform },
         );
+
+        // Instagram standalone: subscribe akun ke webhook komentar (wajib per-akun).
+        // Non-fatal — kalau gagal, komentar tetap bisa disync berkala.
+        if (platform === "INSTAGRAM") {
+            await subscribeInstagramCommentWebhook(profile.platformId, tokens.accessToken).catch(() => false);
+        }
     } catch {
         accountsUrl.searchParams.set("error", "save_failed");
         return NextResponse.redirect(accountsUrl);

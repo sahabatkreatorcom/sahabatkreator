@@ -30,8 +30,10 @@ export async function fetchComments(
 
 async function fetchInstagramComments(token: string, mediaId: string, base: string): Promise<{ comments: PlatformComment[]; error?: string }> {
     try {
+        // NOTE: objek `from` komentar Instagram TIDAK mendukung profile_picture_url
+        // (error: Tried accessing nonexisting field). Pakai from{id,username} saja.
         const res = await fetch(
-            `${base}/${mediaId}/comments?fields=id,text,timestamp,like_count,username,from{id,username,profile_picture_url}`,
+            `${base}/${mediaId}/comments?fields=id,text,timestamp,like_count,from{id,username}`,
             { headers: { Authorization: `Bearer ${token}` } },
         );
         const data = await res.json();
@@ -41,9 +43,9 @@ async function fetchInstagramComments(token: string, mediaId: string, base: stri
             const from = (c.from ?? {}) as Record<string, unknown>;
             return {
                 platformCommentId: String(c.id),
-                authorId: String(from.id ?? c.username ?? ""),
-                authorUsername: String(from.username ?? c.username ?? "unknown"),
-                authorAvatar: from.profile_picture_url ? String(from.profile_picture_url) : null,
+                authorId: String(from.id ?? ""),
+                authorUsername: String(from.username ?? "unknown"),
+                authorAvatar: null,
                 text: String(c.text ?? ""),
                 createdAt: c.timestamp ? new Date(c.timestamp as string) : new Date(),
                 likeCount: Number(c.like_count ?? 0),
@@ -90,10 +92,17 @@ async function fetchTikTokComments(token: string, videoId: string): Promise<{ co
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             body: JSON.stringify({ video_id: videoId, max_count: 50 }),
         });
-        const data = await res.json();
-        if (!res.ok) return { comments: [], error: data.error?.message || `TikTok API error ${res.status}` };
+        let data: Record<string, unknown> = {};
+        try {
+            data = (await res.json()) as Record<string, unknown>;
+        } catch {
+            return { comments: [], error: `TikTok API mengembalikan respons non-JSON (status ${res.status}).` };
+        }
+        if (!res.ok) return { comments: [], error: (data.error as { message?: string })?.message || `TikTok API error ${res.status}` };
 
-        const comments: PlatformComment[] = (data.data?.comments ?? []).map((c: Record<string, unknown>) => {
+        const rawComments = (data.data as { comments?: unknown[] } | undefined)?.comments ?? [];
+        const comments: PlatformComment[] = rawComments.map((cRaw) => {
+            const c = cRaw as Record<string, unknown>;
             const user = (c.user ?? {}) as Record<string, unknown>;
             return {
                 platformCommentId: String(c.comment_id),
@@ -117,10 +126,16 @@ async function fetchYouTubeComments(token: string, videoId: string): Promise<{ c
             `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&maxResults=50`,
             { headers: { Authorization: `Bearer ${token}` } },
         );
-        const data = await res.json();
-        if (!res.ok) return { comments: [], error: data.error?.message || `YouTube API error ${res.status}` };
+        let data: Record<string, unknown> = {};
+        try {
+            data = (await res.json()) as Record<string, unknown>;
+        } catch {
+            return { comments: [], error: `YouTube API mengembalikan respons non-JSON (status ${res.status}).` };
+        }
+        if (!res.ok) return { comments: [], error: (data.error as { message?: string })?.message || `YouTube API error ${res.status}` };
 
-const comments: PlatformComment[] = (data.items ?? []).map((t: Record<string, unknown>) => {
+const comments: PlatformComment[] = ((data.items as unknown[] | undefined) ?? []).map((tRaw) => {
+            const t = tRaw as Record<string, unknown>;
             const top = (t.snippet ?? {}) as { id?: string; snippet?: Record<string, unknown> };
             const cs = (top.snippet ?? {}) as Record<string, unknown>;
             const channel = (cs.authorChannelId ?? {}) as { value?: string };
@@ -147,17 +162,25 @@ async function fetchThreadsComments(token: string, threadId: string): Promise<{ 
             `https://graph.threads.net/v1.0/${threadId}/replies?fields=id,text,timestamp,username`,
             { headers: { Authorization: `Bearer ${token}` } },
         );
-        const data = await res.json();
-        if (!res.ok) return { comments: [], error: data.error?.message || `Threads API error ${res.status}` };
+        let data: Record<string, unknown> = {};
+        try {
+            data = (await res.json()) as Record<string, unknown>;
+        } catch {
+            return { comments: [], error: `Threads API mengembalikan respons non-JSON (status ${res.status}).` };
+        }
+        if (!res.ok) return { comments: [], error: (data.error as { message?: string })?.message || `Threads API error ${res.status}` };
 
-        const comments: PlatformComment[] = (data.data ?? []).map((c: Record<string, unknown>) => ({
-            platformCommentId: String(c.id),
-            authorId: String(c.id),
-            authorUsername: String(c.username ?? "unknown"),
-            authorAvatar: null,
-            text: String(c.text ?? ""),
-            createdAt: c.timestamp ? new Date(c.timestamp as string) : new Date(),
-        }));
+        const comments: PlatformComment[] = ((data.data as unknown[] | undefined) ?? []).map((cRaw) => {
+            const c = cRaw as Record<string, unknown>;
+            return {
+                platformCommentId: String(c.id),
+                authorId: String(c.id),
+                authorUsername: String(c.username ?? "unknown"),
+                authorAvatar: null,
+                text: String(c.text ?? ""),
+                createdAt: c.timestamp ? new Date(c.timestamp as string) : new Date(),
+            };
+        });
         return { comments };
     } catch (e) {
         return { comments: [], error: e instanceof Error ? e.message : "Threads comment fetch failed" };

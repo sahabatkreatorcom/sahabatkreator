@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
-import { handleMetaWebhook, verifyMetaChallenge, verifyMetaSignature } from "@/lib/webhooks/meta";
+import { handleThreadsWebhook, verifyMetaChallenge, verifyMetaSignature } from "@/lib/webhooks/meta";
 import { webhookAck, webhookError, readWebhookBody } from "@/lib/webhooks";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Threads Webhooks (object `threads`).
+ * Threads Webhooks (topik `replies` & `mentions`).
  * Setup di App Dashboard Meta → Webhooks → Threads, callback = URL ini.
+ * Format payload Threads BERBEDA dari Instagram/Page — lihat handleThreadsWebhook.
  */
 export async function GET(req: NextRequest) {
     const challenge = await verifyMetaChallenge(new URL(req.url).searchParams, "THREADS");
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
     if (rawBody === null) return webhookError("Body too large", 413);
     if (!(await verifyMetaSignature(rawBody, req, "THREADS"))) return webhookError("Invalid signature", 401);
     try {
-        await handleMetaWebhook("threads", rawBody);
+        await handleThreadsWebhook(rawBody);
         return webhookAck();
     } catch (err) {
         console.error("[webhook:threads] gagal proses:", err);
