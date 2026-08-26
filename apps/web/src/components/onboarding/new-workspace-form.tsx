@@ -78,7 +78,7 @@ export function NewWorkspaceForm() {
             <div>
                 <Label htmlFor="ws-slug">URL workspace</Label>
                 <div className="flex items-center rounded-md border border-input bg-card focus-within:ring-2 focus-within:ring-ring">
-                    <span className="pl-3 text-sm text-muted-foreground">sahabatkreator.com/</span>
+                    <span className="pl-3 text-sm text-muted-foreground">{(process.env.NEXT_PUBLIC_APP_URL || "https://sahabatkreator.com").replace("https://", "")}/</span>
                     <input
                         id="ws-slug"
                         required

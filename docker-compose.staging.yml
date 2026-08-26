@@ -1,0 +1,85 @@
+# =============================================================================
+# Sahabat Kreator — Staging Docker Compose
+# Domain: staging.sahabatkreator.com
+# Database: Neon (serverless PostgreSQL)
+# Port: 3002 (web) → nginx reverse proxy
+#
+# Cara pakai:
+#   cp .env.staging .env
+#   nano .env  # isi credentials
+#   docker compose -f docker-compose.staging.yml up -d --build
+#
+# Port allocation (VPS):
+#   toeflynk:  3000 (web), 5432 (postgres), 6379 (redis)
+#   prod:      3001 (web), 5433 (postgres), 6380 (redis)
+#   staging:   3002 (web), Neon (database)
+# =============================================================================
+
+services:
+  migrate-staging:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: migrate
+    container_name: sahabat-staging-migrate
+    command: ["pnpm", "--filter", "@sahabat-kreator/db", "db:migrate"]
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    restart: "no"
+
+  web-staging:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: runner
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+        BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+        BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+        CORS_ORIGIN: ${CORS_ORIGIN}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+        ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+        R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+        R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+        R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+        R2_BUCKET_NAME: ${R2_BUCKET_NAME}
+    container_name: sahabat-staging-web
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "127.0.0.1:3002:3000"
+    restart: unless-stopped
+    depends_on:
+      migrate-staging:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker-staging:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    container_name: sahabat-staging-worker
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - WORKER_POLL_INTERVAL_MS=${WORKER_POLL_INTERVAL_MS:-15000}
+      - WORKER_BATCH_SIZE=${WORKER_BATCH_SIZE:-1}
+      - WORKER_FRAME_COUNT=${WORKER_FRAME_COUNT:-4}
+      - WORKER_MAX_VIDEO_BYTES=${WORKER_MAX_VIDEO_BYTES:-104857600}
+      - WORKER_ENABLE_TRANSCODE=${WORKER_ENABLE_TRANSCODE:-true}
+      - TRANSCODER=${TRANSCODER:-local}
+    restart: unless-stopped
+    depends_on:
+      migrate-staging:
+        condition: service_completed_successfully

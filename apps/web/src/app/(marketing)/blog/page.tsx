@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sahabatkreator.com";
   return {
     title: "Blog | Sahabat Kreator - Tips & Panduan Sosial Media",
     description:
@@ -16,13 +17,13 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: "Blog | Sahabat Kreator",
       description: "Tips, tutorial, dan panduan manajemen media sosial dari Sahabat Kreator.",
-      url: "https://sahabatkreator.com/blog",
+      url: `${baseUrl}/blog`,
       siteName: "Sahabat Kreator",
       type: "website",
       locale: "id_ID",
     },
     alternates: {
-      canonical: "https://sahabatkreator.com/blog",
+      canonical: `${baseUrl}/blog`,
     },
     robots: {
       index: true,

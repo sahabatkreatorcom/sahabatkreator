@@ -5,6 +5,8 @@
 
 import type { Metadata } from "next";
 
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://sahabatkreator.com";
+
 export const metadata: Metadata = {
   title: {
     default: "Sahabat Kreator — Platform Manajemen Media Sosial AI",
@@ -44,7 +46,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "id_ID",
-  url: "https://sahabatkreator.com",
+    url: BASE_URL,
     siteName: "Sahabat Kreator",
     title: "Sahabat Kreator — Platform Manajemen Media Sosial AI",
     description:
@@ -67,7 +69,7 @@ export const metadata: Metadata = {
     creator: "@sahabatkreator",
   },
   alternates: {
-    canonical: "https://sahabatkreator.com",
+    canonical: BASE_URL,
   },
   category: "social media management",
   formatDetection: {
@@ -97,7 +99,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appLinks: {
     web: {
-      url: "https://sahabatkreator.com/dashboard",
+      url: `${BASE_URL}/dashboard`,
       should_fallback: false,
     },
   },
@@ -107,6 +109,6 @@ export const seo = {
   title: "Sahabat Kreator — Platform Manajemen Media Sosial AI",
   description:
     "Platform manajemen media sosial AI-powered. Kelola semua akun sosial media dalam satu dashboard.",
-  url: "https://sahabatkreator.com",
+  url: BASE_URL,
   image: "/og-image.jpg",
 };

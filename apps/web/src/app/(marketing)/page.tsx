@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     title: "Sahabat Kreator | Platform Manajemen Media Sosial",
     description:
       "Jadwalkan konten ke Instagram, TikTok, YouTube, Facebook, LinkedIn, dan lainnya, pantau analitik, dan dapatkan rekomendasi asisten AI dalam satu dashboard.",
-    url: "https://sahabatkreator.com",
+    url: process.env.NEXT_PUBLIC_APP_URL || "https://sahabatkreator.com",
     siteName: "Sahabat Kreator",
     type: "website",
     locale: "id_ID",

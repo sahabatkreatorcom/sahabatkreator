@@ -24,13 +24,15 @@ export async function generateMetadata({ params }: Props) {
     };
   }
 
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sahabatkreator.com";
+
   return {
     title: `${post.title} | Sahabat Kreator`,
     description: post.excerpt || `Baca artikel tentang ${post.title} di Sahabat Kreator`,
     openGraph: {
       title: post.title,
       description: post.excerpt || `Baca artikel tentang ${post.title}`,
-      url: `https://sahabatkreator.com/blog/${slug}`,
+      url: `${baseUrl}/blog/${slug}`,
       type: "article",
       publishedTime: post.publishedAt?.toISOString() || new Date().toISOString(),
       siteName: "Sahabat Kreator",
@@ -41,7 +43,7 @@ export async function generateMetadata({ params }: Props) {
       description: post.excerpt || `Baca artikel tentang ${post.title}`,
     },
     alternates: {
-      canonical: `https://sahabatkreator.com/blog/${slug}`,
+      canonical: `${baseUrl}/blog/${slug}`,
     },
   };
 }

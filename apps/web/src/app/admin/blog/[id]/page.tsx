@@ -336,7 +336,7 @@ export default function BlogEditorPage({ params }: { params: Promise<{ id?: stri
                                 Slug
                             </Label>
                             <span className="text-xs text-muted-foreground">
-                                https://sahabatkreator.com/blog/{post.slug || "..."}
+                                {process.env.NEXT_PUBLIC_APP_URL || "https://sahabatkreator.com"}/blog/{post.slug || "..."}
                             </span>
                         </div>
                         <div className="flex gap-2">
@@ -581,7 +581,7 @@ export default function BlogEditorPage({ params }: { params: Promise<{ id?: stri
                         <div className="rounded-md border border-border bg-background p-3">
                             <div className="text-sm">
                                 <div className="mb-1 truncate text-xs text-emerald-700">
-                                    sahabatkreator.com › blog › {post.slug || "..."}
+                                    {(process.env.NEXT_PUBLIC_APP_URL || "https://sahabatkreator.com").replace("https://", "")} › blog › {post.slug || "..."}
                                 </div>
                                 <div className="mb-1 truncate text-[15px] font-medium text-[#1a0dab]">
                                     {post.title || "Judul post di sini"}
