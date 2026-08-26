@@ -297,7 +297,7 @@ export default function SebPage() {
                 <div>
                     <h1 className="text-lg font-semibold">Seb — asisten media sosial</h1>
                     <p className="text-sm text-muted-foreground">
-                        Laporan coaching, rekomendasi, chat, dan brand knowledge. Membutuhkan OPENROUTER_API_KEY.
+                        Laporan coaching, rekomendasi, chat, dan brand knowledge.
                     </p>
                 </div>
                 <Button size="sm" onClick={generate} disabled={generating}>
