@@ -5,6 +5,8 @@
  *   - publish-post : publish post terjadwal (delay-based)
  *   - sync         : sinkronkan analytics / inbox sebuah org
  *   - stale-post-cleanup: reset post stuck PUBLISHING > 10 menit
+ *   - tiktok-check : cek status publish TikTok yang pending
+ *   - media-cleanup: hapus file R2 yatim + temp TikTok (setiap 6 jam)
  *
  * Dengan worker di dalam proses yang sama, semua logic existing
  * (`publishPost`, `syncOrganizationAnalytics`, `syncOrganizationComments`)
@@ -22,17 +24,21 @@ import {
     QUEUE_SYNC,
     QUEUE_STALE_CLEANUP,
     QUEUE_TIKTOK_CHECK,
+    QUEUE_MEDIA_CLEANUP,
     redisConnectionOptions,
     type PublishPostJobData,
     type SyncJobData,
     type StaleCleanupJobData,
     type TikTokCheckJobData,
+    type MediaCleanupJobData,
     enqueueStaleCleanup,
     enqueueTikTokStatusCheck,
+    enqueueMediaCleanup,
 } from "@sahabat-kreator/queue";
 import { publishPost } from "@/lib/publishing/publish-post";
 import { syncOrganizationAnalytics } from "@/lib/analytics";
 import { syncOrganizationComments } from "@/lib/inbox";
+import { cleanupMediaStorage } from "@/lib/media-cleanup";
 import { db, schema } from "@sahabat-kreator/db";
 import { and, eq, lte } from "drizzle-orm";
 import { decryptToken } from "@/lib/token-encryption";
@@ -284,10 +290,39 @@ tiktokCheckWorker.on("failed", (job, err) => {
     LOG(`tiktok-check job failed post=${job?.data.postId}: ${err.message}`);
 });
 
-workers.push(publishWorker, syncWorker, staleCleanupWorker, tiktokCheckWorker);
+// Media storage cleanup — repeatable every 6h via BullMQ scheduler
+const mediaCleanupWorker = new Worker(
+    QUEUE_MEDIA_CLEANUP,
+    async (job) => {
+        const data = job.data as MediaCleanupJobData;
+        LOG("media-cleanup tick");
+        try {
+            const result = await cleanupMediaStorage({ dryRun: data.dryRun ?? false });
+            LOG(
+                `media-cleanup done scanned=${result.scanned} orphanMedia=${result.orphanMedia.length}` +
+                ` orphanFrames=${result.orphanFrames.length} tiktokJpeg=${result.tiktokJpegDeleted.length}` +
+                ` errors=${result.errors.length}`,
+            );
+        } catch (e) {
+            LOG(`media-cleanup error: ${e instanceof Error ? e.message : e}`);
+        }
+    },
+    {
+        connection: redisConnectionOptions(),
+        concurrency: 1,
+    },
+);
+
+mediaCleanupWorker.on("failed", (job, err) => {
+    LOG(`media-cleanup job failed: ${err.message}`);
+});
+
+workers.push(publishWorker, syncWorker, staleCleanupWorker, tiktokCheckWorker, mediaCleanupWorker);
 
     // Start the repeatable stale-cleanup job (once — BullMQ keeps the schedule)
     await enqueueStaleCleanup();
+    // Start the repeatable media-cleanup job (once — BullMQ keeps the schedule)
+    await enqueueMediaCleanup();
 
     return async () => {
         await Promise.all(workers.map((w) => w.close()));

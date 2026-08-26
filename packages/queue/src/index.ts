@@ -15,6 +15,7 @@ export const QUEUE_PUBLISH = "publish-post";
 export const QUEUE_SYNC = "sync";
 export const QUEUE_STALE_CLEANUP = "stale-post-cleanup";
 export const QUEUE_TIKTOK_CHECK = "tiktok-check";
+export const QUEUE_MEDIA_CLEANUP = "media-cleanup";
 
 export interface PublishPostJobData {
     postId: string;
@@ -38,6 +39,11 @@ export interface TikTokCheckJobData {
     organizationId: string;
     publishId: string;
     attempt: number;
+}
+
+export interface MediaCleanupJobData {
+    type: "media-cleanup";
+    dryRun?: boolean;
 }
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
@@ -285,6 +291,33 @@ export async function enqueueTikTokStatusCheck(
                 jobId: `tiktok-check-${postId}-attempt-${attempt}`,
                 removeOnComplete: { count: 50 },
                 removeOnFail: { count: 50 },
+                attempts: 1,
+            },
+        );
+        return true;
+    } finally {
+        await queue.close();
+    }
+}
+
+/**
+ * Enqueue pembersihan storage R2 sebagai repeatable job (setiap 6 jam).
+ * Cukup panggil sekali saat app start — BullMQ menyimpan repeat schedule di Redis.
+ * No-op bila REDIS_URL belum dikonfigurasi.
+ */
+export async function enqueueMediaCleanup(): Promise<boolean> {
+    if (!isRedisConfigured()) return false;
+    const { Queue } = await import("bullmq");
+    const queue = new Queue(QUEUE_MEDIA_CLEANUP, { connection: redisConnectionOptions() });
+    try {
+        await queue.add(
+            "media-cleanup",
+            { type: "media-cleanup" } satisfies MediaCleanupJobData,
+            {
+                jobId: "media-cleanup",
+                repeat: { pattern: "0 */6 * * *" }, // setiap 6 jam
+                removeOnComplete: { count: 10 },
+                removeOnFail: { count: 10 },
                 attempts: 1,
             },
         );
