@@ -1,13 +1,15 @@
 import { NextRequest } from "next/server";
 import { withAuth, json } from "@/lib/api";
-import { updateSavedResponse, deleteSavedResponse, bumpSavedResponseUsage } from "@/lib/inbox-automation";
+import { bumpSavedResponseUsage } from "@/lib/inbox-automation";
+import { and, eq } from "drizzle-orm";
+import { db, schema } from "@sahabat-kreator/db";
 
 export const dynamic = "force-dynamic";
 
 /**
  * PATCH /api/saved-responses/[id] — ubah balasan.
  * DELETE /api/saved-responses/[id] — hapus balasan.
- * POST /api/saved-responses/[id]/use — naikkan usageCount (dipanggil saat balasan dipakai di inbox).
+ * POST /api/saved-responses/[id] — naikkan usageCount (dipanggil saat balasan dipakai di inbox).
  */
 export const PATCH = withAuth(async (ctx, req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { activeOrganizationId } = ctx;
@@ -17,14 +19,20 @@ export const PATCH = withAuth(async (ctx, req: NextRequest, { params }: { params
     const body = (await req.json().catch(() => null)) as { name?: string; content?: string; shortcut?: string; category?: string } | null;
     if (!body) return json({ error: "Invalid JSON body." }, { status: 400 });
 
-    const result = await updateSavedResponse(activeOrganizationId, id, {
-        name: typeof body.name === "string" ? body.name : undefined,
-        content: typeof body.content === "string" ? body.content : undefined,
-        shortcut: body.shortcut === null ? "" : typeof body.shortcut === "string" ? body.shortcut : undefined,
-        category: body.category === null ? "" : typeof body.category === "string" ? body.category : undefined,
+    const existing = await db.query.captionTemplate.findFirst({
+        where: and(eq(schema.captionTemplate.id, id), eq(schema.captionTemplate.organizationId, activeOrganizationId)),
+        columns: { id: true },
     });
-    if (result.error) return json({ error: result.error }, { status: result.status });
-    return json(result, { status: result.status });
+    if (!existing) return json({ error: "Balasan tidak ditemukan." }, { status: 404 });
+
+    const values: Record<string, unknown> = {};
+    if (typeof body.name === "string") values.name = body.name.trim();
+    if (typeof body.content === "string") values.caption = body.content.trim();
+    if (typeof body.category === "string") values.category = body.category?.trim() || null;
+    values.updatedAt = new Date();
+
+    await db.update(schema.captionTemplate).set(values).where(eq(schema.captionTemplate.id, id));
+    return json({ success: true });
 });
 
 export const DELETE = withAuth(async (ctx, _req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
@@ -32,9 +40,15 @@ export const DELETE = withAuth(async (ctx, _req: NextRequest, { params }: { para
     if (!activeOrganizationId) return json({ error: "Pilih workspace dulu." }, { status: 400 });
     const { id } = await params;
 
-    const result = await deleteSavedResponse(activeOrganizationId, id);
-    if (result.error) return json({ error: result.error }, { status: result.status });
-    return json(result, { status: result.status });
+    const result = await db.delete(schema.captionTemplate)
+        .where(and(
+            eq(schema.captionTemplate.id, id),
+            eq(schema.captionTemplate.organizationId, activeOrganizationId),
+        ))
+        .returning({ id: schema.captionTemplate.id });
+
+    if (!result.length) return json({ error: "Balasan tidak ditemukan." }, { status: 404 });
+    return json({ success: true });
 });
 
 export const POST = withAuth(async (ctx, _req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {

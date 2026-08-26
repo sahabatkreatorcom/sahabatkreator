@@ -80,14 +80,14 @@ export async function deleteSavedResponse(organizationId: string, id: string) {
 
 /** Naikkan usageCount ketika balasan siap pakai dipakai. */
 export async function bumpSavedResponseUsage(organizationId: string, id: string) {
-    const existing = await db.query.savedResponse.findFirst({
+    const existing = await db.query.captionTemplate.findFirst({
         where: (t, { and: _and, eq: _eq }) => _and(_eq(t.id, id), _eq(t.organizationId, organizationId)),
         columns: { usageCount: true },
     });
     if (!existing) return;
-    await db.update(schema.savedResponse)
+    await db.update(schema.captionTemplate)
         .set({ usageCount: (existing.usageCount ?? 0) + 1 })
-        .where(eq(schema.savedResponse.id, id));
+        .where(eq(schema.captionTemplate.id, id));
 }
 
 // ─── Automations ───────────────────────────────────────────────────────────
