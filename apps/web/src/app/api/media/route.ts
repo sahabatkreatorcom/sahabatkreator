@@ -72,7 +72,7 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
 
     if (search) where.push(sql`(LOWER(${schema.media.filename}) LIKE ${`%${search.toLowerCase()}%`} OR ${search.toLowerCase()} = ANY(${schema.media.tags}))`);
 
-    const [items, total] = await Promise.all([
+    const [items, total, sizeAgg] = await Promise.all([
         db.query.media.findMany({
             where: and(...where),
             with: { folder: { columns: { id: true, name: true, color: true } } },
@@ -81,6 +81,10 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
             offset,
         }),
         db.$count(schema.media, and(...where)),
+        // Total penyimpanan seluruh media org (untuk limitasi paket langganan)
+        db.select({ total: sql<number>`COALESCE(SUM(${schema.media.size}), 0)` })
+            .from(schema.media)
+            .where(eq(schema.media.organizationId, activeOrganizationId)),
     ]);
 
     return json({
@@ -88,6 +92,7 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
         total,
         limit,
         offset,
+        totalSize: sizeAgg[0]?.total ?? 0,
     });
 });
 

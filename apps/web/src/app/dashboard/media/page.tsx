@@ -37,6 +37,7 @@ export default function MediaLibraryPage() {
     const [folders, setFolders] = useState<MediaFolder[]>([]);
     const [activeFolder, setActiveFolder] = useState<string | null>("root");
     const [media, setMedia] = useState<MediaItem[]>([]);
+    const [totalSize, setTotalSize] = useState(0);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [uploading, setUploading] = useState(false);
@@ -66,7 +67,10 @@ export default function MediaLibraryPage() {
             if (search.trim()) params.set("search", search.trim());
             const res = await fetch(`/api/media?${params}`);
             const data = await res.json();
-            if (res.ok) setMedia(data.media ?? []);
+            if (res.ok) {
+                setMedia(data.media ?? []);
+                if (typeof data.totalSize === "number") setTotalSize(data.totalSize);
+            }
         } catch { /* ignore */ } finally {
             setLoading(false);
         }
@@ -178,7 +182,8 @@ export default function MediaLibraryPage() {
                 <div>
                     <h1 className="text-lg font-semibold">Media library</h1>
                     <p className="text-sm text-muted-foreground">
-                        Upload & kelola aset konten. Tersimpan di Cloudflare R2.
+                        Upload & kelola aset konten. Tersimpan di Cloudflare R2.{" "}
+                        <span className="font-medium text-foreground">Total: {formatBytes(totalSize)}</span>
                     </p>
                 </div>
                 <div className="flex gap-2">
