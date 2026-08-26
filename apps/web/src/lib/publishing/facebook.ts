@@ -50,6 +50,47 @@ export async function publishToFacebook(
         return { success: true, postId: data.id, postUrl: `https://www.facebook.com/${data.id}` };
     }
 
+    // Video post → /{pageId}/videos (endpoint /photos hanya menerima gambar)
+    const isVideo =
+        payload.mediaType === "video" || /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(payload.mediaUrls[0] ?? "");
+    if (isVideo) {
+        const videoUrl = payload.mediaUrls[0];
+        console.log(`[facebook] uploading video: ${videoUrl}`);
+        const videoParams = new URLSearchParams({
+            access_token: account.accessToken,
+            file_url: videoUrl,
+            description: payload.caption,
+        });
+        if (payload.location) videoParams.set("place", payload.location);
+
+        const res = await fetch(`${GRAPH_URL}/${pageId}/videos`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: videoParams,
+        });
+        const data = await res.json();
+        if (data.error) {
+            console.error(`[facebook] /videos error:`, JSON.stringify(data.error));
+            return { success: false, error: data.error.message, errorCode: data.error.code?.toString() };
+        }
+
+        if (data.id && payload.firstComment?.trim()) {
+            try {
+                await fetch(`${GRAPH_URL}/${data.id}/comments`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: new URLSearchParams({
+                        message: payload.firstComment.trim(),
+                        access_token: account.accessToken,
+                    }),
+                });
+            } catch {
+                // non-fatal
+            }
+        }
+        return { success: true, postId: data.id, postUrl: `https://www.facebook.com/${data.id}` };
+    }
+
     // Media: upload pertama via /photos untuk mendapatkan media_fbid
     const firstUrl = payload.mediaUrls[0];
     console.log(`[facebook] uploading photo: ${firstUrl}`);
