@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { withAuth, json } from "@/lib/api";
 import { createPosts } from "@/lib/posts-service";
@@ -24,7 +24,9 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
     const where = [eq(schema.post.organizationId, activeOrganizationId)];
     if (status && status !== "all") where.push(eq(schema.post.status, status.toUpperCase() as never));
 
-    const [posts, total] = await Promise.all([
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // error 30 hari terakhir
+
+    const [posts, total, countPublished, countScheduled, countFailed, countAccounts, publishErrors] = await Promise.all([
         db.query.post.findMany({
             where: and(...where),
             with: {
@@ -36,6 +38,24 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
             offset,
         }),
         db.$count(schema.post, and(...where)),
+        db.$count(schema.post, and(eq(schema.post.organizationId, activeOrganizationId), eq(schema.post.status, "PUBLISHED"))),
+        db.$count(schema.post, and(eq(schema.post.organizationId, activeOrganizationId), eq(schema.post.status, "SCHEDULED"))),
+        db.$count(schema.post, and(eq(schema.post.organizationId, activeOrganizationId), eq(schema.post.status, "FAILED"))),
+        db.$count(schema.socialAccount, eq(schema.socialAccount.organizationId, activeOrganizationId)),
+        // publish_error tidak punya organizationId → filter via join ke post.
+        db.select({
+            id: schema.publishError.id,
+            postId: schema.publishError.postId,
+            platform: schema.publishError.platform,
+            errorHuman: schema.publishError.errorHuman,
+            errorCode: schema.publishError.errorCode,
+            occurredAt: schema.publishError.occurredAt,
+        })
+            .from(schema.publishError)
+            .innerJoin(schema.post, eq(schema.publishError.postId, schema.post.id))
+            .where(and(eq(schema.post.organizationId, activeOrganizationId), gte(schema.publishError.occurredAt, since)))
+            .orderBy(desc(schema.publishError.occurredAt))
+            .limit(20),
     ]);
 
     function buildPostUrl(externalUrl: string | null, platform: string | null, platformPostId: string | null, accountName: string | null): string | null {
@@ -84,6 +104,20 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
         total,
         limit,
         offset,
+        summary: {
+            totalPublished: countPublished,
+            totalScheduled: countScheduled,
+            totalFailed: countFailed,
+            totalAccounts: countAccounts,
+        },
+        publishErrors: publishErrors.map((e) => ({
+            id: e.id,
+            postId: e.postId,
+            platform: e.platform,
+            errorHuman: e.errorHuman,
+            errorCode: e.errorCode,
+            occurredAt: e.occurredAt?.toISOString() ?? null,
+        })),
     });
 });
 

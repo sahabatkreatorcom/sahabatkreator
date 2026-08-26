@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, CheckCircle2, ExternalLink, Send, Trash2, XCircle, Loader2 } from "lucide-react";
+import { CalendarClock, CheckCircle2, ExternalLink, Send, Trash2, XCircle, Loader2, Clock, AlertCircle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
@@ -52,20 +52,41 @@ const STATUS_BADGE: Record<Post["status"], { label: string; className: string }>
     failed: { label: "Gagal", className: "bg-accent-red/15 text-accent-red" },
 };
 
+interface Summary {
+    totalPublished: number;
+    totalScheduled: number;
+    totalFailed: number;
+    totalAccounts: number;
+}
+
+interface PublishError {
+    id: string;
+    postId: string;
+    platform: string | null;
+    errorHuman: string | null;
+    errorCode: string | null;
+    occurredAt: string | null;
+}
+
 export default function PostsPage() {
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<string>("all");
     const [error, setError] = useState<string | null>(null);
     const [busyId, setBusyId] = useState<string | null>(null);
+    const [summary, setSummary] = useState<Summary | null>(null);
+    const [publishErrors, setPublishErrors] = useState<PublishError[]>([]);
 
     const loadPosts = useCallback(async () => {
         setLoading(true);
         try {
             const res = await fetch(`/api/posts?status=${filter}&limit=100`);
             const data = await res.json();
-            if (res.ok) setPosts(data.posts ?? []);
-            else setError(data.error || "Gagal memuat post.");
+            if (res.ok) {
+                setPosts(data.posts ?? []);
+                if (data.summary) setSummary(data.summary);
+                setPublishErrors(data.publishErrors ?? []);
+            } else setError(data.error || "Gagal memuat post.");
         } catch {
             setError("Gagal terhubung ke server.");
         } finally {
@@ -124,6 +145,39 @@ export default function PostsPage() {
             </div>
 
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
+
+            {summary && (
+                <div className="grid gap-3 sm:grid-cols-4">
+                    <div className="rounded-lg border border-border bg-card p-4">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <p className="text-xs">Terbit</p>
+                        </div>
+                        <p className="mt-1 text-2xl font-semibold">{summary.totalPublished}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-card p-4">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <Clock className="h-4 w-4" />
+                            <p className="text-xs">Terjadwal</p>
+                        </div>
+                        <p className="mt-1 text-2xl font-semibold">{summary.totalScheduled}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-card p-4">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <XCircle className="h-4 w-4" />
+                            <p className="text-xs">Gagal</p>
+                        </div>
+                        <p className="mt-1 text-2xl font-semibold text-accent-red">{summary.totalFailed}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-card p-4">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <Users className="h-4 w-4" />
+                            <p className="text-xs">Akun terhubung</p>
+                        </div>
+                        <p className="mt-1 text-2xl font-semibold">{summary.totalAccounts}</p>
+                    </div>
+                </div>
+            )}
 
             <div className="flex flex-wrap gap-2">
                 {STATUS_FILTERS.map((s) => (
@@ -247,6 +301,33 @@ export default function PostsPage() {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {publishErrors.length > 0 && (
+                <div className="rounded-lg border border-accent-red/30 bg-card">
+                    <div className="flex items-center gap-2 border-b border-accent-red/30 px-4 py-3">
+                        <AlertCircle className="h-4 w-4 text-accent-red" />
+                        <h2 className="text-sm font-semibold text-accent-red">Error Publikasi</h2>
+                    </div>
+                    <ul className="divide-y divide-accent-red/20">
+                        {publishErrors.map((err) => (
+                            <li key={err.id} className="flex items-start gap-3 p-4">
+                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent-red" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium text-accent-red">
+                                        {err.platform ? (PLATFORM_LABELS[err.platform as Platform] ?? err.platform) : "Platform"}
+                                    </p>
+                                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{err.errorHuman}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {err.occurredAt
+                                            ? new Date(err.occurredAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })
+                                            : "—"}
+                                    </p>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             )}
         </div>
