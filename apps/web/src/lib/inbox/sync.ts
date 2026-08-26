@@ -65,10 +65,14 @@ export async function syncOrganizationComments(organizationId: string): Promise<
                     }
                 } catch (e) {
                     result.failed++;
+                    const errMsg = e instanceof Error ? e.message : "Unknown error";
+                    console.error(
+                        `[inbox-sync] gagal post=${post.id} platform=${post.platform ?? "unknown"} postId=${post.platformPostId}: ${errMsg}`,
+                    );
                     result.errors.push({
                         postId: post.id,
                         platform: post.platform ?? "unknown",
-                        error: e instanceof Error ? e.message : "Unknown error",
+                        error: errMsg,
                     });
                 }
             }),
