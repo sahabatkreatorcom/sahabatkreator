@@ -69,7 +69,8 @@ export default function MediaLibraryPage() {
             const data = await res.json();
             if (res.ok) {
                 setMedia(data.media ?? []);
-                if (typeof data.totalSize === "number") setTotalSize(data.totalSize);
+                const ts = Number(data.totalSize);
+                if (!Number.isNaN(ts)) setTotalSize(ts);
             }
         } catch { /* ignore */ } finally {
             setLoading(false);
@@ -182,7 +183,7 @@ export default function MediaLibraryPage() {
                 <div>
                     <h1 className="text-lg font-semibold">Media library</h1>
                     <p className="text-sm text-muted-foreground">
-                        Upload & kelola aset konten. Tersimpan di Cloudflare R2.{" "}
+                        Upload & kelola aset konten. {" "}
                         <span className="font-medium text-foreground">Total: {formatBytes(totalSize)}</span>
                     </p>
                 </div>

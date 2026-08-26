@@ -82,7 +82,8 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
         }),
         db.$count(schema.media, and(...where)),
         // Total penyimpanan seluruh media org (untuk limitasi paket langganan)
-        db.select({ total: sql<number>`COALESCE(SUM(${schema.media.size}), 0)` })
+        // SUM() Postgres → bigint → pg mengembalikan string; cast ::int agar angka.
+        db.select({ total: sql<number>`COALESCE(SUM(${schema.media.size}), 0)::int` })
             .from(schema.media)
             .where(eq(schema.media.organizationId, activeOrganizationId)),
     ]);
