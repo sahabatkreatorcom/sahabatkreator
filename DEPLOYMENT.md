@@ -75,8 +75,8 @@ sudo systemctl enable nginx
 ### 1.3 Setup Directory
 ```bash
 # Buat directory untuk aplikasi
-sudo mkdir -p /opt/sahabat-kreator
-sudo chown $USER:$USER /opt/sahabat-kreator
+sudo mkdir -p /opt/sahabatkreator
+sudo chown $USER:$USER /opt/sahabatkreator
 ```
 
 ---
@@ -143,7 +143,7 @@ sudo systemctl reload nginx
 
 ### 4.1 Clone Repository
 ```bash
-cd /opt/sahabat-kreator
+cd /opt/sahabatkreator
 git clone https://github.com/sahabatkreatorcom/sahabatkreator.git .
 ```
 
@@ -425,7 +425,7 @@ cat backup_20240101.sql | docker compose -f docker-compose.prod.yml exec -T post
 crontab -e
 
 # Tambah baris ini (backup harian jam 2 AM)
-0 2 * * * cd /opt/sahabat-kreator && docker compose -f docker-compose.prod.yml exec -T postgres-prod pg_dump -U sahabat sahabat | gzip > /backups/sahabat_$(date +\%Y\%m\%d).sql.gz
+0 2 * * * cd /opt/sahabatkreator && docker compose -f docker-compose.prod.yml exec -T postgres-prod pg_dump -U sahabat sahabat | gzip > /backups/sahabat_$(date +\%Y\%m\%d).sql.gz
 ```
 
 ---
