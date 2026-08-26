@@ -22,7 +22,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     const isPlatformAdmin = session.user.role === "admin";
 
     return (
-        <div className="grid min-h-screen lg:grid-cols-[240px_1fr]">
+        <div className="grid h-screen lg:grid-cols-[240px_1fr]">
             {/* Sidebar: hanya tampil di layar lg ke atas. Di mobile, navigasi
           yang sama diambil dari nav-config.tsx dan dirender ulang oleh
           BottomNav — jadi tidak ada dua sumber daftar menu. */}
@@ -36,11 +36,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 </div>
             </aside>
 
-            <div className="flex flex-col">
+            <div className="flex min-h-0 flex-col">
                 <Topbar user={{ name: session.user.name, email: session.user.email }} />
 
                 {/* Org switcher tetap terlihat di mobile karena aside disembunyikan */}
-                <div className="border-b border-border p-3 lg:hidden">
+                <div className="shrink-0 border-b border-border p-3 lg:hidden">
                     <OrgSwitcher organizations={organizations} activeOrganizationId={activeOrganizationId} />
                 </div>
 
