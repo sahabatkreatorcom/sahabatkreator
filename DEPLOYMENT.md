@@ -187,6 +187,9 @@ openssl rand -hex 32
 # Build dan start semua service
 docker compose -f docker-compose.prod.yml up -d --build
 
+# seed
+docker compose -f docker-compose.prod.yml run --rm migrate-prod pnpm --filter @sahabat-kreator/db db:seed
+
 # Cek status
 docker compose -f docker-compose.prod.yml ps
 
