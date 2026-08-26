@@ -108,7 +108,7 @@ async function fetchTikTokComments(token: string, videoId: string): Promise<{ co
                 platformCommentId: String(c.comment_id),
                 authorId: String(user.user_id ?? ""),
                 authorUsername: String(user.display_name ?? "unknown"),
-                authorAvatar: user.avatar_url ? String(user.avatar_url) : null,
+                authorAvatar: user.avatar ? String(user.avatar) : null,
                 text: String(c.text ?? ""),
                 createdAt: c.create_time ? new Date(Number(c.create_time) * 1000) : new Date(),
                 likeCount: Number(c.like_count ?? 0),
@@ -181,8 +181,47 @@ async function fetchThreadsComments(token: string, threadId: string): Promise<{ 
                 createdAt: c.timestamp ? new Date(c.timestamp as string) : new Date(),
             };
         });
+
+        // Fetch profile pictures for unique commenters via profile_lookup.
+        const uniqueUsernames = [...new Set(comments.map((c) => c.authorUsername).filter((u) => u && u !== "unknown"))];
+        const avatarMap = await fetchThreadsAvatars(token, uniqueUsernames);
+        for (const c of comments) {
+            const avatar = avatarMap.get(c.authorUsername);
+            if (avatar) c.authorAvatar = avatar;
+        }
+
         return { comments };
     } catch (e) {
         return { comments: [], error: e instanceof Error ? e.message : "Threads comment fetch failed" };
     }
+}
+
+async function fetchThreadsAvatars(token: string, usernames: string[]): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    if (usernames.length === 0) return map;
+
+    // Batasi 3 concurrent agar tidak kena rate limit.
+    const CONCURRENCY = 3;
+    for (let i = 0; i < usernames.length; i += CONCURRENCY) {
+        const batch = usernames.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(
+            batch.map(async (username) => {
+                const res = await fetch(
+                    `https://graph.threads.net/v1.0/profile_lookup?username=${encodeURIComponent(username)}`,
+                    { headers: { Authorization: `Bearer ${token}` } },
+                );
+                if (!res.ok) return { username, avatar: null as string | null };
+                const data = (await res.json()) as Record<string, unknown>;
+                return { username, avatar: (data.profile_picture_url as string) ?? null };
+            }),
+        );
+        for (const r of results) {
+            if (r.status === "fulfilled" && r.value.avatar) {
+                map.set(r.value.username, r.value.avatar);
+            }
+        }
+        // Jeda antar batch untuk hindari rate limit.
+        if (i + CONCURRENCY < usernames.length) await new Promise((r) => setTimeout(r, 200));
+    }
+    return map;
 }
