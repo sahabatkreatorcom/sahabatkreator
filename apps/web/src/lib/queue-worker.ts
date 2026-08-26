@@ -34,6 +34,7 @@ import {
     enqueueStaleCleanup,
     enqueueTikTokStatusCheck,
     enqueueMediaCleanup,
+    enqueueInboxSync,
 } from "@sahabat-kreator/queue";
 import { publishPost } from "@/lib/publishing/publish-post";
 import { syncOrganizationAnalytics } from "@/lib/analytics";
@@ -77,6 +78,29 @@ export async function startQueueWorkers(): Promise<() => Promise<void>> {
         async (job) => {
             const data = job.data as SyncJobData;
             LOG(`sync start org=${data.organizationId} type=${data.type}`);
+
+            // Sync inbox ALL org (scheduled job 30 menit) — TikTok/YouTube tanpa webhook.
+            if (data.type === "inbox" && data.organizationId === "ALL") {
+                const organizations = await db.query.organization.findMany({ columns: { id: true } });
+                let totalAdded = 0;
+                let totalFailed = 0;
+                for (const org of organizations) {
+                    try {
+                        const r = await syncOrganizationComments(org.id);
+                        totalAdded += r.commentsAdded;
+                        totalFailed += r.failed;
+                        if (r.failed > 0 || r.commentsAdded > 0) {
+                            LOG(`inbox-sync-all org=${org.id} checked=${r.postsChecked} added=${r.commentsAdded} updated=${r.commentsUpdated} failed=${r.failed}`);
+                        }
+                    } catch (e) {
+                        totalFailed++;
+                        LOG(`inbox-sync-all org=${org.id} error: ${e instanceof Error ? e.message : e}`);
+                    }
+                }
+                LOG(`inbox-sync-all done orgs=${organizations.length} added=${totalAdded} failed=${totalFailed}`);
+                return;
+            }
+
             if (data.type === "analytics") {
                 await syncOrganizationAnalytics(data.organizationId);
             } else if (data.type === "inbox") {
@@ -323,6 +347,8 @@ workers.push(publishWorker, syncWorker, staleCleanupWorker, tiktokCheckWorker, m
     await enqueueStaleCleanup();
     // Start the repeatable media-cleanup job (once — BullMQ keeps the schedule)
     await enqueueMediaCleanup();
+    // Start the repeatable inbox-sync job (once — BullMQ keeps the schedule)
+    await enqueueInboxSync();
 
     return async () => {
         await Promise.all(workers.map((w) => w.close()));

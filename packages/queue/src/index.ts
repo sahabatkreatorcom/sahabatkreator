@@ -185,6 +185,34 @@ export async function enqueueSync(organizationId: string, type: SyncJobType): Pr
 }
 
 /**
+ * Enqueue sinkronisasi komentar SEMUA org sebagai repeatable job (setiap 30 menit).
+ * TikTok/YouTube tidak punya webhook komentar → polling berkala wajib.
+ * Cukup panggil sekali saat app start — BullMQ menyimpan repeat schedule di Redis.
+ * No-op bila REDIS_URL belum dikonfigurasi.
+ */
+export async function enqueueInboxSync(): Promise<boolean> {
+    if (!isRedisConfigured()) return false;
+    const { Queue } = await import("bullmq");
+    const queue = new Queue(QUEUE_SYNC, { connection: redisConnectionOptions() });
+    try {
+        await queue.add(
+            "inbox-sync-all",
+            { organizationId: "ALL", type: "inbox" } satisfies SyncJobData,
+            {
+                jobId: "inbox-sync-all",
+                repeat: { pattern: "*/30 * * * *" }, // setiap 30 menit
+                removeOnComplete: { count: 10 },
+                removeOnFail: { count: 10 },
+                attempts: 1,
+            },
+        );
+        return true;
+    } finally {
+        await queue.close();
+    }
+}
+
+/**
  * Check koneksi Redis. Returns true bila Redis tersedia atau tidak dikonfigurasi (opsional).
  * Dipakai oleh /api/health untuk monitoring readiness.
  */
