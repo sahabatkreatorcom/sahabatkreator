@@ -179,7 +179,7 @@ export default function InboxPage() {
         setBusyId(comment.id);
         setError(null);
         try {
-            const res = await fetch(`/api/inbox/${comment.id}/reply`, {
+            const res = await fetch(`/api/inbox/${comment.id}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ text: replyText.trim() }),
