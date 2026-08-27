@@ -62,7 +62,18 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
     useRepliz?: boolean;
   } | null;
   const platform = body?.platform?.toUpperCase() as Platform;
-  const useRepliz = body?.useRepliz === true;
+
+  // Cek global setting: replizOauthEnabled
+  let useRepliz = body?.useRepliz === true;
+  if (!useRepliz) {
+    const globalSettings = await db.query.globalIntegrationSettings.findFirst({
+      where: (t, { eq: _eq }) => _eq(t.id, "global_integration_settings"),
+      columns: { replizOauthEnabled: true },
+    });
+    if (globalSettings?.replizOauthEnabled) {
+      useRepliz = true;
+    }
+  }
 
   if (!CONNECTABLE_PLATFORMS.includes(platform)) {
     return json(

@@ -11,6 +11,7 @@ interface SettingsLayoutProps {
 const links = [
     { href: "/settings/profile" as any, label: "Profil" },
     { href: "/settings/security" as any, label: "Keamanan" },
+    { href: "/settings/platforms" as any, label: "Platform" },
     { href: "/settings/members" as any, label: "Anggota" },
     { href: "/settings/teams" as any, label: "Tim" },
     { href: "/settings/sessions" as any, label: "Sesi aktif" },

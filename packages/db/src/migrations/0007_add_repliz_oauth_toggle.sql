@@ -1,0 +1,1 @@
+ALTER TABLE "global_integration_settings" ADD COLUMN "repliz_oauth_enabled" boolean DEFAULT false NOT NULL;

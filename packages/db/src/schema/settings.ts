@@ -129,6 +129,7 @@ export const globalIntegrationSettings = pgTable("global_integration_settings", 
   sumopodBase: text("sumopod_base").default("https://api-pay-sandbox.sumopod.com"),
   sumopodConfigured: boolean("sumopod_configured").default(false).notNull(),
   sumopodTrialDays: integer("sumopod_trial_days").default(0).notNull(),
+  replizOauthEnabled: boolean("repliz_oauth_enabled").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
