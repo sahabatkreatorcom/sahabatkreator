@@ -12,12 +12,27 @@
 # Port allocation (VPS):
 #   toeflynk:  3000 (web), 5432 (postgres), 6379 (redis)
 #   prod:      3001 (web), 5433 (postgres), 6380 (redis)
-#   staging:   3002 (web), Neon (database)
+#   staging:   3002 (web), 6381 (redis), Neon (database)
 # =============================================================================
 
 name: sahabat-staging
 
 services:
+  redis-staging:
+    image: redis:7-alpine
+    container_name: sahabat-staging-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - sahabat-staging-redis:/data
+    ports:
+      - "127.0.0.1:6381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   migrate-staging:
     build:
       context: .
@@ -53,10 +68,13 @@ services:
       - .env
     environment:
       - NODE_ENV=production
+      - REDIS_URL=${REDIS_URL:-redis://redis-staging:6379}
     ports:
       - "127.0.0.1:3002:3000"
     restart: unless-stopped
     depends_on:
+      redis-staging:
+        condition: service_healthy
       migrate-staging:
         condition: service_completed_successfully
     healthcheck:
@@ -83,5 +101,10 @@ services:
       - TRANSCODER=${TRANSCODER:-local}
     restart: unless-stopped
     depends_on:
+      redis-staging:
+        condition: service_healthy
       migrate-staging:
         condition: service_completed_successfully
+
+volumes:
+  sahabat-staging-redis:
