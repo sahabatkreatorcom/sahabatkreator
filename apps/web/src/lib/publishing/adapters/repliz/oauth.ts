@@ -69,12 +69,18 @@ export class ReplizOAuth {
     if (!p) throw new Error(`Platform ${platform} not supported by Repliz`);
 
     const connected = await this.client.connect(p, exchangeResult);
+    const acctId = connected.accountId;
+
+    let detail: { name: string; username?: string; picture?: string } | null = null;
+    try {
+      detail = await this.client.getAccount(acctId);
+    } catch (_) {}
 
     return {
-      platformAccountId: connected.generatedId || connected._id,
-      platformAccountName: connected.name,
-      platform: connected.type,
-      picture: connected.picture,
+      platformAccountId: acctId,
+      platformAccountName: detail?.name || `Repliz ${p}`,
+      platform: p,
+      picture: detail?.picture,
     };
   }
 
