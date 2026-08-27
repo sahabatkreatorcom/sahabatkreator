@@ -30,20 +30,25 @@ export const GET = withAuth(async (ctx) => {
   });
 
   return json({
-    accounts: accounts.map((a) => ({
-      id: a.id,
-      platform: a.platform,
-      name: a.name,
-      username: a.username,
-      avatar: a.avatar,
-      tokenExpiry: a.tokenExpiry?.toISOString() ?? null,
-      hasRefreshToken: Boolean(a.refreshToken),
-      lastRefreshError: a.lastRefreshError
-        ? "Perlu perhatian — token mungkin bermasalah."
-        : null,
-      isActive: a.isActive,
-      createdAt: a.createdAt.toISOString(),
-    })),
+    accounts: accounts.map((a) => {
+      const rawToken = decryptToken(a.accessToken);
+      const isReplizManaged = rawToken === "repliz_managed";
+      return {
+        id: a.id,
+        platform: a.platform,
+        name: a.name,
+        username: a.username,
+        avatar: a.avatar,
+        tokenExpiry: a.tokenExpiry?.toISOString() ?? null,
+        hasRefreshToken: Boolean(a.refreshToken),
+        isReplizManaged,
+        lastRefreshError: a.lastRefreshError
+          ? "Perlu perhatian — token mungkin bermasalah."
+          : null,
+        isActive: a.isActive,
+        createdAt: a.createdAt.toISOString(),
+      };
+    }),
   });
 });
 

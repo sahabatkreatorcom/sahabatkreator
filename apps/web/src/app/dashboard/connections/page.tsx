@@ -38,6 +38,7 @@ interface Account {
   avatar: string | null;
   tokenExpiry: string | null;
   hasRefreshToken: boolean;
+  isReplizManaged: boolean;
   lastRefreshError: string | null;
   isActive: boolean;
   createdAt: string;
@@ -68,12 +69,15 @@ const PLATFORM_ORDER: Platform[] = [
 function tokenStatus(
   account: Pick<
     Account,
-    "platform" | "tokenExpiry" | "hasRefreshToken" | "lastRefreshError"
+    "platform" | "tokenExpiry" | "hasRefreshToken" | "lastRefreshError" | "isReplizManaged"
   >,
 ): {
   label: string;
   tone: "ok" | "warn" | "expired" | "none";
 } {
+  if (account.isReplizManaged) {
+    return { label: "Dikelola oleh Repliz", tone: "ok" };
+  }
   if (
     REFRESH_TOKEN_PLATFORMS.includes(account.platform) &&
     account.hasRefreshToken &&
@@ -359,6 +363,7 @@ export default function ConnectionsPage() {
   }, {});
   const connectedPlatformCount = connected.size;
   const accountsWithIssue = accounts.filter((a) => {
+    if (a.isReplizManaged) return false;
     if (a.lastRefreshError) return true;
     const st = tokenStatus(a);
     return st.tone === "expired" || st.tone === "warn" || st.tone === "none";
