@@ -12,6 +12,7 @@ import {
   type Platform,
 } from "@/lib/platforms";
 import { replizOAuth } from "@/lib/publishing/adapters/repliz/oauth";
+import { decryptToken } from "@/lib/token-encryption";
 
 export const dynamic = "force-dynamic";
 
@@ -201,10 +202,27 @@ export const DELETE = withAuth(async (ctx, req: NextRequest) => {
         _eq(t.id, body.accountId!),
         _eq(t.organizationId, activeOrganizationId),
       ),
-    columns: { id: true, name: true, platform: true },
+    columns: { id: true, name: true, platform: true, platformId: true, accessToken: true },
   });
   if (!account)
     return json({ error: "Akun tidak ditemukan." }, { status: 404 });
+
+  // Hapus dari Repliz jika akun managed oleh Repliz
+  const rawToken = decryptToken(account.accessToken);
+  if (rawToken === "repliz_managed") {
+    try {
+      const { getReplizClient } = await import(
+        "@/lib/publishing/adapters/repliz/client"
+      );
+      const replizClient = getReplizClient();
+      if (replizClient && account.platformId) {
+        await replizClient.removeAccount(account.platformId);
+        console.log(`[REPLIZ] Removed account ${account.platformId} from Repliz`);
+      }
+    } catch (e) {
+      console.error(`[REPLIZ] Failed to remove account from Repliz:`, e instanceof Error ? e.message : e);
+    }
+  }
 
   await db
     .delete(schema.socialAccount)

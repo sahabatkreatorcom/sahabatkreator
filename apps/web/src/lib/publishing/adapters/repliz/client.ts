@@ -85,6 +85,10 @@ export class ReplizClient {
     return this.request<ReplizAccount>("GET", `/public/account/${id}`);
   }
 
+  removeAccount(accountId: string) {
+    return this.request<void>("DELETE", `/public/account/${accountId}`);
+  }
+
   getComments(params: {
     page: number;
     limit: number;
