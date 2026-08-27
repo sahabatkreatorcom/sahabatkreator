@@ -108,11 +108,19 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
     ).toString("base64");
 
     try {
+      // Sertakan state di redirectUri agar platform kembali ke callback dengan state
+      const callbackWithState = `${redirectUri}?state=${encodeURIComponent(state)}`;
       const authUrl = await replizOAuth.getAuthorizationUrl(
         platform,
-        redirectUri,
+        callbackWithState,
       );
-      return json({ authUrl, state });
+      // Simpan state di cookie sebagai fallback (beberapa platform tidak kirim state balik)
+      const response = json({ authUrl, state });
+      response.headers.set(
+        "Set-Cookie",
+        `oauth_state=${state}; Path=/api/accounts/callback; HttpOnly; Secure; SameSite=Lax; Max-Age=900`,
+      );
+      return response;
     } catch (e) {
       console.error(
         "[accounts] Repliz authorize failed:",

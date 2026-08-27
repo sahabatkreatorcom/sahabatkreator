@@ -38,15 +38,32 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
 
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
-  const state = searchParams.get("state");
+  let state = searchParams.get("state");
   const oauthError = searchParams.get("error");
+
+  // Fallback: ambil state dari cookie jika tidak ada di query params
+  // (beberapa platform OAuth tidak meneruskan state parameter)
+  if (!state) {
+    const cookieHeader = request.headers.get("cookie") || "";
+    const stateCookie = cookieHeader
+      .split(";")
+      .map((c) => c.trim())
+      .find((c) => c.startsWith("oauth_state="));
+    if (stateCookie) {
+      state = decodeURIComponent(stateCookie.split("=").slice(1).join("="));
+    }
+  }
 
   if (oauthError) {
     accountsUrl.searchParams.set("error", "oauth_denied");
     return NextResponse.redirect(accountsUrl);
   }
-  if (!code || !state) {
-    accountsUrl.searchParams.set("error", "missing_params");
+  if (!code) {
+    accountsUrl.searchParams.set("error", "missing_code");
+    return NextResponse.redirect(accountsUrl);
+  }
+  if (!state) {
+    accountsUrl.searchParams.set("error", "missing_state");
     return NextResponse.redirect(accountsUrl);
   }
 
