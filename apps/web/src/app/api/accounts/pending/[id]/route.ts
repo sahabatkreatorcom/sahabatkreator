@@ -35,7 +35,55 @@ export const GET = withAuth(async (ctx, req: NextRequest, { params }: RouteParam
     const session = await loadPendingSession(id, activeOrganizationId);
     if (!session) return json({ error: "Sesi pilihan halaman tidak valid atau kedaluwarsa." }, { status: 404 });
 
-    const token = decryptToken(session.accessToken);
+    const rawToken = decryptToken(session.accessToken);
+    const isRepliz = rawToken.startsWith("repliz:");
+    const token = isRepliz ? rawToken.slice(7) : rawToken;
+
+    if (isRepliz) {
+        // Repliz 2-step flow
+        const { getReplizClient } = await import("@/lib/publishing/adapters/repliz/client");
+        const replizClient = getReplizClient();
+        if (!replizClient) return json({ error: "Repliz tidak terkonfigurasi." }, { status: 500 });
+
+        if (session.platform === "FACEBOOK") {
+            const pages = await replizClient.getFacebookPages(token);
+            return json({
+                platform: session.platform,
+                method: "repliz",
+                pages: pages.docs.map((p) => ({
+                    pageId: p.id,
+                    pageName: p.name,
+                    avatar: p.picture ?? null,
+                })),
+            });
+        }
+        if (session.platform === "YOUTUBE") {
+            const channels = await replizClient.getYouTubeChannels(token);
+            return json({
+                platform: session.platform,
+                method: "repliz",
+                pages: channels.docs.map((c) => ({
+                    pageId: c.id,
+                    pageName: c.name,
+                    avatar: c.picture ?? null,
+                })),
+            });
+        }
+        if (session.platform === "LINKEDIN") {
+            const orgs = await replizClient.getLinkedInOrganizations(token);
+            return json({
+                platform: session.platform,
+                method: "repliz",
+                pages: orgs.docs.map((o) => ({
+                    pageId: o.id,
+                    pageName: o.name,
+                    avatar: null,
+                })),
+            });
+        }
+    }
+
+    // Native Facebook/Instagram flow
     const choices = await fetchPageChoices(token);
     if (!choices) return json({ error: "Gagal mengambil daftar halaman." }, { status: 400 });
 
@@ -81,7 +129,71 @@ export const POST = withAuth(async (ctx, req: NextRequest, { params }: RoutePara
     const pending = await loadPendingSession(id, activeOrganizationId);
     if (!pending) return json({ error: "Sesi pilihan halaman tidak valid atau kedaluwarsa." }, { status: 404 });
 
-    const token = decryptToken(pending.accessToken);
+    const rawToken = decryptToken(pending.accessToken);
+    const isRepliz = rawToken.startsWith("repliz:");
+    const token = isRepliz ? rawToken.slice(7) : rawToken;
+
+    if (isRepliz) {
+        // Repliz 2-step: connect via Repliz API
+        const { getReplizClient } = await import("@/lib/publishing/adapters/repliz/client");
+        const replizClient = getReplizClient();
+        if (!replizClient) return json({ error: "Repliz tidak terkonfigurasi." }, { status: 500 });
+
+        const platform = pending.platform as "FACEBOOK" | "YOUTUBE" | "LINKEDIN";
+        const connectBody: Record<string, string> = { token };
+        if (platform === "FACEBOOK") connectBody.pageId = body.pageId;
+        else if (platform === "YOUTUBE") connectBody.channelId = body.pageId;
+        else if (platform === "LINKEDIN") connectBody.organizationId = body.pageId;
+
+        const connectResult = await replizClient.connect(platform.toLowerCase(), connectBody);
+        const acctId = connectResult.accountId;
+
+        let accountDetail: { name: string; username?: string; picture?: string } | null = null;
+        try {
+            accountDetail = await replizClient.getAccount(acctId);
+        } catch (_) {}
+
+        const existing = await db.query.socialAccount.findFirst({
+            where: (t, { and: _and, eq: _eq }) =>
+                _and(_eq(t.organizationId, activeOrganizationId), _eq(t.platform, platform), _eq(t.platformId, acctId)),
+            columns: { id: true },
+        });
+
+        if (existing) {
+            await db.update(schema.socialAccount).set({
+                name: accountDetail?.name || `Repliz ${platform}`,
+                avatar: accountDetail?.picture ?? null,
+                isActive: true,
+                lastRefreshError: null,
+            }).where(eq(schema.socialAccount.id, existing.id));
+        } else {
+            await db.insert(schema.socialAccount).values({
+                id: randomUUID(),
+                organizationId: activeOrganizationId,
+                platform,
+                platformId: acctId,
+                name: accountDetail?.name || `Repliz ${platform}`,
+                username: accountDetail?.username || null,
+                avatar: accountDetail?.picture ?? null,
+                accessToken: encryptToken("repliz_managed"),
+                refreshToken: null,
+                tokenExpiry: null,
+                isActive: true,
+            });
+        }
+
+        await db.delete(schema.pendingOauthSession).where(eq(schema.pendingOauthSession.id, id));
+        await logActivity(
+            activeOrganizationId,
+            existing ? "account.refreshed" : "account.connected",
+            { type: "account", id: acctId, name: accountDetail?.name || `Repliz ${platform}` },
+            { platform, method: "repliz_2step" },
+        );
+
+        return json({ success: true, platform, name: accountDetail?.name || `Repliz ${platform}` });
+    }
+
+    // Native Facebook/Instagram flow
     const choices = await fetchPageChoices(token);
     if (!choices) return json({ error: "Gagal mengambil daftar halaman." }, { status: 400 });
 

@@ -147,9 +147,21 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
         const connectResult = await replizClient.connect(replizPlatform, { code });
         console.log(`[REPLIZ-DEBUG][CB] connect_result=${JSON.stringify(connectResult)}`);
 
-        // Fetch full account detail
-        const acctId = connectResult.generatedId || connectResult._id;
-        console.log(`[REPLIZ-DEBUG][CB] connected account id=${acctId}`);
+        const acctId = connectResult.accountId;
+        console.log(`[REPLIZ-DEBUG][CB] connected accountId=${acctId}`);
+
+        // Fetch full account detail dari Repliz
+        let accountDetail: { name: string; username?: string; picture?: string } | null = null;
+        try {
+          accountDetail = await replizClient.getAccount(acctId);
+          console.log(`[REPLIZ-DEBUG][CB] accountDetail: name=${accountDetail.name}, username=${accountDetail.username}`);
+        } catch (e) {
+          console.log(`[REPLIZ-DEBUG][CB] getAccount failed, using fallback: ${e instanceof Error ? e.message : e}`);
+        }
+
+        const acctName = accountDetail?.name || `Repliz ${platform}`;
+        const acctUsername = accountDetail?.username || null;
+        const acctAvatar = accountDetail?.picture || null;
 
         // Save ke DB
         const existing = await db.query.socialAccount.findFirst({
@@ -166,8 +178,8 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
           await db
             .update(schema.socialAccount)
             .set({
-              name: connectResult.name,
-              avatar: connectResult.picture ?? null,
+              name: acctName,
+              avatar: acctAvatar,
               isActive: true,
               lastRefreshError: null,
             })
@@ -178,9 +190,9 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
             organizationId: stateData.organizationId,
             platform,
             platformId: acctId,
-            name: connectResult.name,
-            username: connectResult.username ?? null,
-            avatar: connectResult.picture ?? null,
+            name: acctName,
+            username: acctUsername,
+            avatar: acctAvatar,
             accessToken: encryptToken("repliz_managed"),
             refreshToken: null,
             tokenExpiry: null,
@@ -191,16 +203,114 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
         await logActivity(
           stateData.organizationId,
           "account.connected",
-          { type: "account", id: acctId, name: connectResult.name },
+          { type: "account", id: acctId, name: acctName },
           { platform, method: "repliz_connect" },
         );
 
-        console.log(`[REPLIZ-DEBUG][CB] SUCCESS: account saved name=${connectResult.name}`);
+        console.log(`[REPLIZ-DEBUG][CB] SUCCESS: account saved name=${acctName}`);
         accountsUrl.searchParams.set("success", "connected");
         return NextResponse.redirect(accountsUrl);
       } catch (e) {
-        console.error(`[REPLIZ-DEBUG][CB] connect FAILED:`, e instanceof Error ? e.message : e);
-        console.error(`[REPLIZ-DEBUG][CB] connect FAILED stack:`, e instanceof Error ? e.stack : "");
+        console.error(`[REPLIZ-DEBUG][CB] connect(code) FAILED:`, e instanceof Error ? e.message : e);
+
+        // 2-step platforms: exchange → getPage/getChannel → connect
+        const TWO_STEP = ["FACEBOOK", "INSTAGRAM_PAGE", "YOUTUBE", "LINKEDIN"];
+        if (TWO_STEP.includes(platform) && code) {
+          console.log(`[REPLIZ-DEBUG][CB] Trying 2-step flow for ${platform}...`);
+          try {
+            const { getReplizClient } = await import(
+              "@/lib/publishing/adapters/repliz/client"
+            );
+            const replizClient = getReplizClient();
+            if (!replizClient) throw new Error("Repliz client not configured");
+
+            // Step 1: exchange code → token
+            const exchangeResult = await replizClient.exchange(replizPlatform, { code });
+            console.log(`[REPLIZ-DEBUG][CB] exchange OK: token_length=${exchangeResult.token.length}`);
+            const token = exchangeResult.token;
+
+            // Step 2: get pages/channels/organizations
+            let options: Array<{ id: string; name: string }> = [];
+            if (platform === "FACEBOOK" || platform === "INSTAGRAM_PAGE") {
+              const pages = await replizClient.getFacebookPages(token);
+              options = pages.docs.map((p) => ({ id: p.id, name: p.name }));
+            } else if (platform === "YOUTUBE") {
+              const channels = await replizClient.getYouTubeChannels(token);
+              options = channels.docs.map((c) => ({ id: c.id, name: c.name }));
+            } else if (platform === "LINKEDIN") {
+              const orgs = await replizClient.getLinkedInOrganizations(token);
+              options = orgs.docs.map((o) => ({ id: o.id, name: o.name }));
+            }
+            console.log(`[REPLIZ-DEBUG][CB] options_count=${options.length}`);
+
+            if (options.length === 0) {
+              console.log(`[REPLIZ-DEBUG][CB] ERROR: no pages/channels found`);
+              accountsUrl.searchParams.set("error", "no_pages_found");
+              return NextResponse.redirect(accountsUrl);
+            }
+
+            // Step 3: auto-select jika hanya1, atau save pending & redirect ke picker
+            if (options.length === 1) {
+              const selected = options[0];
+              console.log(`[REPLIZ-DEBUG][CB] Auto-selecting single option: ${selected.name} (${selected.id})`);
+
+              const connectBody: Record<string, string> = { token };
+              if (platform === "FACEBOOK" || platform === "INSTAGRAM_PAGE") connectBody.pageId = selected.id;
+              else if (platform === "YOUTUBE") connectBody.channelId = selected.id;
+              else if (platform === "LINKEDIN") connectBody.organizationId = selected.id;
+
+              const connectResult = await replizClient.connect(replizPlatform, connectBody);
+              const acctId = connectResult.accountId;
+              console.log(`[REPLIZ-DEBUG][CB] 2-step connect OK: accountId=${acctId}`);
+
+              let accountDetail: { name: string; username?: string; picture?: string } | null = null;
+              try {
+                accountDetail = await replizClient.getAccount(acctId);
+              } catch (_) {}
+
+              await db.insert(schema.socialAccount).values({
+                id: randomUUID(),
+                organizationId: stateData.organizationId,
+                platform,
+                platformId: acctId,
+                name: accountDetail?.name || selected.name,
+                username: accountDetail?.username || null,
+                avatar: accountDetail?.picture || null,
+                accessToken: encryptToken("repliz_managed"),
+                refreshToken: null,
+                tokenExpiry: null,
+                isActive: true,
+              });
+
+              await logActivity(
+                stateData.organizationId,
+                "account.connected",
+                { type: "account", id: acctId, name: accountDetail?.name || selected.name },
+                { platform, method: "repliz_2step" },
+              );
+
+              accountsUrl.searchParams.set("success", "connected");
+              return NextResponse.redirect(accountsUrl);
+            }
+
+            // Multiple options: save pending session, redirect ke picker
+            const sessionId = randomUUID();
+            await db.insert(schema.pendingOauthSession).values({
+              id: sessionId,
+              organizationId: stateData.organizationId,
+              platform,
+              accessToken: encryptToken(`repliz:${token}`),
+              expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+            });
+            const pickUrl = new URL("/connections", baseUrl);
+            pickUrl.searchParams.set("pending", sessionId);
+            pickUrl.searchParams.set("platform", platform);
+            console.log(`[REPLIZ-DEBUG][CB] Multiple options, redirecting to picker: session=${sessionId}`);
+            return NextResponse.redirect(pickUrl);
+          } catch (e2) {
+            console.error(`[REPLIZ-DEBUG][CB] 2-step flow FAILED:`, e2 instanceof Error ? e2.message : e2);
+          }
+        }
       }
     }
 

@@ -171,7 +171,7 @@ export class ReplizClient {
   }
 
   connect(platform: string, body: Record<string, string>) {
-    return this.request<ReplizAccount>(
+    return this.request<{ accountId: string }>(
       "POST",
       `/public/account/${platform}/connect`,
       body,
@@ -183,6 +183,27 @@ export class ReplizClient {
       "POST",
       `/public/account/${platform}/exchange`,
       body,
+    );
+  }
+
+  getFacebookPages(token: string) {
+    return this.request<{ docs: Array<{ id: string; name: string; picture: string; token: string }> }>(
+      "GET",
+      `/public/account/facebook/page?token=${encodeURIComponent(token)}`,
+    );
+  }
+
+  getYouTubeChannels(token: string) {
+    return this.request<{ docs: Array<{ id: string; name: string; username: string; picture: string; token: string }> }>(
+      "GET",
+      `/public/account/youtube/channel?token=${encodeURIComponent(token)}`,
+    );
+  }
+
+  getLinkedInOrganizations(token: string) {
+    return this.request<{ docs: Array<{ id: string; name: string; picture: string }> }>(
+      "GET",
+      `/public/account/linkedin/organization?token=${encodeURIComponent(token)}`,
     );
   }
 
