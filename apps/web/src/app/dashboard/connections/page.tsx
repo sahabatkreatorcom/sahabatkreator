@@ -9,7 +9,6 @@ import {
   Loader2,
   Plus,
   RefreshCw,
-  Zap,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
@@ -133,7 +132,6 @@ export default function ConnectionsPage() {
 
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [showInfoDialog, setShowInfoDialog] = useState<Account | null>(null);
-  const [useRepliz, setUseRepliz] = useState(false);
 
   useEffect(() => {
     const success = searchParams.get("success");
@@ -309,14 +307,14 @@ export default function ConnectionsPage() {
     await handleConnect(platform);
   }
 
-  async function handleConnect(platform: Platform, connectViaRepliz = false) {
+  async function handleConnect(platform: Platform) {
     setConnecting(platform);
     setError(null);
     try {
       const res = await fetch("/api/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ platform, useRepliz: connectViaRepliz }),
+        body: JSON.stringify({ platform }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -564,34 +562,6 @@ export default function ConnectionsPage() {
         description="Pilih platform yang ingin dihubungkan ke akun Anda."
       >
         <div className="space-y-4">
-          {/* Repliz Toggle */}
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-3">
-            <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-accent-amber" />
-              <div>
-                <p className="text-sm font-medium">Gunakan Repliz</p>
-                <p className="text-xs text-muted-foreground">
-                  OAuth proxy —elola semua token via Repliz
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={useRepliz}
-              onClick={() => setUseRepliz(!useRepliz)}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                useRepliz ? "bg-accent-amber" : "bg-muted"
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform ${
-                  useRepliz ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
-
           {/* Platform List */}
           <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
             {PLATFORM_ORDER.map((platform) => (
@@ -599,7 +569,7 @@ export default function ConnectionsPage() {
                 key={platform}
                 onClick={() => {
                   setShowConnectDialog(false);
-                  handleConnect(platform, useRepliz);
+                  handleConnect(platform);
                 }}
                 disabled={connecting === platform}
                 className="flex w-full items-center gap-3 rounded-md border border-border bg-background p-3 text-left transition-colors hover:bg-muted disabled:opacity-50"
