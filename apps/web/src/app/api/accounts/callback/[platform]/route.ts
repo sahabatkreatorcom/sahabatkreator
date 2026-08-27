@@ -230,13 +230,13 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
             const token = exchangeResult.token;
 
             // Step 2: get pages/channels/organizations
-            let options: Array<{ id: string; name: string }> = [];
+            let options: Array<{ id: string; name: string; pageToken?: string }> = [];
             if (platform === "FACEBOOK" || platform === "INSTAGRAM_PAGE") {
               const pages = await replizClient.getFacebookPages(token);
-              options = pages.docs.map((p) => ({ id: p.id, name: p.name }));
+              options = pages.docs.map((p) => ({ id: p.id, name: p.name, pageToken: p.token }));
             } else if (platform === "YOUTUBE") {
               const channels = await replizClient.getYouTubeChannels(token);
-              options = channels.docs.map((c) => ({ id: c.id, name: c.name }));
+              options = channels.docs.map((c) => ({ id: c.id, name: c.name, pageToken: c.token }));
             } else if (platform === "LINKEDIN") {
               const orgs = await replizClient.getLinkedInOrganizations(token);
               options = orgs.docs.map((o) => ({ id: o.id, name: o.name }));
@@ -254,7 +254,9 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
               const selected = options[0];
               console.log(`[REPLIZ-DEBUG][CB] Auto-selecting single option: ${selected.name} (${selected.id})`);
 
-              const connectBody: Record<string, string> = { token };
+              // Facebook/YouTube: pakai page token (bukan user token)
+              const connectToken = selected.pageToken || token;
+              const connectBody: Record<string, string> = { token: connectToken };
               if (platform === "FACEBOOK" || platform === "INSTAGRAM_PAGE") connectBody.pageId = selected.id;
               else if (platform === "YOUTUBE") connectBody.channelId = selected.id;
               else if (platform === "LINKEDIN") connectBody.organizationId = selected.id;

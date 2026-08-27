@@ -134,13 +134,26 @@ export const POST = withAuth(async (ctx, req: NextRequest, { params }: RoutePara
     const token = isRepliz ? rawToken.slice(7) : rawToken;
 
     if (isRepliz) {
-        // Repliz 2-step: connect via Repliz API
+        // Repliz 2-step: fetch pages first to get page token, then connect
         const { getReplizClient } = await import("@/lib/publishing/adapters/repliz/client");
         const replizClient = getReplizClient();
         if (!replizClient) return json({ error: "Repliz tidak terkonfigurasi." }, { status: 500 });
 
         const platform = pending.platform as "FACEBOOK" | "YOUTUBE" | "LINKEDIN";
-        const connectBody: Record<string, string> = { token };
+
+        // Fetch pages/channels to get the page-specific token
+        let pageToken = token;
+        if (platform === "FACEBOOK") {
+            const pages = await replizClient.getFacebookPages(token);
+            const selected = pages.docs.find((p) => p.id === body.pageId);
+            if (selected?.token) pageToken = selected.token;
+        } else if (platform === "YOUTUBE") {
+            const channels = await replizClient.getYouTubeChannels(token);
+            const selected = channels.docs.find((c) => c.id === body.pageId);
+            if (selected?.token) pageToken = selected.token;
+        }
+
+        const connectBody: Record<string, string> = { token: pageToken };
         if (platform === "FACEBOOK") connectBody.pageId = body.pageId;
         else if (platform === "YOUTUBE") connectBody.channelId = body.pageId;
         else if (platform === "LINKEDIN") connectBody.organizationId = body.pageId;
