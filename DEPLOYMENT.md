@@ -210,31 +210,56 @@ curl -I https://sahabatkreator.com
 
 ## 5. Deploy Staging
 
-### 5.1 Setup Environment
+### 5.1 Setup Nginx untuk Staging
 ```bash
+# Copy config staging
+sudo cp nginx-sahabat-staging.conf /etc/nginx/sites-available/sahabat-staging.conf
+
+# Aktifkan
+sudo ln -sf /etc/nginx/sites-available/sahabat-staging.conf /etc/nginx/sites-enabled/
+
+# Test & reload
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### 5.2 Setup DNS
+```
+# Cloudflare Dashboard → DNS → Add Record:
+# Type: A
+# Name: staging
+# Content: VPS_IP
+# Proxy: Proxied (orange cloud)
+```
+
+### 5.3 Setup Environment
+```bash
+cd /opt/sahabatstaging
+
 # Copy template
-cp .env.staging .env.staging
+cp .env.example .env
 
 # Edit credentials
-nano .env.staging
+nano .env
 ```
 
 **Yang wajib diisi:**
 ```env
 # Domain
 DOMAIN=staging.sahabatkreator.com
+BETTER_AUTH_URL=https://staging.sahabatkreator.com
+CORS_ORIGIN=https://staging.sahabatkreator.com
+NEXT_PUBLIC_APP_URL=https://staging.sahabatkreator.com
 
 # Database (Neon)
 DATABASE_URL=postgresql://neondb_owner:YOUR_NEON_PASSWORD@ep-xxx.neon.tech/neondb?sslmode=require
 
-# Auth (bisa sama atau beda dengan prod)
+# Auth
 BETTER_AUTH_SECRET=YOUR_RANDOM_32_CHARS_MIN
 ENCRYPTION_KEY=YOUR_RANDOM_64_HEX_CHARS
-
-# OAuth (bisa pakai app yang sama atau terpisah)
 ```
 
-### 5.2 Build & Deploy
+### 5.4 Build & Deploy
 ```bash
 # Build dan start semua service
 docker compose -f docker-compose.staging.yml up -d --build
@@ -246,16 +271,13 @@ docker compose -f docker-compose.staging.yml ps
 docker compose -f docker-compose.staging.yml logs -f web-staging
 ```
 
-### 5.3 Setup DNS
-```bash
-# Setelah staging container berjalan, buat DNS record:
-# staging.sahabatkreator.com → A record → VPS IP
-```
-
-### 5.4 Verifikasi
+### 5.5 Verifikasi
 ```bash
 # Cek dari luar
 curl -I https://staging.sahabatkreator.com
+
+# Cek health endpoint
+curl -s https://staging.sahabatkreator.com/api/health
 ```
 
 ---
@@ -429,6 +451,47 @@ crontab -e
 
 # Tambah baris ini (backup harian jam 2 AM)
 0 2 * * * cd /opt/sahabatkreator && docker compose -f docker-compose.prod.yml exec -T postgres-prod pg_dump -U sahabat sahabat | gzip > /backups/sahabat_$(date +\%Y\%m\%d).sql.gz
+```
+
+---
+
+---
+
+## Quick Reference — Nginx Setup
+
+### Production (sahabatkreator.com)
+```bash
+# Copy config
+sudo cp nginx-sahabatkreator.conf /etc/nginx/sites-available/sahabatkreator.conf
+sudo ln -sf /etc/nginx/sites-available/sahabatkreator.conf /etc/nginx/sites-enabled/
+
+# Test & reload
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### Staging (staging.sahabatkreator.com)
+```bash
+# Copy config
+sudo cp nginx-sahabat-staging.conf /etc/nginx/sites-available/sahabat-staging.conf
+sudo ln -sf /etc/nginx/sites-available/sahabat-staging.conf /etc/nginx/sites-enabled/
+
+# Test & reload
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### List all sites
+```bash
+ls -la /etc/nginx/sites-enabled/
+```
+
+### Test nginx config
+```bash
+sudo nginx -t
+```
+
+### Reload nginx
+```bash
+sudo systemctl reload nginx
 ```
 
 ---
