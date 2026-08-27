@@ -2,13 +2,14 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { MessageSquareReply, Pencil, Plus, Zap, Trash2 } from "lucide-react";
+import { Bot, MessageSquareReply, Pencil, Plus, Zap, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog } from "@/components/ui/dialog";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
+import { ReplizAutomationPanel } from "@/components/repliz-automation-panel";
 
 interface SavedResponse {
     id: string;
@@ -32,7 +33,7 @@ interface Automation {
     createdAt: string;
 }
 
-type Tab = "responses" | "automations";
+type Tab = "responses" | "automations" | "repliz";
 
 const PLATFORM_OPTIONS: Platform[] = ["INSTAGRAM", "INSTAGRAM_PAGE", "FACEBOOK", "TIKTOK", "YOUTUBE", "THREADS"];
 
@@ -187,6 +188,7 @@ export default function InboxAutomationPage() {
     const TAB_BUTTONS: { value: Tab; label: string; icon: React.ReactNode }[] = [
         { value: "responses", label: "Balasan siap pakai", icon: <MessageSquareReply className="h-4 w-4" /> },
         { value: "automations", label: "Automation", icon: <Zap className="h-4 w-4" /> },
+        { value: "repliz", label: "Repliz AI", icon: <Bot className="h-4 w-4" /> },
     ];
 
     return (
@@ -272,7 +274,7 @@ export default function InboxAutomationPage() {
                         </div>
                     ))}
                 </div>
-            ) : (
+            ) : tab === "automations" ? (
                 <div className="space-y-2">
                     {automations.length === 0 && (
                         <p className="text-sm text-muted-foreground">
@@ -326,6 +328,8 @@ export default function InboxAutomationPage() {
                         </div>
                     ))}
                 </div>
+            ) : (
+                <ReplizAutomationPanel />
             )}
 
             {/* Dialog balasan siap pakai */}

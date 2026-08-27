@@ -18,6 +18,8 @@ import {
     CreditCard,
     Link2,
     FileText,
+    Mail,
+    Bot,
     type LucideIcon,
 } from "lucide-react";
 
@@ -119,6 +121,22 @@ export const navItems: NavItem[] = [
         label: "Automasi inbox",
         shortLabel: "Automasi",
         icon: Zap,
+        group: "inbox",
+        mobileTab: false,
+    },
+    {
+        href: "/dm",
+        label: "DM Inbox",
+        shortLabel: "DM",
+        icon: Mail,
+        group: "inbox",
+        mobileTab: false,
+    },
+    {
+        href: "/dm-automation",
+        label: "DM Auto-Reply",
+        shortLabel: "DM Auto",
+        icon: Bot,
         group: "inbox",
         mobileTab: false,
     },

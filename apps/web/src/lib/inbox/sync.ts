@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
-import { fetchComments } from "./comments";
 import { type Platform } from "@/lib/platforms";
 import { refreshAccountTokenIfNeeded } from "@/lib/platforms/token-refresh";
 import { processAutomationForComment } from "@/lib/inbox-automation";
+import { getInboxAdapterRegistry } from "./adapters";
 import type { InboxAccount } from "./types";
 
 export interface InboxSyncResult {
@@ -46,7 +46,11 @@ export async function syncOrganizationComments(organizationId: string): Promise<
 
                 try {
                     const account = await resolveAccount(post.socialAccount);
-                    const { comments, error } = await fetchComments(account, post.platformPostId);
+                    const registry = getInboxAdapterRegistry();
+                    const adapter = registry.getAdapter(account.platform);
+                    if (!adapter) return;
+
+                    const { comments, error } = await adapter.fetchComments(account, post.platformPostId);
                     if (error) throw new Error(error);
 
                     for (const c of comments) {

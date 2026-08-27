@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@sahabat-kreator/db";
 import { decryptToken } from "@/lib/token-encryption";
-import { replyToComment } from "@/lib/inbox/reply";
+import { getInboxAdapterRegistry } from "@/lib/inbox/adapters";
 import type { Platform } from "@/lib/platforms";
 
 // ─── Saved Responses ───────────────────────────────────────────────────────
@@ -204,7 +204,11 @@ export async function processAutomationForComment(comment: {
     });
     if (!account) return;
 
-    const result = await replyToComment(
+    const registry = getInboxAdapterRegistry();
+    const adapter = registry.getAdapter(account.platform);
+    if (!adapter) return;
+
+    const result = await adapter.replyToComment(
         {
             id: account.id,
             organizationId: account.organizationId,

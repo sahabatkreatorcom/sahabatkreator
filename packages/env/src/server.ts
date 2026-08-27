@@ -80,6 +80,13 @@ export const env = createEnv({
     VAPID_PUBLIC_KEY: z.string().optional().describe("VAPID public key untuk push notification (Web Push). Generate via vapidkeys.io atau generate-vapid-keys."),
     VAPID_PRIVATE_KEY: z.string().optional().describe("VAPID private key untuk push notification."),
     VAPID_ADMIN_EMAIL: z.string().email().optional().describe("Email admin untuk VAPID push notification subject."),
+    REPLIZ_ACCESS_KEY: z.string().optional().describe("Repliz API access key untuk unified social media API."),
+    REPLIZ_SECRET_KEY: z.string().optional().describe("Repliz API secret key untuk unified social media API."),
+    REPLIZ_API_URL: z.string().url().default("https://api.repliz.com").describe("Repliz API base URL."),
+    REPLIZ_ENABLED: z
+      .enum(["true", "false"])
+      .default("true")
+      .describe("Aktifkan Repliz adapter untuk publishing. Set 'false' untuk pakai native API saja."),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,
