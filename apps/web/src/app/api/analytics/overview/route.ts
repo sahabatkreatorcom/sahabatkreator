@@ -50,10 +50,8 @@ export const GET = withAuth(async (ctx, req: NextRequest) => {
   // Aggregate per platform (pakai data snapshot terbaru per platform)
   const platformMap = new Map<string, (typeof snapshots)[number]>();
   for (const s of snapshots) {
-    if (
-      !platformMap.has(s.platform) ||
-      s.date > platformMap.get(s.platform)?.date
-    ) {
+    const existing = platformMap.get(s.platform);
+    if (!existing || s.date > existing.date) {
       platformMap.set(s.platform, s);
     }
   }

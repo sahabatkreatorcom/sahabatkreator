@@ -3,8 +3,9 @@ import { getDMAdapterRegistry } from "@/lib/dm/adapters";
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   const { searchParams } = new URL(request.url);
   const platform = searchParams.get("platform");
   const limit = Number(searchParams.get("limit") || "50");
@@ -35,7 +36,7 @@ export async function GET(
     accessToken: "placeholder",
   };
 
-  const result = await adapter.fetchMessages(account, params.id, limit, cursor);
+  const result = await adapter.fetchMessages(account, id, limit, cursor);
 
   if (result.error) {
     return NextResponse.json({ error: result.error }, { status: 500 });
@@ -49,8 +50,9 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   const { searchParams } = new URL(request.url);
   const platform = searchParams.get("platform");
 
@@ -86,12 +88,7 @@ export async function POST(
     return NextResponse.json({ error: "text wajib diisi." }, { status: 400 });
   }
 
-  const result = await adapter.sendMessage(
-    account,
-    params.id,
-    text,
-    attachments,
-  );
+  const result = await adapter.sendMessage(account, id, text, attachments);
 
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 500 });
