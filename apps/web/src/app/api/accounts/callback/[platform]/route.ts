@@ -107,18 +107,60 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
       return NextResponse.redirect(accountsUrl);
     }
 
-    // Tunggu sebentar agar Repliz selesai memproses akun baru
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    console.log(
+      `[oauth-callback] Repliz flow: platform=${platform}, org=${stateData.organizationId}`,
+    );
 
     // Sync akun dari Repliz
-    let replizAccounts;
+    let replizAccounts: {
+      docs: Array<{
+        generatedId?: string;
+        _id: string;
+        name: string;
+        username?: string;
+        picture?: string;
+        type: string;
+      }>;
+      totalDocs: number;
+    } = { docs: [], totalDocs: 0 };
     try {
       const { getReplizClient } = await import(
         "@/lib/publishing/adapters/repliz/client"
       );
       const replizClient = getReplizClient();
       if (!replizClient) throw new Error("Repliz client not configured");
-      replizAccounts = await replizClient.getAccounts(1, 50);
+      // Map platform ke Repliz types
+      const platformMap: Record<string, string> = {
+        INSTAGRAM: "instagram",
+        INSTAGRAM_PAGE: "facebook",
+        FACEBOOK: "facebook",
+        TIKTOK: "tiktok",
+        YOUTUBE: "youtube",
+        LINKEDIN: "linkedin",
+        THREADS: "threads",
+        TWITTER: "twitter",
+        SHOPEE: "shopee",
+      };
+      const replizPlatform = platformMap[platform] || platform.toLowerCase();
+      console.log(`[oauth-callback] Repliz platform: ${replizPlatform}`);
+
+      // Retry hingga 3x dengan delay untuk menunggu Repliz sync
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        console.log(
+          `[oauth-callback] Attempt ${attempt}: fetching accounts for ${replizPlatform}`,
+        );
+        replizAccounts = await replizClient.getAccounts({
+          page: 1,
+          limit: 50,
+          types: [replizPlatform],
+        });
+        console.log(
+          `[oauth-callback] Attempt ${attempt}: found ${replizAccounts.totalDocs} accounts`,
+        );
+        if (replizAccounts.totalDocs > 0) break;
+        // Tunggu sebelum retry (3s, 6s, 9s)
+        await new Promise((resolve) => setTimeout(resolve, attempt * 3000));
+      }
     } catch (e) {
       console.error(
         `[oauth-callback] Repliz getAccounts failed:`,
@@ -128,22 +170,7 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
       return NextResponse.redirect(accountsUrl);
     }
 
-    // Filter akun berdasarkan platform
-    const platformMap: Record<string, string> = {
-      INSTAGRAM: "instagram",
-      INSTAGRAM_PAGE: "facebook",
-      FACEBOOK: "facebook",
-      TIKTOK: "tiktok",
-      YOUTUBE: "youtube",
-      LINKEDIN: "linkedin",
-      THREADS: "threads",
-      TWITTER: "twitter",
-      SHOPEE: "shopee",
-    };
-    const replizPlatform = platformMap[platform] || platform.toLowerCase();
-    const matchingAccounts = replizAccounts.docs.filter(
-      (a) => a.type.toLowerCase() === replizPlatform,
-    );
+    const matchingAccounts = replizAccounts.docs;
 
     if (matchingAccounts.length === 0) {
       accountsUrl.searchParams.set("error", "repliz_no_accounts_found");

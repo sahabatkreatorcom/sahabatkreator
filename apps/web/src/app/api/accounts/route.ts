@@ -108,11 +108,17 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
     ).toString("base64");
 
     try {
-      // Sertakan state di redirectUri agar platform kembali ke callback dengan state
-      const callbackWithState = `${redirectUri}?state=${encodeURIComponent(state)}`;
+      // Repliz akan redirect ke redirectUri setelah proses OAuth selesai
+      // State disimpan di cookie (bukan di URL) agar lebih bersih
+      console.log(
+        `[accounts] Repliz authorize: platform=${platform}, redirect=${redirectUri}`,
+      );
       const authUrl = await replizOAuth.getAuthorizationUrl(
         platform,
-        callbackWithState,
+        redirectUri,
+      );
+      console.log(
+        `[accounts] Repliz authUrl received: ${authUrl.substring(0, 100)}...`,
       );
       // Simpan state di cookie sebagai fallback (beberapa platform tidak kirim state balik)
       const response = json({ authUrl, state });

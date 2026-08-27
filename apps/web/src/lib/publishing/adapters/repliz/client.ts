@@ -60,11 +60,25 @@ export class ReplizClient {
     return this.request<ReplizSchedule>("GET", `/public/schedule/${id}`);
   }
 
-  getAccounts(page = 1, limit = 50) {
-    return this.request<ReplizAccountList>(
-      "GET",
-      `/public/account?page=${page}&limit=${limit}`,
-    );
+  getAccounts(
+    params: {
+      page?: number;
+      limit?: number;
+      types?: string[];
+      search?: string;
+    } = {},
+  ) {
+    const query = new URLSearchParams({
+      page: String(params.page || 1),
+      limit: String(params.limit || 50),
+    });
+    if (params.types) {
+      for (const type of params.types) {
+        query.append("types[]", type);
+      }
+    }
+    if (params.search) query.set("search", params.search);
+    return this.request<ReplizAccountList>("GET", `/public/account?${query}`);
   }
 
   getAccount(id: string) {
