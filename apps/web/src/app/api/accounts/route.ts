@@ -63,14 +63,15 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
   } | null;
   const platform = body?.platform?.toUpperCase() as Platform;
 
-  // Cek global setting: replizOauthEnabled
+  // Cek per-platform setting dari admin
   let useRepliz = body?.useRepliz === true;
   if (!useRepliz) {
     const globalSettings = await db.query.globalIntegrationSettings.findFirst({
       where: (t, { eq: _eq }) => _eq(t.id, "global_integration_settings"),
-      columns: { replizOauthEnabled: true },
+      columns: { replizPlatforms: true },
     });
-    if (globalSettings?.replizOauthEnabled) {
+    const replizPlatforms = (globalSettings?.replizPlatforms as string[]) ?? [];
+    if (replizPlatforms.includes(platform)) {
       useRepliz = true;
     }
   }

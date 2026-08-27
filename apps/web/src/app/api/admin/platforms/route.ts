@@ -8,33 +8,36 @@ const SETTINGS_ID = "global_integration_settings";
 
 /**
  * GET /api/admin/platforms
- * Ambil pengaturan platform (Repliz OAuth toggle, dll).
+ * Ambil pengaturan Repliz per-platform.
  */
 export const GET = withAdmin(async () => {
     const settings = await db.query.globalIntegrationSettings.findFirst({
         where: (t, { eq: _eq }) => _eq(t.id, SETTINGS_ID),
         columns: {
-            replizOauthEnabled: true,
+            replizPlatforms: true,
             updatedAt: true,
         },
     });
 
     return json({
-        replizOauthEnabled: settings?.replizOauthEnabled ?? false,
+        replizPlatforms: (settings?.replizPlatforms as string[]) ?? [],
         updatedAt: settings?.updatedAt?.toISOString() ?? null,
     });
 });
 
 /**
  * PUT /api/admin/platforms
- * Simpan pengaturan platform.
+ * Simpan pengaturan Repliz per-platform.
+ * Body: { replizPlatforms: ["FACEBOOK", "YOUTUBE", ...] }
  */
 export const PUT = withAdmin(async (ctx, req: Request) => {
     const body = (await req.json().catch(() => null)) as {
-        replizOauthEnabled?: boolean;
+        replizPlatforms?: string[];
     } | null;
 
-    if (!body) return json({ error: "Body kosong." }, { status: 400 });
+    if (!body || !Array.isArray(body.replizPlatforms)) {
+        return json({ error: "replizPlatforms harus array." }, { status: 400 });
+    }
 
     const existing = await db.query.globalIntegrationSettings.findFirst({
         where: (t, { eq: _eq }) => _eq(t.id, SETTINGS_ID),
@@ -44,14 +47,12 @@ export const PUT = withAdmin(async (ctx, req: Request) => {
     if (existing) {
         await db
             .update(schema.globalIntegrationSettings)
-            .set({
-                replizOauthEnabled: body.replizOauthEnabled ?? false,
-            })
+            .set({ replizPlatforms: body.replizPlatforms })
             .where(eq(schema.globalIntegrationSettings.id, SETTINGS_ID));
     } else {
         await db.insert(schema.globalIntegrationSettings).values({
             id: SETTINGS_ID,
-            replizOauthEnabled: body.replizOauthEnabled ?? false,
+            replizPlatforms: body.replizPlatforms,
         });
     }
 
