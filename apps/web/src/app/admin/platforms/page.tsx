@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw, Save, Link2, Webhook } from "lucide-react";
+import { Loader2, RefreshCw, Save, Link2, Webhook, Zap, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,9 @@ export default function AdminPlatformCredentialsPage() {
     const [saving, setSaving] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
     const [forms, setForms] = useState<Record<string, PlatformForm>>({});
+    const [replizEnabled, setReplizEnabled] = useState(false);
+    const [replizSaving, setReplizSaving] = useState(false);
+    const [replizSaved, setReplizSaved] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -56,6 +59,13 @@ export default function AdminPlatformCredentialsPage() {
                 };
             }
             setForms(next);
+
+            // Load Repliz setting
+            const resRepliz = await fetch("/api/admin/platforms");
+            if (resRepliz.ok) {
+                const d = await resRepliz.json();
+                setReplizEnabled(d.replizOauthEnabled ?? false);
+            }
         } catch (e) {
             setError(e instanceof Error ? e.message : "Gagal memuat data");
         } finally {
@@ -100,6 +110,21 @@ export default function AdminPlatformCredentialsPage() {
         }
     };
 
+    const saveRepliz = async () => {
+        setReplizSaving(true);
+        setReplizSaved(false);
+        try {
+            const res = await fetch("/api/admin/platforms", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ replizOauthEnabled: replizEnabled }),
+            });
+            if (res.ok) setReplizSaved(true);
+        } finally {
+            setReplizSaving(false);
+        }
+    };
+
     if (loading && !platforms.length) {
         return <p className="py-12 text-sm text-muted-foreground">Memuat kredensial platform...</p>;
     }
@@ -123,6 +148,81 @@ export default function AdminPlatformCredentialsPage() {
                 <p className="rounded-md bg-emerald-500/10 px-3 py-2 text-sm text-emerald-600">{message}</p>
             )}
             {error && <p className="rounded-md bg-accent-red/10 px-3 py-2 text-sm text-accent-red">{error}</p>}
+
+            {/* Repliz OAuth Proxy Toggle */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Zap className="h-5 w-5 text-purple-600" />
+                        Repliz OAuth Proxy
+                    </CardTitle>
+                    <CardDescription>
+                        Kelola semua token OAuth melalui Repliz. Saat aktif, semua koneksi akun menggunakan Repliz sebagai proxy.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                            <Label className="text-base">Aktifkan Repliz OAuth</Label>
+                            <p className="text-sm text-muted-foreground">
+                                Semua koneksi akun sosial akan menggunakan Repliz. Token disimpan di Repliz, bukan di server lokal.
+                            </p>
+                        </div>
+                        <Switch
+                            checked={replizEnabled}
+                            onCheckedChange={setReplizEnabled}
+                        />
+                    </div>
+
+                    {replizEnabled && (
+                        <div className="rounded-lg bg-purple-500/5 border border-purple-500/20 p-4">
+                            <h3 className="text-sm font-medium text-purple-700 dark:text-purple-400 mb-2">
+                                Repliz OAuth aktif
+                            </h3>
+                            <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                                <li>Token disimpan di Repliz (bukan di database lokal)</li>
+                                <li>Publication menggunakan Repliz API</li>
+                                <li>Comment & DM automation aktif</li>
+                                <li>Analytics data diambil dari Repliz</li>
+                            </ul>
+                            <a
+                                href="https://repliz.com/dashboard"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 mt-3 text-sm text-purple-600 hover:underline"
+                            >
+                                Buka Repliz Dashboard
+                                <ExternalLink className="h-3 w-3" />
+                            </a>
+                        </div>
+                    )}
+
+                    {!replizEnabled && (
+                        <div className="rounded-lg bg-muted p-4">
+                            <h3 className="text-sm font-medium mb-2">Mode: Native OAuth</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Token disimpan di server lokal. Setiap platform membutuhkan OAuth credentials sendiri.
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-3">
+                        <Button onClick={saveRepliz} disabled={replizSaving} size="sm">
+                            {replizSaving ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : replizSaved ? (
+                                <Save className="mr-2 h-4 w-4 text-emerald-600" />
+                            ) : (
+                                <Save className="mr-2 h-4 w-4" />
+                            )}
+                            {replizSaved ? "Tersimpan" : "Simpan"}
+                        </Button>
+                        {replizSaved && (
+                            <span className="text-sm text-emerald-600">Pengaturan tersimpan!</span>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
 
             <div className="grid gap-4 md:grid-cols-2">
                 {platforms.map((p) => {
