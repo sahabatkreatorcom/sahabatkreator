@@ -58,15 +58,14 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
     accountsUrl.searchParams.set("error", "oauth_denied");
     return NextResponse.redirect(accountsUrl);
   }
-  if (!code) {
-    accountsUrl.searchParams.set("error", "missing_code");
-    return NextResponse.redirect(accountsUrl);
-  }
+  // Repliz flow: code tidak dikirim ke callback kita (Repliz handle di server mereka)
+  // Native flow: code wajib ada
   if (!state) {
     accountsUrl.searchParams.set("error", "missing_state");
     return NextResponse.redirect(accountsUrl);
   }
 
+  // Parse state
   let stateData: {
     organizationId: string;
     platform: string;
@@ -101,96 +100,130 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
     return NextResponse.redirect(accountsUrl);
   }
 
-  // ── Repliz OAuth ──────────────────────────────────────────────────────
+  // Repliz flow: sync dari Repliz API (tanpa code)
   if (stateData.useRepliz) {
     if (!replizOAuth.isConfigured()) {
       accountsUrl.searchParams.set("error", "repliz_not_configured");
       return NextResponse.redirect(accountsUrl);
     }
 
-    let exchangeResult: Record<string, string>;
+    // Tunggu sebentar agar Repliz selesai memproses akun baru
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // Sync akun dari Repliz
+    let replizAccounts;
     try {
-      exchangeResult = await replizOAuth.exchangeCode(platform, code, state);
+      const { getReplizClient } = await import(
+        "@/lib/publishing/adapters/repliz/client"
+      );
+      const replizClient = getReplizClient();
+      if (!replizClient) throw new Error("Repliz client not configured");
+      replizAccounts = await replizClient.getAccounts(1, 50);
     } catch (e) {
       console.error(
-        `[oauth-callback] Repliz ${platform} exchange failed:`,
+        `[oauth-callback] Repliz getAccounts failed:`,
         e instanceof Error ? e.message : e,
       );
-      accountsUrl.searchParams.set("error", "repliz_exchange_failed");
+      accountsUrl.searchParams.set("error", "repliz_sync_failed");
       return NextResponse.redirect(accountsUrl);
     }
 
-        let connected: { platformAccountId: string; platformAccountName: string; picture?: string };
-    try {
-      connected = await replizOAuth.connectAccount(platform, exchangeResult);
-    } catch (e) {
-      console.error(
-        `[oauth-callback] Repliz ${platform} connect failed:`,
-        e instanceof Error ? e.message : e,
-      );
-      accountsUrl.searchParams.set("error", "repliz_connect_failed");
+    // Filter akun berdasarkan platform
+    const platformMap: Record<string, string> = {
+      INSTAGRAM: "instagram",
+      INSTAGRAM_PAGE: "facebook",
+      FACEBOOK: "facebook",
+      TIKTOK: "tiktok",
+      YOUTUBE: "youtube",
+      LINKEDIN: "linkedin",
+      THREADS: "threads",
+      TWITTER: "twitter",
+      SHOPEE: "shopee",
+    };
+    const replizPlatform = platformMap[platform] || platform.toLowerCase();
+    const matchingAccounts = replizAccounts.docs.filter(
+      (a) => a.type.toLowerCase() === replizPlatform,
+    );
+
+    if (matchingAccounts.length === 0) {
+      accountsUrl.searchParams.set("error", "repliz_no_accounts_found");
       return NextResponse.redirect(accountsUrl);
     }
 
-    // Simpan akun Repliz ke database
-    const existing = await db.query.socialAccount.findFirst({
-      where: (t, { and: _and, eq: _eq }) =>
-        _and(
-          _eq(t.organizationId, stateData.organizationId),
-          _eq(t.platform, platform),
-          _eq(t.platformId, connected.platformAccountId),
-        ),
-      columns: { id: true },
-    });
+    // Simpan semua akun yang match
+    let savedCount = 0;
+    for (const account of matchingAccounts) {
+      const acctId = account.generatedId || account._id;
+      const existing = await db.query.socialAccount.findFirst({
+        where: (t, { and: _and, eq: _eq }) =>
+          _and(
+            _eq(t.organizationId, stateData.organizationId),
+            _eq(t.platform, platform),
+            _eq(t.platformId, acctId),
+          ),
+        columns: { id: true },
+      });
 
-    try {
-      if (existing) {
-        await db
-          .update(schema.socialAccount)
-          .set({
-            name: connected.platformAccountName,
-            avatar: connected.picture ?? null,
+      try {
+        if (existing) {
+          await db
+            .update(schema.socialAccount)
+            .set({
+              name: account.name,
+              avatar: account.picture ?? null,
+              isActive: true,
+              lastRefreshError: null,
+            })
+            .where(eq(schema.socialAccount.id, existing.id));
+        } else {
+          await db.insert(schema.socialAccount).values({
+            id: randomUUID(),
+            organizationId: stateData.organizationId,
+            platform,
+            platformId: acctId,
+            name: account.name,
+            username: account.username ?? null,
+            avatar: account.picture ?? null,
+            accessToken: encryptToken("repliz_managed"),
+            refreshToken: null,
+            tokenExpiry: null,
             isActive: true,
-            lastRefreshError: null,
-          })
-          .where(eq(schema.socialAccount.id, existing.id));
-        accountsUrl.searchParams.set("success", "reconnected");
-      } else {
-        await db.insert(schema.socialAccount).values({
-          id: randomUUID(),
-          organizationId: stateData.organizationId,
-          platform,
-          platformId: connected.platformAccountId,
-          name: connected.platformAccountName,
-          username: null,
-          avatar: connected.picture ?? null,
-          accessToken: encryptToken("repliz_managed"),
-          refreshToken: null,
-          tokenExpiry: null,
-          isActive: true,
-        });
-        accountsUrl.searchParams.set("success", "connected");
+          });
+          savedCount++;
+        }
+      } catch (e) {
+        console.error(
+          `[oauth-callback] Failed to save Repliz account ${account.name}:`,
+          e instanceof Error ? e.message : e,
+        );
       }
+    }
 
+    if (savedCount > 0) {
       await logActivity(
         stateData.organizationId,
-        existing ? "account.refreshed" : "account.connected",
+        "account.connected",
         {
           type: "account",
-          id: existing?.id ?? "new",
-          name: connected.platformAccountName,
+          id: "repliz",
+          name: `${savedCount} akun dari Repliz`,
         },
         { platform, method: "repliz" },
       );
-    } catch {
-      accountsUrl.searchParams.set("error", "save_failed");
-      return NextResponse.redirect(accountsUrl);
+      accountsUrl.searchParams.set("success", "connected");
+    } else {
+      accountsUrl.searchParams.set("success", "reconnected");
     }
 
     return NextResponse.redirect(accountsUrl);
   }
 
   // ── Native OAuth ──────────────────────────────────────────────────────
+  if (!code) {
+    accountsUrl.searchParams.set("error", "missing_code");
+    return NextResponse.redirect(accountsUrl);
+  }
+
   const credentials = await getCredentialsForPlatform(platform);
   if (!credentials) {
     accountsUrl.searchParams.set("error", "no_credentials");
