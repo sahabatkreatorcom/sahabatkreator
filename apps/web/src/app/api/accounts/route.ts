@@ -108,19 +108,27 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
     ).toString("base64");
 
     try {
-      // Repliz akan redirect ke redirectUri setelah proses OAuth selesai
-      // State disimpan di cookie (bukan di URL) agar lebih bersih
       console.log(
-        `[accounts] Repliz authorize: platform=${platform}, redirect=${redirectUri}`,
+        `[REPLIZ-DEBUG][POST] platform=${platform}, replizPlatform=${replizPlatform}`,
       );
+      console.log(`[REPLIZ-DEBUG][POST] redirectUri=${redirectUri}`);
+      console.log(`[REPLIZ-DEBUG][POST] orgId=${activeOrganizationId}`);
+
       const authUrl = await replizOAuth.getAuthorizationUrl(
         platform,
         redirectUri,
       );
-      console.log(
-        `[accounts] Repliz authUrl received: ${authUrl.substring(0, 100)}...`,
-      );
-      // Simpan state di cookie sebagai fallback (beberapa platform tidak kirim state balik)
+      console.log(`[REPLIZ-DEBUG][POST] authUrl=${authUrl}`);
+
+      try {
+        const parsedUrl = new URL(authUrl);
+        const oauthRedirect = parsedUrl.searchParams.get("redirect_uri");
+        console.log(
+          `[REPLIZ-DEBUG][POST] redirect_uri_in_oauth=${oauthRedirect}`,
+        );
+        console.log(`[REPLIZ-DEBUG][POST] our_callback=${redirectUri}`);
+      } catch (_) {}
+
       const response = json({ authUrl, state });
       response.headers.set(
         "Set-Cookie",
@@ -129,8 +137,8 @@ export const POST = withAuth(async (ctx, req: NextRequest) => {
       return response;
     } catch (e) {
       console.error(
-        "[accounts] Repliz authorize failed:",
-        e instanceof Error ? e.message : e,
+        `[REPLIZ-DEBUG][POST] FAILED:`,
+        e instanceof Error ? e.stack : e,
       );
       return json(
         { error: "Gagal membuat URL otorisasi Repliz." },

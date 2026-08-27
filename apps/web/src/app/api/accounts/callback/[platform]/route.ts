@@ -31,36 +31,42 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
   const baseUrl = env.BETTER_AUTH_URL.replace(/\/$/, "");
   const accountsUrl = new URL("/connections", baseUrl);
 
-  if (!CONNECTABLE_PLATFORMS.includes(platform)) {
-    accountsUrl.searchParams.set("error", "invalid_platform");
-    return NextResponse.redirect(accountsUrl);
-  }
+  console.log(`[REPLIZ-DEBUG][CB] === CALLBACK HIT ===`);
+  console.log(`[REPLIZ-DEBUG][CB] url=${request.url}`);
+  console.log(`[REPLIZ-DEBUG][CB] platform=${platform}`);
 
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
   let state = searchParams.get("state");
   const oauthError = searchParams.get("error");
+  const allParams: Record<string, string> = {};
+  searchParams.forEach((v, k) => { allParams[k] = v; });
+  console.log(`[REPLIZ-DEBUG][CB] query_params=${JSON.stringify(allParams)}`);
+  console.log(`[REPLIZ-DEBUG][CB] code=${code ? code.substring(0, 20) + "..." : "NULL"}`);
+  console.log(`[REPLIZ-DEBUG][CB] state_from_query=${state ? "YES" : "NULL"}`);
+  console.log(`[REPLIZ-DEBUG][CB] oauthError=${oauthError || "none"}`);
 
-  // Fallback: ambil state dari cookie jika tidak ada di query params
-  // (beberapa platform OAuth tidak meneruskan state parameter)
-  if (!state) {
-    const cookieHeader = request.headers.get("cookie") || "";
-    const stateCookie = cookieHeader
-      .split(";")
-      .map((c) => c.trim())
-      .find((c) => c.startsWith("oauth_state="));
-    if (stateCookie) {
-      state = decodeURIComponent(stateCookie.split("=").slice(1).join("="));
-    }
+  // Fallback: ambil state dari cookie
+  const cookieHeader = request.headers.get("cookie") || "";
+  const cookies = cookieHeader.split(";").map((c) => c.trim());
+  const oauthCookie = cookies.find((c) => c.startsWith("oauth_state="));
+  console.log(`[REPLIZ-DEBUG][CB] cookies_count=${cookies.length}`);
+  console.log(`[REPLIZ-DEBUG][CB] oauth_state_cookie=${oauthCookie ? "EXISTS" : "MISSING"}`);
+
+  if (!state && oauthCookie) {
+    state = decodeURIComponent(oauthCookie.split("=").slice(1).join("="));
+    console.log(`[REPLIZ-DEBUG][CB] state_recovered_from_cookie=YES`);
   }
 
   if (oauthError) {
+    console.log(`[REPLIZ-DEBUG][CB] ERROR: oauth_denied error=${oauthError}`);
     accountsUrl.searchParams.set("error", "oauth_denied");
     return NextResponse.redirect(accountsUrl);
   }
-  // Repliz flow: code tidak dikirim ke callback kita (Repliz handle di server mereka)
-  // Native flow: code wajib ada
+
   if (!state) {
+    console.log(`[REPLIZ-DEBUG][CB] ERROR: missing_state — no state in query OR cookie`);
+    console.log(`[REPLIZ-DEBUG][CB] All cookies: ${JSON.stringify(cookies)}`);
     accountsUrl.searchParams.set("error", "missing_state");
     return NextResponse.redirect(accountsUrl);
   }
@@ -86,32 +92,120 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
       throw new Error("bad signature");
     }
     stateData = JSON.parse(decoded.payload);
-  } catch {
+    console.log(`[REPLIZ-DEBUG][CB] state_valid: useRepliz=${stateData.useRepliz}, platform=${stateData.platform}, org=${stateData.organizationId}`);
+  } catch (e) {
+    console.log(`[REPLIZ-DEBUG][CB] ERROR: invalid_state — ${e instanceof Error ? e.message : e}`);
     accountsUrl.searchParams.set("error", "invalid_state");
     return NextResponse.redirect(accountsUrl);
   }
 
   if (stateData.platform !== platform) {
+    console.log(`[REPLIZ-DEBUG][CB] ERROR: state_mismatch state_platform=${stateData.platform} url_platform=${platform}`);
     accountsUrl.searchParams.set("error", "state_mismatch");
     return NextResponse.redirect(accountsUrl);
   }
   if (Date.now() - stateData.timestamp > 15 * 60 * 1000) {
+    console.log(`[REPLIZ-DEBUG][CB] ERROR: expired_state age=${Date.now() - stateData.timestamp}ms`);
     accountsUrl.searchParams.set("error", "expired_state");
     return NextResponse.redirect(accountsUrl);
   }
 
-  // Repliz flow: sync dari Repliz API (tanpa code)
+  // ── Repliz flow ──
   if (stateData.useRepliz) {
+    console.log(`[REPLIZ-DEBUG][CB] === REPLIZ FLOW ===`);
+    console.log(`[REPLIZ-DEBUG][CB] code_from_repliz=${code ? "YES: " + code.substring(0, 30) + "..." : "NULL"}`);
+
     if (!replizOAuth.isConfigured()) {
+      console.log(`[REPLIZ-DEBUG][CB] ERROR: repliz_not_configured`);
       accountsUrl.searchParams.set("error", "repliz_not_configured");
       return NextResponse.redirect(accountsUrl);
     }
 
-    console.log(
-      `[oauth-callback] Repliz flow: platform=${platform}, org=${stateData.organizationId}`,
-    );
+    const platformMap: Record<string, string> = {
+      INSTAGRAM: "instagram",
+      INSTAGRAM_PAGE: "facebook",
+      FACEBOOK: "facebook",
+      TIKTOK: "tiktok",
+      YOUTUBE: "youtube",
+      LINKEDIN: "linkedin",
+      THREADS: "threads",
+      TWITTER: "twitter",
+      SHOPEE: "shopee",
+    };
+    const replizPlatform = platformMap[platform] || platform.toLowerCase();
 
-    // Sync akun dari Repliz
+    // Jika ada code dari Repliz callback, coba connect langsung
+    if (code) {
+      console.log(`[REPLIZ-DEBUG][CB] Attempting connect with code...`);
+      try {
+        const { getReplizClient } = await import(
+          "@/lib/publishing/adapters/repliz/client"
+        );
+        const replizClient = getReplizClient();
+        if (!replizClient) throw new Error("Repliz client not configured");
+
+        const connectResult = await replizClient.connect(replizPlatform, { code });
+        console.log(`[REPLIZ-DEBUG][CB] connect_result=${JSON.stringify(connectResult)}`);
+
+        // Fetch full account detail
+        const acctId = connectResult.generatedId || connectResult._id;
+        console.log(`[REPLIZ-DEBUG][CB] connected account id=${acctId}`);
+
+        // Save ke DB
+        const existing = await db.query.socialAccount.findFirst({
+          where: (t, { and: _and, eq: _eq }) =>
+            _and(
+              _eq(t.organizationId, stateData.organizationId),
+              _eq(t.platform, platform),
+              _eq(t.platformId, acctId),
+            ),
+          columns: { id: true },
+        });
+
+        if (existing) {
+          await db
+            .update(schema.socialAccount)
+            .set({
+              name: connectResult.name,
+              avatar: connectResult.picture ?? null,
+              isActive: true,
+              lastRefreshError: null,
+            })
+            .where(eq(schema.socialAccount.id, existing.id));
+        } else {
+          await db.insert(schema.socialAccount).values({
+            id: randomUUID(),
+            organizationId: stateData.organizationId,
+            platform,
+            platformId: acctId,
+            name: connectResult.name,
+            username: connectResult.username ?? null,
+            avatar: connectResult.picture ?? null,
+            accessToken: encryptToken("repliz_managed"),
+            refreshToken: null,
+            tokenExpiry: null,
+            isActive: true,
+          });
+        }
+
+        await logActivity(
+          stateData.organizationId,
+          "account.connected",
+          { type: "account", id: acctId, name: connectResult.name },
+          { platform, method: "repliz_connect" },
+        );
+
+        console.log(`[REPLIZ-DEBUG][CB] SUCCESS: account saved name=${connectResult.name}`);
+        accountsUrl.searchParams.set("success", "connected");
+        return NextResponse.redirect(accountsUrl);
+      } catch (e) {
+        console.error(`[REPLIZ-DEBUG][CB] connect FAILED:`, e instanceof Error ? e.message : e);
+        console.error(`[REPLIZ-DEBUG][CB] connect FAILED stack:`, e instanceof Error ? e.stack : "");
+      }
+    }
+
+    // Fallback: sync dari Repliz API
+    console.log(`[REPLIZ-DEBUG][CB] Falling back to getAccounts sync...`);
     let replizAccounts: {
       docs: Array<{
         generatedId?: string;
@@ -129,43 +223,31 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
       );
       const replizClient = getReplizClient();
       if (!replizClient) throw new Error("Repliz client not configured");
-      // Map platform ke Repliz types
-      const platformMap: Record<string, string> = {
-        INSTAGRAM: "instagram",
-        INSTAGRAM_PAGE: "facebook",
-        FACEBOOK: "facebook",
-        TIKTOK: "tiktok",
-        YOUTUBE: "youtube",
-        LINKEDIN: "linkedin",
-        THREADS: "threads",
-        TWITTER: "twitter",
-        SHOPEE: "shopee",
-      };
-      const replizPlatform = platformMap[platform] || platform.toLowerCase();
-      console.log(`[oauth-callback] Repliz platform: ${replizPlatform}`);
 
-      // Retry hingga 3x dengan delay untuk menunggu Repliz sync
+      console.log(`[REPLIZ-DEBUG][CB] getAccounts platform_filter=${replizPlatform}`);
+
       for (let attempt = 1; attempt <= 3; attempt++) {
-        console.log(
-          `[oauth-callback] Attempt ${attempt}: fetching accounts for ${replizPlatform}`,
-        );
+        console.log(`[REPLIZ-DEBUG][CB] attempt ${attempt}/3...`);
         replizAccounts = await replizClient.getAccounts({
           page: 1,
           limit: 50,
           types: [replizPlatform],
         });
-        console.log(
-          `[oauth-callback] Attempt ${attempt}: found ${replizAccounts.totalDocs} accounts`,
-        );
-        if (replizAccounts.totalDocs > 0) break;
-        // Tunggu sebelum retry (3s, 6s, 9s)
+        console.log(`[REPLIZ-DEBUG][CB] attempt ${attempt} result: totalDocs=${replizAccounts.totalDocs}, docs_count=${replizAccounts.docs.length}`);
+        if (replizAccounts.totalDocs > 0) {
+          for (const acct of replizAccounts.docs) {
+            console.log(`[REPLIZ-DEBUG][CB]   account: id=${acct.generatedId || acct._id}, name=${acct.name}, type=${acct.type}`);
+          }
+          break;
+        }
         await new Promise((resolve) => setTimeout(resolve, attempt * 3000));
       }
     } catch (e) {
       console.error(
-        `[oauth-callback] Repliz getAccounts failed:`,
+        `[REPLIZ-DEBUG][CB] getAccounts FAILED:`,
         e instanceof Error ? e.message : e,
       );
+      console.error(`[REPLIZ-DEBUG][CB] getAccounts stack:`, e instanceof Error ? e.stack : "");
       accountsUrl.searchParams.set("error", "repliz_sync_failed");
       return NextResponse.redirect(accountsUrl);
     }
@@ -173,6 +255,7 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
     const matchingAccounts = replizAccounts.docs;
 
     if (matchingAccounts.length === 0) {
+      console.log(`[REPLIZ-DEBUG][CB] ERROR: no_accounts_found after all attempts`);
       accountsUrl.searchParams.set("error", "repliz_no_accounts_found");
       return NextResponse.redirect(accountsUrl);
     }
@@ -181,6 +264,7 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
     let savedCount = 0;
     for (const account of matchingAccounts) {
       const acctId = account.generatedId || account._id;
+      console.log(`[REPLIZ-DEBUG][CB] Saving account: id=${acctId}, name=${account.name}`);
       const existing = await db.query.socialAccount.findFirst({
         where: (t, { and: _and, eq: _eq }) =>
           _and(
@@ -202,6 +286,7 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
               lastRefreshError: null,
             })
             .where(eq(schema.socialAccount.id, existing.id));
+          console.log(`[REPLIZ-DEBUG][CB] Updated existing account ${existing.id}`);
         } else {
           await db.insert(schema.socialAccount).values({
             id: randomUUID(),
@@ -217,10 +302,11 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
             isActive: true,
           });
           savedCount++;
+          console.log(`[REPLIZ-DEBUG][CB] Inserted new account ${acctId}`);
         }
       } catch (e) {
         console.error(
-          `[oauth-callback] Failed to save Repliz account ${account.name}:`,
+          `[REPLIZ-DEBUG][CB] save FAILED for ${account.name}:`,
           e instanceof Error ? e.message : e,
         );
       }
@@ -235,13 +321,14 @@ export async function GET(request: NextRequest, { params }: CallbackParams) {
           id: "repliz",
           name: `${savedCount} akun dari Repliz`,
         },
-        { platform, method: "repliz" },
+        { platform, method: "repliz_sync" },
       );
       accountsUrl.searchParams.set("success", "connected");
     } else {
       accountsUrl.searchParams.set("success", "reconnected");
     }
 
+    console.log(`[REPLIZ-DEBUG][CB] DONE: savedCount=${savedCount}`);
     return NextResponse.redirect(accountsUrl);
   }
 
