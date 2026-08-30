@@ -83,15 +83,16 @@ function SettingSection({ title, children }: { title: string; children: React.Re
 
 function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
     return (
-        <label className="flex items-center justify-between">
+        <div className="flex items-center justify-between">
             <span className="text-sm">{label}</span>
             <button
+                type="button"
                 onClick={() => onChange(!checked)}
                 className={cn("relative h-5 w-9 rounded-full transition-colors", checked ? "bg-primary" : "bg-muted border border-border")}
             >
                 <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform", checked ? "translate-x-4" : "translate-x-0.5")} />
             </button>
-        </label>
+        </div>
     );
 }
 

@@ -118,40 +118,38 @@ export function TabbedPlatformEditor({
                         rows={8}
                         className="w-full resize-none rounded-xl border border-input bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     />
-
-                    <div className="absolute right-2 top-2">
-                        <CharacterRingRow platforms={platformsToShow} currentLength={charCount} />
-                    </div>
                 </div>
 
-                <div className="mt-2 flex items-center gap-1 rounded-lg border border-border bg-muted/30 px-2 py-1.5">
-                    <button onClick={() => insertText("**")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Bold">
-                        <Bold className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => insertText("_")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Italic">
-                        <Italic className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => insertText("\n- ")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="List">
-                        <List className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => insertText("#")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Hashtag">
-                        <Hash className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => insertText("@")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Mention">
-                        <AtSign className="h-4 w-4" />
-                    </button>
-                    <div className="mx-1 h-4 w-px bg-border" />
-                    {onAIAssist && (
-                        <button onClick={() => onAIAssist(activeTab === "all" ? null : activeTab)} className="rounded p-1 text-muted-foreground hover:bg-muted" title="AI Assist">
-                            {isAIRewriting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                <div className="mt-1.5 flex items-center justify-between">
+                    <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/30 px-2 py-1.5">
+                        <button onClick={() => insertText("**")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Bold">
+                            <Bold className="h-4 w-4" />
                         </button>
-                    )}
-                    {onAddMedia && (
-                        <button onClick={onAddMedia} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Media">
-                            <Image className="h-4 w-4" />
+                        <button onClick={() => insertText("_")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Italic">
+                            <Italic className="h-4 w-4" />
                         </button>
-                    )}
-                    <div className="ml-auto text-[10px] text-muted-foreground">{charCount} karakter</div>
+                        <button onClick={() => insertText("\n- ")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="List">
+                            <List className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => insertText("#")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Hashtag">
+                            <Hash className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => insertText("@")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Mention">
+                            <AtSign className="h-4 w-4" />
+                        </button>
+                        <div className="mx-1 h-4 w-px bg-border" />
+                        {onAIAssist && (
+                            <button onClick={() => onAIAssist(activeTab === "all" ? null : activeTab)} className="rounded p-1 text-muted-foreground hover:bg-muted" title="AI Assist">
+                                {isAIRewriting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                            </button>
+                        )}
+                        {onAddMedia && (
+                            <button onClick={onAddMedia} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Media">
+                                <Image className="h-4 w-4" />
+                            </button>
+                        )}
+                    </div>
+                    <CharacterRingRow platforms={platformsToShow} currentLength={charCount} />
                 </div>
 
                 {media.length > 0 && (

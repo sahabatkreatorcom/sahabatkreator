@@ -26,67 +26,46 @@ interface ProfileSelectorProps {
     className?: string;
 }
 
-function getOrganisationKey(account: SocialAccount): string {
-    return account.organizationId || `ungrouped-${account.id}`;
-}
-
-function getOrganisationName(account: SocialAccount): string {
-    return account.organization?.name || account.name;
+interface PlatformGroup {
+    platform: Platform;
+    accounts: SocialAccount[];
 }
 
 export function ProfileSelector({
     accounts,
     selected,
     onSelectionChange,
-    groupBy = "organisation",
+    groupBy = "platform",
     incompatiblePlatforms = [],
     className,
 }: ProfileSelectorProps) {
     const [searchQuery, setSearchQuery] = useState("");
-    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(["all"]));
+    const [expandedPlatforms, setExpandedPlatforms] = useState<Set<Platform>>(new Set());
 
     const filteredAccounts = useMemo(() => {
-        let result = accounts;
-        if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase();
-            result = accounts.filter(
-                (a) => a.name.toLowerCase().includes(q) || (a.username && a.username.toLowerCase().includes(q)) || a.platform.toLowerCase().includes(q),
-            );
-        }
-        return [...result].sort((a, b) => {
-            const diff = getPlatformSortIndex(a.platform) - getPlatformSortIndex(b.platform);
-            return diff !== 0 ? diff : a.name.localeCompare(b.name);
-        });
+        if (!searchQuery.trim()) return accounts;
+        const q = searchQuery.toLowerCase();
+        return accounts.filter(
+            (a) => a.name.toLowerCase().includes(q) || (a.username && a.username.toLowerCase().includes(q)),
+        );
     }, [accounts, searchQuery]);
 
-    const groups = useMemo(() => {
-        if (groupBy === "platform") {
-            const map = new Map<Platform, SocialAccount[]>();
-            filteredAccounts.forEach((a) => {
-                const existing = map.get(a.platform) || [];
-                existing.push(a);
-                map.set(a.platform, existing);
-            });
-            return Array.from(map.entries()).map(([platform, accs]) => ({ name: platform, accounts: accs, platforms: [platform] }));
-        }
-        const map = new Map<string, { name: string; accounts: SocialAccount[]; platforms: Set<Platform> }>();
+    const platformGroups = useMemo((): PlatformGroup[] => {
+        const map = new Map<Platform, SocialAccount[]>();
         filteredAccounts.forEach((a) => {
-            const key = getOrganisationKey(a);
-            const existing = map.get(key);
-            if (existing) {
-                existing.accounts.push(a);
-                existing.platforms.add(a.platform);
-            } else {
-                map.set(key, { name: getOrganisationName(a), accounts: [a], platforms: new Set([a.platform]) });
-            }
+            const existing = map.get(a.platform) || [];
+            existing.push(a);
+            map.set(a.platform, existing);
         });
-        return Array.from(map.entries()).map(([, v]) => ({ name: v.name, accounts: v.accounts, platforms: Array.from(v.platforms) }));
-    }, [filteredAccounts, groupBy]);
+        return Array.from(map.entries())
+            .sort(([a], [b]) => getPlatformSortIndex(a) - getPlatformSortIndex(b))
+            .map(([platform, accs]) => ({ platform, accounts: accs }));
+    }, [filteredAccounts]);
 
-    const toggleGroup = (name: string) => {
-        setExpandedGroups((prev) => {
+    const togglePlatform = (platform: Platform) => {
+        setExpandedPlatforms((prev) => {
             const next = new Set(prev);
-            if (next.has(name)) next.delete(name); else next.add(name);
+            if (next.has(platform)) next.delete(platform); else next.add(platform);
             return next;
         });
     };
@@ -95,11 +74,24 @@ export function ProfileSelector({
         onSelectionChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
     };
 
-    const toggleAll = (ids: string[]) => {
-        const allSelected = ids.every((id) => selected.includes(id));
-        if (allSelected) onSelectionChange(selected.filter((id) => !ids.includes(id)));
-        else onSelectionChange([...new Set([...selected, ...ids])]);
+    const togglePlatformAll = (platform: Platform) => {
+        const platformAccountIds = filteredAccounts.filter((a) => a.platform === platform).map((a) => a.id);
+        const allSelected = platformAccountIds.every((id) => selected.includes(id));
+        if (allSelected) {
+            onSelectionChange(selected.filter((id) => !platformAccountIds.includes(id)));
+        } else {
+            onSelectionChange([...new Set([...selected, ...platformAccountIds])]);
+        }
     };
+
+    const selectedByPlatform = useMemo(() => {
+        const map: Record<string, number> = {};
+        selected.forEach((id) => {
+            const acc = accounts.find((a) => a.id === id);
+            if (acc) map[acc.platform] = (map[acc.platform] || 0) + 1;
+        });
+        return map;
+    }, [selected, accounts]);
 
     return (
         <div className={cn("flex h-full flex-col overflow-hidden", className)}>
@@ -121,33 +113,39 @@ export function ProfileSelector({
             </div>
 
             <div className="flex-1 overflow-y-auto p-2">
-                {groups.map((group) => {
-                    const isExpanded = expandedGroups.has("all") || expandedGroups.has(group.name);
+                {platformGroups.map((group) => {
+                    const isExpanded = expandedPlatforms.has(group.platform);
                     const accountIds = group.accounts.map((a) => a.id);
                     const allSelected = accountIds.length > 0 && accountIds.every((id) => selected.includes(id));
+                    const count = selectedByPlatform[group.platform] || 0;
 
                     return (
-                        <div key={group.name} className="mb-1">
+                        <div key={group.platform} className="mb-1">
                             <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-muted/50">
-                                <button onClick={() => toggleGroup(group.name)} className="flex items-center gap-1 flex-1 min-w-0">
+                                <button onClick={() => togglePlatform(group.platform)} className="flex items-center gap-1.5 flex-1 min-w-0">
                                     {isExpanded ? <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />}
-                                    <div className="flex -space-x-1">
-                                        {group.platforms.slice(0, 4).map((p) => (
-                                            <span key={p} className="flex h-4 w-4 items-center justify-center rounded-full text-[7px] font-bold text-white ring-1 ring-background" style={{ background: PLATFORM_COLORS[p] }}>
-                                                <PlatformIcon platform={p} size={8} />
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <span className="truncate text-[11px] font-medium ml-1">{group.name}</span>
-                                    <span className="text-[10px] text-muted-foreground ml-auto">{group.accounts.length}</span>
+                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white" style={{ background: PLATFORM_COLORS[group.platform] }}>
+                                        <PlatformIcon platform={group.platform} size={10} />
+                                    </span>
+                                    <span className="truncate text-[11px] font-medium">{PLATFORM_LABELS[group.platform]}</span>
+                                    <span className="text-[10px] text-muted-foreground ml-auto">
+                                        {count > 0 ? `${count}/${group.accounts.length}` : group.accounts.length}
+                                    </span>
                                 </button>
-                                <button onClick={() => toggleAll(accountIds)} className="flex h-4 w-4 items-center justify-center rounded border" title={allSelected ? "Batal pilih semua" : "Pilih semua"}>
-                                    {allSelected && <Check className="h-3 w-3 text-primary" />}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); togglePlatformAll(group.platform); }}
+                                    className={cn(
+                                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors",
+                                        allSelected ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/50"
+                                    )}
+                                    title={allSelected ? "Batal pilih semua" : `Pilih semua ${PLATFORM_LABELS[group.platform]}`}
+                                >
+                                    {allSelected && <Check className="h-3 w-3" />}
                                 </button>
                             </div>
 
                             {isExpanded && (
-                                <div className="ml-4 space-y-0.5">
+                                <div className="ml-4 mt-0.5 space-y-0.5">
                                     {group.accounts.map((account) => {
                                         const isSelected = selected.includes(account.id);
                                         const isIncompatible = incompatiblePlatforms.includes(account.platform);
@@ -156,28 +154,29 @@ export function ProfileSelector({
                                                 key={account.id}
                                                 onClick={() => !isIncompatible && toggleAccount(account.id)}
                                                 disabled={isIncompatible}
-                                                className={cn("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors", isSelected ? "bg-primary/10" : "hover:bg-muted/50", isIncompatible && "opacity-40 cursor-not-allowed")}
+                                                className={cn(
+                                                    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors",
+                                                    isSelected ? "bg-primary/10" : "hover:bg-muted/50",
+                                                    isIncompatible && "opacity-40 cursor-not-allowed"
+                                                )}
                                             >
                                                 <div className="relative shrink-0">
                                                     {account.avatar ? (
-                                                        <img src={account.avatar} alt="" className="h-7 w-7 rounded-full object-cover ring-1 ring-background" />
+                                                        <img src={account.avatar} alt="" className="h-6 w-6 rounded-full object-cover" />
                                                     ) : (
-                                                        <span className="flex h-7 w-7 items-center justify-center rounded-full text-[8px] font-bold text-white" style={{ background: PLATFORM_COLORS[account.platform] }}>
-                                                            <PlatformIcon platform={account.platform} size={12} />
+                                                        <span className="flex h-6 w-6 items-center justify-center rounded-full text-[8px] font-bold text-white" style={{ background: PLATFORM_COLORS[account.platform] }}>
+                                                            {account.name[0]}
                                                         </span>
                                                     )}
-                                                    <span
-                                                        className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full ring-1 ring-background"
-                                                        style={{ background: PLATFORM_COLORS[account.platform] }}
-                                                    >
-                                                        <PlatformIcon platform={account.platform} size={7} />
-                                                    </span>
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="truncate text-[11px] font-medium">{account.name}</p>
                                                     {account.username && <p className="truncate text-[10px] text-muted-foreground">@{account.username}</p>}
                                                 </div>
-                                                <div className={cn("flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border", isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border")}>
+                                                <div className={cn(
+                                                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
+                                                    isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border"
+                                                )}>
                                                     {isSelected && <Check className="h-3 w-3" />}
                                                 </div>
                                             </button>
@@ -188,17 +187,6 @@ export function ProfileSelector({
                         </div>
                     );
                 })}
-            </div>
-
-            <div className="border-t border-border p-2">
-                <div className="flex flex-wrap gap-1">
-                    {Array.from(new Set(selected.map((id) => accounts.find((a) => a.id === id)?.platform))).filter(Boolean).map((p) => (
-                        <span key={p} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white" style={{ background: PLATFORM_COLORS[p!] }}>
-                            <PlatformIcon platform={p!} size={8} />
-                            {PLATFORM_LABELS[p!]}
-                        </span>
-                    ))}
-                </div>
             </div>
         </div>
     );

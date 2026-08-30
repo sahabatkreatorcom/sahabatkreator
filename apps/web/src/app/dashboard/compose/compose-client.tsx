@@ -10,6 +10,7 @@ import { CustomizationPanel } from "@/components/compose/customization-panel";
 import { PlatformPreview } from "@/components/compose/platform-previews";
 import { AICaptionGenerator } from "@/components/compose/ai-caption-generator";
 import { MediaUploadModal } from "@/components/compose/media-upload-modal";
+import { TemplatePicker } from "@/components/compose/template-picker";
 
 interface ComposeClientProps {
     orch: ReturnType<typeof useComposeOrchestration>;
@@ -99,16 +100,16 @@ export function ComposeClient({ orch }: ComposeClientProps) {
                 )}
 
                 <div className="flex flex-1 overflow-hidden">
-                    <div className="w-[180px] flex-shrink-0 border-r border-border overflow-hidden">
+                    <div className="w-[240px] flex-shrink-0 border-r border-border overflow-hidden">
                         <ProfileSelector
                             accounts={compose.accounts}
                             selected={compose.selectedAccountIds}
                             onSelectionChange={compose.setSelectedAccountIds}
-                            groupBy="organisation"
+                            groupBy="platform"
                         />
                     </div>
 
-                    <div className="flex-1 min-w-[380px] max-w-[480px] overflow-hidden border-r border-border">
+                    <div className="flex-1 min-w-[380px] max-w-[520px] overflow-hidden border-r border-border">
                         <TabbedPlatformEditor
                             caption={compose.caption}
                             onCaptionChange={compose.setCaption}
@@ -296,6 +297,12 @@ export function ComposeClient({ orch }: ComposeClientProps) {
                     open={compose.isMediaModalOpen}
                     onClose={() => compose.setIsMediaModalOpen(false)}
                     onSelect={compose.handleMediaUpload}
+                />
+
+                <TemplatePicker
+                    open={compose.isTemplatePickerOpen}
+                    onClose={() => compose.setIsTemplatePickerOpen(false)}
+                    onSelect={compose.handleTemplateSelect}
                 />
             </div>
         </div>

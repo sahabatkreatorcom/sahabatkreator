@@ -15,7 +15,46 @@ interface PlatformPreviewProps {
     videoTitle?: string;
 }
 
-function InstagramPreview({ caption, media, accountName, accountAvatar }: PlatformPreviewProps) {
+function StoryReelPreview({ caption, media, accountName, accountAvatar, platform, label }: PlatformPreviewProps & { label: string }) {
+    return (
+        <div className="relative rounded-xl border border-border bg-black overflow-hidden aspect-[9/16] max-h-[420px]">
+            {media.length > 0 ? (
+                media[0].type === "video" ? (
+                    <video src={mediaFileUrl(media[0].url)} poster={mediaFileUrl(media[0].thumbnailUrl)} className="absolute inset-0 h-full w-full object-cover" muted />
+                ) : (
+                    <img src={mediaFileUrl(media[0].thumbnailUrl || media[0].url)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                )
+            ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                </div>
+            )}
+            <div className="absolute top-3 left-3 right-3 flex items-center gap-2">
+                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-white text-xs font-bold overflow-hidden">
+                    {accountAvatar ? <img src={accountAvatar} alt="" className="h-full w-full object-cover" /> : accountName[0]}
+                </div>
+                <span className="text-xs font-semibold text-white drop-shadow">{accountName}</span>
+                <span className="ml-auto rounded bg-black/50 px-1.5 py-0.5 text-[9px] text-white">{label}</span>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+                <p className="text-xs text-white whitespace-pre-wrap line-clamp-4">{caption || "Caption akan muncul di sini..."}</p>
+            </div>
+            <div className="absolute bottom-3 right-3 flex flex-col gap-3">
+                <span className="text-lg">❤️</span>
+                <span className="text-lg">💬</span>
+                <span className="text-lg">📤</span>
+            </div>
+        </div>
+    );
+}
+
+function InstagramPreview({ caption, media, accountName, accountAvatar, postType, platform }: PlatformPreviewProps) {
+    if (postType === "story" || postType === "reel") {
+        return <StoryReelPreview caption={caption} media={media} accountName={accountName} accountAvatar={accountAvatar} platform={platform} postType={postType} label={postType === "reel" ? "Reel" : "Story"} />;
+    }
+
+    const isCarousel = postType === "carousel" && media.length > 1;
+
     return (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
@@ -27,14 +66,26 @@ function InstagramPreview({ caption, media, accountName, accountAvatar }: Platfo
                     <p className="text-[10px] text-muted-foreground">Sponsored</p>
                 </div>
             </div>
-            {media.length > 0 && (
-                <div className="aspect-square bg-muted">
-                    {media[0].type === "video" ? (
-                        <video src={mediaFileUrl(media[0].url)} poster={mediaFileUrl(media[0].thumbnailUrl)} className="h-full w-full object-cover" muted />
-                    ) : (
-                        <img src={mediaFileUrl(media[0].thumbnailUrl || media[0].url)} alt="" className="h-full w-full object-cover" />
+            {media.length > 0 ? (
+                <div className="relative">
+                    <div className="aspect-square">
+                        {media[0].type === "video" ? (
+                            <video src={mediaFileUrl(media[0].url)} poster={mediaFileUrl(media[0].thumbnailUrl)} className="h-full w-full object-cover" muted />
+                        ) : (
+                            <img src={mediaFileUrl(media[0].thumbnailUrl || media[0].url)} alt="" className="h-full w-full object-cover" />
+                        )}
+                    </div>
+                    {isCarousel && (
+                        <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                            {media.slice(0, 5).map((_, i) => (
+                                <span key={i} className={`h-1.5 w-1.5 rounded-full ${i === 0 ? "bg-primary" : "bg-white/50"}`} />
+                            ))}
+                            {media.length > 5 && <span className="text-[8px] text-white">+{media.length - 5}</span>}
+                        </div>
                     )}
                 </div>
+            ) : (
+                <div className="aspect-square bg-muted flex items-center justify-center text-muted-foreground text-sm">Tambah media</div>
             )}
             <div className="p-3">
                 <div className="flex items-center gap-3 mb-2">
@@ -50,9 +101,13 @@ function InstagramPreview({ caption, media, accountName, accountAvatar }: Platfo
     );
 }
 
-function TikTokPreview({ caption, media, accountName, accountAvatar }: PlatformPreviewProps) {
+function TikTokPreview({ caption, media, accountName, accountAvatar, postType, platform }: PlatformPreviewProps) {
+    if (postType === "story") {
+        return <StoryReelPreview caption={caption} media={media} accountName={accountName} accountAvatar={accountAvatar} platform={platform} postType={postType} label="Story" />;
+    }
+
     return (
-        <div className="relative rounded-xl border border-border bg-black overflow-hidden aspect-[9/16] max-h-[400px]">
+        <div className="relative rounded-xl border border-border bg-black overflow-hidden aspect-[9/16] max-h-[420px]">
             {media.length > 0 ? (
                 <video src={mediaFileUrl(media[0].url)} poster={mediaFileUrl(media[0].thumbnailUrl)} className="absolute inset-0 h-full w-full object-cover" muted />
             ) : (
@@ -67,11 +122,20 @@ function TikTokPreview({ caption, media, accountName, accountAvatar }: PlatformP
                 </div>
                 <p className="text-xs text-white whitespace-pre-wrap line-clamp-3">{caption || "Caption akan muncul di sini..."}</p>
             </div>
+            <div className="absolute bottom-3 right-3 flex flex-col gap-3">
+                <span className="text-lg">❤️</span>
+                <span className="text-lg">💬</span>
+                <span className="text-lg">🔖</span>
+            </div>
         </div>
     );
 }
 
-function YouTubePreview({ caption, media, accountName, accountAvatar, videoTitle }: PlatformPreviewProps) {
+function YouTubePreview({ caption, media, accountName, accountAvatar, videoTitle, postType, platform }: PlatformPreviewProps) {
+    if (postType === "reel") {
+        return <StoryReelPreview caption={caption} media={media} accountName={accountName} accountAvatar={accountAvatar} platform={platform} postType={postType} label="Short" />;
+    }
+
     return (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
             {media.length > 0 ? (
@@ -100,7 +164,32 @@ function YouTubePreview({ caption, media, accountName, accountAvatar, videoTitle
     );
 }
 
-function GenericPreview({ platform, caption, media, accountName, accountAvatar }: PlatformPreviewProps) {
+function GenericPreview({ platform, caption, media, accountName, accountAvatar, postType }: PlatformPreviewProps) {
+    if (postType === "story" || postType === "reel") {
+        return (
+            <div className="relative rounded-xl border border-border bg-black overflow-hidden aspect-[9/16] max-h-[420px]">
+                {media.length > 0 ? (
+                    media[0].type === "video" ? (
+                        <video src={mediaFileUrl(media[0].url)} poster={mediaFileUrl(media[0].thumbnailUrl)} className="absolute inset-0 h-full w-full object-cover" muted />
+                    ) : (
+                        <img src={mediaFileUrl(media[0].thumbnailUrl || media[0].url)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    )
+                ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900" />
+                )}
+                <div className="absolute top-3 left-3 flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full text-white" style={{ background: PLATFORM_COLORS[platform] }}>
+                        <PlatformIcon platform={platform} size={12} />
+                    </span>
+                    <span className="text-xs font-semibold text-white drop-shadow">{accountName}</span>
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+                    <p className="text-xs text-white whitespace-pre-wrap line-clamp-4">{caption || "Caption akan muncul di sini..."}</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
