@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { StockMediaPicker } from "@/components/media/stock-media-picker";
 import { cn } from "@/lib/utils";
+import { mediaFileUrl } from "@/lib/media-file-url";
 
 interface MediaFolder {
     id: string;
@@ -351,7 +352,7 @@ export default function MediaLibraryPage() {
                             <div className="flex items-center justify-center bg-black/20 p-4">
                                 {previewItem.type === "video" ? (
                                     <video
-                                        src={previewItem.url}
+                                        src={mediaFileUrl(previewItem.url)}
                                         controls
                                         className="max-h-[60vh] max-w-full rounded-md"
                                         autoPlay
@@ -361,11 +362,11 @@ export default function MediaLibraryPage() {
                                         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10">
                                             <span className="text-4xl">🎵</span>
                                         </div>
-                                        <audio src={previewItem.url} controls className="w-full max-w-md" autoPlay />
+                                        <audio src={mediaFileUrl(previewItem.url)} controls className="w-full max-w-md" autoPlay />
                                     </div>
                                 ) : (
                                     <img
-                                        src={previewItem.url}
+                                        src={mediaFileUrl(previewItem.url)}
                                         alt={previewItem.altText ?? previewItem.filename}
                                         className="max-h-[60vh] max-w-full object-contain rounded-md"
                                     />
@@ -500,7 +501,7 @@ function MediaCard({
             )}
         >
             {item.type === "video" ? (
-                <video src={item.url} poster={item.thumbnailUrl ?? undefined} className="h-full w-full object-cover" muted preload="metadata" />
+                <video src={mediaFileUrl(item.url)} poster={mediaFileUrl(item.thumbnailUrl)} className="h-full w-full object-cover" muted preload="metadata" />
             ) : item.type === "audio" ? (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-card p-2">
                     <span className="text-[10px] font-medium uppercase text-muted-foreground">Audio</span>
@@ -508,7 +509,7 @@ function MediaCard({
                 </div>
             ) : (
                 <img
-                    src={item.thumbnailUrl ?? item.url}
+                    src={mediaFileUrl(item.thumbnailUrl ?? item.url)}
                     alt={item.altText ?? item.filename}
                     loading="lazy"
                     className="h-full w-full object-cover transition-transform group-hover:scale-105"

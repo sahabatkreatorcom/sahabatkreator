@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { mediaFileUrl } from "@/lib/media-file-url";
 
 type Tab = "summary" | "recommendations" | "chat" | "brand" | "media";
 
@@ -501,7 +502,7 @@ export default function SebPage() {
                             <div key={item.id} className="rounded-lg border border-border bg-card p-4">
                                 <div className="flex items-start gap-3">
                                     <img
-                                        src={item.thumbnailUrl || item.url}
+                                        src={mediaFileUrl(item.thumbnailUrl || item.url)}
                                         alt={item.filename}
                                         className="h-16 w-16 shrink-0 rounded-md border border-border object-cover"
                                     />

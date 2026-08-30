@@ -3,6 +3,7 @@
 import { type Platform, PLATFORM_COLORS, PLATFORM_LABELS } from "@/lib/platform-config";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import type { ComposeMediaItem } from "@/hooks/use-compose";
+import { mediaFileUrl } from "@/lib/media-file-url";
 
 interface PlatformPreviewProps {
     platform: Platform;
@@ -29,9 +30,9 @@ function InstagramPreview({ caption, media, accountName, accountAvatar }: Platfo
             {media.length > 0 && (
                 <div className="aspect-square bg-muted">
                     {media[0].type === "video" ? (
-                        <video src={media[0].url} poster={media[0].thumbnailUrl} className="h-full w-full object-cover" muted />
+                        <video src={mediaFileUrl(media[0].url)} poster={mediaFileUrl(media[0].thumbnailUrl)} className="h-full w-full object-cover" muted />
                     ) : (
-                        <img src={media[0].thumbnailUrl || media[0].url} alt="" className="h-full w-full object-cover" />
+                        <img src={mediaFileUrl(media[0].thumbnailUrl || media[0].url)} alt="" className="h-full w-full object-cover" />
                     )}
                 </div>
             )}
@@ -53,7 +54,7 @@ function TikTokPreview({ caption, media, accountName, accountAvatar }: PlatformP
     return (
         <div className="relative rounded-xl border border-border bg-black overflow-hidden aspect-[9/16] max-h-[400px]">
             {media.length > 0 ? (
-                <video src={media[0].url} poster={media[0].thumbnailUrl} className="absolute inset-0 h-full w-full object-cover" muted />
+                <video src={mediaFileUrl(media[0].url)} poster={mediaFileUrl(media[0].thumbnailUrl)} className="absolute inset-0 h-full w-full object-cover" muted />
             ) : (
                 <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900" />
             )}
@@ -76,9 +77,9 @@ function YouTubePreview({ caption, media, accountName, accountAvatar, videoTitle
             {media.length > 0 ? (
                 <div className="aspect-video bg-muted">
                     {media[0].type === "video" ? (
-                        <video src={media[0].url} poster={media[0].thumbnailUrl} className="h-full w-full object-cover" muted />
+                        <video src={mediaFileUrl(media[0].url)} poster={mediaFileUrl(media[0].thumbnailUrl)} className="h-full w-full object-cover" muted />
                     ) : (
-                        <img src={media[0].thumbnailUrl || media[0].url} alt="" className="h-full w-full object-cover" />
+                        <img src={mediaFileUrl(media[0].thumbnailUrl || media[0].url)} alt="" className="h-full w-full object-cover" />
                     )}
                 </div>
             ) : (
@@ -113,7 +114,7 @@ function GenericPreview({ platform, caption, media, accountName, accountAvatar }
             </div>
             {media.length > 0 && (
                 <div className="aspect-square bg-muted">
-                    <img src={media[0].thumbnailUrl || media[0].url} alt="" className="h-full w-full object-cover" />
+                    <img src={mediaFileUrl(media[0].thumbnailUrl || media[0].url)} alt="" className="h-full w-full object-cover" />
                 </div>
             )}
             <div className="p-3">

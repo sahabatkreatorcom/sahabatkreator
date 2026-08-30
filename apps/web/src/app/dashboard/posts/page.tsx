@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_LABELS, PLATFORM_COLORS, type Platform } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
+import { mediaFileUrl } from "@/lib/media-file-url";
 
 interface AccountRef {
     id: string;
@@ -262,7 +263,7 @@ export default function PostsPage() {
                                             {post.media.slice(0, 4).map((m) => (
                                                 <img
                                                     key={m.id}
-                                                    src={m.thumbnailUrl ?? m.url}
+                                                    src={mediaFileUrl(m.thumbnailUrl ?? m.url)}
                                                     alt=""
                                                     className="h-12 w-12 rounded-md border border-border object-cover"
                                                 />

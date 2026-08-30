@@ -7,6 +7,7 @@ import { type Platform, getCharacterLimit } from "@/lib/platform-config";
 import { type SocialAccount } from "@/components/compose/profile-selector";
 import type { ComposeMediaItem } from "@/hooks/use-compose";
 import { CharacterRingRow } from "@/components/compose/character-ring";
+import { mediaFileUrl } from "@/lib/media-file-url";
 
 type EditorTab = "all" | Platform;
 
@@ -158,9 +159,9 @@ export function TabbedPlatformEditor({
                         {media.map((m) => (
                             <div key={m.id} className="group relative aspect-square overflow-hidden rounded-lg border border-border">
                                 {m.type === "video" ? (
-                                    <video src={m.url} poster={m.thumbnailUrl} className="h-full w-full object-cover" muted preload="metadata" />
+                                    <video src={mediaFileUrl(m.url)} poster={mediaFileUrl(m.thumbnailUrl)} className="h-full w-full object-cover" muted preload="metadata" />
                                 ) : (
-                                    <img src={m.thumbnailUrl || m.url} alt="" className="h-full w-full object-cover" />
+                                    <img src={mediaFileUrl(m.thumbnailUrl || m.url)} alt="" className="h-full w-full object-cover" />
                                 )}
                                 <button
                                     onClick={() => onMediaChange(media.filter((x) => x.id !== m.id))}

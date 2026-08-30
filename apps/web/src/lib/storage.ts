@@ -294,15 +294,22 @@ export async function getDownloadUrl(
 }
 
 /**
- * Get the public URL for a file (requires public bucket or custom domain)
- * @param key - The file key
- * @param customDomain - Optional custom domain override; fallback ke R2_CUSTOM_DOMAIN env
+ * Get the public URL for a file via proxy route (served through our server).
+ * @param key - The R2 key (e.g. orgs/orgId/media/uuid.jpg)
  */
-export function getPublicUrl(key: string, customDomain?: string): string {
-  const domain = customDomain || getCustomDomain();
-  if (domain) {
-    return `https://${domain}/${key}`;
-  }
-  // R2 public buckets use the format: https://<bucket>.<account>.r2.dev/<key>
-  return `https://${getBucketName()}.${env.R2_ACCOUNT_ID ?? ""}.r2.dev/${key}`;
+export function getPublicUrl(key: string): string {
+  return `/api/media/file?key=${encodeURIComponent(key)}`;
+}
+
+/**
+ * Convert any existing R2 direct URL to our proxy URL.
+ * Handles both r2.dev and custom domain URLs by extracting the key.
+ */
+export function toProxyUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const key = decodeURIComponent(u.pathname.replace(/^\//, ""));
+    if (key) return `/api/media/file?key=${encodeURIComponent(key)}`;
+  } catch { /* not a URL, return as-is */ }
+  return url;
 }

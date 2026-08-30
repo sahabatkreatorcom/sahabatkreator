@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { PLATFORM_COLORS, PLATFORM_LABELS } from "@/lib/platforms/config";
 import { cn } from "@/lib/utils";
+import { mediaFileUrl } from "@/lib/media-file-url";
 import type { CalendarPost } from "./types";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -68,7 +69,7 @@ export function GridView({
                         >
                             {p.media?.[0]?.thumbnailUrl ? (
                                 <img
-                                    src={p.media[0].thumbnailUrl}
+                                    src={mediaFileUrl(p.media[0].thumbnailUrl)}
                                     alt=""
                                     className="absolute inset-0 w-full h-full object-cover"
                                     loading="lazy"

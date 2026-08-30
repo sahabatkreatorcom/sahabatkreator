@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { useComposeOrchestration } from "@/hooks/use-compose-orchestration";
 import { PLATFORM_COLORS, PLATFORM_LABELS, type Platform } from "@/lib/platform-config";
 import { PlatformIcon } from "@/components/ui/platform-icon";
+import { mediaFileUrl } from "@/lib/media-file-url";
 
 interface ComposeMobileProps {
     orch: ReturnType<typeof useComposeOrchestration>;
@@ -111,9 +112,9 @@ export default function ComposeMobile({ orch }: ComposeMobileProps) {
                                 {compose.media.map((m) => (
                                     <div key={m.id} className="relative aspect-square overflow-hidden rounded-lg border border-border">
                                         {m.type === "video" ? (
-                                            <video src={m.url} poster={m.thumbnailUrl} className="h-full w-full object-cover" muted />
+                                            <video src={mediaFileUrl(m.url)} poster={mediaFileUrl(m.thumbnailUrl)} className="h-full w-full object-cover" muted />
                                         ) : (
-                                            <img src={m.thumbnailUrl || m.url} alt="" className="h-full w-full object-cover" />
+                                            <img src={mediaFileUrl(m.thumbnailUrl || m.url)} alt="" className="h-full w-full object-cover" />
                                         )}
                                         <button
                                             onClick={() => compose.setMedia(compose.media.filter((x) => x.id !== m.id))}
