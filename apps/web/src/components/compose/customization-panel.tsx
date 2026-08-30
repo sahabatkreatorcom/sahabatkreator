@@ -20,6 +20,7 @@ export interface PlatformSettings {
     autoPublish: boolean;
     location?: string;
     altText?: string;
+    altTexts?: Record<string, string>;
     videoTitle?: string;
     privacy?: string;
     commentsEnabled?: boolean;
@@ -238,18 +239,29 @@ export function CustomizationPanel({
                             <Label className="text-xs">Lokasi</Label>
                             <Input value={s.instagramLocationId || ""} onChange={(e) => set({ instagramLocationId: e.target.value })} placeholder="ID lokasi" className="h-9" />
                         </div>
-                        <div className="space-y-1">
-                            <Label className="text-xs">Alt text</Label>
-                            <Input value={s.altText || ""} onChange={(e) => set({ altText: e.target.value })} placeholder="Deskripsi aksesibilitas" maxLength={100} className="h-9" />
-                        </div>
                     </div>
                 </SettingSection>
             )}
 
             {media.length > 0 && (
-                <SettingSection title="Alt Text">
-                    <Input value={s.altText || ""} onChange={(e) => set({ altText: e.target.value })} placeholder="Deskripsi aksesibilitas gambar" maxLength={100} className="h-9" />
-                    <p className="mt-1 text-[10px] text-muted-foreground">{(s.altText || "").length}/100</p>
+                <SettingSection title="Alt Text per Gambar">
+                    <div className="space-y-2">
+                        {media.map((item, idx) => (
+                            <div key={item.id}>
+                                <p className="text-[10px] text-muted-foreground mb-1">Gambar {idx + 1}</p>
+                                <Input
+                                    value={s.altTexts?.[item.id] || ""}
+                                    onChange={(e) => {
+                                        const newAltTexts = { ...(s.altTexts || {}), [item.id]: e.target.value };
+                                        set({ altTexts: newAltTexts });
+                                    }}
+                                    placeholder={`Deskripsi gambar ${idx + 1}`}
+                                    maxLength={100}
+                                    className="h-8 text-xs"
+                                />
+                            </div>
+                        ))}
+                    </div>
                 </SettingSection>
             )}
         </div>

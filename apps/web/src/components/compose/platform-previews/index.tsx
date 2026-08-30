@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type Platform, PLATFORM_COLORS, PLATFORM_LABELS } from "@/lib/platform-config";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import type { ComposeMediaItem } from "@/hooks/use-compose";
@@ -49,11 +51,14 @@ function StoryReelPreview({ caption, media, accountName, accountAvatar, platform
 }
 
 function InstagramPreview({ caption, media, accountName, accountAvatar, postType, platform }: PlatformPreviewProps) {
+    const [carouselIdx, setCarouselIdx] = useState(0);
+
     if (postType === "story" || postType === "reel") {
         return <StoryReelPreview caption={caption} media={media} accountName={accountName} accountAvatar={accountAvatar} platform={platform} postType={postType} label={postType === "reel" ? "Reel" : "Story"} />;
     }
 
     const isCarousel = postType === "carousel" && media.length > 1;
+    const currentMedia = isCarousel ? media[carouselIdx] || media[0] : media[0];
 
     return (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -67,21 +72,33 @@ function InstagramPreview({ caption, media, accountName, accountAvatar, postType
                 </div>
             </div>
             {media.length > 0 ? (
-                <div className="relative">
+                <div className="relative group">
                     <div className="aspect-square">
-                        {media[0].type === "video" ? (
-                            <video src={mediaFileUrl(media[0].url)} poster={mediaFileUrl(media[0].thumbnailUrl)} className="h-full w-full object-cover" muted />
+                        {currentMedia.type === "video" ? (
+                            <video src={mediaFileUrl(currentMedia.url)} poster={mediaFileUrl(currentMedia.thumbnailUrl)} className="h-full w-full object-cover" muted />
                         ) : (
-                            <img src={mediaFileUrl(media[0].thumbnailUrl || media[0].url)} alt="" className="h-full w-full object-cover" />
+                            <img src={mediaFileUrl(currentMedia.thumbnailUrl || currentMedia.url)} alt="" className="h-full w-full object-cover" />
                         )}
                     </div>
                     {isCarousel && (
-                        <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
-                            {media.slice(0, 5).map((_, i) => (
-                                <span key={i} className={`h-1.5 w-1.5 rounded-full ${i === 0 ? "bg-primary" : "bg-white/50"}`} />
-                            ))}
-                            {media.length > 5 && <span className="text-[8px] text-white">+{media.length - 5}</span>}
-                        </div>
+                        <>
+                            {carouselIdx > 0 && (
+                                <button onClick={() => setCarouselIdx((i) => i - 1)} className="absolute left-1.5 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+                            )}
+                            {carouselIdx < media.length - 1 && (
+                                <button onClick={() => setCarouselIdx((i) => i + 1)} className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            )}
+                            <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                                {media.slice(0, 5).map((_, i) => (
+                                    <span key={i} className={`h-1.5 w-1.5 rounded-full ${i === carouselIdx ? "bg-primary" : "bg-white/50"}`} />
+                                ))}
+                                {media.length > 5 && <span className="text-[8px] text-white">+{media.length - 5}</span>}
+                            </div>
+                        </>
                     )}
                 </div>
             ) : (

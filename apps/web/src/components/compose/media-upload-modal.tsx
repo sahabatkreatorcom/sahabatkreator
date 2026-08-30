@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { X, Upload, Search, Loader2, Image as ImageIcon } from "lucide-react";
+import { X, Upload, Search, Loader2, Image as ImageIcon, Trash2, CheckSquare, Square, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { mediaFileUrl } from "@/lib/media-file-url";
 
@@ -49,6 +49,9 @@ export function MediaUploadModal({ open, onClose, onSelect }: MediaUploadModalPr
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [searchQuery, setSearchQuery] = useState("");
+    const [selectMode, setSelectMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [deleting, setDeleting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [stockSource, setStockSource] = useState<StockSource>("PEXELS");
@@ -73,6 +76,41 @@ export function MediaUploadModal({ open, onClose, onSelect }: MediaUploadModalPr
             if (res.ok) setLibraryItems(data.media ?? []);
         } catch { /* ignore */ }
         setLoadingLibrary(false);
+    };
+
+    const toggleSelectItem = (id: string) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const deleteSelected = async () => {
+        if (selectedIds.size === 0) return;
+        setDeleting(true);
+        try {
+            const res = await fetch("/api/media", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: [...selectedIds] }),
+            });
+            if (res.ok) {
+                setLibraryItems((prev) => prev.filter((m) => !selectedIds.has(m.id)));
+                setSelectedIds(new Set());
+                setSelectMode(false);
+            }
+        } catch { /* ignore */ }
+        setDeleting(false);
+    };
+
+    const selectAll = () => {
+        const allIds = filteredLibrary.map((m) => m.id);
+        setSelectedIds((prev) => {
+            if (prev.size === allIds.length) return new Set();
+            return new Set(allIds);
+        });
     };
 
     const searchStock = useCallback(async (q: string, p: number) => {
@@ -206,17 +244,44 @@ export function MediaUploadModal({ open, onClose, onSelect }: MediaUploadModalPr
                 <div className="flex-1 overflow-y-auto p-4">
                     {tab === "library" && (
                         <>
-                            <div className="relative mb-3">
-                                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                                <input
-                                    type="text"
-                                    placeholder="Cari media..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => e.key === "Enter" && loadLibrary()}
-                                    className="h-9 w-full rounded-md border border-border bg-muted/50 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                                />
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                    <input
+                                        type="text"
+                                        placeholder="Cari media..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && loadLibrary()}
+                                        className="h-9 w-full rounded-md border border-border bg-muted/50 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                    />
+                                </div>
+                                <Button
+                                    variant={selectMode ? "primary" : "secondary"}
+                                    size="sm"
+                                    onClick={() => {
+                                        setSelectMode(!selectMode);
+                                        setSelectedIds(new Set());
+                                    }}
+                                >
+                                    {selectMode ? <CheckSquare className="mr-1 h-3.5 w-3.5" /> : <Square className="mr-1 h-3.5 w-3.5" />}
+                                    {selectMode ? "Batal" : "Pilih"}
+                                </Button>
                             </div>
+
+                            {selectMode && selectedIds.size > 0 && (
+                                <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2 mb-3">
+                                    <p className="text-xs font-medium">{selectedIds.size} dipilih</p>
+                                    <div className="flex gap-2">
+                                        <Button variant="secondary" size="sm" onClick={selectAll}>
+                                            {selectedIds.size === filteredLibrary.length ? "Batal Pilih" : "Pilih Semua"}
+                                        </Button>
+                                        <Button variant="destructive" size="sm" loading={deleting} onClick={deleteSelected}>
+                                            <Trash2 className="mr-1 h-3.5 w-3.5" /> Hapus
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
 
                             {loadingLibrary ? (
                                 <div className="flex items-center justify-center py-12">
@@ -229,24 +294,36 @@ export function MediaUploadModal({ open, onClose, onSelect }: MediaUploadModalPr
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-4 gap-2">
-                                    {filteredLibrary.map((item) => (
-                                        <button
-                                            key={item.id}
-                                            onClick={() => {
-                                                onSelect([{ id: item.id, url: item.url, thumbnailUrl: item.thumbnailUrl ?? undefined, type: item.type, size: 0 }]);
-                                                onClose();
-                                            }}
-                                            className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
-                                        >
-                                            {item.type === "video" ? (
-                                                <video src={mediaFileUrl(item.url)} poster={mediaFileUrl(item.thumbnailUrl)} className="h-full w-full object-cover" muted preload="metadata" />
-                                            ) : item.type === "audio" ? (
-                                                <div className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">Audio</div>
-                                            ) : (
-                                                <img src={mediaFileUrl(item.thumbnailUrl ?? item.url)} alt={item.filename} loading="lazy" className="h-full w-full object-cover" />
-                                            )}
-                                        </button>
-                                    ))}
+                                    {filteredLibrary.map((item) => {
+                                        const isSelected = selectedIds.has(item.id);
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => {
+                                                    if (selectMode) {
+                                                        toggleSelectItem(item.id);
+                                                    } else {
+                                                        onSelect([{ id: item.id, url: item.url, thumbnailUrl: item.thumbnailUrl ?? undefined, type: item.type, size: 0 }]);
+                                                        onClose();
+                                                    }
+                                                }}
+                                                className={`group relative aspect-square overflow-hidden rounded-lg border bg-muted ${isSelected ? "border-primary ring-2 ring-primary/30" : "border-border"}`}
+                                            >
+                                                {item.type === "video" ? (
+                                                    <video src={mediaFileUrl(item.url)} poster={mediaFileUrl(item.thumbnailUrl)} className="h-full w-full object-cover" muted preload="metadata" />
+                                                ) : item.type === "audio" ? (
+                                                    <div className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">Audio</div>
+                                                ) : (
+                                                    <img src={mediaFileUrl(item.thumbnailUrl ?? item.url)} alt={item.filename} loading="lazy" className="h-full w-full object-cover" />
+                                                )}
+                                                {selectMode && (
+                                                    <span className={`absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded border ${isSelected ? "border-primary bg-primary text-white" : "border-white/60 bg-black/30 text-white"}`}>
+                                                        {isSelected ? <Check className="h-3 w-3" /> : <Square className="h-3 w-3" />}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </>

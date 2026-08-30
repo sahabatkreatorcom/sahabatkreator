@@ -7,8 +7,9 @@ export function mediaFileUrl(url: string | null | undefined): string {
     if (url.startsWith("/api/media/file")) return url;
     try {
         const u = new URL(url);
-        const key = decodeURIComponent(u.pathname.replace(/^\//, ""));
-        if (key) return `/api/media/file?key=${encodeURIComponent(key)}`;
+        if (u.protocol === "http:" || u.protocol === "https:") {
+            return url;
+        }
     } catch { /* relative or non-URL — return as-is */ }
     return url;
 }

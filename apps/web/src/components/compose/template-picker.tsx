@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, FileText, Loader2, Search } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 interface CaptionTemplate {
@@ -71,7 +72,12 @@ export function TemplatePicker({ open, onClose, onSelect }: TemplatePickerProps)
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                             <FileText className="mb-2 h-8 w-8" />
                             <p className="text-sm">Belum ada template</p>
-                            <p className="mt-1 text-xs">Buat template di Content Tools</p>
+                            <p className="mt-1 text-xs">
+                                Buat template di{" "}
+                                <Link href="/dashboard/content-tools" onClick={onClose} className="text-primary underline hover:text-primary/80">
+                                    Content Tools
+                                </Link>
+                            </p>
                         </div>
                     ) : (
                         <div className="space-y-2">
