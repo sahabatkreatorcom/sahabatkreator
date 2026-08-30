@@ -125,6 +125,7 @@ export function CustomizationPanel({
     hashtagCollectionIds,
     onHashtagCollectionChange,
 }: CustomizationPanelProps) {
+    const [showPillarHashtag, setShowPillarHashtag] = useState(true);
     const s = settings[activePlatform] || getDefaultPlatformSettings(activePlatform);
     const set = useCallback((updates: Partial<PlatformSettings>) => onSettingsChange(activePlatform, updates), [activePlatform, onSettingsChange]);
 
@@ -145,24 +146,31 @@ export function CustomizationPanel({
                 ))}
             </div>
 
-            <SettingSection title="Pilar & Hashtag">
-                <div className="space-y-3">
-                    <div>
-                        <Label className="text-xs mb-1.5 block">Pilar Konten</Label>
-                        <PillarSelector
-                            value={pillarId}
-                            onChange={onPillarChange ?? (() => {})}
-                        />
+            <div>
+                <button
+                    type="button"
+                    onClick={() => setShowPillarHashtag(!showPillarHashtag)}
+                    className="flex w-full items-center justify-between py-2 text-left"
+                >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pilar & Hashtag</p>
+                    <svg className={`h-4 w-4 text-muted-foreground transition-transform ${showPillarHashtag ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                {showPillarHashtag && (
+                    <div className="space-y-3 pt-1 pb-2">
+                        <div>
+                            <Label className="text-xs mb-1.5 block">Pilar Konten</Label>
+                            <PillarSelector value={pillarId} onChange={onPillarChange ?? (() => {})} />
+                        </div>
+                        <div>
+                            <Label className="text-xs mb-1.5 block">Koleksi Hashtag</Label>
+                            <HashtagCollectionSelector value={hashtagCollectionIds} onChange={onHashtagCollectionChange ?? (() => {})} />
+                        </div>
                     </div>
-                    <div>
-                        <Label className="text-xs mb-1.5 block">Koleksi Hashtag</Label>
-                        <HashtagCollectionSelector
-                            value={hashtagCollectionIds}
-                            onChange={onHashtagCollectionChange ?? (() => {})}
-                        />
-                    </div>
-                </div>
-            </SettingSection>
+                )}
+            </div>
+            <div className="border-b border-border" />
 
             <SettingSection title="Jenis Post">
                 <select

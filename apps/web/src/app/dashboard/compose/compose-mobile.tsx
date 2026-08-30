@@ -23,6 +23,7 @@ const STEPS = ["Akun", "Konten", "Preview"];
 export default function ComposeMobile({ orch }: ComposeMobileProps) {
     const { compose, onSaveDraft, onPublishNow } = orch;
     const [step, setStep] = useState(0);
+    const [showPillarHashtag, setShowPillarHashtag] = useState(true);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const canProceed = step === 0 ? compose.selectedAccountIds.length > 0 : true;
@@ -180,21 +181,29 @@ export default function ComposeMobile({ orch }: ComposeMobileProps) {
                                 ))}
                             </div>
                         )}
-                        <div className="space-y-3 pt-2 border-t border-border">
-                            <div>
-                                <p className="text-xs font-medium text-muted-foreground mb-2">Pilar Konten</p>
-                                <PillarSelector
-                                    value={compose.pillarId}
-                                    onChange={compose.setPillarId}
-                                />
-                            </div>
-                            <div>
-                                <p className="text-xs font-medium text-muted-foreground mb-2">Koleksi Hashtag</p>
-                                <HashtagCollectionSelector
-                                    value={compose.hashtagCollectionIds}
-                                    onChange={compose.setHashtagCollectionIds}
-                                />
-                            </div>
+                        <div className="pt-2 border-t border-border">
+                            <button
+                                type="button"
+                                onClick={() => setShowPillarHashtag(!showPillarHashtag)}
+                                className="flex w-full items-center justify-between py-2 text-left"
+                            >
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pilar & Hashtag</p>
+                                <svg className={`h-4 w-4 text-muted-foreground transition-transform ${showPillarHashtag ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            {showPillarHashtag && (
+                                <div className="space-y-3 pb-2">
+                                    <div>
+                                        <p className="text-xs font-medium text-muted-foreground mb-2">Pilar Konten</p>
+                                        <PillarSelector value={compose.pillarId} onChange={compose.setPillarId} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-medium text-muted-foreground mb-2">Koleksi Hashtag</p>
+                                        <HashtagCollectionSelector value={compose.hashtagCollectionIds} onChange={compose.setHashtagCollectionIds} />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
