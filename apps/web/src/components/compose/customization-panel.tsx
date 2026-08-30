@@ -146,11 +146,11 @@ export function CustomizationPanel({
                 ))}
             </div>
 
-            <div>
+            <div className="border-b border-border px-4 py-3">
                 <button
                     type="button"
                     onClick={() => setShowPillarHashtag(!showPillarHashtag)}
-                    className="flex w-full items-center justify-between py-2 text-left"
+                    className="flex w-full items-center justify-between py-0 text-left"
                 >
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pilar & Hashtag</p>
                     <svg className={`h-4 w-4 text-muted-foreground transition-transform ${showPillarHashtag ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -158,7 +158,7 @@ export function CustomizationPanel({
                     </svg>
                 </button>
                 {showPillarHashtag && (
-                    <div className="space-y-3 pt-1 pb-2">
+                    <div className="space-y-3 pt-3">
                         <div>
                             <Label className="text-xs mb-1.5 block">Pilar Konten</Label>
                             <PillarSelector value={pillarId} onChange={onPillarChange ?? (() => {})} />
@@ -170,7 +170,6 @@ export function CustomizationPanel({
                     </div>
                 )}
             </div>
-            <div className="border-b border-border" />
 
             <SettingSection title="Jenis Post">
                 <select
