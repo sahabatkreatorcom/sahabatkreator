@@ -245,17 +245,19 @@ export default function ComposeMobile({ orch }: ComposeMobileProps) {
                             Lanjut <ChevronRight className="ml-1 h-4 w-4" />
                         </Button>
                     ) : (
-                        <>
-                            <Button variant="secondary" onClick={onSaveDraft} loading={compose.isSaving} className="flex-1">
-                                Draft
+                        <div className="w-full flex flex-col gap-2">
+                            <div className="flex gap-2">
+                                <Button variant="secondary" onClick={onSaveDraft} loading={compose.isSaving} className="flex-1">
+                                    Draft
+                                </Button>
+                                <Button variant="secondary" onClick={() => compose.handleOpenScheduleModal()} className="flex-1">
+                                    Jadwalkan
+                                </Button>
+                            </div>
+                            <Button onClick={onPublishNow} loading={compose.isPublishing} className="w-full h-11 text-base">
+                                Terbitkan Sekarang
                             </Button>
-                            <Button variant="secondary" onClick={() => compose.handleOpenScheduleModal()} className="flex-1">
-                                Jadwalkan
-                            </Button>
-                            <Button onClick={onPublishNow} loading={compose.isPublishing} className="flex-1">
-                                Terbitkan
-                            </Button>
-                        </>
+                        </div>
                     )}
                 </div>
             </footer>
