@@ -149,7 +149,12 @@ export function TabbedPlatformEditor({
                             </button>
                         )}
                     </div>
-                    <CharacterRingRow platforms={platformsToShow} currentLength={charCount} />
+                    <div className="flex items-center gap-2">
+                        <span className={`text-xs font-medium ${charCount > 0 && platformsToShow.some((p) => charCount > getCharacterLimit(p)) ? "text-red-500" : "text-muted-foreground"}`}>
+                            {charCount}{platformsToShow.length === 1 ? `/${getCharacterLimit(platformsToShow[0])}` : ""}
+                        </span>
+                        <CharacterRingRow platforms={platformsToShow} currentLength={charCount} />
+                    </div>
                 </div>
 
                 {media.length > 0 && (

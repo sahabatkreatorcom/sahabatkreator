@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { type Platform, PLATFORM_COLORS, PLATFORM_LABELS, getCharacterLimit } from "@/lib/platform-config";
-import { type SocialAccount } from "@/components/compose/profile-selector";
+import { type Platform, PLATFORM_LABELS } from "@/lib/platform-config";
 import { type ComposeMediaItem } from "@/hooks/use-compose";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { Input } from "@/components/ui/input";
@@ -84,14 +82,24 @@ function SettingSection({ title, children }: { title: string; children: React.Re
 
 function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
     return (
-        <div className="flex items-center justify-between">
-            <span className="text-sm">{label}</span>
+        <div className="flex items-center justify-between py-1">
+            <span className="text-sm text-foreground">{label}</span>
             <button
                 type="button"
+                role="switch"
+                aria-checked={checked}
                 onClick={() => onChange(!checked)}
-                className={cn("relative h-5 w-9 rounded-full transition-colors", checked ? "bg-primary" : "bg-muted border border-border")}
+                className={cn(
+                    "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    checked ? "bg-primary" : "bg-muted"
+                )}
             >
-                <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform", checked ? "translate-x-4" : "translate-x-0.5")} />
+                <span
+                    className={cn(
+                        "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ease-in-out",
+                        checked ? "translate-x-5" : "translate-x-0"
+                    )}
+                />
             </button>
         </div>
     );
@@ -157,22 +165,20 @@ export function CustomizationPanel({
             )}
 
             {activePlatform === "TIKTOK" && (
-                <>
-                    <SettingSection title="TikTok">
-                        <div className="space-y-3">
-                            <div className="space-y-1">
-                                <Label className="text-xs">Privasi *</Label>
-                                <select value={s.tiktokPrivacyLevel || ""} onChange={(e) => set({ tiktokPrivacyLevel: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-                                    <option value="SELF_ONLY">Hanya saya</option>
-                                    <option value="MUTUAL_FOLLOW_FRIENDS">Teman</option>
-                                    <option value="PUBLIC_TO_EVERYONE">Publik</option>
-                                </select>
-                            </div>
-                            <ToggleSwitch checked={s.tiktokComments !== false} onChange={(v) => set({ tiktokComments: v })} label="Komentar" />
-                            <ToggleSwitch checked={s.tiktokAutoAddMusic === true} onChange={(v) => set({ tiktokAutoAddMusic: v })} label="Musik otomatis" />
+                <SettingSection title="TikTok">
+                    <div className="space-y-3">
+                        <div className="space-y-1">
+                            <Label className="text-xs">Privasi *</Label>
+                            <select value={s.tiktokPrivacyLevel || ""} onChange={(e) => set({ tiktokPrivacyLevel: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                <option value="SELF_ONLY">Hanya saya</option>
+                                <option value="MUTUAL_FOLLOW_FRIENDS">Teman</option>
+                                <option value="PUBLIC_TO_EVERYONE">Publik</option>
+                            </select>
                         </div>
-                    </SettingSection>
-                </>
+                        <ToggleSwitch checked={s.tiktokComments !== false} onChange={(v) => set({ tiktokComments: v })} label="Izinkan komentar" />
+                        <ToggleSwitch checked={s.tiktokAutoAddMusic === true} onChange={(v) => set({ tiktokAutoAddMusic: v })} label="Tambah musik otomatis" />
+                    </div>
+                </SettingSection>
             )}
 
             {activePlatform === "YOUTUBE" && (
@@ -234,7 +240,7 @@ export function CustomizationPanel({
                 <SettingSection title="Instagram">
                     <div className="space-y-3">
                         <ToggleSwitch checked={s.instagramShareToFeed !== false} onChange={(v) => set({ instagramShareToFeed: v })} label="Bagikan ke Feed" />
-                        <ToggleSwitch checked={s.instagramComments !== false} onChange={(v) => set({ instagramComments: v })} label="Komentar" />
+                        <ToggleSwitch checked={s.instagramComments !== false} onChange={(v) => set({ instagramComments: v })} label="Izinkan komentar" />
                         <div className="space-y-1">
                             <Label className="text-xs">Lokasi</Label>
                             <Input value={s.instagramLocationId || ""} onChange={(e) => set({ instagramLocationId: e.target.value })} placeholder="ID lokasi" className="h-9" />

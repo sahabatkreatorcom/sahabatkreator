@@ -119,14 +119,45 @@ function InstagramPreview({ caption, media, accountName, accountAvatar, postType
 }
 
 function TikTokPreview({ caption, media, accountName, accountAvatar, postType, platform }: PlatformPreviewProps) {
+    const [carouselIdx, setCarouselIdx] = useState(0);
+
     if (postType === "story") {
         return <StoryReelPreview caption={caption} media={media} accountName={accountName} accountAvatar={accountAvatar} platform={platform} postType={postType} label="Story" />;
     }
 
+    const isCarousel = (postType === "carousel" || media.length > 1) && media.length > 1;
+    const currentMedia = isCarousel ? media[carouselIdx] || media[0] : media[0];
+
     return (
         <div className="relative rounded-xl border border-border bg-black overflow-hidden aspect-[9/16] max-h-[420px]">
             {media.length > 0 ? (
-                <video src={mediaFileUrl(media[0].url)} poster={mediaFileUrl(media[0].thumbnailUrl)} className="absolute inset-0 h-full w-full object-cover" muted />
+                <div className="relative h-full w-full">
+                    {currentMedia.type === "video" ? (
+                        <video src={mediaFileUrl(currentMedia.url)} poster={mediaFileUrl(currentMedia.thumbnailUrl)} className="absolute inset-0 h-full w-full object-cover" muted />
+                    ) : (
+                        <img src={mediaFileUrl(currentMedia.thumbnailUrl || currentMedia.url)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    )}
+                    {isCarousel && (
+                        <>
+                            {carouselIdx > 0 && (
+                                <button onClick={() => setCarouselIdx((i) => i - 1)} className="absolute left-1.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white z-10">
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+                            )}
+                            {carouselIdx < media.length - 1 && (
+                                <button onClick={() => setCarouselIdx((i) => i + 1)} className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white z-10">
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            )}
+                            <div className="absolute bottom-14 left-0 right-0 flex justify-center gap-1 z-10">
+                                {media.slice(0, 7).map((_, i) => (
+                                    <span key={i} className={`h-1.5 w-1.5 rounded-full ${i === carouselIdx ? "bg-white" : "bg-white/40"}`} />
+                                ))}
+                                {media.length > 7 && <span className="text-[8px] text-white">+{media.length - 7}</span>}
+                            </div>
+                        </>
+                    )}
+                </div>
             ) : (
                 <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900" />
             )}

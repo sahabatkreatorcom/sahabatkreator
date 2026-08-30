@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, CalendarClock, ImagePlus } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { ChevronLeft, ChevronRight, CalendarClock, ImagePlus, Bold, Italic, List, Hash, AtSign, Sparkles, Bookmark, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { useComposeOrchestration } from "@/hooks/use-compose-orchestration";
 import { PLATFORM_COLORS, PLATFORM_LABELS, type Platform } from "@/lib/platform-config";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { mediaFileUrl } from "@/lib/media-file-url";
+import { CharacterRingRow } from "@/components/compose/character-ring";
+import { getCharacterLimit } from "@/lib/platform-config";
 
 interface ComposeMobileProps {
     orch: ReturnType<typeof useComposeOrchestration>;
@@ -17,8 +19,25 @@ const STEPS = ["Akun", "Konten", "Preview"];
 export default function ComposeMobile({ orch }: ComposeMobileProps) {
     const { compose, onSaveDraft, onScheduleConfirm } = orch;
     const [step, setStep] = useState(0);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const canProceed = step === 0 ? compose.selectedAccountIds.length > 0 : true;
+
+    const uniquePlatforms = [...new Set(compose.selectedAccounts.map((a) => a.platform))];
+    const charCount = compose.caption.length;
+
+    const insertText = useCallback(
+        (text: string) => {
+            const ta = textareaRef.current;
+            if (!ta) { compose.setCaption(compose.caption + text); return; }
+            const start = ta.selectionStart;
+            const end = ta.selectionEnd;
+            const newValue = compose.caption.substring(0, start) + text + compose.caption.substring(end);
+            compose.setCaption(newValue);
+            setTimeout(() => { ta.selectionStart = ta.selectionEnd = start + text.length; ta.focus(); }, 0);
+        },
+        [compose.caption, compose.setCaption],
+    );
 
     return (
         <div className="flex h-dvh flex-col bg-background">
@@ -92,17 +111,48 @@ export default function ComposeMobile({ orch }: ComposeMobileProps) {
                 )}
 
                 {step === 1 && (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                         <textarea
+                            ref={textareaRef}
                             value={compose.caption}
                             onChange={(e) => compose.setCaption(e.target.value)}
                             placeholder="Tulis caption kontenmu..."
-                            rows={8}
+                            rows={6}
                             className="w-full resize-none rounded-xl border border-input bg-card px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         />
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/30 px-1.5 py-1">
+                                <button onClick={() => insertText("**")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Bold">
+                                    <Bold className="h-4 w-4" />
+                                </button>
+                                <button onClick={() => insertText("_")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Italic">
+                                    <Italic className="h-4 w-4" />
+                                </button>
+                                <button onClick={() => insertText("\n- ")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="List">
+                                    <List className="h-4 w-4" />
+                                </button>
+                                <button onClick={() => insertText("#")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Hashtag">
+                                    <Hash className="h-4 w-4" />
+                                </button>
+                                <button onClick={() => insertText("@")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Mention">
+                                    <AtSign className="h-4 w-4" />
+                                </button>
+                                <div className="mx-0.5 h-4 w-px bg-border" />
+                                <button onClick={() => compose.handleAIAssist()} className="rounded p-1 text-muted-foreground hover:bg-muted" title="AI Assist">
+                                    <Sparkles className="h-4 w-4" />
+                                </button>
+                                <button onClick={compose.handleAddMedia} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Media">
+                                    <ImagePlus className="h-4 w-4" />
+                                </button>
+                                <button onClick={compose.handleOpenTemplates} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Template">
+                                    <Bookmark className="h-4 w-4" />
+                                </button>
+                            </div>
+                            <CharacterRingRow platforms={uniquePlatforms} currentLength={charCount} />
+                        </div>
                         <button
                             onClick={compose.handleAddMedia}
-                            className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-6 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/50"
+                            className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-5 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/50"
                         >
                             <ImagePlus className="h-5 w-5" />
                             <span className="text-sm font-medium">Tambah Media</span>
