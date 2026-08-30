@@ -213,6 +213,8 @@ function YouTubePreview({ caption, media, accountName, accountAvatar, videoTitle
 }
 
 function GenericPreview({ platform, caption, media, accountName, accountAvatar, postType }: PlatformPreviewProps) {
+    const [carouselIdx, setCarouselIdx] = useState(0);
+
     if (postType === "story" || postType === "reel") {
         return (
             <div className="relative rounded-xl border border-border bg-black overflow-hidden aspect-[9/16] max-h-[420px]">
@@ -238,6 +240,9 @@ function GenericPreview({ platform, caption, media, accountName, accountAvatar, 
         );
     }
 
+    const isCarousel = postType === "carousel" && media.length > 1;
+    const currentMedia = isCarousel ? media[carouselIdx] || media[0] : media[0];
+
     return (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
@@ -249,10 +254,38 @@ function GenericPreview({ platform, caption, media, accountName, accountAvatar, 
                     <p className="text-[10px] text-muted-foreground">{PLATFORM_LABELS[platform]}</p>
                 </div>
             </div>
-            {media.length > 0 && (
-                <div className="aspect-square bg-muted">
-                    <img src={mediaFileUrl(media[0].thumbnailUrl || media[0].url)} alt="" className="h-full w-full object-cover" />
+            {media.length > 0 ? (
+                <div className="relative group">
+                    <div className="aspect-square bg-muted">
+                        {currentMedia.type === "video" ? (
+                            <video src={mediaFileUrl(currentMedia.url)} poster={mediaFileUrl(currentMedia.thumbnailUrl)} className="h-full w-full object-cover" muted />
+                        ) : (
+                            <img src={mediaFileUrl(currentMedia.thumbnailUrl || currentMedia.url)} alt="" className="h-full w-full object-cover" />
+                        )}
+                    </div>
+                    {isCarousel && (
+                        <>
+                            {carouselIdx > 0 && (
+                                <button onClick={() => setCarouselIdx((i) => i - 1)} className="absolute left-1.5 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+                            )}
+                            {carouselIdx < media.length - 1 && (
+                                <button onClick={() => setCarouselIdx((i) => i + 1)} className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            )}
+                            <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                                {media.slice(0, 5).map((_, i) => (
+                                    <span key={i} className={`h-1.5 w-1.5 rounded-full ${i === carouselIdx ? "bg-primary" : "bg-white/50"}`} />
+                                ))}
+                                {media.length > 5 && <span className="text-[8px] text-white">+{media.length - 5}</span>}
+                            </div>
+                        </>
+                    )}
                 </div>
+            ) : (
+                <div className="aspect-square bg-muted flex items-center justify-center text-muted-foreground text-sm">Tambah media</div>
             )}
             <div className="p-3">
                 <p className="text-xs whitespace-pre-wrap line-clamp-4">{caption || "Caption akan muncul di sini..."}</p>

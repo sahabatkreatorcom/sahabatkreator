@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { ChevronLeft, ChevronRight, CalendarClock, ImagePlus, Bold, Italic, List, Hash, AtSign, Sparkles, Bookmark, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarClock, ImagePlus, Bold, Italic, List, Hash, AtSign, Sparkles, Bookmark, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { useComposeOrchestration } from "@/hooks/use-compose-orchestration";
-import { PLATFORM_COLORS, PLATFORM_LABELS, type Platform } from "@/lib/platform-config";
+import { PLATFORM_COLORS, PLATFORM_LABELS, type Platform, getCharacterLimit } from "@/lib/platform-config";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { mediaFileUrl } from "@/lib/media-file-url";
 import { CharacterRingRow } from "@/components/compose/character-ring";
-import { getCharacterLimit } from "@/lib/platform-config";
+import { AICaptionGenerator } from "@/components/compose/ai-caption-generator";
+import { MediaUploadModal } from "@/components/compose/media-upload-modal";
+import { TemplatePicker } from "@/components/compose/template-picker";
 
 interface ComposeMobileProps {
     orch: ReturnType<typeof useComposeOrchestration>;
@@ -120,38 +122,38 @@ export default function ComposeMobile({ orch }: ComposeMobileProps) {
                             rows={6}
                             className="w-full resize-none rounded-xl border border-input bg-card px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         />
+                        <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/30 px-1.5 py-1">
+                            <button onClick={() => insertText("**")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Bold">
+                                <Bold className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => insertText("_")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Italic">
+                                <Italic className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => insertText("\n- ")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="List">
+                                <List className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => insertText("#")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Hashtag">
+                                <Hash className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => insertText("@")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Mention">
+                                <AtSign className="h-4 w-4" />
+                            </button>
+                            <div className="mx-0.5 h-4 w-px bg-border" />
+                            <button onClick={() => compose.handleAIAssist()} className="rounded p-1 text-muted-foreground hover:bg-muted" title="AI Assist">
+                                <Sparkles className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => compose.handleAddMedia()} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Media">
+                                <ImagePlus className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => compose.handleOpenTemplates()} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Template">
+                                <Bookmark className="h-4 w-4" />
+                            </button>
+                        </div>
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/30 px-1.5 py-1">
-                                <button onClick={() => insertText("**")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Bold">
-                                    <Bold className="h-4 w-4" />
-                                </button>
-                                <button onClick={() => insertText("_")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Italic">
-                                    <Italic className="h-4 w-4" />
-                                </button>
-                                <button onClick={() => insertText("\n- ")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="List">
-                                    <List className="h-4 w-4" />
-                                </button>
-                                <button onClick={() => insertText("#")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Hashtag">
-                                    <Hash className="h-4 w-4" />
-                                </button>
-                                <button onClick={() => insertText("@")} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Mention">
-                                    <AtSign className="h-4 w-4" />
-                                </button>
-                                <div className="mx-0.5 h-4 w-px bg-border" />
-                                <button onClick={() => compose.handleAIAssist()} className="rounded p-1 text-muted-foreground hover:bg-muted" title="AI Assist">
-                                    <Sparkles className="h-4 w-4" />
-                                </button>
-                                <button onClick={compose.handleAddMedia} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Media">
-                                    <ImagePlus className="h-4 w-4" />
-                                </button>
-                                <button onClick={compose.handleOpenTemplates} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Template">
-                                    <Bookmark className="h-4 w-4" />
-                                </button>
-                            </div>
                             <CharacterRingRow platforms={uniquePlatforms} currentLength={charCount} />
                         </div>
                         <button
-                            onClick={compose.handleAddMedia}
+                            onClick={() => compose.handleAddMedia()}
                             className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-5 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/50"
                         >
                             <ImagePlus className="h-5 w-5" />
@@ -227,6 +229,33 @@ export default function ComposeMobile({ orch }: ComposeMobileProps) {
                     )}
                 </div>
             </footer>
+
+            {compose.isAIModalOpen && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="relative max-h-[85vh] w-[92vw] max-w-lg overflow-y-auto rounded-xl bg-background shadow-2xl">
+                        <button onClick={() => compose.setIsAIModalOpen(false)} className="absolute right-3 top-3 z-10 rounded-md bg-muted p-1 hover:bg-muted/80">
+                            <X className="h-4 w-4" />
+                        </button>
+                        <AICaptionGenerator
+                            onSelect={compose.handleAICaptionSelect}
+                            platform={compose.aiPlatform || "INSTAGRAM"}
+                            currentDraft={compose.caption}
+                        />
+                    </div>
+                </div>
+            )}
+
+            <MediaUploadModal
+                open={compose.isMediaModalOpen}
+                onClose={() => compose.setIsMediaModalOpen(false)}
+                onSelect={compose.handleMediaUpload}
+            />
+
+            <TemplatePicker
+                open={compose.isTemplatePickerOpen}
+                onClose={() => compose.setIsTemplatePickerOpen(false)}
+                onSelect={compose.handleTemplateSelect}
+            />
         </div>
     );
 }
