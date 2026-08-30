@@ -77,3 +77,13 @@
 3. Test "Jadwalkan" → modal muncul, pilih tanggal/waktu, post tersimpan SCHEDULED
 4. Test Pilar Konten → pilih/create pilar, post tersimpan dengan pillarId
 5. Test Koleksi Hashtag → pilih/create koleksi, hashtags masuk ke caption
+
+---
+
+## Commit History (Round 5)
+- `b293963` — feat: compose UX round 5 — publish fix, schedule modal, pillar & hashtag collections
+- `7e091af` — refactor: collapsible Pilar & Hashtag section di compose
+- `f71ebe5` — docs: update handoffs & changelog for collapsible section
+- `ffabd24` — fix: mobile footer layout — Terbitkan full-width di baris sendiri
+
+**Note**: Mobile footer diubah dari 3 tombol sejajar (`flex-1`) menjadi 2 baris — Draft & Jadwalkan di baris atas, Terbitkan full-width di baris bawah. Ini mencegah tombol "Terbitkan" terpotong di layar sempit.
