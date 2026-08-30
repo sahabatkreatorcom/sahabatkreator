@@ -59,6 +59,8 @@ export function useCompose(initialPostData?: unknown) {
     const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
     const [aiPlatform, setAiPlatform] = useState<Platform | null>(null);
+    const [pillarId, setPillarId] = useState<string | null>(null);
+    const [hashtagCollectionIds, setHashtagCollectionIds] = useState<string[]>([]);
 
     const [editPostStatus, setEditPostStatus] = useState<string | null>(null);
     const [editPostUpdatedAt, setEditPostUpdatedAt] = useState<Date | null>(null);
@@ -264,6 +266,12 @@ export function useCompose(initialPostData?: unknown) {
 
     const handleOpenScheduleModal = useCallback(() => setIsScheduleModalOpen(true), []);
 
+    const handleScheduleConfirm = useCallback((date: string, time: string) => {
+        setSelectedDate(new Date(date));
+        setScheduledTime(time);
+        setIsScheduleModalOpen(false);
+    }, []);
+
     const handleAIAssist = useCallback((platform?: Platform | null) => {
         setAiPlatform(platform || activeAccount?.platform || "INSTAGRAM");
         setIsAIModalOpen(true);
@@ -330,6 +338,7 @@ export function useCompose(initialPostData?: unknown) {
 
         handleAIAssist, handleAICaptionSelect, handleTemplateSelect,
         handleOpenTemplates,
+        handleScheduleConfirm,
         handleAddMedia: () => setIsMediaModalOpen(true),
         handleMediaUpload: (uploaded: Array<{ id: string; url: string; thumbnailUrl?: string; type: string; size: number }>) => {
             const items: ComposeMediaItem[] = uploaded
@@ -344,6 +353,9 @@ export function useCompose(initialPostData?: unknown) {
             if (items.length > 0) setMedia((prev) => [...prev, ...items]);
         },
         handleOpenScheduleModal, resetForm,
+
+        pillarId, setPillarId,
+        hashtagCollectionIds, setHashtagCollectionIds,
     };
 }
 

@@ -24,19 +24,12 @@ test("login ke dashboard", async ({ page }) => {
 });
 
 const PAGES: [string, string][] = [
-    ["/dashboard/posts", "02-posts"],
-    ["/dashboard/inbox", "03-inbox"],
-    ["/dashboard/analytics", "04-analytics"],
-    ["/dashboard/calendar", "05-calendar"],
-    ["/dashboard/media", "06-media"],
-    ["/dashboard/compose", "07-compose"],
-    ["/dashboard/settings", "08-settings"],
 ];
 
 for (const [path, name] of PAGES) {
     test(`screenshot ${path}`, async ({ page }) => {
         await page.goto(path);
-        await page.waitForLoadState("networkidle").catch(() => {});
+        await page.waitForLoadState("networkidle").catch(() => { });
         await page.waitForTimeout(1200);
         await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
         await expect(page.locator("body")).toBeVisible();

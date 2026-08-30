@@ -1,22 +1,22 @@
 import { NextRequest } from "next/server";
 import { withAuth, json } from "@/lib/api";
-import { listHashtagCollections, createHashtagCollection } from "@/lib/content-tools";
+import { listPillars, createPillar } from "@/lib/content-tools";
 
 export const dynamic = "force-dynamic";
 
 export const GET = withAuth(async (ctx) => {
     const { activeOrganizationId } = ctx;
     if (!activeOrganizationId) return json({ error: "Pilih workspace dulu." }, { status: 400 });
-    const collections = await listHashtagCollections(activeOrganizationId);
-    return json({ collections });
+    const pillars = await listPillars(activeOrganizationId);
+    return json({ pillars });
 });
 
 export const POST = withAuth(async (ctx, req: NextRequest) => {
     const { activeOrganizationId } = ctx;
     if (!activeOrganizationId) return json({ error: "Pilih workspace dulu." }, { status: 400 });
-    const body = (await req.json().catch(() => null)) as { name?: string; hashtags?: string[] } | null;
+    const body = (await req.json().catch(() => null)) as { name?: string; description?: string; color?: string; icon?: string } | null;
     if (!body) return json({ error: "Invalid JSON body." }, { status: 400 });
-    const result = await createHashtagCollection(activeOrganizationId, { name: body.name || "", hashtags: body.hashtags });
+    const result = await createPillar(activeOrganizationId, { name: body.name || "", description: body.description, color: body.color, icon: body.icon });
     if (result.error) return json({ error: result.error }, { status: result.status });
-    return json({ collection: result.collection }, { status: result.status });
+    return json({ pillar: result.pillar }, { status: result.status });
 });

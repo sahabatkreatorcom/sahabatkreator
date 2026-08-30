@@ -8,6 +8,7 @@ import { PlatformIcon } from "@/components/ui/platform-icon";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { PillarSelector, HashtagCollectionSelector } from "@/components/compose/content-pillar-selector";
 
 export interface PlatformSettings {
     postType: string;
@@ -69,6 +70,10 @@ interface CustomizationPanelProps {
     onFirstCommentChange?: (value: string) => void;
     selectedAccounts?: Array<{ id: string; platform: string }>;
     isCarouselMode?: boolean;
+    pillarId?: string | null;
+    onPillarChange?: (id: string | null) => void;
+    hashtagCollectionIds?: string[];
+    onHashtagCollectionChange?: (ids: string[]) => void;
 }
 
 function SettingSection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -115,6 +120,10 @@ export function CustomizationPanel({
     media,
     firstComment,
     onFirstCommentChange,
+    pillarId,
+    onPillarChange,
+    hashtagCollectionIds,
+    onHashtagCollectionChange,
 }: CustomizationPanelProps) {
     const s = settings[activePlatform] || getDefaultPlatformSettings(activePlatform);
     const set = useCallback((updates: Partial<PlatformSettings>) => onSettingsChange(activePlatform, updates), [activePlatform, onSettingsChange]);
@@ -135,6 +144,25 @@ export function CustomizationPanel({
                     </button>
                 ))}
             </div>
+
+            <SettingSection title="Pilar & Hashtag">
+                <div className="space-y-3">
+                    <div>
+                        <Label className="text-xs mb-1.5 block">Pilar Konten</Label>
+                        <PillarSelector
+                            value={pillarId}
+                            onChange={onPillarChange ?? (() => {})}
+                        />
+                    </div>
+                    <div>
+                        <Label className="text-xs mb-1.5 block">Koleksi Hashtag</Label>
+                        <HashtagCollectionSelector
+                            value={hashtagCollectionIds}
+                            onChange={onHashtagCollectionChange ?? (() => {})}
+                        />
+                    </div>
+                </div>
+            </SettingSection>
 
             <SettingSection title="Jenis Post">
                 <select

@@ -11,6 +11,8 @@ import { CharacterRingRow } from "@/components/compose/character-ring";
 import { AICaptionGenerator } from "@/components/compose/ai-caption-generator";
 import { MediaUploadModal } from "@/components/compose/media-upload-modal";
 import { TemplatePicker } from "@/components/compose/template-picker";
+import { ScheduleModal } from "@/components/compose/schedule-modal";
+import { PillarSelector, HashtagCollectionSelector } from "@/components/compose/content-pillar-selector";
 
 interface ComposeMobileProps {
     orch: ReturnType<typeof useComposeOrchestration>;
@@ -19,7 +21,7 @@ interface ComposeMobileProps {
 const STEPS = ["Akun", "Konten", "Preview"];
 
 export default function ComposeMobile({ orch }: ComposeMobileProps) {
-    const { compose, onSaveDraft, onScheduleConfirm } = orch;
+    const { compose, onSaveDraft, onPublishNow } = orch;
     const [step, setStep] = useState(0);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -178,6 +180,22 @@ export default function ComposeMobile({ orch }: ComposeMobileProps) {
                                 ))}
                             </div>
                         )}
+                        <div className="space-y-3 pt-2 border-t border-border">
+                            <div>
+                                <p className="text-xs font-medium text-muted-foreground mb-2">Pilar Konten</p>
+                                <PillarSelector
+                                    value={compose.pillarId}
+                                    onChange={compose.setPillarId}
+                                />
+                            </div>
+                            <div>
+                                <p className="text-xs font-medium text-muted-foreground mb-2">Koleksi Hashtag</p>
+                                <HashtagCollectionSelector
+                                    value={compose.hashtagCollectionIds}
+                                    onChange={compose.setHashtagCollectionIds}
+                                />
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -222,8 +240,11 @@ export default function ComposeMobile({ orch }: ComposeMobileProps) {
                             <Button variant="secondary" onClick={onSaveDraft} loading={compose.isSaving} className="flex-1">
                                 Draft
                             </Button>
-                            <Button onClick={onScheduleConfirm} loading={compose.isScheduling} className="flex-1">
-                                <CalendarClock className="mr-1 h-4 w-4" /> Terbitkan
+                            <Button variant="secondary" onClick={() => compose.handleOpenScheduleModal()} className="flex-1">
+                                Jadwalkan
+                            </Button>
+                            <Button onClick={onPublishNow} loading={compose.isPublishing} className="flex-1">
+                                Terbitkan
                             </Button>
                         </>
                     )}
@@ -255,6 +276,13 @@ export default function ComposeMobile({ orch }: ComposeMobileProps) {
                 open={compose.isTemplatePickerOpen}
                 onClose={() => compose.setIsTemplatePickerOpen(false)}
                 onSelect={compose.handleTemplateSelect}
+            />
+
+            <ScheduleModal
+                open={compose.isScheduleModalOpen}
+                onClose={() => compose.setIsScheduleModalOpen(false)}
+                onConfirm={compose.handleScheduleConfirm}
+                loading={compose.isScheduling}
             />
         </div>
     );

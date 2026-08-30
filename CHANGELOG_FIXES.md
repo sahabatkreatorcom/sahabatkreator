@@ -4,6 +4,38 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 
 ---
 
+### Fix #43 — Compose UX: Terbitkan tersimpan sebagai jadwal, ScheduleModal tidak ada, Pilar & Hashtag belum tersedia
+
+**Gejala:**
+1. Tombol "Terbitkan" di desktop dan mobile memanggil `onScheduleConfirm` (mengirim `scheduledAt` + `autoPublish: true`) → post tersimpan sebagai SCHEDULED bukan PUBLISHED.
+2. Tombol "Jadwalkan" membuka `handleOpenScheduleModal` yang set `isScheduleModalOpen = true`, tapi tidak ada ScheduleModal component yang dirender.
+3. Tidak ada pilihan Pilar Konten dan Koleksi Hashtag di compose (desktop maupun mobile), padahal DB sudah punya tabel `content_pillar` dan `hashtag_collection`.
+
+**Akar Masalah:**
+1. `compose-client.tsx` dan `compose-mobile.tsx` menggunakan `onScheduleConfirm` untuk tombol "Terbitkan" — seharusnya `onPublishNow`.
+2. Tidak ada komponen `ScheduleModal` — `handleOpenScheduleModal` hanya membuka state tanpa UI.
+3. API routes untuk content pillars dan hashtag collections belum ada, tidak ada komponen UI untuk memilihnya.
+
+**Fix:**
+1. **Desktop** (`compose-client.tsx`): Ubah tombol utama "Terbitkan" dari `onClick={onScheduleConfirm}` → `onClick={onPublishNow}`.
+2. **Mobile** (`compose-mobile.tsx`): Ubah tombol "Terbitkan" ke `onPublishNow`, tambah tombol "Jadwalkan" terpisah.
+3. **ScheduleModal**: Buat `src/components/compose/schedule-modal.tsx` dengan form tanggal + waktu. Tambah `handleScheduleConfirm(date, time)` di `use-compose.ts`.
+4. **API Routes**: Buat `POST/GET /api/content-pillars`, `PATCH/DELETE /api/content-pillars/[id]`, `POST/GET /api/hashtag-collections`, `PATCH/DELETE /api/hashtag-collections/[id]`.
+5. **UI Components**: Buat `src/components/compose/content-pillar-selector.tsx` dengan `PillarSelector` dan `HashtagCollectionSelector` (pill-style dengan create inline).
+6. **Compose Integration**: Tambah section "Pilar & Hashtag" di `CustomizationPanel` (desktop) dan step 1 (mobile). Kirim `pillarId` ke POST /api/posts di semua 3 handler (saveDraft, schedule, publishNow).
+
+| | |
+|---|---|
+| **File** | `apps/web/src/components/compose/schedule-modal.tsx` (baru), `apps/web/src/components/compose/content-pillar-selector.tsx` (baru), `apps/web/src/app/api/content-pillars/route.ts` (baru), `apps/web/src/app/api/content-pillars/[id]/route.ts` (baru), `apps/web/src/app/api/hashtag-collections/route.ts` (baru), `apps/web/src/app/api/hashtag-collections/[id]/route.ts` (baru), `apps/web/src/hooks/use-compose.ts` (+pillarId, hashtagCollectionIds, handleScheduleConfirm), `apps/web/src/hooks/use-compose-orchestration.ts` (pass pillarId), `apps/web/src/app/dashboard/compose/compose-client.tsx` (fix tombol, render modal), `apps/web/src/app/dashboard/compose/compose-mobile.tsx` (fix tombol, render modal, tambah selector), `apps/web/src/components/compose/customization-panel.tsx` (+section Pilar & Hashtag) |
+| **Masalah** | Terbitkan tersimpan jadwal; Jadwalkan tidak bisa; Pilar & Hashtag tidak ada |
+| **Akar** | Tombol salah handler; modal tidak dirender; API + UI belum dibuat |
+| **Fix** | Perbaiki handler tombol; buat ScheduleModal; buat API + UI pilar & hashtag |
+| **Verifikasi** | `pnpm --filter web exec tsc --noEmit` lolos. **PENDING verifikasi live** — terbitkan harus PUBLISHED, jadwalkan harus SCHEDULED, pilar & hashtag tersimpan di post. |
+| **Log Keyword** | compose, terbitkan, jadwal, schedule, modal, pillar, hashtag, collection |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
+---
+
 ### Fix #42 — Instagram Error 190 (token expired) + Facebook Error 100 (invalid parameter)
 
 **Gejala:**

@@ -11,6 +11,7 @@ import { PlatformPreview } from "@/components/compose/platform-previews";
 import { AICaptionGenerator } from "@/components/compose/ai-caption-generator";
 import { MediaUploadModal } from "@/components/compose/media-upload-modal";
 import { TemplatePicker } from "@/components/compose/template-picker";
+import { ScheduleModal } from "@/components/compose/schedule-modal";
 
 interface ComposeClientProps {
     orch: ReturnType<typeof useComposeOrchestration>;
@@ -146,6 +147,10 @@ export function ComposeClient({ orch }: ComposeClientProps) {
                                 onFirstCommentChange={compose.setFirstComment}
                                 selectedAccounts={compose.selectedAccounts}
                                 isCarouselMode={compose.isCarouselMode}
+                                pillarId={compose.pillarId}
+                                onPillarChange={compose.setPillarId}
+                                hashtagCollectionIds={compose.hashtagCollectionIds}
+                                onHashtagCollectionChange={compose.setHashtagCollectionIds}
                             />
                         </div>
                     )}
@@ -197,7 +202,7 @@ export function ComposeClient({ orch }: ComposeClientProps) {
                             <div className="relative">
                                 <div className="flex">
                                     <Button
-                                        onClick={onScheduleConfirm}
+                                        onClick={onPublishNow}
                                         disabled={compose.isSubmitting || hasValidationErrors || hasTranscodingMedia || (isPostPublishing && !isStuckPublishing)}
                                         className="rounded-r-none border-r border-white/20"
                                     >
@@ -303,6 +308,13 @@ export function ComposeClient({ orch }: ComposeClientProps) {
                     open={compose.isTemplatePickerOpen}
                     onClose={() => compose.setIsTemplatePickerOpen(false)}
                     onSelect={compose.handleTemplateSelect}
+                />
+
+                <ScheduleModal
+                    open={compose.isScheduleModalOpen}
+                    onClose={() => compose.setIsScheduleModalOpen(false)}
+                    onConfirm={compose.handleScheduleConfirm}
+                    loading={compose.isScheduling}
                 />
             </div>
         </div>

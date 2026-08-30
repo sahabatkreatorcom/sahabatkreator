@@ -112,6 +112,7 @@ export function useComposeOrchestration(initialPostData?: unknown) {
                     mediaIds: compose.media.map((m) => m.id),
                     scheduledAt: null,
                     autoPublish: false,
+                    pillarId: compose.pillarId || null,
                     platformSettings: compose.effectiveAccountSettings,
                 }),
             });
@@ -138,6 +139,7 @@ export function useComposeOrchestration(initialPostData?: unknown) {
                     mediaIds: compose.media.map((m) => m.id),
                     scheduledAt: new Date(`${compose.scheduledDate}T${compose.scheduledTime}`).toISOString(),
                     autoPublish: true,
+                    pillarId: compose.pillarId || null,
                     platformSettings: compose.effectiveAccountSettings,
                 }),
             });
@@ -165,6 +167,7 @@ export function useComposeOrchestration(initialPostData?: unknown) {
                     mediaIds: compose.media.map((m) => m.id),
                     scheduledAt: null,
                     autoPublish: true,
+                    pillarId: compose.pillarId || null,
                     platformSettings: compose.effectiveAccountSettings,
                 }),
             });
