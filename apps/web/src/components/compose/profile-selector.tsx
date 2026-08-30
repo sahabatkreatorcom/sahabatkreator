@@ -159,10 +159,19 @@ export function ProfileSelector({
                                                 className={cn("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors", isSelected ? "bg-primary/10" : "hover:bg-muted/50", isIncompatible && "opacity-40 cursor-not-allowed")}
                                             >
                                                 <div className="relative shrink-0">
-                                                    <span className="flex h-6 w-6 items-center justify-center rounded-full text-[8px] font-bold text-white" style={{ background: PLATFORM_COLORS[account.platform] }}>
-                                                        <PlatformIcon platform={account.platform} size={10} />
+                                                    {account.avatar ? (
+                                                        <img src={account.avatar} alt="" className="h-7 w-7 rounded-full object-cover ring-1 ring-background" />
+                                                    ) : (
+                                                        <span className="flex h-7 w-7 items-center justify-center rounded-full text-[8px] font-bold text-white" style={{ background: PLATFORM_COLORS[account.platform] }}>
+                                                            <PlatformIcon platform={account.platform} size={12} />
+                                                        </span>
+                                                    )}
+                                                    <span
+                                                        className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full ring-1 ring-background"
+                                                        style={{ background: PLATFORM_COLORS[account.platform] }}
+                                                    >
+                                                        <PlatformIcon platform={account.platform} size={7} />
                                                     </span>
-                                                    {account.avatar && <img src={account.avatar} alt="" className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border border-background object-cover" />}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="truncate text-[11px] font-medium">{account.name}</p>
