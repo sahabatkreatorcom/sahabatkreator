@@ -13,6 +13,7 @@ const isDev = process.env.NODE_ENV === "development";
 const nextConfig: NextConfig = {
   typedRoutes: true,
   reactCompiler: true,
+allowedDevOrigins: ['kreator.englishbooster.id'],
   poweredByHeader: false,
   output: "standalone",
   outputFileTracingRoot: workspaceRoot,

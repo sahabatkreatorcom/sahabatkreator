@@ -259,7 +259,7 @@ export default function CalendarPage() {
                             </button>
                         ))}
                     </div>
-                    <Button size="sm" onClick={() => setView("day")}>
+                    <Button size="sm" onClick={() => window.location.href = "/compose"}>
                         <Plus className="h-4 w-4" />
                         Post baru
                     </Button>

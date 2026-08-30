@@ -4,7 +4,6 @@ import {
     BarChart3,
     MessageSquare,
     Image as ImageIcon,
-    PenSquare,
     ListTodo,
     Users,
     Settings,
@@ -67,14 +66,6 @@ export const navItems: NavItem[] = [
         icon: CalendarDays,
         group: "content",
         mobileTab: true,
-    },
-    {
-        href: "/compose",
-        label: "Buat konten",
-        shortLabel: "Buat",
-        icon: PenSquare,
-        group: "content",
-        mobileTab: false,
     },
     {
         href: "/posts",

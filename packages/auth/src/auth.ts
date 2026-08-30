@@ -42,6 +42,57 @@ export const auth = betterAuth({
     },
   },
 
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          try {
+            const userName = user.name || "Workspace";
+            const slug = `${userName
+              .toLowerCase()
+              .trim()
+              .replace(/[^a-z0-9\s-]/g, "")
+              .replace(/\s+/g, "-")
+              .replace(/-+/g, "-")}-${Date.now().toString(36)}`;
+
+            await auth.api.createOrganization({
+              body: {
+                name: `${userName}'s Workspace`,
+                slug,
+                userId: user.id,
+              },
+            });
+          } catch (err) {
+            console.error("Failed to auto-create organization:", err);
+          }
+        },
+      },
+    },
+    session: {
+      create: {
+        before: async (session) => {
+          try {
+            const memberRow = await db.query.member.findFirst({
+              where: (t, { eq }) => eq(t.userId, session.userId),
+              columns: { organizationId: true },
+            });
+
+            if (memberRow) {
+              return {
+                data: {
+                  ...session,
+                  activeOrganizationId: memberRow.organizationId,
+                },
+              };
+            }
+          } catch (err) {
+            console.error("Failed to set active organization:", err);
+          }
+          return { data: session };
+        },
+      },
+    },
+  },
 
   plugins: [
     organization({
