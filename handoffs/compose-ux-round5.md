@@ -37,6 +37,21 @@
 - `content-pillar-selector.tsx`: onChange optional, pakai `onChange?.()` pattern
 - API routes: type safety untuk body parsing
 
+### 5. Collapsible Section Pilar & Hashtag
+**Perubahan UI/UX**: Section Pilar & Hashtag dibuat collapsible (bisa expand/collapse) di:
+- Desktop: CustomizationPanel — section dengan toggle chevron, default expanded
+- Mobile: Step 1 (bawah media grid) — section collapsible, default collapsed untuk hemat space
+
+| | |
+|---|---|
+| **File** | `apps/web/src/components/compose/customization-panel.tsx`, `apps/web/src/app/dashboard/compose/compose-mobile.tsx` |
+| **Masalah** | Section langsung terlihat semua waktu, memakan space |
+| **Akar** | UI tidak memberi opsi untuk collapse |
+| **Fix** | Tambah state `showPillarHashtag`, render conditional dengan chevron animation |
+| **Verifikasi** | `pnpm --filter web build` lolos. Perlu test live di VPS. |
+| **Log Keyword** | compose, pilar, hashtag, collapsible, section |
+| **Deploy** | PENDING — belum di-deploy di VPS |
+
 ---
 
 ## File baru

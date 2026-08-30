@@ -22,14 +22,14 @@ Riwayat perbaikan bug. Terbaru → terlama. Hanya entri yang sudah terverifikasi
 3. **ScheduleModal**: Buat `src/components/compose/schedule-modal.tsx` dengan form tanggal + waktu. Tambah `handleScheduleConfirm(date, time)` di `use-compose.ts`.
 4. **API Routes**: Buat `POST/GET /api/content-pillars`, `PATCH/DELETE /api/content-pillars/[id]`, `POST/GET /api/hashtag-collections`, `PATCH/DELETE /api/hashtag-collections/[id]`.
 5. **UI Components**: Buat `src/components/compose/content-pillar-selector.tsx` dengan `PillarSelector` dan `HashtagCollectionSelector` (pill-style dengan create inline).
-6. **Compose Integration**: Tambah section "Pilar & Hashtag" di `CustomizationPanel` (desktop) dan step 1 (mobile). Kirim `pillarId` ke POST /api/posts di semua 3 handler (saveDraft, schedule, publishNow).
+6. **Compose Integration**: Tambah section "Pilar & Hashtag" di `CustomizationPanel` (desktop) dan step 1 (mobile) — **collapsible** dengan toggle chevron. Kirim `pillarId` ke POST /api/posts di semua 3 handler (saveDraft, schedule, publishNow).
 
 | | |
 |---|---|
-| **File** | `apps/web/src/components/compose/schedule-modal.tsx` (baru), `apps/web/src/components/compose/content-pillar-selector.tsx` (baru), `apps/web/src/app/api/content-pillars/route.ts` (baru), `apps/web/src/app/api/content-pillars/[id]/route.ts` (baru), `apps/web/src/app/api/hashtag-collections/route.ts` (baru), `apps/web/src/app/api/hashtag-collections/[id]/route.ts` (baru), `apps/web/src/hooks/use-compose.ts` (+pillarId, hashtagCollectionIds, handleScheduleConfirm), `apps/web/src/hooks/use-compose-orchestration.ts` (pass pillarId), `apps/web/src/app/dashboard/compose/compose-client.tsx` (fix tombol, render modal), `apps/web/src/app/dashboard/compose/compose-mobile.tsx` (fix tombol, render modal, tambah selector), `apps/web/src/components/compose/customization-panel.tsx` (+section Pilar & Hashtag) |
+| **File** | `apps/web/src/components/compose/schedule-modal.tsx` (baru), `apps/web/src/components/compose/content-pillar-selector.tsx` (baru), `apps/web/src/app/api/content-pillars/route.ts` (baru), `apps/web/src/app/api/content-pillars/[id]/route.ts` (baru), `apps/web/src/app/api/hashtag-collections/route.ts` (baru), `apps/web/src/app/api/hashtag-collections/[id]/route.ts` (baru), `apps/web/src/hooks/use-compose.ts` (+pillarId, hashtagCollectionIds, handleScheduleConfirm), `apps/web/src/hooks/use-compose-orchestration.ts` (pass pillarId), `apps/web/src/app/dashboard/compose/compose-client.tsx` (fix tombol, render modal), `apps/web/src/app/dashboard/compose/compose-mobile.tsx` (fix tombol, render modal, tambah selector), `apps/web/src/components/compose/customization-panel.tsx` (+section Pilar & Hashtag collapsible) |
 | **Masalah** | Terbitkan tersimpan jadwal; Jadwalkan tidak bisa; Pilar & Hashtag tidak ada |
 | **Akar** | Tombol salah handler; modal tidak dirender; API + UI belum dibuat |
-| **Fix** | Perbaiki handler tombol; buat ScheduleModal; buat API + UI pilar & hashtag |
+| **Fix** | Perbaiki handler tombol; buat ScheduleModal; buat API + UI pilar & hashtag; collapsible section |
 | **Verifikasi** | `pnpm --filter web exec tsc --noEmit` lolos. **PENDING verifikasi live** — terbitkan harus PUBLISHED, jadwalkan harus SCHEDULED, pilar & hashtag tersimpan di post. |
 | **Log Keyword** | compose, terbitkan, jadwal, schedule, modal, pillar, hashtag, collection |
 | **Deploy** | PENDING — belum di-deploy di VPS |
