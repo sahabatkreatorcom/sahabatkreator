@@ -3,7 +3,7 @@
 // Auth: Basic (AccessKey:SecretKey), disimpan terenkripsi di tabel bridge_config.
 // Tier syarat: OAuth Connect APIs + Chat/Content = Gold+; Schedule = Premium+.
 
-import { httpRequest, throwFromResponse, type HttpResponse } from "./http";
+import { type HttpResponse, httpRequest, throwFromResponse } from "./http";
 import { PublishError } from "./types";
 
 const API_BASE = "https://api.repliz.com";
@@ -126,7 +126,12 @@ async function replizEmpty(
 export async function replizListAccounts(
   cred: ReplizCredentials,
   opts: { page?: number; limit?: number; type?: string; search?: string } = {},
-): Promise<{ docs: ReplizAccount[]; totalDocs: number; hasNextPage: boolean; nextPage: number | null }> {
+): Promise<{
+  docs: ReplizAccount[];
+  totalDocs: number;
+  hasNextPage: boolean;
+  nextPage: number | null;
+}> {
   return replizRequest(cred, "/public/account", {
     query: {
       page: String(opts.page ?? 1),
@@ -161,7 +166,11 @@ export async function replizAuthorizeUrl(
     query: { redirect },
   });
   if (!data?.url) {
-    throw new PublishError("repliz_no_authorize_url", "Repliz tidak mengembalikan URL authorize.", false);
+    throw new PublishError(
+      "repliz_no_authorize_url",
+      "Repliz tidak mengembalikan URL authorize.",
+      false,
+    );
   }
   return data.url;
 }
@@ -202,9 +211,13 @@ export async function replizGetYouTubeChannels(
   cred: ReplizCredentials,
   token: string,
 ): Promise<ReplizChannel[]> {
-  const data = await replizRequest<{ docs: ReplizChannel[] }>(cred, "/public/account/youtube/channel", {
-    query: { token },
-  });
+  const data = await replizRequest<{ docs: ReplizChannel[] }>(
+    cred,
+    "/public/account/youtube/channel",
+    {
+      query: { token },
+    },
+  );
   return data?.docs ?? [];
 }
 
@@ -293,7 +306,11 @@ export async function replizCreateSchedule(
   });
   const id = data?.id ?? data?._id;
   if (!id) {
-    throw new PublishError("repliz_no_schedule_id", "Repliz tidak mengembalikan schedule ID.", false);
+    throw new PublishError(
+      "repliz_no_schedule_id",
+      "Repliz tidak mengembalikan schedule ID.",
+      false,
+    );
   }
   return id;
 }
@@ -304,13 +321,17 @@ export async function replizGetSchedule(
   scheduleId: string,
   accountId: string,
 ): Promise<ReplizSchedule | null> {
-  const data = await replizRequest<{ docs: Array<Record<string, unknown>> }>(cred, "/public/schedule", {
-    query: {
-      page: "1",
-      limit: "50",
-      accountIds: accountId,
+  const data = await replizRequest<{ docs: Array<Record<string, unknown>> }>(
+    cred,
+    "/public/schedule",
+    {
+      query: {
+        page: "1",
+        limit: "50",
+        accountIds: accountId,
+      },
     },
-  });
+  );
   const match = (data?.docs ?? []).find((d) => d._id === scheduleId || d.id === scheduleId);
   if (!match) return null;
   return {

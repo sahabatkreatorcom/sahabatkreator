@@ -562,8 +562,7 @@ function AccountInfoModal({
 }) {
   const cfg = PLATFORMS[account.platform as keyof typeof PLATFORMS];
   const Icon = cfg?.icon;
-  const needsReconnection =
-    !account.isConnected || !!account.lastError || account.needsReconnect;
+  const needsReconnection = !account.isConnected || !!account.lastError || account.needsReconnect;
 
   const rows: Array<{ label: string; value: string }> = [
     { label: "Platform", value: cfg?.label ?? account.platform },
@@ -629,7 +628,7 @@ function AccountInfoModal({
           {rows.map((row) => (
             <div key={row.label} className="flex items-start justify-between gap-4 py-2.5">
               <dt className="text-[var(--text-secondary)] text-sm">{row.label}</dt>
-              <dd className="max-w-[60%] text-right text-sm break-words">{row.value}</dd>
+              <dd className="max-w-[60%] break-words text-right text-sm">{row.value}</dd>
             </div>
           ))}
         </dl>

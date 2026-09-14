@@ -78,14 +78,16 @@ export function VariationsPanel({
       .map((t) => t.replace(/^#/, "").trim())
       .filter(Boolean);
 
-  const withVariation =
-    selected.filter((a) => variations[a.id]?.trim() || hashtagVariations[a.id]?.trim());
+  const withVariation = selected.filter(
+    (a) => variations[a.id]?.trim() || hashtagVariations[a.id]?.trim(),
+  );
   const allUseBase = withVariation.length === 0;
 
   // Tab aktif default = akun terpilih pertama yang punya variasi, atau akun pertama
-  const currentTab = activeTab && selected.some((a) => a.id === activeTab)
-    ? activeTab
-    : (withVariation[0]?.id ?? selected[0]!.id);
+  const currentTab =
+    activeTab && selected.some((a) => a.id === activeTab)
+      ? activeTab
+      : (withVariation[0]?.id ?? selected[0]!.id);
   const activeAccount = selected.find((a) => a.id === currentTab)!;
   const activeCfg = PLATFORMS[activeAccount.platform as keyof typeof PLATFORMS];
   const activeValue = variations[activeAccount.id] ?? "";
@@ -99,7 +101,8 @@ export function VariationsPanel({
   const tagOverLimit =
     activeTagCount > 0 && activeHashtagLimit !== undefined && activeTagCount > activeHashtagLimit;
 
-  const hasAnyVariation = Object.values(variations).some((v) => v?.trim()) ||
+  const hasAnyVariation =
+    Object.values(variations).some((v) => v?.trim()) ||
     Object.values(hashtagVariations).some((v) => v?.trim());
 
   return (
@@ -154,8 +157,8 @@ export function VariationsPanel({
                   : "border-[var(--border)] hover:border-[var(--accent-gold)]"
               }`}
             >
-              {Icon && <Icon className="h-3.5 w-3.5" style={{ color: cfg.color }} />}
-              @{account.username}
+              {Icon && <Icon className="h-3.5 w-3.5" style={{ color: cfg.color }} />}@
+              {account.username}
               {isCustomTab && (
                 <span
                   className={cn(
@@ -201,7 +204,7 @@ export function VariationsPanel({
           className="text-sm"
         />
         {baseExceedsActive && !activeValue.trim() && baseContent.trim() && (
-          <p className="text-[11px] font-medium text-red-500">
+          <p className="font-medium text-[11px] text-red-500">
             Caption utama {baseContent.length} karakter melebihi batas{" "}
             {activeCfg?.label ?? activeAccount.platform} ({activeLimit}) — isi variasi untuk
             platform ini.
@@ -238,9 +241,9 @@ export function VariationsPanel({
             className="text-sm"
           />
           {tagOverLimit && (
-            <p className="text-[11px] font-medium text-red-500">
-              {activeTagCount} hashtag melebihi batas{" "}
-              {activeCfg?.label ?? activeAccount.platform} (maks {activeHashtagLimit}).
+            <p className="font-medium text-[11px] text-red-500">
+              {activeTagCount} hashtag melebihi batas {activeCfg?.label ?? activeAccount.platform}{" "}
+              (maks {activeHashtagLimit}).
             </p>
           )}
         </div>

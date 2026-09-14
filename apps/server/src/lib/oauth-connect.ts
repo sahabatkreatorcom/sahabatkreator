@@ -42,8 +42,7 @@ export function buildPendingPages(platform: "instagram" | "facebook", pages: Raw
     igUserId: p.instagram_business_account?.id ?? null,
     igUsername: p.instagram_business_account?.username ?? null,
     // Instagram: avatar profil IG; Facebook: foto Page
-    avatarUrl:
-      p.instagram_business_account?.profile_picture_url ?? p.picture?.data?.url ?? null,
+    avatarUrl: p.instagram_business_account?.profile_picture_url ?? p.picture?.data?.url ?? null,
   }));
   return {
     id: generateId("oauthpend"),

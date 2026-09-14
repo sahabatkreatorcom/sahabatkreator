@@ -218,8 +218,7 @@ const DOCS: Record<
   },
   "privacy-policy": {
     title: "Privacy Policy",
-    description:
-      "Sahabat Kreator Privacy Policy — how we collect, use, and protect your data.",
+    description: "Sahabat Kreator Privacy Policy — how we collect, use, and protect your data.",
     sections: [
       {
         heading: "1. Data We Collect",
@@ -285,8 +284,7 @@ const DOCS: Record<
   },
   "terms-of-service": {
     title: "Terms of Service",
-    description:
-      "Sahabat Kreator Terms of Service — terms governing your use of our platform.",
+    description: "Sahabat Kreator Terms of Service — terms governing your use of our platform.",
     sections: [
       {
         heading: "1. Acceptance of Terms",

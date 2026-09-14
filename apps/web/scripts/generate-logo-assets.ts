@@ -56,10 +56,7 @@ async function main() {
   // ---------- Icon persegi dari grafik ----------
   // bg tidak diisi → kanvas transparan (favicon & PWA any-purpose).
   // bg diisi → opaque (apple-touch-icon, maskable).
-  const iconFromMark = async (
-    size: number,
-    opts: { bg?: string; scale?: number } = {},
-  ) => {
+  const iconFromMark = async (size: number, opts: { bg?: string; scale?: number } = {}) => {
     const inner = Math.round(size * (opts.scale ?? 0.8));
     const pad = Math.round((size - inner) / 2);
     const mark = await markSquare(inner);
@@ -93,9 +90,7 @@ async function main() {
 
   // ---------- favicon.ico (multi-size 16/32/48, format PNG-in-ICO) ----------
   const sizes = [16, 32, 48];
-  const pngs = await Promise.all(
-    sizes.map(async (s) => (await iconFromMark(s)).toBuffer()),
-  );
+  const pngs = await Promise.all(sizes.map(async (s) => (await iconFromMark(s)).toBuffer()));
   let offset = 6 + sizes.length * 16;
   const entries: Buffer[] = [];
   for (let i = 0; i < sizes.length; i++) {

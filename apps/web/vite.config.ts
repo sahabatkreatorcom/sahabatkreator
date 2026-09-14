@@ -31,7 +31,7 @@ function stagingSeoGuardPlugin(): Plugin {
       // Override robots.txt → Disallow all
       writeFileSync(
         path.join(outDir, "robots.txt"),
-        `User-agent: *\nDisallow: /\n# STAGING — jangan index apapun\n`,
+        "User-agent: *\nDisallow: /\n# STAGING — jangan index apapun\n",
       );
       // Hapus sitemap statis biar tidak terbaca crawler
       const smFile = path.join(outDir, "sitemap.xml");

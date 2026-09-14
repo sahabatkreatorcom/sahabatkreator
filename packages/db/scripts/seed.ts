@@ -5,13 +5,7 @@ import { resolve } from "node:path";
 import { config } from "dotenv";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import {
-  blogCategory,
-  blogPost,
-  blogPostTag,
-  plan,
-  platformSettings,
-} from "../src/schema";
+import { blogCategory, blogPost, blogPostTag, plan, platformSettings } from "../src/schema";
 
 config({ path: resolve(process.cwd(), "../../.env") });
 
