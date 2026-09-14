@@ -42,6 +42,7 @@ const PLATFORM_WEB_URLS: Record<string, string> = {
   linkedin: "https://www.linkedin.com/feed/",
   pinterest: "https://www.pinterest.com/",
   threads: "https://www.threads.net/",
+  bluesky: "https://bsky.app/intent/compose",
   gmb: "https://business.google.com/",
   whatsapp: "https://web.whatsapp.com/",
   manual: "",

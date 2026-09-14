@@ -100,7 +100,13 @@ async function publishBluesky(input: PublishInput): Promise<PublishResult> {
   if (!res.ok) await throwFromResponse(res, "Bluesky createRecord");
   const data = await res.json();
   if (!data.uri) throw new PublishError("bluesky_no_uri", "Bluesky tidak mengembalikan URI", true);
-  return { status: "published", platformPostId: data.uri };
+  // Web URL: at://did:plc:xxx/app.bsky.feed.post/rkey → bsky.app/profile/{did}/post/{rkey}
+  const rkey = data.uri.split("/").pop();
+  return {
+    status: "published",
+    platformPostId: data.uri,
+    platformPostUrl: rkey ? `https://bsky.app/profile/${did}/post/${rkey}` : null,
+  };
 }
 
 export const blueskyAdapter: PlatformAdapter = {
