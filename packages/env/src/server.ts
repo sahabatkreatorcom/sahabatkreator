@@ -50,6 +50,10 @@ export const env = createEnv({
     THREADS_APP_SECRET: z.string().optional(),
     TIKTOK_CLIENT_KEY: z.string().optional(),
     TIKTOK_CLIENT_SECRET: z.string().optional(),
+    // Scope TikTok ekstra (mis. "comment.list,comment.list.manage" utk inbox).
+    // Comment API adalah product terpisah — scope-nya DILUAR default karena app
+    // yang belum di-approve akan menolak authorize ("scope" error di halaman login).
+    TIKTOK_EXTRA_SCOPES: z.string().optional(),
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     PINTEREST_APP_ID: z.string().optional(),

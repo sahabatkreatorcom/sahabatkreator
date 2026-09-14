@@ -98,10 +98,13 @@ async function getAppCredential(platform: OAuthPlatform): Promise<AppCredential>
     );
   }
 
-  // Extra scopes dari env (LinkedIn: org admin scopes setelah product approved)
+  // Extra scopes dari env (LinkedIn/TikTok: scope product terpisah, setelah approved)
   const extra: Record<string, string> = {};
   if (platform === "linkedin" && env.LINKEDIN_EXTRA_SCOPES) {
     extra.extraScopes = env.LINKEDIN_EXTRA_SCOPES;
+  }
+  if (platform === "tiktok" && env.TIKTOK_EXTRA_SCOPES) {
+    extra.extraScopes = env.TIKTOK_EXTRA_SCOPES;
   }
 
   return {

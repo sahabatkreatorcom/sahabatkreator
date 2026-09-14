@@ -133,8 +133,9 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
       "video.upload",
       "video.publish",
       "video.list", // list video utk sync komentar
-      "comment.list", // baca komentar utk inbox
-      "comment.list.manage", // reply/hide komentar
+      // comment.list / comment.list.manage (inbox) — BUKAN scope default:
+      // Comment API adalah product terpisah; app belum di-approve menolak authorize
+      // dengan error "scope". Tambahkan via TIKTOK_EXTRA_SCOPES setelah approval.
     ],
   },
   // YouTube & GBP share Google OAuth (client sama, scope beda)
@@ -368,6 +369,25 @@ export async function refreshAccessToken(
 // Profil fetch per platform — untuk upsert social_account
 // ---------------------------------------------------------------------------
 
+/**
+ * Identitas user access token Meta — untuk pesan error saat /me/accounts kosong.
+ * Best-effort: gagal fetch → string kosong (jangan gagalkan error utama).
+ */
+async function metaWhoAmI(accessToken: string): Promise<string> {
+  try {
+    const meRes = await httpRequest<{ name?: string; email?: string }>(
+      `https://graph.facebook.com/${GRAPH_VERSION}/me`,
+      { query: { access_token: accessToken, fields: "name,email" } },
+    );
+    if (!meRes.ok) return "";
+    const me = await meRes.json();
+    if (!me.name) return "";
+    return ` (login sebagai "${me.name}"${me.email ? ` / ${me.email}` : ""})`;
+  } catch {
+    return "";
+  }
+}
+
 export async function fetchPlatformProfile(
   platform: OAuthPlatform,
   token: TokenResult,
@@ -399,7 +419,7 @@ export async function fetchPlatformProfile(
       if (pages.length === 0) {
         throw new PublishError(
           "oauth_no_page",
-          "Akun Facebook ini tidak mengelola Page apa pun. Pastikan akun yang dipilih saat login benar (cek facebook.com/pages), dan untuk aplikasi mode development, hanya pengguna dengan role di aplikasi yang Page-nya terlihat.",
+          `Akun Facebook ini tidak mengelola Page apa pun${await metaWhoAmI(at)}. Pastikan akun yang dipilih saat login benar (cek facebook.com/pages), dan untuk aplikasi mode development, hanya pengguna dengan role di aplikasi yang Page-nya terlihat.`,
           false,
         );
       }
@@ -454,8 +474,15 @@ export async function fetchPlatformProfile(
           false,
         );
       const pages = (await res.json()).data ?? [];
-      if (pages.length === 0)
-        throw new PublishError("oauth_no_page", "Tidak ada Page Facebook yang dikelola", false);
+      if (pages.length === 0) {
+        // Penyebab terumum /me/accounts kosong: salah pilih akun di account
+        // chooser, atau Page tak terlihat app di mode development.
+        throw new PublishError(
+          "oauth_no_page",
+          `Tidak ada Page Facebook yang dikelola akun ini${await metaWhoAmI(at)}. Pastikan akun yang dipilih saat login memiliki role di Page (cek facebook.com/pages), dan di aplikasi mode development, hanya pengguna dengan role di aplikasi yang Page-nya terlihat.`,
+          false,
+        );
+      }
       const page = pages[0]!;
       return {
         platformAccountId: page.id,
