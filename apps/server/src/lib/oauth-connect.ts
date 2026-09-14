@@ -15,7 +15,12 @@ export type RawMetaPage = {
   id: string;
   name: string;
   access_token: string;
-  instagram_business_account?: { id: string; username?: string };
+  picture?: { data?: { url?: string } };
+  instagram_business_account?: {
+    id: string;
+    username?: string;
+    profile_picture_url?: string;
+  };
 };
 
 /** Company LinkedIn tempat user ADMIN (dari fetchPlatformProfile extra.organizations) */
@@ -36,6 +41,9 @@ export function buildPendingPages(platform: "instagram" | "facebook", pages: Raw
     pageAccessTokenEnc: encrypt(p.access_token),
     igUserId: p.instagram_business_account?.id ?? null,
     igUsername: p.instagram_business_account?.username ?? null,
+    // Instagram: avatar profil IG; Facebook: foto Page
+    avatarUrl:
+      p.instagram_business_account?.profile_picture_url ?? p.picture?.data?.url ?? null,
   }));
   return {
     id: generateId("oauthpend"),
@@ -209,6 +217,7 @@ export async function upsertSocialAccount(params: {
       .set({
         username,
         displayName: page.pageName,
+        avatarUrl: page.avatarUrl ?? null,
         accessTokenEnc,
         ...(refreshTokenEnc ? { refreshTokenEnc } : {}),
         tokenExpiresAt: effectiveExpiresAt,
@@ -231,6 +240,7 @@ export async function upsertSocialAccount(params: {
     platformAccountId,
     username,
     displayName: page.pageName,
+    avatarUrl: page.avatarUrl ?? null,
     accessTokenEnc,
     refreshTokenEnc,
     tokenExpiresAt: effectiveExpiresAt,

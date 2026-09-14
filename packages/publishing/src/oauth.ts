@@ -407,12 +407,18 @@ export async function fetchPlatformProfile(
           id: string;
           name: string;
           access_token: string;
-          instagram_business_account?: { id: string; username?: string };
+          picture?: { data?: { url?: string } };
+          instagram_business_account?: {
+            id: string;
+            username?: string;
+            profile_picture_url?: string;
+          };
         }>;
       }>(`https://graph.facebook.com/${GRAPH_VERSION}/me/accounts`, {
         query: {
           access_token: at,
-          fields: "id,name,access_token,instagram_business_account{id,username}",
+          fields:
+            "id,name,access_token,picture{url},instagram_business_account{id,username,profile_picture_url}",
         },
       });
       if (!res.ok)
@@ -443,6 +449,7 @@ export async function fetchPlatformProfile(
         platformAccountId: igba.id,
         username: igba.username ?? page.name,
         displayName: page.name,
+        avatarUrl: igba.profile_picture_url ?? page.picture?.data?.url ?? null,
         extra: {
           pageId: page.id,
           pageAccessToken: page.access_token,
@@ -452,6 +459,7 @@ export async function fetchPlatformProfile(
             id: p.id,
             name: p.name,
             access_token: p.access_token,
+            picture: p.picture,
             instagram_business_account: p.instagram_business_account,
           })),
         },
@@ -463,22 +471,32 @@ export async function fetchPlatformProfile(
         id?: string;
         username?: string;
         account_type?: string;
+        profile_picture_url?: string;
       }>(`https://graph.instagram.com/${GRAPH_VERSION}/me`, {
-        query: { fields: "id,username,account_type", access_token: at },
+        query: { fields: "id,username,account_type,profile_picture_url", access_token: at },
       });
       if (!res.ok)
         throw new PublishError("oauth_profile_failed", "Gagal mengambil profil Instagram", false);
       const me = await res.json();
       if (!me.id)
         throw new PublishError("oauth_no_profile", "Profil IG tidak mengembalikan ID", false);
-      return { platformAccountId: me.id, username: me.username ?? me.id };
+      return {
+        platformAccountId: me.id,
+        username: me.username ?? me.id,
+        avatarUrl: me.profile_picture_url ?? null,
+      };
     }
 
     case "facebook": {
       const res = await httpRequest<{
-        data?: Array<{ id: string; name: string; access_token: string }>;
+        data?: Array<{
+          id: string;
+          name: string;
+          access_token: string;
+          picture?: { data?: { url?: string } };
+        }>;
       }>(`https://graph.facebook.com/${GRAPH_VERSION}/me/accounts`, {
-        query: { access_token: at, fields: "id,name,access_token" },
+        query: { access_token: at, fields: "id,name,access_token,picture{url}" },
       });
       if (!res.ok)
         throw new PublishError(
@@ -501,25 +519,38 @@ export async function fetchPlatformProfile(
         platformAccountId: page.id,
         username: page.name,
         displayName: page.name,
+        avatarUrl: page.picture?.data?.url ?? null,
         extra: {
           pageAccessToken: page.access_token,
           // access_token WAJIB ikut — dipakai buildPendingPages (multi-Page)
-          pages: pages.map((p) => ({ id: p.id, name: p.name, access_token: p.access_token })),
+          pages: pages.map((p) => ({
+            id: p.id,
+            name: p.name,
+            access_token: p.access_token,
+            picture: p.picture,
+          })),
         },
       };
     }
 
     case "threads": {
-      const res = await httpRequest<{ id?: string; username?: string }>(
-        "https://graph.threads.net/v1.0/me",
-        { query: { fields: "id,username", access_token: at } },
-      );
+      const res = await httpRequest<{
+        id?: string;
+        username?: string;
+        threads_profile_picture_url?: string;
+      }>("https://graph.threads.net/v1.0/me", {
+        query: { fields: "id,username,threads_profile_picture_url", access_token: at },
+      });
       if (!res.ok)
         throw new PublishError("oauth_profile_failed", "Gagal mengambil profil Threads", false);
       const me = await res.json();
       if (!me.id)
         throw new PublishError("oauth_no_profile", "Profil Threads tidak mengembalikan ID", false);
-      return { platformAccountId: me.id, username: me.username ?? me.id };
+      return {
+        platformAccountId: me.id,
+        username: me.username ?? me.id,
+        avatarUrl: me.threads_profile_picture_url ?? null,
+      };
     }
 
     case "tiktok": {

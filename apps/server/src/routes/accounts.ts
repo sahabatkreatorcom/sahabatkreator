@@ -120,6 +120,7 @@ accountsRoute.get("/pending/:id", async (c) => {
         pageName: p.pageName,
         hasInstagram: Boolean(p.igUserId),
         igUsername: p.igUsername,
+        avatarUrl: p.avatarUrl ?? null,
         // LinkedIn: profil pribadi vs company (deteksi dari prefix URN)
         isPersonal: row.platform === "linkedin" && p.pageId.startsWith("urn:li:person:"),
       })),

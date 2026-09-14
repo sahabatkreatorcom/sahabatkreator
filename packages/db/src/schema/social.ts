@@ -21,6 +21,8 @@ export type PendingPageData = {
   igUserId: string | null;
   /** Username IG bisnis / username Pinterest (null bila tidak ada) */
   igUsername: string | null;
+  /** Avatar entitas — profil IG (jalur instagram) atau foto Page (null bila tidak ada) */
+  avatarUrl?: string | null;
   /** LinkedIn saja: refresh token user-level (terenkripsi) */
   refreshTokenEnc?: string | null;
   /** LinkedIn saja: expiry token user-level (ISO string) */
