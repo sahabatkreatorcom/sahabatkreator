@@ -30,7 +30,9 @@ export async function enqueuePublish(
   const delay =
     scheduledAt && scheduledAt.getTime() > Date.now() ? scheduledAt.getTime() - Date.now() : 0;
   const job = await queue.add("publish", { type: "publish", postId, platform } satisfies JobData, {
-    jobId: `publish:${postId}`, // idempotent — duplikat enqueue di-dedupe BullMQ
+    // Idempotent — duplikat enqueue di-dedupe BullMQ. NOTE: jobId tidak boleh
+    // mengandung ":" (reserved untuk flow BullMQ, harus tepat 3 segmen) — pakai "-".
+    jobId: `publish-${postId}`,
     delay,
   });
   return job.id ?? null;
@@ -45,7 +47,7 @@ export async function enqueuePoll(
   const queue = getPublishQueue(platform);
   if (!queue) return null;
   const job = await queue.add("poll", { type: "poll", postId, platform } satisfies JobData, {
-    jobId: `poll:${postId}`,
+    jobId: `poll-${postId}`,
     delay: firstPollDelayMs,
   });
   return job.id ?? null;
@@ -55,7 +57,7 @@ export async function enqueuePoll(
 export async function cancelPublishJob(postId: string, platform: string): Promise<void> {
   const queue = getPublishQueue(platform);
   if (!queue) return;
-  const job = await queue.getJob(`publish:${postId}`);
+  const job = await queue.getJob(`publish-${postId}`);
   await job?.remove().catch(() => undefined);
 }
 
@@ -105,7 +107,7 @@ export function createPublishWorker(platform: string): Worker<JobData> | null {
           "poll",
           { type: "poll", postId: data.postId, platform: data.platform } satisfies JobData,
           {
-            jobId: `poll:${data.postId}:${Date.now()}`, // jobId unik tiap round
+            jobId: `poll-${data.postId}-${Date.now()}`, // jobId unik tiap round
             delay: nextDelay,
           },
         );

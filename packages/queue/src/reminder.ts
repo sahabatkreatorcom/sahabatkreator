@@ -124,7 +124,7 @@ export async function enqueuePostReminder(
       scheduledAt: scheduledAt.toISOString(),
       content,
     } satisfies ReminderJobData,
-    { jobId: `reminder:${postGroupId}`, delay },
+    { jobId: `reminder-${postGroupId}`, delay },
   );
   await queue.close();
   return true;
@@ -138,7 +138,7 @@ export async function cancelPostReminder(postGroupId: string): Promise<void> {
   if (!conn) return;
   const { Queue } = await import("bullmq");
   const queue = new Queue<ReminderJobData>(REMINDER_QUEUE_NAME, { connection: conn });
-  const job = await queue.getJob(`reminder:${postGroupId}`);
+  const job = await queue.getJob(`reminder-${postGroupId}`);
   await job?.remove().catch(() => undefined);
   await queue.close();
 }
