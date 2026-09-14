@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { DayView } from "@/components/calendar/day-view";
 import { ManualReminderPanel } from "@/components/calendar/manual-reminder-panel";
 import { MonthView } from "@/components/calendar/month-view";
+import { PostDetailModal } from "@/components/calendar/post-detail-modal";
 import {
   type CalendarNote,
   type CalendarPostGroup,
@@ -68,6 +69,8 @@ export function CalendarPage() {
   const [cursor, setCursor] = useState(() => new Date());
   const [noteModal, setNoteModal] = useState<NoteModalState>(null);
   const [conflictModalOpen, setConflictModalOpen] = useState(false);
+  // Post group terpilih untuk modal detail (klik kartu post di grid)
+  const [selectedGroup, setSelectedGroup] = useState<CalendarPostGroup | null>(null);
 
   // Rentang fetch: sekitar view aktif (bulatkan ke grid bulanan agar semua view tercover)
   const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -225,6 +228,10 @@ export function CalendarPage() {
     notesByDate,
     todayKey,
     conflictedGroupIds,
+    onSelectPost: (groupId: string) => {
+      const group = (postsData?.groups ?? []).find((g) => g.id === groupId);
+      if (group) setSelectedGroup(group);
+    },
     onAddNote: (dateKey: string) =>
       setNoteModal({ date: dateKey, title: "", content: "", color: NOTE_COLORS[0]!.value }),
     onEditNote: (note: CalendarNote) =>
@@ -356,6 +363,9 @@ export function CalendarPage() {
           <CalendarDays className="h-3 w-3" /> Geser kartu ke tanggal/jam lain untuk reschedule
         </span>
       </div>
+
+      {/* Modal detail post (klik kartu post) */}
+      <PostDetailModal group={selectedGroup} onClose={() => setSelectedGroup(null)} />
 
       {/* Modal catatan */}
       {noteModal && (

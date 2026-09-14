@@ -1,5 +1,6 @@
 // Chip konten eksternal — dipublikasikan langsung di platform (bukan via SK).
-// Non-draggable (tidak bisa dijadwalkan ulang); klik membuka post asli di platform.
+// Non-draggable (tidak bisa dijadwalkan ulang); klik membuka modal detail,
+// link ke post asli tersedia dari modal.
 import { ExternalLink } from "lucide-react";
 import { PLATFORMS } from "@/lib/platforms";
 import { type CalendarPostGroup, formatTimeId } from "./shared";
@@ -10,9 +11,16 @@ type ExternalPostChipProps = {
   showTime?: boolean;
   /** Ukuran ringkas (untuk week view) */
   size?: "sm" | "xs";
+  /** Klik chip → buka modal detail (jika tidak ada, chip jadi link ke platform) */
+  onSelect?: (groupId: string) => void;
 };
 
-export function ExternalPostChip({ group, showTime = false, size = "sm" }: ExternalPostChipProps) {
+export function ExternalPostChip({
+  group,
+  showTime = false,
+  size = "sm",
+  onSelect,
+}: ExternalPostChipProps) {
   const post = group.posts[0];
   const cfg = post ? PLATFORMS[post.platform as keyof typeof PLATFORMS] : undefined;
   const Icon = cfg?.icon;
@@ -38,6 +46,21 @@ export function ExternalPostChip({ group, showTime = false, size = "sm" }: Exter
   );
 
   const title = group.content || "(konten platform)";
+
+  // Dengan onSelect: klik → modal detail (post eksternal = virtual group dengan
+  // id post, endpoint landing tetap valid). Tanpa onSelect: fallback link lama.
+  if (onSelect) {
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect(group.id)}
+        title={title}
+        className={`${containerCls} w-full text-left hover:bg-[var(--bg-primary)]`}
+      >
+        {inner}
+      </button>
+    );
+  }
 
   return url ? (
     <a

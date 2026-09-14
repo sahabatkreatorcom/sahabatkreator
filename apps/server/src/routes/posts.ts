@@ -859,8 +859,12 @@ postsRoute.get("/:id/landing", async (c) => {
         errorCode: post.errorCode,
         errorMessage: post.errorMessage,
         publishedAt: post.publishedAt,
+        username: socialAccount.username,
+        displayName: socialAccount.displayName,
+        avatarUrl: socialAccount.avatarUrl,
       })
       .from(post)
+      .innerJoin(socialAccount, eq(post.socialAccountId, socialAccount.id))
       .where(eq(post.postGroupId, group.id));
 
     const medias = await db
@@ -868,6 +872,7 @@ postsRoute.get("/:id/landing", async (c) => {
         name: mediaTable.name,
         type: mediaTable.type,
         url: mediaTable.url,
+        thumbnailUrl: mediaTable.thumbnailUrl,
         mimeType: mediaTable.mimeType,
       })
       .from(postMedia)
