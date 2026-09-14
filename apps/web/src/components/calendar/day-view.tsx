@@ -18,6 +18,8 @@ type DayViewProps = {
   onAddNote: (dateKey: string) => void;
   onEditNote: (note: CalendarNote) => void;
   onReschedule: (groupId: string, dateKey: string, hour: number) => void;
+  /** Klik kartu post → buka modal detail */
+  onSelectPost: (groupId: string) => void;
 };
 
 export function DayView({
@@ -29,6 +31,7 @@ export function DayView({
   onAddNote,
   onEditNote,
   onReschedule,
+  onSelectPost,
 }: DayViewProps) {
   const dayPosts = postsByDate.get(dateKey) ?? [];
   const dayNotes = notesByDate.get(dateKey) ?? [];
@@ -104,14 +107,21 @@ export function DayView({
                     >
                       {withDragIndexes(hourPosts).map(({ g, dragIndex }) =>
                         dragIndex === null ? (
-                          <ExternalPostChip key={g.id} group={g} showTime />
+                          <ExternalPostChip key={g.id} group={g} showTime onSelect={onSelectPost} />
                         ) : (
                           <Draggable key={g.id} draggableId={`post:${g.id}`} index={dragIndex}>
                             {(dragProvided, dragSnapshot) => (
+                              // biome-ignore lint/a11y/useSemanticElements: drag handle dnd — <button> diblokir lib drag
                               <div
                                 ref={dragProvided.innerRef}
                                 {...dragProvided.draggableProps}
                                 {...dragProvided.dragHandleProps}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => onSelectPost(g.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") onSelectPost(g.id);
+                                }}
                                 title={g.content || "(tanpa caption)"}
                                 className={`flex items-center gap-2 rounded bg-[var(--accent-gold-light)] px-2 py-1.5 text-[var(--text-primary)] text-xs ${
                                   dragSnapshot.isDragging

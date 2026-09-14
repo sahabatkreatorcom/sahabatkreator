@@ -26,6 +26,8 @@ type WeekViewProps = {
   onAddNote: (dateKey: string) => void;
   onEditNote: (note: CalendarNote) => void;
   onReschedule: (groupId: string, dateKey: string, hour: number) => void;
+  /** Klik kartu post → buka modal detail */
+  onSelectPost: (groupId: string) => void;
 };
 
 export function WeekView({
@@ -37,6 +39,7 @@ export function WeekView({
   onAddNote,
   onEditNote,
   onReschedule,
+  onSelectPost,
 }: WeekViewProps) {
   const weekStart = startOfWeek(cursor);
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -107,8 +110,9 @@ export function WeekView({
                 <button
                   type="button"
                   onClick={() => onAddNote(key)}
-                  className="hidden rounded p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] group-hover:block"
+                  className="rounded p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)]"
                   aria-label="Tambah catatan"
+                  title="Tambah catatan"
                 >
                   <StickyNote className="h-3 w-3" />
                 </button>
@@ -148,14 +152,26 @@ export function WeekView({
                       >
                         {withDragIndexes(hourPosts).map(({ g, dragIndex }) =>
                           dragIndex === null ? (
-                            <ExternalPostChip key={g.id} group={g} size="xs" />
+                            <ExternalPostChip
+                              key={g.id}
+                              group={g}
+                              size="xs"
+                              onSelect={onSelectPost}
+                            />
                           ) : (
                             <Draggable key={g.id} draggableId={`post:${g.id}`} index={dragIndex}>
                               {(dragProvided, dragSnapshot) => (
+                                // biome-ignore lint/a11y/useSemanticElements: drag handle dnd — <button> diblokir lib drag
                                 <div
                                   ref={dragProvided.innerRef}
                                   {...dragProvided.draggableProps}
                                   {...dragProvided.dragHandleProps}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => onSelectPost(g.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") onSelectPost(g.id);
+                                  }}
                                   title={g.content || "(tanpa caption)"}
                                   className={`mb-0.5 flex items-center gap-1 rounded bg-[var(--accent-gold-light)] px-1 py-0.5 text-[10px] text-[var(--text-primary)] ${
                                     dragSnapshot.isDragging
