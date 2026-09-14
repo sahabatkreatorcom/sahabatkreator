@@ -118,6 +118,10 @@ export default defineConfig({
         share_target: {
           action: "/compose",
           method: "GET",
+          // enctype wajib eksplisit untuk menghilangkan warning parser manifest
+          // Chrome ("Manifest: Enctype should be set to either..."); untuk GET
+          // nilainya diabaikan, jadi aman.
+          enctype: "application/x-www-form-urlencoded",
           params: { title: "title", text: "text", url: "url" },
         },
         // "Buka dengan Sahabat Kreator" dari file manager (PWA ter-install) —
