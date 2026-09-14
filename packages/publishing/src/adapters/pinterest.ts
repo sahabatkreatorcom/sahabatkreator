@@ -24,6 +24,13 @@ async function publishPinterest(input: PublishInput): Promise<PublishResult> {
 
   const image = input.media.find((m) => m.type === "image");
   const video = input.media.find((m) => m.type === "video");
+  if (image && video) {
+    throw new PublishError(
+      "pinterest_mixed_media",
+      "Pinterest hanya mendukung 1 gambar ATAU 1 video per pin — pisahkan videonya.",
+      false,
+    );
+  }
 
   const headers = {
     Authorization: `Bearer ${input.accessToken}`,
@@ -113,7 +120,7 @@ async function checkPinterestStatus(input: {
   content: string;
   hashtags: string[];
   platformSettings: Record<string, unknown>;
-  coverImageUrl?: string;
+  media?: { url: string; type: string; thumbnailUrl?: string | null }[];
 }): Promise<
   | { status: "processing" }
   | { status: "published"; platformPostId: string }
@@ -131,12 +138,14 @@ async function checkPinterestStatus(input: {
   const { status } = await res.json();
 
   if (status === "succeeded") {
-    // Media siap → create pin dengan video_id (cover_image_url WAJIB — riset)
+    // Media siap → create pin dengan video_id (cover_image_url WAJIB — riset).
+    // Fallback: thumbnail video otomatis (generate client-side saat upload).
     const cover =
-      input.coverImageUrl ??
       (typeof input.platformSettings.coverImageUrl === "string"
         ? input.platformSettings.coverImageUrl
-        : undefined);
+        : undefined) ??
+      input.media?.find((m) => m.type === "video")?.thumbnailUrl ??
+      undefined;
     if (!cover) {
       return {
         status: "failed",
@@ -178,15 +187,23 @@ async function checkPinterestStatus(input: {
 export const pinterestAdapter: PlatformAdapter = {
   platform: "pinterest",
   publish: publishPinterest,
-  async checkStatus({ accessToken, platformAccountId, handle }) {
-    // checkStatus ringkas — konten diambil pipeline dari DB
+  async checkStatus({
+    accessToken,
+    platformAccountId,
+    handle,
+    content,
+    hashtags,
+    platformSettings,
+    media,
+  }) {
     const r = await checkPinterestStatus({
       accessToken,
       platformAccountId,
       handle,
-      content: "",
-      hashtags: [],
-      platformSettings: {},
+      content: content ?? "",
+      hashtags: hashtags ?? [],
+      platformSettings: platformSettings ?? {},
+      media,
     });
     if (r.status === "published") return { status: "published", platformPostId: r.platformPostId };
     if (r.status === "failed")

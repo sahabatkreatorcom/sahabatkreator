@@ -48,6 +48,13 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
         false,
       );
     }
+    if (photos.length > 0) {
+      throw new PublishError(
+        "tiktok_no_mixed_media",
+        "TikTok tidak mendukung campuran video dan foto dalam satu post — pisahkan fotonya.",
+        false,
+      );
+    }
     if (caption.length > 2200) {
       throw new PublishError(
         "tiktok_caption_limit",

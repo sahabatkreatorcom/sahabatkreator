@@ -31,6 +31,15 @@ async function publishGoogleBusiness(input: PublishInput): Promise<PublishResult
       ? new Date(scheduledAtRaw)
       : undefined;
 
+  // LocalPosts media hanya mendukung PHOTO — tolak jelas bila ada video/audio
+  // agar post tidak terkirim text-only tanpa media.
+  if (input.media.length > 0 && !input.media.some((m) => m.type === "image")) {
+    throw new PublishError(
+      "gbp_video_unsupported",
+      "Google Business hanya mendukung foto — lepas videonya atau pilih platform lain.",
+      false,
+    );
+  }
   const photos = input.media.filter((m) => m.type === "image").slice(0, 10);
 
   const body: Record<string, unknown> = {

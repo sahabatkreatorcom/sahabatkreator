@@ -106,6 +106,7 @@ async function loadPostMedia(postId: string) {
       type: mediaTable.type,
       mimeType: mediaTable.mimeType,
       altText: mediaTable.altText,
+      thumbnailUrl: mediaTable.thumbnailUrl,
     })
     .from(postMedia)
     .innerJoin(mediaTable, eq(postMedia.mediaId, mediaTable.id))
@@ -546,6 +547,7 @@ export async function pollPost(postId: string): Promise<"published" | "failed" |
     content: row.content ?? undefined,
     hashtags: row.hashtags as string[] | undefined,
     platformSettings: (row.platformSettings as Record<string, unknown>) ?? undefined,
+    media: await loadPostMedia(postId),
   });
   if (status.status === "published") {
     await markPublished(postId, status.platformPostId, status.platformPostUrl);
@@ -661,6 +663,7 @@ export async function pollInFlightPosts(
         content: row.content ?? undefined,
         hashtags: row.hashtags as string[] | undefined,
         platformSettings: (row.platformSettings as Record<string, unknown>) ?? undefined,
+        media: await loadPostMedia(row.id),
       });
 
       if (status.status === "published") {

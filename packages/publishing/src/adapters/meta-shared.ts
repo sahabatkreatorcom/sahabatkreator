@@ -36,8 +36,9 @@ export async function publishStory(
   mode: "fb" | "standalone",
 ): Promise<PublishResult> {
   const igUserId = input.platformAccountId;
-  const image = firstImage(input);
+  // Story hanya 1 media — video diprioritaskan bila keduanya ada
   const video = firstVideo(input);
+  const image = video ? undefined : firstImage(input);
   const media = image ?? video;
 
   if (!media) {

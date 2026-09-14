@@ -1,4 +1,4 @@
-// Adapter Facebook Pages — 1-call feed/photos + native scheduling
+// Adapter Facebook Pages — 1-call photo/video/feed + native scheduling
 // Riset: docs/social-platforms/meta-facebook.md (Sep 2026)
 
 import { httpRequest, throwFromResponse } from "../http";
@@ -9,18 +9,51 @@ import {
   type PublishInput,
   type PublishResult,
 } from "../types";
-import { firstImage, GRAPH_FB, quotaHook } from "./meta-shared";
+import { firstImage, firstVideo, GRAPH_FB, quotaHook } from "./meta-shared";
 
 async function publishFacebook(input: PublishInput, scheduledAt?: Date): Promise<PublishResult> {
   const pageId = input.platformAccountId;
   const message = composeCaption(input.content, input.hashtags);
   const image = firstImage(input);
+  const video = firstVideo(input);
 
   // Scheduling native FB: rentang valid 10 menit – 30 hari dari sekarang
   const scheduleValid =
     scheduledAt &&
     scheduledAt.getTime() > Date.now() + 10 * 60 * 1000 &&
     scheduledAt.getTime() < Date.now() + 30 * 24 * 60 * 60 * 1000;
+
+  if (video) {
+    // Video post — Graph mengunduh dari URL publik (R2) lalu memprosesnya,
+    // jadi timeout perlu lebih panjang dari default 30s. Jika ada media campuran
+    // (video + foto), video diprioritaskan.
+    const res = await httpRequest<{ id?: string }>(`${GRAPH_FB}/${pageId}/videos`, {
+      method: "POST",
+      query: {
+        file_url: video.url,
+        description: message,
+        access_token: input.accessToken,
+        ...(scheduleValid
+          ? {
+              published: "false",
+              scheduled_publish_time: Math.floor(scheduledAt.getTime() / 1000),
+            }
+          : {}),
+      },
+      timeoutMs: 120_000,
+      onResponse: quotaHook("facebook", input),
+    });
+    if (!res.ok) await throwFromResponse(res, "FB video");
+    const data = await res.json();
+    if (!data.id) {
+      throw new PublishError("fb_no_video_id", "FB tidak mengembalikan video ID", true);
+    }
+    return {
+      status: "published",
+      platformPostId: data.id,
+      scheduledOnPlatform: Boolean(scheduleValid),
+    };
+  }
 
   if (image && input.media.filter((m) => m.type === "image").length === 1) {
     // Photo post

@@ -23,6 +23,23 @@ async function publishThreads(input: PublishInput): Promise<PublishResult> {
   const image = firstImage(input);
   const video = firstVideo(input);
 
+  // Audio tidak didukung Threads; lebih baik gagal jelas daripada post text-only senyap
+  if (input.media.length > 0 && !image && !video) {
+    throw new PublishError(
+      "threads_media_unsupported",
+      "Threads hanya mendukung foto atau video — lepas file audio-nya.",
+      false,
+    );
+  }
+  // Threads 1 media per post (carousel via children belum didukung)
+  if (input.media.length > 1) {
+    throw new PublishError(
+      "threads_single_media",
+      "Threads hanya mendukung 1 media per post — pisahkan medianya.",
+      false,
+    );
+  }
+
   // Cross-post ke IG Stories (share to IG) — hanya berlaku untuk post media,
   // butuh scope threads_share_to_instagram (docs: share-to-ig-stories)
   const shareToIg = input.platformSettings.crossreshareToIg === true;

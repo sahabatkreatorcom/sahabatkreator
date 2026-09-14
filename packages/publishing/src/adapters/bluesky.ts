@@ -53,7 +53,15 @@ async function publishBluesky(input: PublishInput): Promise<PublishResult> {
     langs: ["id"],
   };
 
-  // Embed image (maks 4) via uploadBlob — video via video service di luar scope v1
+  // Embed image (maks 4) via uploadBlob — video via video service di luar scope v1,
+  // jadi tolak jelas agar post tidak terkirim text-only tanpa media.
+  if (input.media.some((m) => m.type !== "image")) {
+    throw new PublishError(
+      "bluesky_video_unsupported",
+      "Bluesky belum mendukung video — lepas videonya atau pilih platform lain.",
+      false,
+    );
+  }
   const images = input.media.filter((m) => m.type === "image").slice(0, 4);
   if (images.length > 0) {
     const embedImages: { alt: string; image: Record<string, unknown> }[] = [];

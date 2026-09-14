@@ -7,6 +7,8 @@ export type PublishMedia = {
   type: "image" | "video" | "audio";
   mimeType: string;
   altText?: string | null;
+  /** Thumbnail video (URL publik) — dipakai sebagai cover Pinterest video pin */
+  thumbnailUrl?: string | null;
 };
 
 /** Input untuk adapter platform */
@@ -82,6 +84,8 @@ export type PlatformAdapter = {
     content?: string;
     hashtags?: string[];
     platformSettings?: Record<string, unknown>;
+    /** Media terlampir post (URL publik R2) — Pinterest pakai thumbnail video sebagai cover */
+    media?: PublishMedia[];
   }): Promise<AsyncPostStatus>;
 };
 
