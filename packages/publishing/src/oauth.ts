@@ -73,7 +73,6 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
       "pages_show_list",
       "pages_manage_posts",
       "pages_read_engagement",
-      "publish_video",
       "instagram_basic",
       "instagram_content_publish",
       "instagram_manage_comments",
@@ -100,7 +99,6 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
       "pages_show_list",
       "pages_manage_posts",
       "pages_read_engagement",
-      "publish_video",
       "pages_manage_engagement", // reply komentar Page
     ],
   },
