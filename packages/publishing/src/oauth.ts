@@ -60,6 +60,11 @@ type OAuthConfig = {
   basicAuth?: boolean;
   /** Param tambahan untuk authorize URL */
   extraAuthorizeParams?: Record<string, string>;
+  /**
+   * Nama param client id — TikTok Login Kit v2 memakai "client_key"
+   * (di authorize, token exchange, dan refresh), bukan "client_id".
+   */
+  clientIdParam?: "client_id" | "client_key";
 };
 
 const GRAPH_VERSION = META_GRAPH_VERSION;
@@ -117,6 +122,10 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
   tiktok: {
     authorizeUrl: "https://www.tiktok.com/v2/auth/authorize/",
     tokenUrl: "https://open.tiktokapis.com/v2/oauth/token/",
+    // TikTok Login Kit v2: param kredensial bernama client_key, bukan client_id
+    clientIdParam: "client_key",
+    // Scope di authorize dipisah koma (docs Login Kit v2)
+    scopeSeparator: ",",
     scopes: [
       "user.info.basic",
       "user.info.profile",
@@ -224,7 +233,7 @@ export function buildAuthorizeUrl(
   }
   const sep = config.scopeSeparator ?? " ";
   const params = new URLSearchParams({
-    client_id: cred.clientId,
+    [config.clientIdParam ?? "client_id"]: cred.clientId,
     redirect_uri: cred.redirectUri,
     response_type: "code",
     scope: requestedScopes(platform, cred).join(sep),
@@ -249,7 +258,7 @@ export async function exchangeCodeForToken(
     grant_type: "authorization_code",
     code,
     redirect_uri: cred.redirectUri,
-    client_id: cred.clientId,
+    [config.clientIdParam ?? "client_id"]: cred.clientId,
     client_secret: cred.clientSecret,
   });
 
@@ -311,7 +320,7 @@ export async function refreshAccessToken(
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: refreshToken,
-    client_id: cred.clientId,
+    [config.clientIdParam ?? "client_id"]: cred.clientId,
     client_secret: cred.clientSecret,
   });
   const headers: Record<string, string> = {
@@ -387,24 +396,26 @@ export async function fetchPlatformProfile(
           false,
         );
       const pages = (await res.json()).data ?? [];
-      const page = pages.find((p) => p.instagram_business_account) ?? pages[0];
-      if (!page)
+      if (pages.length === 0) {
         throw new PublishError(
           "oauth_no_page",
-          "Tidak ada Page Facebook dengan akun IG bisnis terhubung",
-          false,
-        );
-      if (!page.instagram_business_account) {
-        throw new PublishError(
-          "oauth_no_ig_account",
-          "Page Facebook tidak punya Instagram Business Account terhubung. Hubungkan IG ke Page dulu.",
+          "Akun Facebook ini tidak mengelola Page apa pun. Pastikan akun yang dipilih saat login benar (cek facebook.com/pages), dan untuk aplikasi mode development, hanya pengguna dengan role di aplikasi yang Page-nya terlihat.",
           false,
         );
       }
+      const page = pages.find((p) => p.instagram_business_account);
+      if (!page) {
+        throw new PublishError(
+          "oauth_no_ig_account",
+          "Tidak ada Page Facebook dengan Instagram Business terhubung. Hubungkan akun IG (Business/Creator) ke Page dulu di pengaturan Instagram → Linked accounts.",
+          false,
+        );
+      }
+      const igba = page.instagram_business_account!;
       // Page access token: lebih tahan lama, scope page penuh
       return {
-        platformAccountId: page.instagram_business_account.id,
-        username: page.instagram_business_account.username ?? page.name,
+        platformAccountId: igba.id,
+        username: igba.username ?? page.name,
         displayName: page.name,
         extra: {
           pageId: page.id,
@@ -544,31 +555,38 @@ export async function fetchPlatformProfile(
     }
 
     case "pinterest": {
+      // GET /v5/user_account → response FLAT { id, username, profile_image, ... }
+      // (bukan wrapper { data } — cek docs developers.pinterest.com)
       const res = await httpRequest<{
-        data?: {
-          id?: string;
-          username?: string;
-          profile_image?: string;
-          boards?: Array<{ id: string; name: string }>;
-        };
+        id?: string;
+        username?: string;
+        profile_image?: string;
       }>("https://api.pinterest.com/v5/user_account", {
         headers: { Authorization: `Bearer ${at}` },
-        query: { "boards-fields": "id,name" },
       });
       if (!res.ok)
         throw new PublishError("oauth_profile_failed", "Gagal mengambil profil Pinterest", false);
-      const me = (await res.json()).data;
-      if (!me?.id)
+      const me = await res.json();
+      if (!me.id)
         throw new PublishError(
           "oauth_no_profile",
           "Profil Pinterest tidak mengembalikan ID",
           false,
         );
+      // Daftar board — endpoint terpisah (user_account tidak mengembalikan boards).
+      // Dipakai flow pemilihan board: platformAccountId = board_id tujuan publish.
+      const boardsRes = await httpRequest<{
+        items?: Array<{ id: string; name: string; privacy?: string }>;
+      }>("https://api.pinterest.com/v5/boards", {
+        query: { page_size: "250" }, // max per docs — satu halaman cukup utk hampir semua akun
+        headers: { Authorization: `Bearer ${at}` },
+      });
+      const boards = boardsRes.ok ? ((await boardsRes.json()).items ?? []) : [];
       return {
         platformAccountId: me.id,
         username: me.username ?? me.id,
         avatarUrl: me.profile_image ?? null,
-        extra: { boards: me.boards ?? [] },
+        extra: { boards },
       };
     }
 

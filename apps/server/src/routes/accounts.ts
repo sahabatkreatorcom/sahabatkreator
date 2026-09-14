@@ -159,7 +159,8 @@ accountsRoute.post("/pending/:id/select", async (c) => {
       row.platform !== "instagram" &&
       row.platform !== "facebook" &&
       row.platform !== "youtube" &&
-      row.platform !== "linkedin"
+      row.platform !== "linkedin" &&
+      row.platform !== "pinterest"
     ) {
       return c.json({ message: "Platform tidak mendukung pemilihan multi-akun" }, 400);
     }
@@ -288,7 +289,10 @@ accountsRoute.post("/pending/:id/select", async (c) => {
 
     return c.json({
       ok: true,
-      username: row.platform === "instagram" ? (page.igUsername ?? page.pageName) : page.pageName,
+      username:
+        row.platform === "instagram" || row.platform === "pinterest"
+          ? (page.igUsername ?? page.pageName)
+          : page.pageName,
     });
   } catch (error) {
     return errorResponse(error);

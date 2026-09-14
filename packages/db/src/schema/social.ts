@@ -7,18 +7,19 @@ import { organization } from "./organization";
 
 /**
  * Data entitas pilihan untuk picker multi-entity — disimpan terenkripsi di oauthPendingSelection.
- * Meta (FB/IG): entitas = Page; LinkedIn: entitas = profil pribadi / company.
+ * Meta (FB/IG): entitas = Page; LinkedIn: entitas = profil pribadi / company;
+ * Pinterest: entitas = board (platformAccountId = board_id tujuan publish).
  */
 export type PendingPageData = {
-  /** ID entitas (Page ID Facebook / URN LinkedIn "urn:li:person:{sub}" | "urn:li:organization:{id}") */
+  /** ID entitas (Page ID Facebook / URN LinkedIn / board ID Pinterest) */
   pageId: string;
-  /** Nama entitas (Page / profil / company) */
+  /** Nama entitas (Page / profil / company / board) */
   pageName: string;
-  /** Token entitas (sudah terenkripsi AES-256-GCM). LinkedIn: token user-level (sama untuk semua entitas) */
+  /** Token entitas (sudah terenkripsi AES-256-GCM). LinkedIn/Pinterest: token user-level (sama untuk semua entitas) */
   pageAccessTokenEnc: string;
   /** IG business account id (null bila Page tidak punya IG bisnis) */
   igUserId: string | null;
-  /** Username IG bisnis (null bila tidak ada) */
+  /** Username IG bisnis / username Pinterest (null bila tidak ada) */
   igUsername: string | null;
   /** LinkedIn saja: refresh token user-level (terenkripsi) */
   refreshTokenEnc?: string | null;

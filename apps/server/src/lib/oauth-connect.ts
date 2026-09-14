@@ -93,19 +93,51 @@ export function buildPendingLinkedIn(params: {
 }
 
 /**
+ * Bangun data pending Pinterest — entitas = board (publish butuh board_id
+ * sebagai platformAccountId). Token user-level sama untuk semua board.
+ */
+export function buildPendingPinterest(params: {
+  username: string;
+  boards: Array<{ id: string; name: string; privacy?: string }>;
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: Date | null;
+  scopes: string[];
+}) {
+  const { username, boards, accessToken, refreshToken, expiresAt, scopes } = params;
+  const pagesData: PendingPageData[] = boards.map((board) => ({
+    pageId: board.id,
+    pageName: board.name,
+    pageAccessTokenEnc: encrypt(accessToken),
+    igUserId: null,
+    igUsername: username, // username Pinterest (sama utk semua board)
+    refreshTokenEnc: refreshToken ? encrypt(refreshToken) : null,
+    tokenExpiresAt: expiresAt ? expiresAt.toISOString() : null,
+    scopes,
+  }));
+  return {
+    id: generateId("oauthpend"),
+    platform: "pinterest" as const,
+    pagesData: JSON.stringify(pagesData),
+    expiresAt: new Date(Date.now() + OAUTH_PENDING_TTL_MS),
+  };
+}
+
+/**
  * Upsert social account dari entitas terpilih.
  * - instagram: pakai IG business account id sebagai platformAccountId (publish via IG Graph),
  *   simpan pageId + pageAccessToken di metadata (pola sama dengan fetchPlatformProfile)
  * - facebook: pakai page id, page access token langsung sebagai access token
  * - linkedin: pakai URN owner (urn:li:person:{sub} | urn:li:organization:{id}),
  *   access token = token user-level (LinkedIn tidak punya token per-company)
+ * - pinterest: pakai board id (publish butuh board_id), token user-level + RT rotating
  *
  * Return { account, existing } — existing=true bila re-connect (update token).
  */
 export async function upsertSocialAccount(params: {
   organizationId: string;
   userId: string;
-  platform: "instagram" | "facebook" | "youtube" | "linkedin";
+  platform: "instagram" | "facebook" | "youtube" | "linkedin" | "pinterest";
   page: PendingPageData;
   /** User access token fallback (dipakai facebook bila page token tak ada) */
   userAccessToken: string;
@@ -132,6 +164,14 @@ export async function upsertSocialAccount(params: {
     effectiveExpiresAt = page.tokenExpiresAt ? new Date(page.tokenExpiresAt) : null;
     effectiveScopes = page.scopes ?? scopes;
     refreshTokenEnc = page.refreshTokenEnc ?? null;
+  } else if (platform === "pinterest") {
+    platformAccountId = page.pageId; // board_id — target publish pin
+    username = page.igUsername ?? page.pageName; // username akun Pinterest
+    accessTokenEnc = page.pageAccessTokenEnc; // token user-level (terenkripsi)
+    metadata = { boardId: page.pageId, boardName: page.pageName };
+    effectiveExpiresAt = page.tokenExpiresAt ? new Date(page.tokenExpiresAt) : null;
+    effectiveScopes = page.scopes ?? scopes;
+    refreshTokenEnc = page.refreshTokenEnc ?? null; // RT rotating — persist setiap connect
   } else {
     const isInstagram = platform === "instagram";
     platformAccountId = isInstagram ? (page.igUserId ?? page.pageId) : page.pageId;

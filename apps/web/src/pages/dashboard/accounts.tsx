@@ -11,6 +11,7 @@ import {
   Info,
   Link2,
   Loader2,
+  Pin,
   Plus,
   RefreshCw,
   User,
@@ -689,15 +690,20 @@ function PagePickerModal({
 
   const isInstagramFlow = data?.platform === "instagram";
   const isLinkedInFlow = data?.platform === "linkedin";
+  const isPinterestFlow = data?.platform === "pinterest";
 
   const title = isLinkedInFlow
     ? "Pilih Profil LinkedIn"
     : isInstagramFlow
       ? "Pilih Halaman Instagram"
-      : "Pilih Halaman Facebook";
+      : isPinterestFlow
+        ? "Pilih Board Pinterest"
+        : "Pilih Halaman Facebook";
   const description = isLinkedInFlow
     ? "Pilih profil yang akan dihubungkan — profil pribadi atau halaman company yang Anda kelola"
-    : "Akun Meta Anda mengelola beberapa halaman — pilih satu untuk dihubungkan";
+    : isPinterestFlow
+      ? "Pilih board tujuan publish Pin — setiap board menjadi satu akun terhubung"
+      : "Akun Meta Anda mengelola beberapa halaman — pilih satu untuk dihubungkan";
 
   return (
     <Modal open onClose={onClose} title={title} description={description} size="lg">
@@ -739,6 +745,8 @@ function PagePickerModal({
                       ) : (
                         <Building2 className="h-5 w-5 text-[var(--text-secondary)]" />
                       )
+                    ) : isPinterestFlow ? (
+                      <Pin className="h-5 w-5 text-[var(--text-secondary)]" />
                     ) : page.hasInstagram ? (
                       <AtSign className="h-5 w-5 text-[var(--text-secondary)]" />
                     ) : (
@@ -752,9 +760,11 @@ function PagePickerModal({
                         ? page.isPersonal
                           ? "Profil pribadi"
                           : "Halaman company"
-                        : page.hasInstagram
-                          ? `IG: @${page.igUsername ?? "bisnis"}`
-                          : "Tanpa Instagram Business"}
+                        : isPinterestFlow
+                          ? `Board — @${page.igUsername ?? "pinterest"}`
+                          : page.hasInstagram
+                            ? `IG: @${page.igUsername ?? "bisnis"}`
+                            : "Tanpa Instagram Business"}
                     </p>
                   </div>
                   {selected && <Check className="h-4 w-4 shrink-0 text-[var(--accent-gold)]" />}

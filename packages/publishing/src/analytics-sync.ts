@@ -325,17 +325,19 @@ async function blueskyAccountMetrics(did: string): Promise<AccountMetrics> {
 /** Pinterest — user_account dengan follower_count */
 async function pinterestAccountMetrics(token: string): Promise<AccountMetrics> {
   const res = await httpRequest<{
-    data?: { follower_count?: number; pin_count?: number; board_count?: number };
+    follower_count?: number;
+    pin_count?: number;
+    board_count?: number;
   }>("https://api.pinterest.com/v5/user_account", {
-    query: { fields: "follower_count,pin_count,board_count" },
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Pinterest akun: ${text.slice(0, 150)}`);
   }
-  const data = (await res.json()).data;
-  return { followers: data?.follower_count ?? null, posts: data?.pin_count ?? null };
+  // Response /v5/user_account FLAT (bukan wrapper { data })
+  const data = await res.json();
+  return { followers: data.follower_count ?? null, posts: data.pin_count ?? null };
 }
 
 // ---------------------------------------------------------------------------

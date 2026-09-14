@@ -39,6 +39,7 @@ import { generateId } from "../lib/id";
 import {
   buildPendingLinkedIn,
   buildPendingPages,
+  buildPendingPinterest,
   type RawLinkedInOrganization,
   type RawMetaPage,
 } from "../lib/oauth-connect";
@@ -258,6 +259,33 @@ oauthRoute.get("/:platform/callback", async (c) => {
         userId: stateRow.userId,
         organizationId: stateRow.organizationId,
         platform: "linkedin",
+        pagesData: pending.pagesData,
+        expiresAt: pending.expiresAt,
+      });
+      return c.redirect(`${env.WEB_URL}/accounts?pending=${encodeURIComponent(pending.id)}`);
+    }
+
+    // Pinterest: entitas = board (publish butuh board_id) → user pilih board via picker
+    if (platform === "pinterest" && Array.isArray(profile.extra?.boards)) {
+      const boards = profile.extra.boards as Array<{ id: string; name: string; privacy?: string }>;
+      if (boards.length === 0) {
+        return failRedirect(
+          "Akun Pinterest tidak memiliki board. Buat minimal satu board dulu di Pinterest.",
+        );
+      }
+      const pending = buildPendingPinterest({
+        username: profile.username,
+        boards,
+        accessToken: token.accessToken,
+        refreshToken: token.refreshToken,
+        expiresAt: token.expiresAt,
+        scopes: token.scopes,
+      });
+      await db.insert(oauthPendingSelection).values({
+        id: pending.id,
+        userId: stateRow.userId,
+        organizationId: stateRow.organizationId,
+        platform: "pinterest",
         pagesData: pending.pagesData,
         expiresAt: pending.expiresAt,
       });
