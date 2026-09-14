@@ -4,7 +4,7 @@
 import { db } from "@sahabatkreator/db";
 import { type PendingPageData, socialAccount } from "@sahabatkreator/db/schema";
 import { and, eq } from "drizzle-orm";
-import { encrypt } from "./crypto";
+import { decrypt, encrypt } from "./crypto";
 import { generateId } from "./id";
 
 /** TTL pending seleksi — 10 menit (kenapa: berisi token, jangan tinggal lama) */
@@ -179,7 +179,10 @@ export async function upsertSocialAccount(params: {
     accessTokenEnc = page.pageAccessTokenEnc; // sudah terenkripsi
     metadata = {
       pageId: page.pageId,
-      pageAccessToken: page.pageAccessTokenEnc, // terenkripsi at-rest (pola sama profil lama)
+      // PLAINTEXT — konsumer (engagement-sync, dm-sync, reply, posts-sync)
+      // memakai langsung sebagai access_token Graph. Pola sama jalur single-Page
+      // (metadata = profile.extra, pageAccessToken plaintext).
+      pageAccessToken: decrypt(page.pageAccessTokenEnc),
     };
     if (!isInstagram) metadata.userAccessToken = encrypt(userAccessToken);
     effectiveExpiresAt = tokenExpiresAt; // page token long-lived; expiry diurus worker token-refresh

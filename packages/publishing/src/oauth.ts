@@ -446,7 +446,14 @@ export async function fetchPlatformProfile(
         extra: {
           pageId: page.id,
           pageAccessToken: page.access_token,
-          pages: pages.map((p) => ({ id: p.id, name: p.name })),
+          // access_token + instagram_business_account WAJIB ikut — dipakai
+          // buildPendingPages (multi-Page) utk enkripsi page token per Page
+          pages: pages.map((p) => ({
+            id: p.id,
+            name: p.name,
+            access_token: p.access_token,
+            instagram_business_account: p.instagram_business_account,
+          })),
         },
       };
     }
@@ -496,7 +503,8 @@ export async function fetchPlatformProfile(
         displayName: page.name,
         extra: {
           pageAccessToken: page.access_token,
-          pages: pages.map((p) => ({ id: p.id, name: p.name })),
+          // access_token WAJIB ikut — dipakai buildPendingPages (multi-Page)
+          pages: pages.map((p) => ({ id: p.id, name: p.name, access_token: p.access_token })),
         },
       };
     }
