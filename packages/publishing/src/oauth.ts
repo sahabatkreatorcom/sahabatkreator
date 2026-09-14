@@ -171,7 +171,12 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
       "https://www.googleapis.com/auth/userinfo.profile",
     ],
     scopeSeparator: " ",
-    extraAuthorizeParams: { access_type: "offline", prompt: "consent" },
+    extraAuthorizeParams: {
+      access_type: "offline",
+      // select_account: akun pengelola GBP sering beda dengan akun YouTube —
+      // paksa account chooser (pola sama dengan youtube, lihat komentar di atas)
+      prompt: "select_account consent",
+    },
   },
   pinterest: {
     authorizeUrl: "https://www.pinterest.com/oauth/",
@@ -610,12 +615,16 @@ export async function fetchPlatformProfile(
       }>("https://mybusinessaccountmanagement.googleapis.com/v1/accounts", {
         headers: { Authorization: `Bearer ${at}` },
       });
-      if (!res.ok)
+      if (!res.ok) {
+        // Surface status + body: 403 SERVICE_DISABLED (API belum di-enable),
+        // 429/403 quota (Basic Access belum approve), dst — jangan telan detailnya
+        const body = await res.text().catch(() => "");
         throw new PublishError(
           "oauth_profile_failed",
-          "Gagal mengambil akun Google Business",
+          `Gagal mengambil akun Google Business (${res.status}): ${body.slice(0, 200)}`,
           false,
         );
+      }
       const account = (await res.json()).accounts?.[0];
       if (!account)
         throw new PublishError("oauth_no_gbp", "Tidak ada akun Google Business Profile", false);
