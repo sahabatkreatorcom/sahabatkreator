@@ -185,7 +185,42 @@ async function replyTikTok(input: ReplyInput): Promise<ReplyResult> {
 }
 
 async function replyYouTube(input: ReplyInput): Promise<ReplyResult> {
-  // commentThreads.insert sebagai reply ke comment parent
+  // First comment di video (platformItemId = video ID) → commentThreads.insert
+  // (top-level comment). Reply komentar (platformItemId/parentId = comment ID)
+  // → comments.insert dengan snippet.parentId.
+  // NOTE: commentThreads.insert butuh channelId → platformAccountId akun
+  // YouTube direct-OAuth = channelId.
+  if (input.itemType === "first_comment") {
+    if (!input.platformItemId) {
+      throw new PublishError("no_platform_item", "Post YouTube tidak punya video ID.", false);
+    }
+    const res = await httpRequest<{ id?: string }>(
+      "https://www.googleapis.com/youtube/v3/commentThreads",
+      {
+        method: "POST",
+        query: { part: "snippet" },
+        headers: {
+          Authorization: `Bearer ${input.accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          snippet: {
+            channelId: input.platformAccountId,
+            videoId: input.platformItemId,
+            topLevelComment: {
+              snippet: { textOriginal: input.content.slice(0, 10000) },
+            },
+          },
+        }),
+      },
+    );
+    if (!res.ok) await throwFromResponse(res, "YouTube first comment");
+    const id = (await res.json()).id;
+    if (!id) throw new PublishError("yt_no_comment_id", "YouTube first comment tanpa ID", true);
+    return { replyId: id };
+  }
+
+  // Reply ke komentar — comments.insert dengan parentId (comment ID)
   if (!input.platformItemId && !input.platformParentId) {
     throw new PublishError("no_platform_item", "Item tidak punya ID komentar YouTube.", false);
   }

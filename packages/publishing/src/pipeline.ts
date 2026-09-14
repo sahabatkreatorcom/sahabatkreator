@@ -85,6 +85,7 @@ async function sendFirstComment(
       platform,
       accessToken,
       platformItemId: platformPostId,
+      itemType: "first_comment", // YouTube: beda endpoint utk top-level comment vs reply
       content,
       platformAccountId: account.platformAccountId,
       accountMetadata: account.metadata,
