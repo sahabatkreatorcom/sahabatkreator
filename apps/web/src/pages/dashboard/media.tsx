@@ -497,10 +497,18 @@ export function MediaPage() {
                           className="h-full w-full object-cover"
                           loading="lazy"
                         />
+                      ) : item.mimeType.startsWith("video/") ? (
+                        <video
+                          src={item.url}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="h-full w-full object-cover"
+                        />
                       ) : (
                         <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[var(--text-muted)]">
                           <ImageIcon className="h-8 w-8" />
-                          <span className="text-xs">{item.mimeType.split("/")[0]}</span>
+                          <span className="text-xs">audio</span>
                         </div>
                       )}
 

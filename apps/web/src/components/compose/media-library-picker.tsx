@@ -169,9 +169,17 @@ export function MediaLibraryPicker({
                     className="h-full w-full object-cover"
                     loading="lazy"
                   />
+                ) : m.mimeType.startsWith("video/") ? (
+                  <video
+                    src={m.url}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-[var(--bg-tertiary)] text-[var(--text-muted)] text-xs">
-                    {m.mimeType.startsWith("video/") ? "Video" : "Audio"}
+                    Audio
                   </div>
                 )}
                 {isChecked && (
