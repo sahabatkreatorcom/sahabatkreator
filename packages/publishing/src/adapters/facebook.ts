@@ -1,0 +1,88 @@
+// Adapter Facebook Pages — 1-call feed/photos + native scheduling
+// Riset: docs/social-platforms/meta-facebook.md (Sep 2026)
+
+import { httpRequest, throwFromResponse } from "../http";
+import {
+  composeCaption,
+  type PlatformAdapter,
+  PublishError,
+  type PublishInput,
+  type PublishResult,
+} from "../types";
+import { firstImage, GRAPH_FB, quotaHook } from "./meta-shared";
+
+async function publishFacebook(input: PublishInput, scheduledAt?: Date): Promise<PublishResult> {
+  const pageId = input.platformAccountId;
+  const message = composeCaption(input.content, input.hashtags);
+  const image = firstImage(input);
+
+  // Scheduling native FB: rentang valid 10 menit – 30 hari dari sekarang
+  const scheduleValid =
+    scheduledAt &&
+    scheduledAt.getTime() > Date.now() + 10 * 60 * 1000 &&
+    scheduledAt.getTime() < Date.now() + 30 * 24 * 60 * 60 * 1000;
+
+  if (image && input.media.filter((m) => m.type === "image").length === 1) {
+    // Photo post
+    const res = await httpRequest<{ post_id?: string; id?: string }>(
+      `${GRAPH_FB}/${pageId}/photos`,
+      {
+        method: "POST",
+        query: {
+          url: image.url,
+          caption: message,
+          access_token: input.accessToken,
+          ...(scheduleValid
+            ? {
+                published: "false",
+                scheduled_publish_time: Math.floor(scheduledAt.getTime() / 1000),
+              }
+            : {}),
+        },
+      },
+    );
+    if (!res.ok) await throwFromResponse(res, "FB photo");
+    const data = await res.json();
+    return {
+      status: "published",
+      platformPostId: data.post_id ?? data.id ?? "",
+      scheduledOnPlatform: Boolean(scheduleValid),
+    };
+  }
+
+  // Feed post (teks/link/multi-photo via attached_media — sederhanakan: link atau teks)
+  const link =
+    typeof input.platformSettings.link === "string" ? input.platformSettings.link : undefined;
+  const res = await httpRequest<{ id?: string }>(`${GRAPH_FB}/${pageId}/feed`, {
+    method: "POST",
+    query: {
+      message,
+      link,
+      access_token: input.accessToken,
+      ...(scheduleValid
+        ? { published: "false", scheduled_publish_time: Math.floor(scheduledAt.getTime() / 1000) }
+        : {}),
+    },
+    onResponse: quotaHook("facebook", input),
+  });
+  if (!res.ok) await throwFromResponse(res, "FB feed");
+  const data = await res.json();
+  if (!data.id) throw new PublishError("fb_no_post_id", "FB tidak mengembalikan post ID", true);
+  return {
+    status: "published",
+    platformPostId: data.id,
+    scheduledOnPlatform: Boolean(scheduleValid),
+  };
+}
+
+export const facebookAdapter: PlatformAdapter = {
+  platform: "facebook",
+  async publish(input) {
+    const scheduledAtRaw = input.platformSettings.scheduledAt;
+    const scheduledAt =
+      typeof scheduledAtRaw === "string" || typeof scheduledAtRaw === "number"
+        ? new Date(scheduledAtRaw)
+        : undefined;
+    return publishFacebook(input, scheduledAt);
+  },
+};

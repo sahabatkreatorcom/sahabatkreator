@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sahabat Kreator — Kelola Semua Konten Social Media di Satu Tempat</title>
+    <meta
+      name="description"
+      content="Sahabat Kreator membantu kreator dan bisnis Indonesia menjadwalkan posting, menganalisis performa, dan mengelola semua akun social media dari satu dashboard."
+    />
+    <!-- Canonical + OG/Twitter statis: fallback untuk crawler yang tidak mengeksekusi
+         JS (WhatsApp/Facebook/LinkedIn/X). Nilai harus konsisten dengan landing.tsx
+         dan src/lib/seo.ts; og:url/canonical SELALU domain produksi. -->
+    <link rel="canonical" href="https://sahabatkreator.com/" />
+    <meta property="og:title" content="Sahabat Kreator — Kelola Semua Konten Social Media di Satu Tempat" />
+    <meta
+      property="og:description"
+      content="Jadwalkan posting, pantau analitik, dan kelola semua akun social media Anda dari satu dashboard. Gratis untuk memulai."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sahabatkreator.com/" />
+    <meta property="og:site_name" content="Sahabat Kreator" />
+    <meta property="og:image" content="https://sahabatkreator.com/og-default.png" />
+    <meta property="og:image:secure_url" content="https://sahabatkreator.com/og-default.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
+    <meta
+      property="og:image:alt"
+      content="Logo Sahabat Kreator — platform manajemen social media all-in-one untuk kreator Indonesia"
+    />
+    <meta property="og:locale" content="id_ID" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@sahabatkreator" />
+    <meta name="twitter:title" content="Sahabat Kreator — Kelola Semua Konten Social Media di Satu Tempat" />
+    <meta
+      name="twitter:description"
+      content="Jadwalkan posting, pantau analitik, dan kelola semua akun social media Anda dari satu dashboard. Gratis untuk memulai."
+    />
+    <meta name="twitter:image" content="https://sahabatkreator.com/og-default.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0c1627" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Sahabat Kreator" />
+    <script>
+      // Anti-FOUC: set theme sebelum paint
+      (() => {
+        try {
+          const theme = localStorage.getItem("sk-theme") || "system";
+          const dark =
+            theme === "dark" ||
+            (theme === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.setAttribute(
+            "data-theme",
+            dark ? "dark" : "light",
+          );
+          document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

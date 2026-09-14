@@ -1,0 +1,67 @@
+// Guard dashboard — redirect ke login jika belum ada session
+import { useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { Navigate, Outlet, useLocation } from "react-router";
+import { PageLoader } from "@/components/ui/spinner";
+import { api } from "@/lib/api";
+
+export type MeResponse = {
+  authenticated: boolean;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    emailVerified: boolean;
+    image: string | null;
+    role: string;
+    twoFactorEnabled: boolean;
+  };
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+    logo: string | null;
+    role: string;
+  } | null;
+  organizations: {
+    id: string;
+    name: string;
+    slug: string;
+    logo: string | null;
+    role: string;
+  }[];
+  limits: Record<string, number> | null;
+};
+
+/** Query key session/me — dipakai lintas komponen dashboard */
+export const meQueryOptions = {
+  queryKey: ["me"],
+  queryFn: () => api.get<MeResponse>("/me"),
+  staleTime: 60 * 1000,
+  retry: false,
+} as const;
+
+export function RequireAuth({ children }: { children?: ReactNode }) {
+  const location = useLocation();
+  const { data, isLoading, isError } = useQuery(meQueryOptions);
+
+  if (isLoading) return <PageLoader />;
+
+  // 401 / error → belum login
+  if (isError || !data?.authenticated) {
+    return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
+  }
+
+  // Session ada tapi email belum terverifikasi (mis. session lama / OAuth) →
+  // arahkan ke halaman verifikasi agar user tidak bisa memakai dashboard.
+  if (!data.user.emailVerified && location.pathname !== "/verify-email") {
+    return <Navigate to="/verify-email" replace />;
+  }
+
+  // Belum punya org → arahkan ke wizard buat org
+  if (data.organizations.length === 0 && location.pathname !== "/create-organization") {
+    return <Navigate to="/create-organization" replace />;
+  }
+
+  return <>{children ?? <Outlet />}</>;
+}

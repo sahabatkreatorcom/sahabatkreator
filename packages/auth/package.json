@@ -1,0 +1,31 @@
+{
+  "name": "@sahabatkreator/auth",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "1.6.22",
+    "@sahabatkreator/db": "workspace:*",
+    "@sahabatkreator/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "drizzle-orm": "^0.45.2",
+    "resend": "^6.22.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@sahabatkreator/config": "workspace:*",
+    "typescript": "^6.0.3"
+  }
+}
