@@ -617,9 +617,27 @@ oauthRoute.post("/bluesky/connect", async (c) => {
       did?: string;
       handle?: string;
       email?: string;
+      accessJwt?: string;
     };
     if (!session.did) {
       return c.json({ message: "Bluesky tidak mengembalikan DID" }, 400);
+    }
+
+    // Avatar profil — getProfile pakai accessJwt dari session (best effort)
+    let avatarUrl: string | null = null;
+    if (session.accessJwt) {
+      try {
+        const profRes = await fetch(
+          `${pds}/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(session.did)}`,
+          { headers: { Authorization: `Bearer ${session.accessJwt}` } },
+        );
+        if (profRes.ok) {
+          const prof = (await profRes.json()) as { avatar?: string };
+          avatarUrl = prof.avatar ?? null;
+        }
+      } catch {
+        // best effort — akun tetap tersambung tanpa avatar
+      }
     }
 
     // Upsert akun — app password disimpan sebagai "accessToken" (dipakai adapter createSession)
@@ -643,6 +661,7 @@ oauthRoute.post("/bluesky/connect", async (c) => {
         .update(socialAccount)
         .set({
           username: session.handle ?? input.handle,
+          avatarUrl,
           accessTokenEnc: encrypt(input.appPassword),
           isConnected: true,
           lastError: null,
@@ -667,6 +686,7 @@ oauthRoute.post("/bluesky/connect", async (c) => {
         platform: "bluesky",
         platformAccountId: session.did,
         username: session.handle ?? input.handle,
+        avatarUrl,
         accessTokenEnc: encrypt(input.appPassword),
         scopes: ["app_password"],
         isConnected: true,

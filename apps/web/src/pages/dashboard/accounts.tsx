@@ -183,7 +183,7 @@ export function AccountsPage() {
 
       {/* Akun terhubung */}
       {accounts.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {accounts.map((account) => {
             const cfg = PLATFORMS[account.platform as keyof typeof PLATFORMS];
             const Icon = cfg?.icon;
