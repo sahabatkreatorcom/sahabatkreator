@@ -1,7 +1,7 @@
 # ============================================================================
 # Sahabat Kreator — PRODUKSI (sahabatkreator.com)
 #
-#   DB: PostgreSQL 18 CONTAINER (service "postgres" — data persisten di volume
+#   DB: PostgreSQL 17 CONTAINER (service "postgres" — data persisten di volume
 #       postgres_data, hanya jaringan internal Docker). STAGING memakai Neon;
 #       produksi self-hosted di server ini.
 #   Redis tetap container untuk BullMQ.
@@ -23,6 +23,10 @@
 #
 # DATABASE_URL TIDAK diambil dari .env.prod — di-set otomatis oleh compose
 # (environment meng-override env_file) mengarah ke container postgres.
+#
+# ⚠️ JANGAN pakai postgres:18 — drizzle-kit 0.31 tidak kompatibel dengan PG18
+#     (PG18 memindahkan NOT NULL ke pg_constraint → push salah deteksi diff /
+#     crash saat introspeksi). Turunkan ke 17 sampai drizzle-kit 1.0 stabil.
 # ============================================================================
 
 name: sahabatkreator
@@ -45,7 +49,7 @@ x-db-env: &db-env
 
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:17-alpine
     container_name: sahabatkreator-postgres
     restart: unless-stopped
     environment:
@@ -53,9 +57,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Isi POSTGRES_PASSWORD di .env.prod}
       POSTGRES_DB: sahabatkreator
     volumes:
-      # ⚠️ PG 18 mengubah PGDATA → /var/lib/postgresql/18/docker dan VOLUME
-      # resmi kini /var/lib/postgresql (parent). Mount di path lama
-      # (/var/lib/postgresql/data) membuat container PG18 MENOLAK start.
+      # Mount di parent /var/lib/postgresql — aman untuk major upgrade
+      # minor/patch (17.x) tanpa mengubah volume path.
       - postgres_data:/var/lib/postgresql
     # shm default 64mb terlalu kecil untuk query analitik — naikkan.
     shm_size: 256mb
