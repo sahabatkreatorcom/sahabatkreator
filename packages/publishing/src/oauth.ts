@@ -76,6 +76,9 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
     tokenUrl: `https://graph.facebook.com/${GRAPH_VERSION}/oauth/access_token`,
     scopes: [
       "pages_show_list",
+      // Page di Business Manager hanya muncul di /me/accounts bila token punya
+      // scope ini (terbukti via Graph API Explorer; tanpa ini → data kosong)
+      "business_management",
       "pages_manage_posts",
       "pages_read_engagement",
       "instagram_basic",
@@ -102,6 +105,9 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
     tokenUrl: `https://graph.facebook.com/${GRAPH_VERSION}/oauth/access_token`,
     scopes: [
       "pages_show_list",
+      // Sama dengan instagram: Page Business Manager butuh scope ini agar
+      // terlihat di /me/accounts (picker Page saat connect)
+      "business_management",
       "pages_manage_posts",
       "pages_read_engagement",
       "pages_manage_engagement", // reply komentar Page
