@@ -106,19 +106,21 @@ export function buildPendingLinkedIn(params: {
  */
 export function buildPendingPinterest(params: {
   username: string;
+  avatarUrl?: string | null;
   boards: Array<{ id: string; name: string; privacy?: string }>;
   accessToken: string;
   refreshToken?: string;
   expiresAt?: Date | null;
   scopes: string[];
 }) {
-  const { username, boards, accessToken, refreshToken, expiresAt, scopes } = params;
+  const { username, avatarUrl, boards, accessToken, refreshToken, expiresAt, scopes } = params;
   const pagesData: PendingPageData[] = boards.map((board) => ({
     pageId: board.id,
     pageName: board.name,
     pageAccessTokenEnc: encrypt(accessToken),
     igUserId: null,
     igUsername: username, // username Pinterest (sama utk semua board)
+    avatarUrl: avatarUrl ?? null, // foto profil akun Pinterest (sama utk semua board)
     refreshTokenEnc: refreshToken ? encrypt(refreshToken) : null,
     tokenExpiresAt: expiresAt ? expiresAt.toISOString() : null,
     scopes,

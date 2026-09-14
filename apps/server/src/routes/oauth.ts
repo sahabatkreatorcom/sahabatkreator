@@ -278,6 +278,7 @@ oauthRoute.get("/:platform/callback", async (c) => {
       }
       const pending = buildPendingPinterest({
         username: profile.username,
+        avatarUrl: profile.avatarUrl,
         boards,
         accessToken: token.accessToken,
         refreshToken: token.refreshToken,
