@@ -42,6 +42,8 @@ export type PreviewMedia = {
   /** Dimensi asli media (piksel) — untuk deteksi rasio preview */
   width?: number | null;
   height?: number | null;
+  /** Thumbnail video (JPEG frame) — dipakai sebagai poster elemen video */
+  thumbnailUrl?: string | null;
 };
 
 /** Rasio media untuk preview umum — tiktok 9:16, youtube 16:9, sisanya 1:1 */
@@ -109,6 +111,7 @@ function SingleMedia({ media, aspectClass }: { media: PreviewMedia; aspectClass:
         {/* Muted default ala preview sosmed — user bisa unmute via kontrol */}
         <video
           src={media.url}
+          poster={media.thumbnailUrl ?? undefined}
           controls
           muted
           playsInline

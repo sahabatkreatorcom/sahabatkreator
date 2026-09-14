@@ -20,6 +20,8 @@ export type MediaItem = {
   height?: number | null;
   /** Durasi video dalam detik — null bila bukan video / tidak diketahui */
   durationSeconds?: number | null;
+  /** Thumbnail video (JPEG frame) — null bila bukan video/tidak tersedia */
+  thumbnailUrl?: string | null;
 };
 
 /** Opsi resize cepat per platform — dimensi ditangani server (sharp) */

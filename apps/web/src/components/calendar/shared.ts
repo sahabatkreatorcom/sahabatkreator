@@ -80,7 +80,9 @@ export function formatTimeId(iso: string): string {
   }).format(new Date(iso));
 }
 
-/** Group items by tanggal YYYY-MM-DD (dari scheduledAt post atau date note) */
+/** Group items by tanggal YYYY-MM-DD (dari scheduledAt post atau date note).
+ * scheduledAt dari server = ISO UTC — konversi ke tanggal lokal browser dulu,
+ * jangan slice mentah string UTC (post WIB pagi akan bergeser ke hari sebelumnya). */
 export function groupByDate<T extends { scheduledAt?: string | null; date?: string }>(
   items: T[],
 ): Map<string, T[]> {
@@ -88,7 +90,8 @@ export function groupByDate<T extends { scheduledAt?: string | null; date?: stri
   for (const item of items) {
     const raw = item.scheduledAt ?? item.date;
     if (!raw) continue;
-    const key = raw.slice(0, 10);
+    // date note sudah YYYY-MM-DD (tanpa jam) — pakai apa adanya
+    const key = item.scheduledAt ? toLocalISODate(new Date(raw)) : raw.slice(0, 10);
     const arr = map.get(key) ?? [];
     arr.push(item);
     map.set(key, arr);

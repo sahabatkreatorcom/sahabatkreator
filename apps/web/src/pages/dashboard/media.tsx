@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { PageLoader } from "@/components/ui/spinner";
 import { api } from "@/lib/api";
 import { formatBytes, formatDate } from "@/lib/format";
+import { generateVideoThumbnail } from "@/lib/media-thumbnail";
 import { cn } from "@/lib/utils";
 
 type MediaItem = {
@@ -35,6 +36,8 @@ type MediaItem = {
   altText: string | null;
   folderId: string | null;
   createdAt: string;
+  /** Thumbnail video (JPEG frame) — null bila bukan video/tidak tersedia */
+  thumbnailUrl: string | null;
 };
 
 type Folder = { id: string; name: string };
@@ -85,9 +88,11 @@ export function MediaPage() {
   };
 
   const upload = useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
+      const thumbnail = await generateVideoThumbnail(file);
+      if (thumbnail) formData.append("thumbnail", thumbnail, "thumbnail.jpg");
       return api.upload<{ media: MediaItem }>("/media/upload", formData);
     },
     onSuccess: () => {
@@ -481,6 +486,13 @@ export function MediaPage() {
                       {item.mimeType.startsWith("image/") ? (
                         <img
                           src={item.url}
+                          alt={item.altText ?? item.name}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : item.thumbnailUrl ? (
+                        <img
+                          src={item.thumbnailUrl}
                           alt={item.altText ?? item.name}
                           className="h-full w-full object-cover"
                           loading="lazy"

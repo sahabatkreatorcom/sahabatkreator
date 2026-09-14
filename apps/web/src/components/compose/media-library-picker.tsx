@@ -5,6 +5,7 @@ import { Check, Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { api } from "@/lib/api";
+import { generateVideoThumbnail } from "@/lib/media-thumbnail";
 import { cn } from "@/lib/utils";
 
 export type LibraryMedia = {
@@ -12,6 +13,8 @@ export type LibraryMedia = {
   name: string | null;
   url: string;
   mimeType: string;
+  /** Thumbnail video (JPEG frame) — null bila video tanpa thumbnail/audio */
+  thumbnailUrl?: string | null;
 };
 
 export function MediaLibraryPicker({
@@ -39,9 +42,11 @@ export function MediaLibraryPicker({
 
   // Upload dari dalam modal — invalidasi daftar agar item baru muncul di grid
   const upload = useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
+      const thumbnail = await generateVideoThumbnail(file);
+      if (thumbnail) formData.append("thumbnail", thumbnail, "thumbnail.jpg");
       return api.upload<{ media: LibraryMedia }>("/media/upload", formData);
     },
     onSuccess: (res) => {
@@ -153,6 +158,13 @@ export function MediaLibraryPicker({
                 {isImage ? (
                   <img
                     src={m.url}
+                    alt={m.name ?? ""}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                ) : m.thumbnailUrl ? (
+                  <img
+                    src={m.thumbnailUrl}
                     alt={m.name ?? ""}
                     className="h-full w-full object-cover"
                     loading="lazy"

@@ -23,6 +23,7 @@ import { useComposeDraft } from "@/hooks/use-compose-draft";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { meQueryOptions } from "@/layouts/require-auth";
 import { api } from "@/lib/api";
+import { generateVideoThumbnail } from "@/lib/media-thumbnail";
 
 // ---- Tipe Web App Launch Handler (file_handlers PWA) — belum ada di lib.dom ----
 declare global {
@@ -199,9 +200,12 @@ export function useComposeForm() {
   const { allowNext: allowNextNavigation } = useUnsavedChanges(hasChanges && !createPost.isPending);
 
   const uploadMedia = useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
+      // Thumbnail video client-side (frame ~10%) — null bila gagal decode
+      const thumbnail = await generateVideoThumbnail(file);
+      if (thumbnail) formData.append("thumbnail", thumbnail, "thumbnail.jpg");
       return api.upload<{ media: MediaItem }>("/media/upload", formData);
     },
     onSuccess: (data) => {
@@ -311,7 +315,14 @@ export function useComposeForm() {
 
     createPost.mutate({
       content,
-      scheduledAt: scheduleMode === "schedule" ? new Date(scheduledAt).toISOString() : null,
+      // Mode "Sekarang" kirim waktu saat ini (bukan null) agar post langsung
+      // berstatus scheduled + job publish delay-0 — null hanya membuat draft.
+      scheduledAt:
+        scheduleMode === "now"
+          ? new Date().toISOString()
+          : scheduleMode === "schedule"
+            ? new Date(scheduledAt).toISOString()
+            : null,
       audioTrackId: soundTrack?.id ?? null,
       productIds,
       items: selectedAccounts.map((socialAccountId) => {

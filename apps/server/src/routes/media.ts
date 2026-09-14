@@ -379,7 +379,8 @@ mediaRoute.post("/import", async (c) => {
   }
 });
 
-/** POST /media/upload — upload file (multipart/form-data: file, altText?) */
+/** POST /media/upload — upload file (multipart/form-data: file, altText?, thumbnail?)
+ * thumbnail = JPEG frame video di-generate client-side (canvas) untuk video. */
 mediaRoute.post("/upload", async (c) => {
   try {
     const ctx = await requireOrg(c);
@@ -411,6 +412,22 @@ mediaRoute.post("/upload", async (c) => {
       return c.json({ message: "Tipe file tidak sesuai isi" }, 400);
     }
 
+    // Thumbnail video (opsional): JPEG frame dari browser — validasi magic
+    // bytes agar tidak bisa dipakai menyelundupkan file lain ke R2.
+    let thumbnailUrl: string | null = null;
+    const thumbnail = formData.get("thumbnail");
+    if (thumbnail instanceof File && thumbnail.size > 0 && file.type.startsWith("video/")) {
+      const thumbBuffer = Buffer.from(await thumbnail.arrayBuffer());
+      if (sniffContentType(new Uint8Array(thumbBuffer)) === "image/jpeg") {
+        const { url } = await uploadObject(ctx.organization.id, {
+          data: thumbBuffer,
+          mimeType: "image/jpeg",
+          originalName: `${file.name}.jpg`,
+        });
+        thumbnailUrl = url;
+      }
+    }
+
     const { storageKey, url } = await uploadObject(ctx.organization.id, {
       data: buffer,
       mimeType: file.type,
@@ -429,6 +446,7 @@ mediaRoute.post("/upload", async (c) => {
           : "image",
       storageKey,
       url,
+      thumbnailUrl,
       mimeType: file.type,
       sizeBytes: file.size,
       altText: typeof altText === "string" ? altText : null,
@@ -560,6 +578,23 @@ mediaRoute.patch("/:id", async (c) => {
 });
 
 /** DELETE /media/:id — hapus media + object R2 */
+/** StorageKey R2 dari public URL media — null bila URL bukan format storage
+ * (mis. R2_PUBLIC_URL berubah sejak upload). Key = path setelah folder org. */
+function storageKeyFromUrl(url: string | null, organizationId: string): string | null {
+  if (!url) return null;
+  const idx = url.indexOf(`/${organizationId}/`);
+  return idx >= 0 ? url.slice(idx + 1) : null;
+}
+
+/** Hapus object thumbnail R2 milik media (best-effort, log-only) */
+async function deleteThumbnailObject(url: string | null, organizationId: string): Promise<void> {
+  const key = storageKeyFromUrl(url, organizationId);
+  if (!key) return;
+  await deleteObject(key).catch((err: unknown) =>
+    console.error("[media] gagal hapus thumbnail R2:", err),
+  );
+}
+
 mediaRoute.delete("/:id", async (c) => {
   try {
     const ctx = await requireOrg(c);
@@ -575,6 +610,7 @@ mediaRoute.delete("/:id", async (c) => {
       await deleteObject(row.storageKey).catch((err: unknown) =>
         console.error("[media] gagal hapus object R2:", err),
       );
+      await deleteThumbnailObject(row.thumbnailUrl, row.organizationId);
     }
     return c.json({ ok: true });
   } catch (error) {
@@ -597,6 +633,7 @@ mediaRoute.post("/batch-delete", async (c) => {
       await db.delete(media).where(eq(media.id, row.id));
       if (isStorageConfigured()) {
         await deleteObject(row.storageKey).catch(() => {});
+        await deleteThumbnailObject(row.thumbnailUrl, row.organizationId);
       }
     }
     return c.json({ deleted: rows.length });

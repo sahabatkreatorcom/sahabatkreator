@@ -62,6 +62,12 @@ export function MediaSection({
                   alt={m.name ?? m.filename}
                   className="h-20 w-20 rounded-[var(--radius-md)] object-cover"
                 />
+              ) : m.thumbnailUrl ? (
+                <img
+                  src={m.thumbnailUrl}
+                  alt={m.name ?? m.filename}
+                  className="h-20 w-20 rounded-[var(--radius-md)] object-cover"
+                />
               ) : (
                 <div className="flex h-20 w-20 items-center justify-center rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] text-xs">
                   video
