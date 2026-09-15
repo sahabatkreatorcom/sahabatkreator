@@ -7,7 +7,7 @@ import { AuthLayout } from "./layouts/auth-layout";
 import { DashboardLayout } from "./layouts/dashboard-layout";
 import { MarketingLayout } from "./layouts/marketing-layout";
 import { RequireAdmin } from "./layouts/require-admin";
-import { RequireAuth } from "./layouts/require-auth";
+import { RedirectIfAuthenticated, RequireAuth } from "./layouts/require-auth";
 import { ForgotPasswordPage } from "./pages/auth/forgot-password";
 // Auth
 import { LoginPage } from "./pages/auth/login";
@@ -225,10 +225,17 @@ export const router = createBrowserRouter([
   {
     element: <AuthLayout />,
     children: [
-      { path: "/login", element: <LoginPage /> },
-      { path: "/register", element: <RegisterPage /> },
-      { path: "/forgot-password", element: <ForgotPasswordPage /> },
-      { path: "/reset-password", element: <ResetPasswordPage /> },
+      // Halaman guest — redirect ke dashboard bila session masih aktif
+      {
+        element: <RedirectIfAuthenticated />,
+        children: [
+          { path: "/login", element: <LoginPage /> },
+          { path: "/register", element: <RegisterPage /> },
+          { path: "/forgot-password", element: <ForgotPasswordPage /> },
+          { path: "/reset-password", element: <ResetPasswordPage /> },
+        ],
+      },
+      // verify-email & two-factor — bagian flow login, session parsial wajar ada
       { path: "/verify-email", element: <VerifyEmailPage /> },
       { path: "/two-factor", element: <TwoFactorPage /> },
     ],

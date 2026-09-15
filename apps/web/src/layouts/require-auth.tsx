@@ -1,7 +1,7 @@
 // Guard dashboard — redirect ke login jika belum ada session
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { Navigate, Outlet, useLocation } from "react-router";
+import { Navigate, Outlet, useLocation, useSearchParams } from "react-router";
 import { PageLoader } from "@/components/ui/spinner";
 import { api } from "@/lib/api";
 
@@ -64,4 +64,24 @@ export function RequireAuth({ children }: { children?: ReactNode }) {
   }
 
   return <>{children ?? <Outlet />}</>;
+}
+
+/**
+ * Guard kebalikan RequireAuth — halaman guest (login/register/forgot).
+ * User yang masih terautentikasi diarahkan ke dashboard (atau ?redirect=).
+ * Jangan dipakai di /verify-email & /two-factor — keduanya bagian dari
+ * flow login (session parsial justru diharapkan ada di sana).
+ */
+export function RedirectIfAuthenticated({ children }: { children?: ReactNode }) {
+  const [params] = useSearchParams();
+  const redirectTo = params.get("redirect") ?? "/dashboard";
+  const { data, isLoading } = useQuery(meQueryOptions);
+
+  // Cek session berjalan — jangan render form login saat masih loading,
+  // kalau tidak user melihat kedipan form lalu tiba-tiba di-redirect
+  if (isLoading) return <PageLoader />;
+
+  if (data?.authenticated) return <Navigate to={redirectTo} replace />;
+
+  return <>{children}</>;
 }

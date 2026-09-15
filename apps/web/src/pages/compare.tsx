@@ -200,9 +200,10 @@ export function ComparePage() {
 
       {/* CTA */}
       <div className="card mt-12 bg-gradient p-10 text-center text-white">
-        <h2 className="font-bold text-2xl">Coba gratis 14 hari</h2>
+        <h2 className="font-bold text-2xl">Mulai gratis selamanya</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-white/80">
-          Rasakan sendiri bedanya — tanpa kartu kredit, batalkan kapan saja.
+          Rasakan sendiri bedanya — tanpa kartu kredit. Upgrade ke paket berbayar hanya saat Anda
+          butuh lebih.
         </p>
         <Link to="/register" className="mt-6 inline-block">
           <Button size="lg" variant="secondary">

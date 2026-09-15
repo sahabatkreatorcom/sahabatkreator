@@ -231,6 +231,15 @@ body {
   border-radius: var(--radius-lg);
 }
 
+/* Banner CTA navy — .card.bg-gradient harus menang atas .card
+   (specificity sama, urutan menentukan; rule ini setelah .card) */
+.card.bg-gradient {
+  background: var(--brand-navy);
+}
+[data-theme="dark"] .card.bg-gradient {
+  background: var(--accent-gold);
+}
+
 .card-hover {
   transition: all var(--transition-normal);
 }
