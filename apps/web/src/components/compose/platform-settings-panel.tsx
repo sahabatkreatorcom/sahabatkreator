@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 
 type SettingsState = {
   firstComment: string;
-  // Instagram/Facebook post type: feed (default), story, reels
-  postType?: "feed" | "story" | "reels";
+  // Instagram/Facebook post type: feed (default) atau story (STORIES, 1 media, tanpa caption)
+  postType?: "feed" | "story";
   // TikTok
   tiktokPrivacy?: "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "SELF_ONLY";
   tiktokDisableComment?: boolean;
@@ -78,20 +78,18 @@ export function PlatformSettingsPanel({
               key={account.id}
               className="rounded-[var(--radius-md)] border border-[var(--border-light)]"
             >
-              <div className="flex items-center justify-between gap-2 px-3 py-2.5">
-                <button
-                  type="button"
-                  onClick={() => setOpen(isOpen ? null : account.id)}
-                  className="flex min-w-0 items-center gap-2 text-left font-medium text-xs"
-                  aria-expanded={isOpen}
-                >
+              <button
+                type="button"
+                onClick={() => setOpen(isOpen ? null : account.id)}
+                className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                aria-expanded={isOpen}
+              >
+                <span className="flex items-center gap-2 font-medium text-xs">
                   <span
-                    className="inline-block h-2 w-2 shrink-0 rounded-full"
+                    className="inline-block h-2 w-2 rounded-full"
                     style={{ backgroundColor: cfg?.color ?? "var(--text-muted)" }}
                   />
-                  <span className="truncate">
-                    {cfg?.label ?? account.platform} · @{account.username}
-                  </span>
+                  {cfg?.label ?? account.platform} · @{account.username}
                   {s.firstComment.trim() !== "" && (
                     <span
                       className="text-[10px] text-[var(--accent-gold)]"
@@ -100,49 +98,41 @@ export function PlatformSettingsPanel({
                       • FC
                     </span>
                   )}
-                </button>
-                <div className="flex shrink-0 items-center gap-2">
-                  {/* Selector jenis konten — selalu terlihat tanpa membuka accordion */}
-                  {isInstagram && (
-                    <select
-                      value={s.postType ?? "feed"}
-                      onChange={(e) =>
-                        onChange(account.id, {
-                          ...s,
-                          postType: e.target.value as SettingsState["postType"],
-                        })
-                      }
-                      className="h-7 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-1.5 text-xs"
-                      aria-label="Jenis konten"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <option value="feed">Feed</option>
-                      <option value="reels">Reels</option>
-                      <option value="story">Story</option>
-                    </select>
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-3.5 w-3.5 text-[var(--text-muted)] transition-transform",
+                    isOpen && "rotate-180",
                   )}
-                  <ChevronDown
-                    className={cn(
-                      "h-3.5 w-3.5 text-[var(--text-muted)] transition-transform",
-                      isOpen && "rotate-180",
-                    )}
-                  />
-                </div>
-              </div>
+                />
+              </button>
 
               {isOpen && (
                 <div className="space-y-3 border-[var(--border-light)] border-t p-3">
-                  {/* Info jenis konten IG (selector ada di header baris) */}
-                  {isInstagram && s.postType === "story" && (
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      Story hanya memakai 1 media pertama, tanpa caption & first comment. Gunakan
-                      gambar/video vertikal 1080×1920.
-                    </p>
-                  )}
-                  {isInstagram && s.postType === "reels" && (
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      Reels membutuhkan tepat 1 video (disarankan vertikal 9:16).
-                    </p>
+                  {/* Post type (feed/story) — didukung Instagram kedua jalur */}
+                  {isInstagram && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Jenis konten</Label>
+                      <select
+                        value={s.postType ?? "feed"}
+                        onChange={(e) =>
+                          onChange(account.id, {
+                            ...s,
+                            postType: e.target.value as SettingsState["postType"],
+                          })
+                        }
+                        className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-2 text-xs"
+                      >
+                        <option value="feed">Feed Post (foto/video/Reels)</option>
+                        <option value="story">Story (1 media, rasio 9:16, 24 jam)</option>
+                      </select>
+                      {s.postType === "story" && (
+                        <p className="text-[11px] text-[var(--text-muted)]">
+                          Story hanya memakai 1 media pertama, tanpa caption & first comment.
+                          Gunakan gambar/video vertikal 1080×1920.
+                        </p>
+                      )}
+                    </div>
                   )}
 
                   {/* First comment — diposting sebagai komentar pertama setelah post tayang.
@@ -351,7 +341,7 @@ export function PlatformSettingsPanel({
                   {/* Instagram tip */}
                   {isInstagram && s.postType !== "story" && (
                     <p className="text-[11px] text-[var(--text-muted)]">
-                      Tip: video tanpa jenis Reels tetap tayang di tab Reels Instagram. Gunakan Grid
+                      Tip: video otomatis di-publish sebagai Reels di Instagram. Gunakan Grid
                       Planner untuk preview feed.
                     </p>
                   )}
@@ -373,11 +363,9 @@ export function buildPlatformSettings(
   if (!s) return undefined;
   const settings: Record<string, unknown> = {};
 
-  // Post type (IG kedua jalur) — story diteruskan sebagai postType,
-  // reels sebagai mediaType: "REELS" (dibaca adapter instagram saat buat container)
-  if (["instagram", "instagram_standalone"].includes(platform)) {
-    if (s?.postType === "story") settings.postType = "story";
-    if (s?.postType === "reels") settings.mediaType = "REELS";
+  // Post type story (IG kedua jalur) — diteruskan ke adapter sebagai postType
+  if (["instagram", "instagram_standalone"].includes(platform) && s?.postType === "story") {
+    settings.postType = "story";
   }
 
   if (platform === "tiktok") {
