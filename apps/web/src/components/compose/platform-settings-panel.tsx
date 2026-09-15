@@ -18,11 +18,15 @@ type SettingsState = {
   tiktokDisableComment?: boolean;
   tiktokDisableDuet?: boolean;
   tiktokDisableStitch?: boolean;
+  // Label konten AI (AIGC) — wajib aktif bila konten dibuat/diedit AI secara signifikan
+  tiktokIsAigc?: boolean;
   // YouTube
   youtubeTitle?: string;
   youtubePrivacy?: "public" | "unlisted" | "private";
   youtubeCategory?: string;
   youtubeMadeForKids?: boolean;
+  /** Disclosure konten sintetis/AI di YouTube */
+  youtubeSyntheticMedia?: boolean;
   // Pinterest
   pinterestLink?: string;
   // Facebook
@@ -203,6 +207,23 @@ export function PlatformSettingsPanel({
                           {label}
                         </label>
                       ))}
+                      <label className="flex items-start gap-2 text-[var(--text-secondary)] text-xs">
+                        <input
+                          type="checkbox"
+                          checked={s.tiktokIsAigc ?? false}
+                          onChange={(e) =>
+                            onChange(account.id, { ...s, tiktokIsAigc: e.target.checked })
+                          }
+                          className="mt-0.5 accent-[var(--accent-gold)]"
+                        />
+                        <span>
+                          Konten dibuat/diedit AI (label AIGC)
+                          <span className="block text-[11px] text-[var(--text-muted)]">
+                            Wajib diaktifkan bila konten realistis dibuat atau diedit AI secara
+                            signifikan — sesuai kebijakan pelabelan TikTok.
+                          </span>
+                        </span>
+                      </label>
                     </>
                   )}
 
@@ -270,6 +291,26 @@ export function PlatformSettingsPanel({
                           className="accent-[var(--accent-gold)]"
                         />
                         Konten untuk anak-anak (Made for Kids)
+                      </label>
+                      <label className="flex items-start gap-2 text-[var(--text-secondary)] text-xs">
+                        <input
+                          type="checkbox"
+                          checked={s.youtubeSyntheticMedia ?? false}
+                          onChange={(e) =>
+                            onChange(account.id, {
+                              ...s,
+                              youtubeSyntheticMedia: e.target.checked,
+                            })
+                          }
+                          className="mt-0.5 accent-[var(--accent-gold)]"
+                        />
+                        <span>
+                          Mengandung konten sintetis/AI (disclosure)
+                          <span className="block text-[11px] text-[var(--text-muted)]">
+                            Aktifkan bila ada adegan realistis yang dibuat/diubah AI — sesuai
+                            kebijakan disclosure YouTube.
+                          </span>
+                        </span>
                       </label>
                       <p className="text-[11px] text-[var(--text-muted)]">
                         Tip: video vertikal 9:16 (atau persegi) ≤ 3 menit otomatis menjadi Shorts —
@@ -376,12 +417,14 @@ export function buildPlatformSettings(
     if (s.tiktokDisableComment) settings.disableComment = true;
     if (s.tiktokDisableDuet) settings.disableDuet = true;
     if (s.tiktokDisableStitch) settings.disableStitch = true;
+    if (s.tiktokIsAigc) settings.isAigc = true;
   }
   if (platform === "youtube") {
     if (s.youtubeTitle?.trim()) settings.title = s.youtubeTitle.trim();
     if (s.youtubePrivacy) settings.privacyStatus = s.youtubePrivacy;
     if (s.youtubeCategory) settings.categoryId = s.youtubeCategory;
     if (s.youtubeMadeForKids) settings.madeForKids = true;
+    if (s.youtubeSyntheticMedia) settings.containsSyntheticMedia = true;
   }
   if (platform === "pinterest" && s.pinterestLink?.trim()) {
     settings.link = s.pinterestLink.trim();

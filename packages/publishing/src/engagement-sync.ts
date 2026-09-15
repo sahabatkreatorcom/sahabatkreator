@@ -275,10 +275,14 @@ async function syncFacebook(ctx: SyncContext): Promise<SyncResult> {
         id: string;
         message?: string;
         created_time?: string;
-        from?: { id?: string; name?: string };
+        from?: { id?: string; name?: string; picture?: { data?: { url?: string } } };
       }>;
     }>(`${GRAPH_FB}/${post.id}/comments`, {
-      query: { fields: "id,message,created_time,from{id,name}", limit: 50, access_token: token },
+      query: {
+        fields: "id,message,created_time,from{id,name,picture.type(large)}",
+        limit: 50,
+        access_token: token,
+      },
     });
     if (!commentsRes.ok) continue;
     const comments = (await commentsRes.json()).data ?? [];
@@ -290,6 +294,7 @@ async function syncFacebook(ctx: SyncContext): Promise<SyncResult> {
         platformItemId: comment.id,
         platformAuthorId: comment.from?.id ?? null,
         authorName: comment.from?.name ?? null,
+        authorAvatarUrl: comment.from?.picture?.data?.url ?? null,
         content: comment.message ?? null,
         mediaUrl: post.permalink_url ?? null,
         occurredAt: comment.created_time ? new Date(comment.created_time) : null,
@@ -305,11 +310,11 @@ async function syncFacebook(ctx: SyncContext): Promise<SyncResult> {
       created_time?: string;
       rating?: number;
       review_text?: string;
-      reviewer?: { id?: string; name?: string };
+      reviewer?: { id?: string; name?: string; picture?: { data?: { url?: string } } };
     }>;
   }>(`${GRAPH_FB}/${pageId}/ratings`, {
     query: {
-      fields: "id,created_time,rating,review_text,reviewer{id,name}",
+      fields: "id,created_time,rating,review_text,reviewer{id,name,picture.type(large)}",
       limit: 50,
       access_token: token,
     },
@@ -324,6 +329,7 @@ async function syncFacebook(ctx: SyncContext): Promise<SyncResult> {
         platformItemId: rating.id,
         platformAuthorId: rating.reviewer?.id ?? null,
         authorName: rating.reviewer?.name ?? null,
+        authorAvatarUrl: rating.reviewer?.picture?.data?.url ?? null,
         content: rating.review_text ?? null,
         rating: rating.rating ?? null,
         occurredAt: rating.created_time ? new Date(rating.created_time) : null,
@@ -648,6 +654,7 @@ async function syncRepliz(ctx: SyncContext): Promise<SyncResult> {
     platformItemId: c._id,
     authorName: c.user?.name ?? null,
     authorUsername: c.username ?? (c.user?.username ? `@${c.user.username}` : null),
+    authorAvatarUrl: c.user?.picture ?? null,
     content: c.message ?? c.text ?? null,
     occurredAt: c.createdAt ? new Date(c.createdAt) : null,
   }));
