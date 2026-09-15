@@ -7,7 +7,16 @@
 import { db } from "@sahabatkreator/db";
 import { platformCredential, socialAccount } from "@sahabatkreator/db/schema";
 import { env } from "@sahabatkreator/env/server";
-import { TIKTOK_OPEN_API_URL } from "@sahabatkreator/publishing";
+import {
+  BSKY_APPVIEW_URL,
+  GBP_ACCOUNT_API_URL,
+  GRAPH_FB_URL,
+  LINKEDIN_USERINFO_URL,
+  PINTEREST_API_BASE_URL,
+  PINTEREST_SANDBOX,
+  TIKTOK_OPEN_API_URL,
+  YOUTUBE_API_URL,
+} from "@sahabatkreator/publishing";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { logAdminAction } from "../lib/audit";
@@ -26,7 +35,17 @@ type TestResult = {
   durationMs: number;
 };
 
-type PlatformKey = "instagram" | "instagram_standalone" | "facebook" | "threads" | "tiktok";
+type PlatformKey =
+  | "instagram"
+  | "instagram_standalone"
+  | "facebook"
+  | "threads"
+  | "tiktok"
+  | "youtube"
+  | "google_business"
+  | "pinterest"
+  | "linkedin"
+  | "bluesky";
 
 /** Suite yang tersedia — key dipakai di URL POST /run/:platform */
 const AVAILABLE_PLATFORMS: PlatformKey[] = [
@@ -35,6 +54,11 @@ const AVAILABLE_PLATFORMS: PlatformKey[] = [
   "facebook",
   "threads",
   "tiktok",
+  "youtube",
+  "google_business",
+  "pinterest",
+  "linkedin",
+  "bluesky",
 ];
 
 /**
@@ -89,7 +113,7 @@ async function fetchJson<T>(
 }
 
 /** Mapping platform → env kredensial (sama dengan oauth.ts — DB prioritas, env fallback) */
-const ENV_CREDENTIAL_KEYS: Record<PlatformKey, { id: string; secret: string }> = {
+const ENV_CREDENTIAL_KEYS: Partial<Record<PlatformKey, { id: string; secret: string }>> = {
   // Instagram & Facebook — satu aplikasi Meta
   instagram: { id: "META_APP_ID", secret: "META_APP_SECRET" },
   // Instagram Login — app terpisah, kredensial sendiri
@@ -97,6 +121,12 @@ const ENV_CREDENTIAL_KEYS: Record<PlatformKey, { id: string; secret: string }> =
   facebook: { id: "META_APP_ID", secret: "META_APP_SECRET" },
   threads: { id: "THREADS_APP_ID", secret: "THREADS_APP_SECRET" },
   tiktok: { id: "TIKTOK_CLIENT_KEY", secret: "TIKTOK_CLIENT_SECRET" },
+  // YouTube & GBP share satu Google OAuth client
+  youtube: { id: "GOOGLE_CLIENT_ID", secret: "GOOGLE_CLIENT_SECRET" },
+  google_business: { id: "GOOGLE_CLIENT_ID", secret: "GOOGLE_CLIENT_SECRET" },
+  pinterest: { id: "PINTEREST_APP_ID", secret: "PINTEREST_APP_SECRET" },
+  linkedin: { id: "LINKEDIN_CLIENT_ID", secret: "LINKEDIN_CLIENT_SECRET" },
+  // Bluesky tanpa app credential — auth via app password per akun (connect manual)
 };
 
 /**
@@ -133,6 +163,7 @@ async function getCredential(
   }
 
   const envKeys = ENV_CREDENTIAL_KEYS[platform];
+  if (!envKeys) return null;
   const clientId = process.env[envKeys.id];
   const clientSecret = process.env[envKeys.secret];
   if (clientId && clientSecret) {
@@ -157,6 +188,40 @@ async function getStoredUserToken(platform: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/** Data akun sosial tersimpan (token + refresh + expiry) untuk suite non-Meta */
+async function getStoredAccount(platform: string): Promise<{
+  platformAccountId: string;
+  accessToken: string | null;
+  refreshToken: string | null;
+  tokenExpiresAt: Date | null;
+} | null> {
+  const [account] = await db
+    .select({
+      platformAccountId: socialAccount.platformAccountId,
+      accessTokenEnc: socialAccount.accessTokenEnc,
+      refreshTokenEnc: socialAccount.refreshTokenEnc,
+      tokenExpiresAt: socialAccount.tokenExpiresAt,
+    })
+    .from(socialAccount)
+    .where(eq(socialAccount.platform, platform as never))
+    .limit(1);
+  if (!account) return null;
+  let accessToken: string | null = null;
+  let refreshToken: string | null = null;
+  try {
+    accessToken = account.accessTokenEnc ? decrypt(account.accessTokenEnc) : null;
+    refreshToken = account.refreshTokenEnc ? decrypt(account.refreshTokenEnc) : null;
+  } catch {
+    // decrypt gagal (ENCRYPTION_KEY ganti) — anggap token tidak tersedia
+  }
+  return {
+    platformAccountId: account.platformAccountId,
+    accessToken,
+    refreshToken,
+    tokenExpiresAt: account.tokenExpiresAt,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -208,36 +273,47 @@ function checkMetaCredentialFormat(
   };
 }
 
-/** Check (b): app token valid via GET /oauth/access_token_info */
+/** Check (b): app token valid — mint via client_credentials lalu GET /oauth/access_token_info */
 async function checkMetaAppToken(
   cred: { clientId: string; clientSecret: string; source: "db" | "env" } | null,
-  graphHost: string,
 ): Promise<Omit<TestResult, "name" | "durationMs">> {
   if (!cred) {
     return { status: "fail", message: "Dilewati — kredensial app belum tersimpan." };
   }
-  const url =
-    `https://${graphHost}/${env.META_GRAPH_VERSION}/oauth/access_token_info` +
-    `?client_id=${encodeURIComponent(cred.clientId)}&client_secret=${encodeURIComponent(cred.clientSecret)}`;
-  const res = await fetchJson<{ error?: { message?: string } }>(url);
+  // Mint app access token dulu — /oauth/access_token_info hanya menerima
+  // param access_token (client_id+client_secret langsung akan ditolak 400).
+  const mintUrl =
+    `${GRAPH_FB_URL}/oauth/access_token` +
+    `?client_id=${encodeURIComponent(cred.clientId)}&client_secret=${encodeURIComponent(cred.clientSecret)}` +
+    "&grant_type=client_credentials";
+  const mintRes = await fetchJson<{ access_token?: string }>(mintUrl);
+  const appToken = mintRes.data?.access_token;
+  if (!mintRes.ok || !appToken) {
+    // 400 = invalid credential (OAuthException)
+    if (mintRes.status === 400) {
+      return {
+        status: "fail",
+        message:
+          "Meta menolak kredensial (HTTP 400 saat mint app token). App ID/Secret salah atau app sudah dihapus — cek developer console.",
+      };
+    }
+    return {
+      status: "fail",
+      message: `Graph API merespons HTTP ${mintRes.status} saat mint app token — periksa koneksi jaringan.`,
+    };
+  }
 
+  const infoUrl = `${GRAPH_FB_URL}/oauth/access_token_info?access_token=${encodeURIComponent(appToken)}`;
+  const res = await fetchJson<{ error?: { message?: string } }>(infoUrl);
   if (res.ok) {
     return {
       status: "pass",
       message: `App token valid — Graph API menerima client_id + client_secret (HTTP ${res.status}).`,
     };
   }
-  // 400 = invalid credential (OAuthException), 404 = versi API salah
-  if (res.status === 400) {
-    return {
-      status: "fail",
-      message:
-        "Meta menolak kredensial (HTTP 400). App ID/Secret salah atau app sudah dihapus — cek developer console.",
-    };
-  }
   return {
     status: "fail",
-    message: `Graph API merespons HTTP ${res.status} — periksa koneksi jaringan atau versi API (${env.META_GRAPH_VERSION}).`,
+    message: `Graph API merespons HTTP ${res.status} — periksa koneksi jaringan atau versi API.`,
   };
 }
 
@@ -262,7 +338,6 @@ function checkVerifyTokenEnv(
 async function checkUserToken(
   userToken: string | null,
   cred: { clientId: string; clientSecret: string; source: "db" | "env" } | null,
-  graphHost: string,
 ): Promise<Omit<TestResult, "name" | "durationMs">> {
   if (!userToken) {
     return {
@@ -275,9 +350,11 @@ async function checkUserToken(
     return { status: "fail", message: "Dilewati — butuh app credential untuk /debug_token." };
   }
 
-  // App access token diperlukan sebagai access_token param untuk debug_token
+  // App access token diperlukan sebagai access_token param untuk debug_token.
+  // debug_token ada di Graph API umum (graph.facebook.com) — user token IG/FB/Threads
+  // semuanya diterbitkan app Meta dan bisa diinspeksi di sana.
   const tokenUrl =
-    `https://${graphHost}/${env.META_GRAPH_VERSION}/oauth/access_token` +
+    `${GRAPH_FB_URL}/oauth/access_token` +
     `?client_id=${encodeURIComponent(cred.clientId)}&client_secret=${encodeURIComponent(cred.clientSecret)}` +
     "&grant_type=client_credentials";
   const tokenRes = await fetchJson<{ access_token?: string }>(tokenUrl);
@@ -290,7 +367,7 @@ async function checkUserToken(
   }
 
   const debugUrl =
-    `https://${graphHost}/${env.META_GRAPH_VERSION}/debug_token` +
+    `${GRAPH_FB_URL}/debug_token` +
     `?input_token=${encodeURIComponent(userToken)}&access_token=${encodeURIComponent(appToken)}`;
   const res = await fetchJson<MetaDebugTokenResponse>(debugUrl);
   const d = res.data?.data;
@@ -316,10 +393,9 @@ async function checkUserToken(
   };
 }
 
-/** Suite lengkap Instagram/Facebook/Threads — graphHost & verify token env beda */
+/** Suite lengkap Instagram/Facebook/Threads — verify token env beda per platform */
 async function runMetaSuite(
   platform: PlatformKey,
-  graphHost: string,
   verifyTokenEnv: string | undefined,
   verifyTokenKey: string,
   socialAccountPlatform: string,
@@ -332,20 +408,425 @@ async function runMetaSuite(
       Promise.resolve(checkMetaCredentialFormat(cred)),
     ),
     await runCheck("App token valid (Graph /oauth/access_token_info)", () =>
-      checkMetaAppToken(cred, graphHost),
+      checkMetaAppToken(cred),
     ),
     await runCheck("Webhook verify token env terisi", () =>
       Promise.resolve(checkVerifyTokenEnv(verifyTokenEnv, verifyTokenKey)),
     ),
     await runCheck("User token tersimpan — scopes & expiry (/debug_token)", () =>
-      checkUserToken(userToken, cred, graphHost),
+      checkUserToken(userToken, cred),
     ),
   ];
 }
 
 // ---------------------------------------------------------------------------
-// Suite diagnostik TikTok
+// Suite diagnostik YouTube & Google Business (Google OAuth — client sama)
 // ---------------------------------------------------------------------------
+
+async function runYouTubeSuite(): Promise<TestResult[]> {
+  const cred = await getCredential("youtube");
+  const account = await getStoredAccount("youtube");
+
+  return [
+    await runCheck("Kredensial Google OAuth tersimpan & format valid", async () => {
+      if (!cred) {
+        return {
+          status: "fail",
+          message:
+            "Kredensial Google belum tersimpan. Isi di Admin Panel → Kredensial Platform (atau env GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET).",
+        };
+      }
+      // Client ID Google: format {id}-{hash}.apps.googleusercontent.com
+      if (!/^[\w-]+\.apps\.googleusercontent\.com$/.test(cred.clientId)) {
+        return {
+          status: "warn",
+          message:
+            "Client ID tidak sesuai format Google (*.apps.googleusercontent.com) — periksa Google Cloud Console.",
+        };
+      }
+      const sourceLabel = cred.source === "db" ? "Admin Panel (DB)" : "env";
+      return {
+        status: "pass",
+        message: `Kredensial valid (sumber: ${sourceLabel}). Client ID: ${cred.clientId.slice(0, 12)}…`,
+      };
+    }),
+    await runCheck("Endpoint YouTube Data API hidup (googleapis.com)", async () => {
+      // Ping tanpa API key — 400/403 berarti endpoint hidup
+      const res = await fetchJson(`${YOUTUBE_API_URL}/channels?part=id`);
+      if (res.status === 400 || res.status === 403) {
+        return {
+          status: "pass",
+          message: `Endpoint merespons HTTP ${res.status} (key/auth diperlukan) — API YouTube hidup & terjangkau.`,
+        };
+      }
+      return {
+        status: "fail",
+        message: `Endpoint tidak terjangkau (HTTP ${res.status}) — cek koneksi jaringan / firewall keluar.`,
+      };
+    }),
+    await runCheck("User token tersimpan — refresh token & expiry", async () => {
+      if (!account) {
+        return {
+          status: "warn",
+          message:
+            "Belum ada akun YouTube terhubung. Hubungkan minimal satu channel untuk memvalidasi token.",
+        };
+      }
+      if (!account.refreshToken) {
+        return {
+          status: "fail",
+          message:
+            "Access token ada tapi refresh token kosong — connect ulang akun (access_type=offline wajib).",
+        };
+      }
+      const expiry = account.tokenExpiresAt
+        ? new Date(account.tokenExpiresAt).toLocaleString("id-ID")
+        : "tidak diketahui";
+      return {
+        status: "pass",
+        message: `Token tersimpan + refresh token ada. Access token berlaku sampai: ${expiry}.`,
+      };
+    }),
+    await runCheck("User token valid — panggil /channels (mine)", async () => {
+      if (!account?.accessToken) {
+        return { status: "warn", message: "Dilewati — belum ada akun terhubung." };
+      }
+      const res = await fetchJson<{ items?: Array<{ snippet?: { title?: string } }> }>(
+        `${YOUTUBE_API_URL}/channels?part=snippet&mine=true`,
+        { headers: { Authorization: `Bearer ${account.accessToken}` } },
+      );
+      if (res.ok && res.data?.items?.length) {
+        return {
+          status: "pass",
+          message: `Token valid — channel: ${res.data.items[0]?.snippet?.title ?? "(tanpa nama)"}.`,
+        };
+      }
+      if (res.status === 401) {
+        return {
+          status: "fail",
+          message: "Token ditolak (401) — refresh gagal/terhapus; connect ulang akun YouTube.",
+        };
+      }
+      if (res.status === 403) {
+        return {
+          status: "fail",
+          message:
+            "Token valid tapi 403 — project Google belum aktifkan YouTube Data API v3 di Cloud Console.",
+        };
+      }
+      return {
+        status: "fail",
+        message: `Gagal memanggil /channels (HTTP ${res.status}): ${res.data?.toString().slice(0, 120) ?? ""}`,
+      };
+    }),
+  ];
+}
+
+async function runGoogleBusinessSuite(): Promise<TestResult[]> {
+  const cred = await getCredential("youtube");
+  const account = await getStoredAccount("google_business");
+
+  return [
+    await runCheck("Kredensial Google OAuth tersimpan & format valid", async () => {
+      if (!cred) {
+        return {
+          status: "fail",
+          message:
+            "Kredensial Google belum tersimpan (share dengan YouTube). Isi GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET.",
+        };
+      }
+      if (!/^[\w-]+\.apps\.googleusercontent\.com$/.test(cred.clientId)) {
+        return {
+          status: "warn",
+          message: "Client ID tidak sesuai format Google — periksa Google Cloud Console.",
+        };
+      }
+      return { status: "pass", message: "Kredensial valid (client OAuth sama dengan YouTube)." };
+    }),
+    await runCheck("Endpoint Business Profile API hidup (googleapis.com)", async () => {
+      const res = await fetchJson(`${GBP_ACCOUNT_API_URL}/accounts`);
+      if (res.status === 401 || res.status === 403) {
+        return {
+          status: "pass",
+          message: `Endpoint merespons HTTP ${res.status} (auth diperlukan) — API Business Profile hidup & terjangkau.`,
+        };
+      }
+      if (res.status === 404) {
+        return {
+          status: "fail",
+          message:
+            "Endpoint 404 — API Business Profile Account Management belum diaktifkan di Google Cloud project.",
+        };
+      }
+      return {
+        status: "fail",
+        message: `Endpoint tidak terjangkau (HTTP ${res.status}) — cek koneksi jaringan.`,
+      };
+    }),
+    await runCheck("User token tersimpan — scope business.manage", async () => {
+      if (!account) {
+        return {
+          status: "warn",
+          message:
+            "Belum ada akun Google Business terhubung. Hubungkan minimal satu akun untuk memvalidasi token.",
+        };
+      }
+      if (!account.refreshToken) {
+        return {
+          status: "fail",
+          message: "Refresh token kosong — connect ulang akun Google Business.",
+        };
+      }
+      return { status: "pass", message: "Token + refresh token tersimpan." };
+    }),
+    await runCheck("User token valid — daftar akun GBP (accounts.list)", async () => {
+      if (!account?.accessToken) {
+        return { status: "warn", message: "Dilewati — belum ada akun terhubung." };
+      }
+      const res = await fetchJson<{ accounts?: Array<{ name?: string }> }>(
+        `${GBP_ACCOUNT_API_URL}/accounts`,
+        { headers: { Authorization: `Bearer ${account.accessToken}` } },
+      );
+      if (res.ok) {
+        const n = res.data?.accounts?.length ?? 0;
+        return {
+          status: n > 0 ? "pass" : "warn",
+          message:
+            n > 0
+              ? `Token valid — ${n} akun GBP terjangkau.`
+              : "Token valid tapi tidak ada akun GBP terdaftar (user belum jadi manager bisnis).",
+        };
+      }
+      if (res.status === 403) {
+        return {
+          status: "fail",
+          message:
+            "Token ditolak (403) — scope business.manage hilang atau API belum diaktifkan; connect ulang akun.",
+        };
+      }
+      return { status: "fail", message: `Gagal (HTTP ${res.status}) — periksa token akun.` };
+    }),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Suite diagnostik Pinterest
+// ---------------------------------------------------------------------------
+
+async function runPinterestSuite(): Promise<TestResult[]> {
+  const cred = await getCredential("pinterest");
+  const account = await getStoredAccount("pinterest");
+
+  return [
+    await runCheck("Kredensial app tersimpan & format valid", async () => {
+      if (!cred) {
+        return {
+          status: "fail",
+          message:
+            "Kredensial Pinterest belum tersimpan. Isi di Admin Panel → Kredensial Platform (atau env PINTEREST_APP_ID/PINTEREST_APP_SECRET).",
+        };
+      }
+      // App ID Pinterest numerik; secret 32 karakter
+      if (!/^\d{8,20}$/.test(cred.clientId)) {
+        return {
+          status: "warn",
+          message: "App ID terdeteksi bukan numerik standar Pinterest — periksa developer console.",
+        };
+      }
+      const sourceLabel = cred.source === "db" ? "Admin Panel (DB)" : "env";
+      return {
+        status: "pass",
+        message: `Kredensial valid (sumber: ${sourceLabel}, App ID ${cred.clientId.length} digit, secret ${cred.clientSecret.length} karakter).`,
+      };
+    }),
+    await runCheck("Lingkungan API aktif (production vs sandbox)", async () => {
+      const host = PINTEREST_API_BASE_URL.includes("api-sandbox")
+        ? "api-sandbox.pinterest.com"
+        : "api.pinterest.com";
+      return {
+        status: PINTEREST_SANDBOX ? "warn" : "pass",
+        message: PINTEREST_SANDBOX
+          ? `Menggunakan SANDBOX (${host}) — pin hanya tersimpan di lingkungan uji, bukan akun production. Token sandbox berlaku 30 hari.`
+          : `Menggunakan production (${host}).`,
+      };
+    }),
+    await runCheck("Endpoint Pinterest API hidup", async () => {
+      // Ping /user_account tanpa token — 401 berarti hidup
+      const res = await fetchJson(`${PINTEREST_API_BASE_URL}/user_account`);
+      if (res.status === 401) {
+        return {
+          status: "pass",
+          message:
+            "Endpoint merespons HTTP 401 (auth diperlukan) — API Pinterest hidup & terjangkau.",
+        };
+      }
+      return {
+        status: "fail",
+        message: `Endpoint tidak terjangkau (HTTP ${res.status}) — cek koneksi / nilai PINTEREST_API_BASE_URL.`,
+      };
+    }),
+    await runCheck("User token valid — panggil /user_account", async () => {
+      if (!account?.accessToken) {
+        return {
+          status: "warn",
+          message:
+            "Belum ada akun Pinterest terhubung. Hubungkan minimal satu akun untuk memvalidasi token.",
+        };
+      }
+      const res = await fetchJson<{ username?: string; account_type?: string }>(
+        `${PINTEREST_API_BASE_URL}/user_account`,
+        { headers: { Authorization: `Bearer ${account.accessToken}` } },
+      );
+      if (res.ok && res.data?.username) {
+        return {
+          status: "pass",
+          message: `Token valid — user @${res.data.username} (tipe ${res.data.account_type ?? "n/a"}).`,
+        };
+      }
+      if (res.status === 401) {
+        return {
+          status: "fail",
+          message:
+            "Token ditolak (401) — token expired atau bukan untuk lingkungan API ini; connect ulang.",
+        };
+      }
+      return { status: "fail", message: `Gagal (HTTP ${res.status}) — periksa token akun.` };
+    }),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Suite diagnostik LinkedIn
+// ---------------------------------------------------------------------------
+
+async function runLinkedInSuite(): Promise<TestResult[]> {
+  const cred = await getCredential("linkedin");
+  const account = await getStoredAccount("linkedin");
+
+  return [
+    await runCheck("Kredensial app tersimpan & format valid", async () => {
+      if (!cred) {
+        return {
+          status: "fail",
+          message:
+            "Kredensial LinkedIn belum tersimpan. Isi di Admin Panel → Kredensial Platform (atau env LINKEDIN_CLIENT_ID/LINKEDIN_CLIENT_SECRET).",
+        };
+      }
+      // Client ID LinkedIn: 77-78 karakter alfanumerik
+      if (cred.clientId.length < 20) {
+        return {
+          status: "warn",
+          message: "Client ID terlihat terlalu pendek — pastikan sesuai LinkedIn Developer Apps.",
+        };
+      }
+      const sourceLabel = cred.source === "db" ? "Admin Panel (DB)" : "env";
+      return {
+        status: "pass",
+        message: `Kredensial valid (sumber: ${sourceLabel}, Client ID ${cred.clientId.length} karakter).`,
+      };
+    }),
+    await runCheck("Endpoint LinkedIn API hidup (api.linkedin.com)", async () => {
+      // Ping userinfo tanpa token — 401/403 berarti endpoint hidup
+      const res = await fetchJson(LINKEDIN_USERINFO_URL);
+      if (res.status === 401 || res.status === 403) {
+        return {
+          status: "pass",
+          message: `Endpoint merespons HTTP ${res.status} (auth diperlukan) — API LinkedIn hidup & terjangkau.`,
+        };
+      }
+      return {
+        status: "fail",
+        message: `Endpoint tidak terjangkau (HTTP ${res.status}) — cek koneksi jaringan.`,
+      };
+    }),
+    await runCheck("User token valid — OpenID userinfo (sub)", async () => {
+      if (!account?.accessToken) {
+        return {
+          status: "warn",
+          message:
+            "Belum ada akun LinkedIn terhubung. Hubungkan minimal satu akun untuk memvalidasi token.",
+        };
+      }
+      const res = await fetchJson<{ sub?: string; name?: string }>(LINKEDIN_USERINFO_URL, {
+        headers: { Authorization: `Bearer ${account.accessToken}` },
+      });
+      if (res.ok && res.data?.sub) {
+        return {
+          status: "pass",
+          message: `Token valid — profil: ${res.data.name ?? res.data.sub}.`,
+        };
+      }
+      if (res.status === 401) {
+        return {
+          status: "fail",
+          message:
+            "Token ditolak (401) — expired; refresh token LinkedIn 1x pakai perlu dijalankan ulang.",
+        };
+      }
+      return { status: "fail", message: `Gagal (HTTP ${res.status}) — periksa token akun.` };
+    }),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Suite diagnostik Bluesky
+// ---------------------------------------------------------------------------
+
+async function runBlueskySuite(): Promise<TestResult[]> {
+  const account = await getStoredAccount("bluesky");
+
+  return [
+    await runCheck("AppView publik Bluesky hidup (public.api.bsky.app)", async () => {
+      // Ping describeFeedGenerators — endpoint publik tanpa auth
+      const res = await fetchJson(`${BSKY_APPVIEW_URL}/xrpc/app.bsky.feed.describeFeedGenerator`);
+      if (res.ok) {
+        return {
+          status: "pass",
+          message: "AppView publik merespons OK — jaringan ke Bluesky sehat.",
+        };
+      }
+      return {
+        status: "fail",
+        message: `AppView tidak terjangkau (HTTP ${res.status}) — cek koneksi jaringan keluar.`,
+      };
+    }),
+    await runCheck("Session akun tersimpan (app password)", async () => {
+      if (!account?.accessToken) {
+        return {
+          status: "warn",
+          message:
+            "Belum ada akun Bluesky terhubung. Hubungkan via app password (halaman Connect).",
+        };
+      }
+      const isJwt = account.accessToken.startsWith("eyJ");
+      return {
+        status: "pass",
+        message: isJwt
+          ? "Access JWT tersimpan (session aktif)."
+          : "App password tersimpan — session dibuat ulang saat publish.",
+      };
+    }),
+    await runCheck("Akun valid — getProfile via AppView (DID)", async () => {
+      if (!account) {
+        return { status: "warn", message: "Dilewati — belum ada akun terhubung." };
+      }
+      // platformAccountId = DID; getProfile publik (tanpa auth) cukup validasi akun ada
+      const res = await fetchJson<{ handle?: string; displayName?: string }>(
+        `${BSKY_APPVIEW_URL}/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(account.platformAccountId)}`,
+      );
+      if (res.ok && res.data?.handle) {
+        return {
+          status: "pass",
+          message: `Akun aktif — @${res.data.handle} (${res.data.displayName ?? "tanpa nama"}).`,
+        };
+      }
+      return {
+        status: "fail",
+        message: `Gagal mengambil profil (HTTP ${res.status}) — DID mungkin tidak valid.`,
+      };
+    }),
+  ];
+}
 
 async function runTikTokSuite(): Promise<TestResult[]> {
   return [
@@ -429,37 +910,52 @@ apiTestsRoute.post("/run/:platform", async (c) => {
     }
 
     let results: TestResult[];
-    if (platform === "tiktok") {
-      results = await runTikTokSuite();
-    } else if (platform === "threads") {
-      // Threads — Graph host sendiri + verify token env sendiri (app terpisah)
-      results = await runMetaSuite(
-        "threads",
-        "graph.threads.net",
-        env.THREADS_WEBHOOK_VERIFY_TOKEN ?? env.META_WEBHOOK_VERIFY_TOKEN,
-        "THREADS_WEBHOOK_VERIFY_TOKEN",
-        "threads",
-      );
-    } else if (platform === "instagram_standalone") {
-      // Instagram Login — Graph host sendiri (graph.instagram.com) +
-      // verify token & secret app sendiri (terpisah dari aplikasi Meta)
-      results = await runMetaSuite(
-        "instagram_standalone",
-        "graph.instagram.com",
-        env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN,
-        "INSTAGRAM_WEBHOOK_VERIFY_TOKEN",
-        "instagram_standalone",
-      );
-    } else {
-      // Instagram & Facebook — satu aplikasi Meta, graph host sama
-      results = await runMetaSuite(
-        platform,
-        "graph.facebook.com",
-        env.META_WEBHOOK_VERIFY_TOKEN,
-        "META_WEBHOOK_VERIFY_TOKEN",
-        // User token IG business disimpan di platform "instagram"
-        "instagram",
-      );
+    switch (platform) {
+      case "tiktok":
+        results = await runTikTokSuite();
+        break;
+      case "youtube":
+        results = await runYouTubeSuite();
+        break;
+      case "google_business":
+        results = await runGoogleBusinessSuite();
+        break;
+      case "pinterest":
+        results = await runPinterestSuite();
+        break;
+      case "linkedin":
+        results = await runLinkedInSuite();
+        break;
+      case "bluesky":
+        results = await runBlueskySuite();
+        break;
+      case "threads":
+        // Threads — app terpisah, verify token env sendiri (fallback ke Meta)
+        results = await runMetaSuite(
+          "threads",
+          env.THREADS_WEBHOOK_VERIFY_TOKEN ?? env.META_WEBHOOK_VERIFY_TOKEN,
+          "THREADS_WEBHOOK_VERIFY_TOKEN",
+          "threads",
+        );
+        break;
+      case "instagram_standalone":
+        // Instagram Login — aplikasi terpisah, verify token & secret app sendiri
+        results = await runMetaSuite(
+          "instagram_standalone",
+          env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN,
+          "INSTAGRAM_WEBHOOK_VERIFY_TOKEN",
+          "instagram_standalone",
+        );
+        break;
+      default:
+        // Instagram & Facebook — satu aplikasi Meta
+        results = await runMetaSuite(
+          platform,
+          env.META_WEBHOOK_VERIFY_TOKEN,
+          "META_WEBHOOK_VERIFY_TOKEN",
+          // User token IG business disimpan di platform "instagram"
+          "instagram",
+        );
     }
 
     const ranAt = new Date().toISOString();

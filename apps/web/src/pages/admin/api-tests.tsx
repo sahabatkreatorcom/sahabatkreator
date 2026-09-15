@@ -31,6 +31,11 @@ const TESTABLE_PLATFORMS = [
   "facebook",
   "threads",
   "tiktok",
+  "youtube",
+  "google_business",
+  "pinterest",
+  "linkedin",
+  "bluesky",
 ] as const;
 
 const STATUS_META: Record<
