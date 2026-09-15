@@ -426,6 +426,9 @@ export function useComposeForm() {
 
   /** Reset seluruh form ke kondisi awal — dipakai tombol "Bersihkan" & buang draft */
   function clearAll() {
+    // Hapus draft di localStorage agar refresh tidak memulihkan ulang —
+    // tanpa ini hanya state React yang ter-reset, draft lama tetap tersimpan.
+    clearDraft();
     setContent("");
     setHashtags("");
     setMediaIds([]);
