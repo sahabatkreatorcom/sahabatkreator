@@ -398,34 +398,37 @@ export function ComposePage() {
               onScheduledAtChange={setScheduledAt}
             />
           </div>
-
-          {/* Panel validasi — error memblokir publish */}
-          <ValidationPanel issues={validationIssues} />
         </div>
 
         {/* ============ Zona 2 & 3: Preview sticky + submit bar ============ */}
         <div className="space-y-4 lg:sticky lg:top-6">
-          <div className="card max-h-[calc(100vh-260px)] overflow-y-auto p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <Eye className="h-4 w-4 text-[var(--text-muted)]" />
-              <h2 className="font-semibold">Preview</h2>
-              {hasPreviewContent && (
-                <span className="text-[var(--text-muted)] text-xs">
-                  ({selectedAccounts.length} akun)
-                </span>
+          {/* Preview + validasi scroll bersama — submit bar tetap terlihat di bawah */}
+          <div className="max-h-[calc(100vh-200px)] space-y-4 overflow-y-auto">
+            <div className="card p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <Eye className="h-4 w-4 text-[var(--text-muted)]" />
+                <h2 className="font-semibold">Preview</h2>
+                {hasPreviewContent && (
+                  <span className="text-[var(--text-muted)] text-xs">
+                    ({selectedAccounts.length} akun)
+                  </span>
+                )}
+              </div>
+              {hasPreviewContent ? (
+                <PlatformPreviews
+                  accounts={accounts}
+                  selectedAccountIds={selectedAccounts}
+                  content={content}
+                  variations={variations}
+                  media={selectedMedia}
+                />
+              ) : (
+                <PreviewEmptyState hasAccounts={accounts.length > 0} />
               )}
             </div>
-            {hasPreviewContent ? (
-              <PlatformPreviews
-                accounts={accounts}
-                selectedAccountIds={selectedAccounts}
-                content={content}
-                variations={variations}
-                media={selectedMedia}
-              />
-            ) : (
-              <PreviewEmptyState hasAccounts={accounts.length > 0} />
-            )}
+
+            {/* Panel validasi — error memblokir publish; di samping preview agar terlihat saat editing */}
+            <ValidationPanel issues={validationIssues} />
           </div>
 
           <SubmitBar
