@@ -16,16 +16,16 @@ import { composeCaption, PublishError } from "../types";
 function buildScheduleType(input: PublishInput, platform: string): ReplizScheduleInput["type"] {
   const images = input.media.filter((m) => m.type === "image");
   const videos = input.media.filter((m) => m.type === "video");
-  // IG story setting (platformSettings.story) → type "story"
+  // UI compose mengirim postType: "story" (IG kedua jalur) → type "story"
   if (
-    input.platformSettings?.story === true &&
+    input.platformSettings?.postType === "story" &&
     (platform === "instagram" || platform === "instagram_standalone")
   ) {
     return "story";
   }
   if (videos.length > 0) {
-    // TikTok/IG reel setting → "reel" (video pendek vertikal)
-    if (input.platformSettings?.reel === true) return "reel";
+    // IG reels eksplisit → "reel" (video pendek vertikal); TikTok/IG lain "video"
+    if (input.platformSettings?.postType === "reels") return "reel";
     return "video";
   }
   if (images.length > 1) return "album";

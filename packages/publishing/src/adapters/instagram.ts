@@ -38,6 +38,18 @@ async function publishInstagramViaFb(input: PublishInput): Promise<PublishResult
     return publishStory(input, GRAPH_FB, "fb");
   }
 
+  // Reels: wajib tepat 1 video (media_type REELS — dibaca di bawah)
+  if (input.platformSettings.mediaType === "REELS") {
+    const videos = input.media.filter((m) => m.type === "video");
+    if (videos.length !== 1 || input.media.length !== 1) {
+      throw new PublishError(
+        "ig_reels_single_video",
+        "Reels membutuhkan tepat 1 video — lepas media lain atau ubah jenis konten ke Feed.",
+        false,
+      );
+    }
+  }
+
   let creationId: string;
 
   if (input.media.length > 1) {

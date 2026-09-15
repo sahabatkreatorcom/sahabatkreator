@@ -51,7 +51,7 @@ export type ValidatePostInput = {
 };
 
 export type ValidationPlatformSettings = {
-  postType?: "feed" | "story";
+  postType?: "feed" | "story" | "reels";
   youtubeTitle?: string;
   tiktokPrivacy?: string;
 };
@@ -192,14 +192,6 @@ export function validatePost(input: ValidatePostInput): ValidationIssue[] {
             message: `Durasi video ${video.durationSeconds} detik melebihi 60 detik — post bisa dipotong otomatis oleh TikTok.`,
           });
         }
-      }
-      // Story/reel TikTok wajib video
-      if (settings?.postType === "story" && videoMedia.length === 0) {
-        issues.push({
-          severity: "error",
-          platform: "tiktok",
-          message: "Story/Reel TikTok membutuhkan video — lampirkan minimal satu video.",
-        });
       }
     }
 

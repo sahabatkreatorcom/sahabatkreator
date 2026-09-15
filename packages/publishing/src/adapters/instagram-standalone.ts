@@ -37,6 +37,18 @@ async function publishInstagramStandalone(input: PublishInput): Promise<PublishR
     return publishStory(input, GRAPH_IG, "standalone");
   }
 
+  // Reels: wajib tepat 1 video (media_type REELS)
+  if (input.platformSettings.mediaType === "REELS") {
+    const videos = input.media.filter((m) => m.type === "video");
+    if (videos.length !== 1 || input.media.length !== 1) {
+      throw new PublishError(
+        "ig_reels_single_video",
+        "Reels membutuhkan tepat 1 video — lepas media lain atau ubah jenis konten ke Feed.",
+        false,
+      );
+    }
+  }
+
   const image = firstImage(input);
   const video = firstVideo(input);
   const res = await httpRequest<{ id?: string }>(`${GRAPH_IG}/${igUserId}/media`, {
@@ -44,6 +56,8 @@ async function publishInstagramStandalone(input: PublishInput): Promise<PublishR
     query: {
       image_url: image?.url,
       video_url: video?.url,
+      // Video feed biasa; Reels dipilih user via platformSettings.mediaType
+      media_type: video ? String(input.platformSettings.mediaType ?? "VIDEO") : undefined,
       caption,
       access_token: input.accessToken,
     },

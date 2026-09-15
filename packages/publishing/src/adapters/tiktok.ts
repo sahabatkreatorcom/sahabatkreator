@@ -64,7 +64,10 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
     }
 
     // privacy_level wajib & harus cocok privacy_level_options akun (riset: beda per akun)
-    const privacyLevel = String(input.platformSettings.privacyLevel ?? "SELF_ONLY");
+    // UI compose mengirim key `privacy` — dukung juga `privacyLevel` (nama asli API)
+    const privacyLevel = String(
+      input.platformSettings.privacy ?? input.platformSettings.privacyLevel ?? "PUBLIC_TO_EVERYONE",
+    );
     const res = await httpRequest<TikTokInitResponse>(`${TIKTOK_BASE}/video/init/`, {
       method: "POST",
       headers: {
@@ -119,7 +122,11 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
       post_info: {
         title: caption.slice(0, 90),
         description: caption.slice(0, 4000),
-        privacy_level: String(input.platformSettings.privacyLevel ?? "SELF_ONLY"),
+        privacy_level: String(
+          input.platformSettings.privacy ??
+            input.platformSettings.privacyLevel ??
+            "PUBLIC_TO_EVERYONE",
+        ),
         is_aigc: input.platformSettings.isAigc === true,
       },
       source_info: {
