@@ -136,6 +136,7 @@ async function replyThreads(input: ReplyInput): Promise<ReplyResult> {
     {
       method: "POST",
       query: {
+        media_type: "TEXT",
         text,
         reply_to_id: input.platformItemId,
         access_token: input.accessToken,

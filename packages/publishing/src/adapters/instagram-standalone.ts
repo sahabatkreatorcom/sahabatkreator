@@ -11,15 +11,7 @@ import {
   type PublishInput,
   type PublishResult,
 } from "../types";
-import {
-  fetchGraphPermalink,
-  firstImage,
-  firstVideo,
-  GRAPH_IG,
-  pollInstagram,
-  publishStory,
-  quotaHook,
-} from "./meta-shared";
+import { firstImage, firstVideo, GRAPH_IG, pollInstagram, publishStory } from "./meta-shared";
 
 async function publishInstagramStandalone(input: PublishInput): Promise<PublishResult> {
   const igUserId = input.platformAccountId;
@@ -52,7 +44,7 @@ async function publishInstagramStandalone(input: PublishInput): Promise<PublishR
 
   const image = firstImage(input);
   const video = firstVideo(input);
-  const res = await httpRequest<{ id?: string }>(`${GRAPH_IG}/${igUserId}/media`, {
+  const publishRes = await httpRequest<{ id?: string }>(`${GRAPH_IG}/${igUserId}/media`, {
     method: "POST",
     query: {
       image_url: image?.url,
@@ -63,29 +55,14 @@ async function publishInstagramStandalone(input: PublishInput): Promise<PublishR
       access_token: input.accessToken,
     },
   });
-  if (!res.ok) await throwFromResponse(res, "IG standalone container");
-  const creationId = (await res.json()).id;
+  if (!publishRes.ok) await throwFromResponse(publishRes, "IG standalone container");
+  const creationId = (await publishRes.json()).id;
   if (!creationId)
     throw new PublishError("ig_no_container", "Platform tidak mengembalikan container ID", true);
 
-  if (video) {
-    return { status: "processing", handle: `igs:${creationId}` };
-  }
-
-  const publishRes = await httpRequest<{ id?: string }>(`${GRAPH_IG}/${igUserId}/media_publish`, {
-    method: "POST",
-    query: { creation_id: creationId, access_token: input.accessToken },
-    onResponse: quotaHook("instagram_standalone", input),
-  });
-  if (!publishRes.ok) await throwFromResponse(publishRes, "IG standalone publish");
-  const mediaId = (await publishRes.json()).id;
-  if (!mediaId)
-    throw new PublishError("ig_no_media_id", "Publish sukses tapi media ID kosong", true);
-  return {
-    status: "published",
-    platformPostId: mediaId,
-    platformPostUrl: await fetchGraphPermalink(GRAPH_IG, input.accessToken, mediaId),
-  };
+  // Flow async konsisten: media_publish hanya valid setelah container FINISHED
+  // (publish segera → [9007] Media ID is not available). Worker poll handle lalu publish final.
+  return { status: "processing", handle: `igs:${creationId}` };
 }
 
 export const instagramStandaloneAdapter: PlatformAdapter = {

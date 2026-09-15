@@ -10,15 +10,7 @@ import {
   type PublishInput,
   type PublishResult,
 } from "../types";
-import {
-  fetchGraphPermalink,
-  firstImage,
-  firstVideo,
-  GRAPH_FB,
-  pollInstagram,
-  publishStory,
-  quotaHook,
-} from "./meta-shared";
+import { firstImage, firstVideo, GRAPH_FB, pollInstagram, publishStory } from "./meta-shared";
 
 async function publishInstagramViaFb(input: PublishInput): Promise<PublishResult> {
   const igUserId = input.platformAccountId;
@@ -113,31 +105,10 @@ async function publishInstagramViaFb(input: PublishInput): Promise<PublishResult
     throw new PublishError("ig_no_container", "Platform tidak mengembalikan container ID", true);
   }
 
-  // Video butuh waktu processing — publish langsung bisa error. Untuk image langsung publish.
-  // Flow async konsisten: return processing dan biarkan worker poll + publish final.
-  const video =
-    firstVideo(input) || input.media.length > 1
-      ? input.media.some((m) => m.type === "video")
-      : false;
-  if (video) {
-    return { status: "processing", handle: `ig:${creationId}` };
-  }
-
-  // Image: publish segera
-  const res = await httpRequest<{ id?: string }>(`${GRAPH_FB}/${igUserId}/media_publish`, {
-    method: "POST",
-    query: { creation_id: creationId, access_token: input.accessToken },
-    onResponse: quotaHook("instagram", input),
-  });
-  if (!res.ok) await throwFromResponse(res, "IG publish");
-  const mediaId = (await res.json()).id;
-  if (!mediaId)
-    throw new PublishError("ig_no_media_id", "Publish sukses tapi media ID kosong", true);
-  return {
-    status: "published",
-    platformPostId: mediaId,
-    platformPostUrl: await fetchGraphPermalink(GRAPH_FB, input.accessToken, mediaId),
-  };
+  // Flow async konsisten: media_publish hanya valid setelah container FINISHED
+  // (publish segera → [9007] Media ID is not available — carousel/image juga butuh
+  // waktu diproses Meta). Worker poll handle lalu publish final saat FINISHED.
+  return { status: "processing", handle: `ig:${creationId}` };
 }
 
 export const instagramAdapter: PlatformAdapter = {

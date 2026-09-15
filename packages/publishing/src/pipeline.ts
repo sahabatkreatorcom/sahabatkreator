@@ -507,7 +507,18 @@ export async function pollPost(postId: string): Promise<"published" | "failed" |
     .from(post)
     .where(and(eq(post.id, postId), eq(post.status, "publishing")))
     .limit(1);
-  if (!row?.handle) return "processing";
+  // Post sudah selesai (published/failed) oleh runner lain — hentikan chain poll,
+  // jangan re-enqueue job berikutnya (poll job lama bisa masih di queue saat
+  // recovery sweep / race dengan job poll sebelumnya).
+  if (!row) {
+    const [done] = await db
+      .select({ status: post.status })
+      .from(post)
+      .where(eq(post.id, postId))
+      .limit(1);
+    return done?.status === "failed" ? "failed" : "published";
+  }
+  if (!row.handle) return "processing";
 
   const [account] = await db
     .select({
@@ -541,16 +552,27 @@ export async function pollPost(postId: string): Promise<"published" | "failed" |
     return "failed";
   }
 
-  const status = await adapter.checkStatus({
-    accessToken,
-    platformAccountId: account.platformAccountId,
-    handle: row.handle,
-    accountHandle: account.username,
-    content: row.content ?? undefined,
-    hashtags: row.hashtags as string[] | undefined,
-    platformSettings: (row.platformSettings as Record<string, unknown>) ?? undefined,
-    media: await loadPostMedia(postId),
-  });
+  let status: Awaited<ReturnType<NonNullable<typeof adapter.checkStatus>>>;
+  try {
+    status = await adapter.checkStatus({
+      accessToken,
+      platformAccountId: account.platformAccountId,
+      handle: row.handle,
+      accountHandle: account.username,
+      content: row.content ?? undefined,
+      hashtags: row.hashtags as string[] | undefined,
+      platformSettings: (row.platformSettings as Record<string, unknown>) ?? undefined,
+      media: await loadPostMedia(postId),
+    });
+  } catch (error) {
+    // Error permanen dari platform (mis. container EXPIRED, token invalid) →
+    // tandai failed langsung; jangan buang attempt retry utk error non-retryable.
+    if (error instanceof PublishError && !error.retryable) {
+      await markFailed(postId, error.code, error.message);
+      return "failed";
+    }
+    throw error; // transien → job poll di-retry BullMQ / next tick fallback
+  }
   if (status.status === "published") {
     await markPublished(postId, status.platformPostId, status.platformPostUrl);
     // First comment — best-effort setelah post tayang (jalur async/poll)

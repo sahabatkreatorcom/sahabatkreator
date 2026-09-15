@@ -7,7 +7,7 @@ import { recordQuotaFromHeaders } from "../quota";
 import { PublishError, type PublishInput, type PublishResult } from "../types";
 
 /** Rekam kuota BUC Meta dari response header (entity = platformAccountId akun) */
-export function quotaHook(platform: string, input: PublishInput) {
+export function quotaHook(platform: string, input: Pick<PublishInput, "platformAccountId">) {
   return (res: { headers: Headers }) =>
     void recordQuotaFromHeaders(platform, input.platformAccountId, res.headers);
 }
@@ -63,25 +63,12 @@ export async function publishStory(
     throw new PublishError("ig_no_container", "Platform tidak mengembalikan container ID", true);
   }
 
-  // Video story butuh processing — poll via handle mode fb/igs
-  if (video) {
-    return {
-      status: "processing",
-      handle: mode === "fb" ? `ig:${creationId}` : `igs:${creationId}`,
-    };
-  }
-
-  // Image: publish segera
-  const publishRes = await httpRequest<{ id?: string }>(`${base}/${igUserId}/media_publish`, {
-    method: "POST",
-    query: { creation_id: creationId, access_token: input.accessToken },
-    onResponse: quotaHook("instagram", input),
-  });
-  if (!publishRes.ok) await throwFromResponse(publishRes, "IG story publish");
-  const mediaId = (await publishRes.json()).id;
-  if (!mediaId)
-    throw new PublishError("ig_no_media_id", "Publish sukses tapi media ID kosong", true);
-  return { status: "published", platformPostId: mediaId };
+  // Flow async konsisten: media_publish hanya valid setelah container FINISHED —
+  // biarkan worker poll (image sekalipun butuh waktu diproses Meta) lalu publish final.
+  return {
+    status: "processing",
+    handle: mode === "fb" ? `ig:${creationId}` : `igs:${creationId}`,
+  };
 }
 
 /** Poll status container IG kedua jalur; saat FINISHED lakukan media_publish final */
@@ -108,7 +95,11 @@ export async function pollInstagram(input: {
     // Container siap → publish final
     const pub = await httpRequest<{ id?: string }>(
       `${base}/${input.platformAccountId}/media_publish`,
-      { method: "POST", query: { creation_id: containerId, access_token: input.accessToken } },
+      {
+        method: "POST",
+        query: { creation_id: containerId, access_token: input.accessToken },
+        onResponse: quotaHook(input.mode === "fb" ? "instagram" : "instagram_standalone", input),
+      },
     );
     if (!pub.ok) await throwFromResponse(pub, "IG publish");
     const mediaId = (await pub.json()).id;
