@@ -148,15 +148,65 @@ async function replyThreads(input: ReplyInput): Promise<ReplyResult> {
   if (!containerId)
     throw new PublishError("threads_no_container", "Threads reply tanpa container ID", true);
 
-  const pub = await httpRequest<{ id?: string }>(
-    `${GRAPH_THREADS}/${input.platformAccountId}/threads_publish`,
-    { method: "POST", query: { creation_id: containerId, access_token: input.accessToken } },
-  );
-  if (!pub.ok) await throwFromResponse(pub, "Threads reply publish");
-  const mediaId = (await pub.json()).id;
-  if (!mediaId)
-    throw new PublishError("threads_no_media_id", "Threads reply publish tanpa ID", true);
-  return { replyId: mediaId };
+  // Container harus FINISHED sebelum threads_publish (docs: rata-rata ±30 detik;
+  // publish terlalu dini → ditolak platform). Poll inline — teks biasanya <5 detik.
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    const st = await httpRequest<{ status?: string; error_message?: string }>(
+      `${GRAPH_THREADS}/${containerId}`,
+      { query: { fields: "status,error_message", access_token: input.accessToken } },
+    );
+    if (!st.ok) await throwFromResponse(st, "Threads reply container status");
+    const { status, error_message } = await st.json();
+    if (status === "FINISHED" || status === "PUBLISHED") break;
+    if (status === "ERROR" || status === "EXPIRED") {
+      throw new PublishError(
+        `threads_reply_${status.toLowerCase()}`,
+        `Container reply Threads ${status}${error_message ? `: ${error_message}` : ""}`,
+        false,
+      );
+    }
+    if (Date.now() >= deadline) {
+      throw new PublishError(
+        "threads_reply_timeout",
+        "Container reply Threads belum selesai diproses (timeout 60 detik).",
+        true,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+  }
+
+  // Publish final — error [24] "resource does not exist" terjadi bila post parent
+  // baru saja terpublish dan belum terpropagasi di sisi Meta; retry singkat.
+  const pubDeadline = Date.now() + 60_000;
+  for (let attempt = 0; ; attempt++) {
+    const pub = await httpRequest<{ id?: string }>(
+      `${GRAPH_THREADS}/${input.platformAccountId}/threads_publish`,
+      { method: "POST", query: { creation_id: containerId, access_token: input.accessToken } },
+    );
+    if (pub.ok) {
+      const mediaId = (await pub.json()).id;
+      if (!mediaId)
+        throw new PublishError("threads_no_media_id", "Threads reply publish tanpa ID", true);
+      return { replyId: mediaId };
+    }
+    // Body native Response hanya bisa dibaca sekali — baca sekarang, reuse utk throw
+    const body = await pub.text();
+    const propagating = pub.status === 404 || body.includes("[24]");
+    if (!propagating || Date.now() >= pubDeadline || attempt >= 9) {
+      await throwFromResponse(
+        {
+          ok: pub.ok,
+          status: pub.status,
+          headers: pub.headers,
+          json: () => Promise.reject(new Error("body sudah dikonsumsi")),
+          text: () => Promise.resolve(body),
+        },
+        "Threads reply publish",
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 6_000));
+  }
 }
 
 async function replyTikTok(input: ReplyInput): Promise<ReplyResult> {
