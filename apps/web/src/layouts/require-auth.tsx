@@ -83,5 +83,7 @@ export function RedirectIfAuthenticated({ children }: { children?: ReactNode }) 
 
   if (data?.authenticated) return <Navigate to={redirectTo} replace />;
 
-  return <>{children}</>;
+  // Dipakai sebagai pathless layout route di router — anak-anaknya dirender
+  // via Outlet; children prop hanya untuk pemakaian langsung membungkus elemen.
+  return <>{children ?? <Outlet />}</>;
 }
