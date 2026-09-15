@@ -138,6 +138,7 @@ export function validatePost(input: ValidatePostInput): ValidationIssue[] {
   // --- Validasi per platform (akun terpilih) ---
   const hashtagCount = countHashtags(input.hashtags);
   const videoMedia = input.media.filter((m) => m.mimeType.startsWith("video/"));
+  const imageMedia = input.media.filter((m) => m.mimeType.startsWith("image/"));
 
   for (const account of input.accounts) {
     const platform = account.platform;
@@ -183,6 +184,17 @@ export function validatePost(input: ValidatePostInput): ValidationIssue[] {
     }
 
     if (platform === "tiktok") {
+      // Photo post TikTok hanya mendukung JPEG/WebP — PNG/GIF ditolak
+      // platform dengan file_format_check_failed (gagal asinkron setelah submit).
+      for (const image of imageMedia) {
+        if (image.mimeType !== "image/jpeg" && image.mimeType !== "image/webp") {
+          issues.push({
+            severity: "error",
+            platform: "tiktok",
+            message: `TikTok hanya mendukung foto JPEG/WebP — ada foto berformat ${image.mimeType}. Buka editor gambar atau gunakan resize untuk mengonversinya ke JPEG.`,
+          });
+        }
+      }
       // Durasi video maks 60 detik — cek bila durasi tersedia di objek media
       for (const video of videoMedia) {
         if (video.durationSeconds != null && video.durationSeconds > TIKTOK_MAX_DURATION_SECONDS) {

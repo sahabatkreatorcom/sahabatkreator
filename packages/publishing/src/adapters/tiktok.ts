@@ -108,6 +108,18 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
   }
 
   // ---- Photo post (carousel foto) via content/init ----
+  // Riset docs: photo post TikTok hanya mendukung JPEG/WebP — PNG/GIF ditolak
+  // TikTok secara asinkron (fail_reason: file_format_check_failed).
+  const unsupported = photos.filter(
+    (p) => p.mimeType !== "image/jpeg" && p.mimeType !== "image/webp",
+  );
+  if (unsupported.length > 0) {
+    throw new PublishError(
+      "tiktok_photo_format",
+      `TikTok hanya mendukung foto JPEG/WebP — ${unsupported.length} foto berformat lain (${[...new Set(unsupported.map((p) => p.mimeType))].join(", ")}). Konversi ke JPEG via fitur edit/resize media, lalu publish ulang.`,
+      false,
+    );
+  }
   if (photos.length > 35) {
     throw new PublishError("tiktok_photo_limit", "Maksimal 35 foto per post TikTok.", false);
   }

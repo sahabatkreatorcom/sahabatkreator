@@ -147,6 +147,58 @@ function sniffMatches(claimed: string, sniffed: string | null): boolean {
   return false;
 }
 
+/**
+ * Batas dimensi & ukuran hasil normalisasi gambar.
+ * 4096px: platform sosmed max 1080–4096px — lebih dari itu hanya buang storage.
+ * 20 MB: batas per foto TikTok (paling ketat di antara platform yang didukung).
+ */
+const IMAGE_MAX_DIMENSION = 4096;
+const IMAGE_MAX_BYTES = 20 * 1024 * 1024;
+
+/**
+ * Normalisasi gambar agar kompatibel semua platform + hemat storage:
+ * - PNG → JPEG (flatten alpha ke putih; TikTok photo post hanya dukung JPEG/WebP)
+ * - Downscale bila sisi terpanjang > 4096px
+ * - Re-encode bila hasil masih > 20 MB
+ * GIF, video, dan audio tidak disentuh. Return null bila tidak perlu dikonversi.
+ */
+async function normalizeImage(
+  buffer: Buffer,
+  mimeType: string,
+): Promise<{ buffer: Buffer<ArrayBuffer>; mimeType: string } | null> {
+  if (mimeType === "image/gif" || !mimeType.startsWith("image/")) return null;
+
+  const image = sharp(buffer, { limitInputPixels: 268402689 }); // guard dekod — cegah decompression bomb
+  const meta = await image.metadata();
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
+  const needsDownscale = Math.max(width, height) > IMAGE_MAX_DIMENSION;
+  const needsPngConvert = mimeType === "image/png";
+
+  if (!needsDownscale && !needsPngConvert && buffer.byteLength <= IMAGE_MAX_BYTES) return null;
+
+  let pipeline = image.rotate(); // hormati orientasi EXIF
+  if (needsDownscale) {
+    pipeline = pipeline.resize({
+      width: IMAGE_MAX_DIMENSION,
+      height: IMAGE_MAX_DIMENSION,
+      fit: "inside", // jangan upscale / jangan distorsi — hanya perkecil
+      withoutEnlargement: true,
+    });
+  }
+  // JPEG: universally diterima semua platform (TikTok/IG/FB/Pinterest/…)
+  const converted = await pipeline.jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+
+  // Kasus ekstrem (downscale + quality 90 masih > 20MB): turunkan quality satu tahap
+  if (converted.byteLength > IMAGE_MAX_BYTES) {
+    const smaller = await pipeline.jpeg({ quality: 75, mozjpeg: true }).toBuffer();
+    return smaller.byteLength < converted.byteLength
+      ? { buffer: smaller, mimeType: "image/jpeg" }
+      : { buffer: converted, mimeType: "image/jpeg" };
+  }
+  return { buffer: converted, mimeType: "image/jpeg" };
+}
+
 /** GET /media — list media org (filter: folderId) */
 mediaRoute.get("/", async (c) => {
   try {
@@ -345,12 +397,24 @@ mediaRoute.post("/import", async (c) => {
       return c.json({ message: "Tipe file tidak sesuai isi" }, 400);
     }
 
+    // Normalisasi gambar (PNG→JPEG, cap 4096px/20MB) — kompatibel semua platform
+    let finalBuffer = buffer;
+    let finalMimeType = contentType;
+    const normalized = await normalizeImage(buffer, contentType);
+    if (normalized) {
+      finalBuffer = normalized.buffer;
+      finalMimeType = normalized.mimeType;
+    }
+
     // Ambil nama file dari path URL (assertSafeExternalUrl sudah memastikan URL valid)
     const parsed = new URL(input.url);
-    const filename = input.name ?? parsed.pathname.split("/").pop() ?? "imported";
+    let filename = input.name ?? parsed.pathname.split("/").pop() ?? "imported";
+    if (normalized && !filename.toLowerCase().match(/\.(jpe?g)$/)) {
+      filename = `${filename.replace(/\.[^.]+$/, "")}.jpg`;
+    }
     const { storageKey, url } = await uploadObject(ctx.organization.id, {
-      data: buffer,
-      mimeType: contentType,
+      data: finalBuffer,
+      mimeType: finalMimeType,
       originalName: filename,
     });
 
@@ -359,15 +423,15 @@ mediaRoute.post("/import", async (c) => {
       id,
       organizationId: ctx.organization.id,
       name: filename,
-      type: contentType.startsWith("video/")
+      type: finalMimeType.startsWith("video/")
         ? "video"
-        : contentType.startsWith("audio/")
+        : finalMimeType.startsWith("audio/")
           ? "audio"
           : "image",
       storageKey,
       url,
-      mimeType: contentType,
-      sizeBytes: buffer.byteLength,
+      mimeType: finalMimeType,
+      sizeBytes: finalBuffer.byteLength,
       folderId: input.folderId ?? null,
       uploadedByUserId: ctx.user.id,
     });
@@ -403,13 +467,26 @@ mediaRoute.post("/upload", async (c) => {
     }
 
     const altText = formData.get("altText");
-    const buffer = Buffer.from(await file.arrayBuffer());
+    let buffer = Buffer.from(await file.arrayBuffer());
 
     // Validasi isi file (magic bytes) vs content-type yang diklaim client —
     // cegah upload file berbahaya (HTML/SVG) menyamar sebagai gambar.
     const sniffed = sniffContentType(new Uint8Array(buffer));
     if (!sniffMatches(file.type, sniffed)) {
       return c.json({ message: "Tipe file tidak sesuai isi" }, 400);
+    }
+
+    // Normalisasi gambar (PNG→JPEG, cap 4096px/20MB) — kompatibel semua platform
+    // + hemat storage. Video/audio/GIF tidak disentuh (re-encode video = ffmpeg, berat).
+    let mimeType = file.type;
+    let filename = file.name;
+    const normalized = await normalizeImage(buffer, mimeType);
+    if (normalized) {
+      buffer = normalized.buffer;
+      mimeType = normalized.mimeType;
+      if (!filename.toLowerCase().endsWith(".jpg") && !filename.toLowerCase().endsWith(".jpeg")) {
+        filename = `${filename.replace(/\.[^.]+$/, "")}.jpg`;
+      }
     }
 
     // Thumbnail video (opsional): JPEG frame dari browser — validasi magic
@@ -430,25 +507,25 @@ mediaRoute.post("/upload", async (c) => {
 
     const { storageKey, url } = await uploadObject(ctx.organization.id, {
       data: buffer,
-      mimeType: file.type,
-      originalName: file.name,
+      mimeType,
+      originalName: filename,
     });
 
     const id = generateId("media");
     await db.insert(media).values({
       id,
       organizationId: ctx.organization.id,
-      name: file.name,
-      type: file.type.startsWith("video/")
+      name: filename,
+      type: mimeType.startsWith("video/")
         ? "video"
-        : file.type.startsWith("audio/")
+        : mimeType.startsWith("audio/")
           ? "audio"
           : "image",
       storageKey,
       url,
       thumbnailUrl,
-      mimeType: file.type,
-      sizeBytes: file.size,
+      mimeType,
+      sizeBytes: buffer.byteLength,
       altText: typeof altText === "string" ? altText : null,
       uploadedByUserId: ctx.user.id,
     });

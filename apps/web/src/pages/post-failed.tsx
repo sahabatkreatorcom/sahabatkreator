@@ -44,6 +44,10 @@ function suggestionFor(code: string | null): string {
       return "Platform sedang membatasi jumlah posting. Tunggu beberapa menit lalu coba lagi.";
     case "media_invalid":
       return "Media tidak memenuhi spesifikasi platform (format/durasi/ukuran). Periksa media lalu publish ulang.";
+    case "tiktok_publish_failed":
+      return "TikTok menolak media ini — bila berupa foto, pastikan formatnya JPEG/WebP (PNG tidak didukung). Konversi lewat editor gambar/resize di media library, lalu publish ulang.";
+    case "tiktok_photo_format":
+      return "TikTok hanya mendukung foto JPEG/WebP. Konversi foto lewat editor gambar atau fitur resize di media library, lalu publish ulang.";
     case "duplicate_content":
       return "Platform mendeteksi konten duplikat. Ubah caption atau media sebelum mencoba lagi.";
     default:
