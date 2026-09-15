@@ -43,7 +43,10 @@ export function SebChatPanel({
   const queryClient = useQueryClient();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [optimistic, setOptimistic] = useState<string[]>([]);
+  const [newChat, setNewChat] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const sessionsQuery = useQuery({
     queryKey: ["seb-chat-sessions"],
@@ -57,15 +60,16 @@ export function SebChatPanel({
     enabled: !!activeSessionId,
   });
 
+  // Auto-select sesi terbaru hanya bila user sedang tidak memulai chat baru
   useEffect(() => {
-    if (!activeSessionId && sessionsQuery.data?.sessions?.length) {
+    if (!activeSessionId && !newChat && sessionsQuery.data?.sessions?.length) {
       setActiveSessionId(sessionsQuery.data.sessions[0].id);
     }
-  }, [sessionsQuery.data, activeSessionId]);
+  }, [sessionsQuery.data, activeSessionId, newChat]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messagesQuery.data]);
+  }, [messagesQuery.data, optimistic]);
 
   const sendMessage = useMutation({
     mutationFn: (message: string) =>
@@ -77,13 +81,18 @@ export function SebChatPanel({
         message,
       }),
     onSuccess: (res) => {
+      setOptimistic([]);
       if (!activeSessionId) {
         setActiveSessionId(res.session.id);
+        setNewChat(false);
       }
       queryClient.invalidateQueries({ queryKey: ["seb-chat-sessions"] });
       queryClient.invalidateQueries({ queryKey: ["seb-chat-messages"] });
     },
-    onError: (e: Error) => {
+    onError: (e: Error, message) => {
+      // Pesan gagal terkirim — kembalikan ke input agar bisa diedit/coba lagi
+      setOptimistic([]);
+      setDraft((d) => d || message);
       toast.error(e.message);
       onError?.(e.message);
     },
@@ -92,7 +101,12 @@ export function SebChatPanel({
   const deleteSession = useMutation({
     mutationFn: (id: string) => api.delete(`/seb/chat/sessions/${id}`),
     onSuccess: (_data, id) => {
-      if (activeSessionId === id) setActiveSessionId(null);
+      // Bersihkan cache pesan sesi terhapus agar chat lama tidak terlihat
+      queryClient.removeQueries({ queryKey: ["seb-chat-messages", id] });
+      if (activeSessionId === id) {
+        setActiveSessionId(null);
+        setOptimistic([]);
+      }
       queryClient.invalidateQueries({ queryKey: ["seb-chat-sessions"] });
       toast.success("Sesi dihapus");
     },
@@ -102,6 +116,28 @@ export function SebChatPanel({
   const sessions = sessionsQuery.data?.sessions ?? [];
   const messages = messagesQuery.data?.messages ?? [];
   const busy = sendMessage.isPending;
+  const showEmptyState =
+    (sessions.length === 0 && !optimistic.length) ||
+    (!activeSessionId && (newChat || sessions.length === 0) && !optimistic.length);
+
+  // Auto-resize textarea mengikuti isi (maks 6 baris) agar input multi-baris nyaman
+  function autoResize(el: HTMLTextAreaElement) {
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 144)}px`;
+  }
+
+  useEffect(() => {
+    if (inputRef.current) autoResize(inputRef.current);
+  }, [draft]);
+
+  function submit() {
+    const message = draft.trim();
+    if (!message || busy) return;
+    setDraft("");
+    // Tampilkan pesan user seketika — jawaban SEB menyusul setelah respons
+    setOptimistic((list) => [...list, message]);
+    sendMessage.mutate(message);
+  }
 
   return (
     <div className={cn("card flex h-[560px] flex-col overflow-hidden p-0", className)}>
@@ -120,7 +156,11 @@ export function SebChatPanel({
             >
               <button
                 type="button"
-                onClick={() => setActiveSessionId(s.id)}
+                onClick={() => {
+                  setActiveSessionId(s.id);
+                  setNewChat(false);
+                  setOptimistic([]);
+                }}
                 className="max-w-40 truncate"
                 title={s.title}
               >
@@ -141,7 +181,10 @@ export function SebChatPanel({
           type="button"
           onClick={() => {
             setActiveSessionId(null);
+            setNewChat(true);
+            setOptimistic([]);
             setDraft("");
+            inputRef.current?.focus();
           }}
           className="flex shrink-0 items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1 font-medium text-xs transition-colors hover:border-[var(--accent-gold)] hover:text-[var(--accent-gold)]"
         >
@@ -152,17 +195,20 @@ export function SebChatPanel({
 
       {/* Daftar pesan */}
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {sessions.length === 0 && (
+        {showEmptyState && !busy && (
           <p className="mt-8 text-center text-[var(--text-secondary)] text-sm">
             Mulai percakapan pertama Anda dengan SEB — tanya apa saja soal konten dan performa
             sosmed Anda.
           </p>
         )}
-        {activeSessionId && messages.length === 0 && !messagesQuery.isLoading && (
-          <p className="mt-8 text-center text-[var(--text-secondary)] text-sm">
-            Belum ada pesan di sesi ini.
-          </p>
-        )}
+        {activeSessionId &&
+          messages.length === 0 &&
+          !optimistic.length &&
+          !messagesQuery.isLoading && (
+            <p className="mt-8 text-center text-[var(--text-secondary)] text-sm">
+              Belum ada pesan di sesi ini.
+            </p>
+          )}
         {messages.map((m) => {
           const isUser = m.role === "user";
           const attachments = m.metadata?.attachments ?? [];
@@ -182,6 +228,14 @@ export function SebChatPanel({
             </div>
           );
         })}
+        {/* Pesan user yang baru dikirim — tampil seketika sebelum respons masuk */}
+        {optimistic.map((message, i) => (
+          <div key={`optimistic-${i}-${message.slice(0, 12)}`} className="flex justify-end">
+            <div className="max-w-[85%] rounded-[var(--radius-lg)] bg-[var(--accent-gold)] px-3.5 py-2.5 text-sm text-white opacity-70">
+              <p className="whitespace-pre-wrap break-words">{message}</p>
+            </div>
+          </div>
+        ))}
         {busy && (
           <div className="flex justify-start">
             <div className="flex items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-3.5 py-2.5 text-sm">
@@ -198,28 +252,23 @@ export function SebChatPanel({
         className="flex items-end gap-2 border-[var(--border-light)] border-t p-3"
         onSubmit={(e) => {
           e.preventDefault();
-          const message = draft.trim();
-          if (!message || busy) return;
-          setDraft("");
-          sendMessage.mutate(message);
+          submit();
         }}
       >
         <textarea
+          ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              const message = draft.trim();
-              if (!message || busy) return;
-              setDraft("");
-              sendMessage.mutate(message);
+              submit();
             }
           }}
           rows={1}
           maxLength={4000}
-          placeholder="Tanya SEB… (Enter kirim, Shift+Enter baris baru)"
-          className="input max-h-32 flex-1 resize-none"
+          placeholder="Tanya SEB apa saja… (Enter kirim)"
+          className="input max-h-36 min-h-[40px] flex-1 resize-none overflow-y-auto"
         />
         <button
           type="submit"

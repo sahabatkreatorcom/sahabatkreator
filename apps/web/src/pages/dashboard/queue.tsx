@@ -8,15 +8,13 @@ import {
   ChevronDown,
   Clock,
   ExternalLink,
-  LayoutGrid,
-  List,
   Loader2,
   RefreshCw,
   Send,
   Share2,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,18 +56,6 @@ const STATUS_TABS = [
   { key: "failed", label: "Gagal" },
   { key: "published", label: "Terbit" },
 ] as const;
-
-type ViewMode = "grid" | "list";
-const VIEW_STORAGE_KEY = "queue-view-mode";
-
-/** Preferensi tampilan queue (grid/list) — persist di localStorage */
-function loadViewMode(): ViewMode {
-  try {
-    return localStorage.getItem(VIEW_STORAGE_KEY) === "grid" ? "grid" : "list";
-  } catch {
-    return "list";
-  }
-}
 
 const STATUS_BADGE: Record<
   string,
@@ -123,15 +109,6 @@ export function QueuePage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<(typeof STATUS_TABS)[number]["key"]>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [view, setView] = useState<ViewMode>(loadViewMode);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(VIEW_STORAGE_KEY, view);
-    } catch {
-      // abaikan — private mode / storage penuh
-    }
-  }, [view]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["queue-posts"],
@@ -187,40 +164,11 @@ export function QueuePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-bold text-2xl">Antrian Post</h1>
-          <p className="mt-1 text-[var(--text-secondary)] text-sm">
-            Kelola post terjadwal, gagal, dan terbit — semua platform dalam satu tempat
-          </p>
-        </div>
-
-        {/* Toggle tampilan grid/list */}
-        <div className="flex items-center gap-0.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] p-0.5">
-          {(
-            [
-              ["list", "Tampilan list", List],
-              ["grid", "Tampilan grid", LayoutGrid],
-            ] as const
-          ).map(([mode, title, Icon]) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setView(mode)}
-              title={title}
-              aria-label={title}
-              aria-pressed={view === mode}
-              className={cn(
-                "rounded-[calc(var(--radius-md)-2px)] p-1.5 transition-colors",
-                view === mode
-                  ? "bg-[var(--accent-gold)] text-white"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-              )}
-            >
-              <Icon className="h-4 w-4" />
-            </button>
-          ))}
-        </div>
+      <div>
+        <h1 className="font-bold text-2xl">Antrian Post</h1>
+        <p className="mt-1 text-[var(--text-secondary)] text-sm">
+          Kelola post terjadwal, gagal, dan terbit — semua platform dalam satu tempat
+        </p>
       </div>
 
       {/* Tab filter */}
@@ -258,11 +206,7 @@ export function QueuePage() {
           }
         />
       ) : (
-        <div
-          className={cn(
-            view === "grid" ? "items-start gap-4 sm:grid-cols-2 xl:grid-cols-3" : "space-y-3",
-          )}
-        >
+        <div className="space-y-3">
           {filtered.map((group) => {
             const status = groupStatus(group.posts);
             const isFailed = status === "failed";
@@ -281,82 +225,63 @@ export function QueuePage() {
                 key={group.id}
                 className={cn("card overflow-hidden", isFailed && "border-[var(--error)]/30")}
               >
-                {/* Row utama — horizontal di mode list, vertikal di mode grid */}
-                <div
-                  className={cn(
-                    "gap-3 p-4",
-                    view === "grid" ? "flex flex-col" : "flex items-start",
-                  )}
-                >
-                  <div className={cn("min-w-0", view === "list" && "flex-1")}>
-                    <div className="flex items-start gap-3">
-                      {/* Status icon */}
-                      <div className="mt-0.5 shrink-0">
-                        {status === "failed" ? (
-                          <AlertCircle className="h-5 w-5 text-[var(--error)]" />
-                        ) : status === "published" ? (
-                          <CheckCircle2 className="h-5 w-5 text-[var(--success)]" />
-                        ) : status === "processing" ? (
-                          <Loader2 className="h-5 w-5 animate-spin text-[var(--warning)]" />
-                        ) : (
-                          <Clock className="h-5 w-5 text-[var(--info)]" />
-                        )}
-                      </div>
+                {/* Row utama */}
+                <div className="flex items-start gap-3 p-4">
+                  {/* Status icon */}
+                  <div className="mt-0.5 shrink-0">
+                    {status === "failed" ? (
+                      <AlertCircle className="h-5 w-5 text-[var(--error)]" />
+                    ) : status === "published" ? (
+                      <CheckCircle2 className="h-5 w-5 text-[var(--success)]" />
+                    ) : status === "processing" ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-[var(--warning)]" />
+                    ) : (
+                      <Clock className="h-5 w-5 text-[var(--info)]" />
+                    )}
+                  </div>
 
-                      {/* Konten */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {STATUS_BADGE[status] && (
-                            <Badge variant={STATUS_BADGE[status].variant}>
-                              {STATUS_BADGE[status].label}
-                            </Badge>
-                          )}
-                          {group.scheduledAt && (
-                            <span className="flex items-center gap-1 text-[var(--text-muted)] text-xs">
-                              <CalendarClock className="h-3.5 w-3.5" />
-                              {formatDate(group.scheduledAt)}
-                            </span>
-                          )}
-                          {/* Chip platform */}
-                          {group.posts.map((p) => {
-                            const cfg = PLATFORMS[p.platform as keyof typeof PLATFORMS];
-                            if (!cfg) return null;
-                            return (
-                              <span
-                                key={p.id}
-                                className="rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 font-medium text-[11px]"
-                                style={{ color: cfg.color }}
-                              >
-                                {cfg.label}
-                              </span>
-                            );
-                          })}
-                        </div>
-                        <p
-                          className={cn(
-                            "mt-1.5 line-clamp-2 text-[var(--text-primary)] text-sm",
-                            view === "grid" && "min-h-10",
-                          )}
-                        >
-                          {group.content || "(tanpa caption)"}
-                        </p>
-                        {isFailed && (
-                          <p className="mt-1 text-[var(--error)] text-xs">
-                            {group.posts.filter((p) => p.status === "failed").length} post gagal —
-                            klik detail untuk melihat error
-                          </p>
-                        )}
-                      </div>
+                  {/* Konten */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {STATUS_BADGE[status] && (
+                        <Badge variant={STATUS_BADGE[status].variant}>
+                          {STATUS_BADGE[status].label}
+                        </Badge>
+                      )}
+                      {group.scheduledAt && (
+                        <span className="flex items-center gap-1 text-[var(--text-muted)] text-xs">
+                          <CalendarClock className="h-3.5 w-3.5" />
+                          {formatDate(group.scheduledAt)}
+                        </span>
+                      )}
+                      {/* Chip platform */}
+                      {group.posts.map((p) => {
+                        const cfg = PLATFORMS[p.platform as keyof typeof PLATFORMS];
+                        if (!cfg) return null;
+                        return (
+                          <span
+                            key={p.id}
+                            className="rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 font-medium text-[11px]"
+                            style={{ color: cfg.color }}
+                          >
+                            {cfg.label}
+                          </span>
+                        );
+                      })}
                     </div>
+                    <p className="mt-1.5 line-clamp-2 text-[var(--text-primary)] text-sm">
+                      {group.content || "(tanpa caption)"}
+                    </p>
+                    {isFailed && (
+                      <p className="mt-1 text-[var(--error)] text-xs">
+                        {group.posts.filter((p) => p.status === "failed").length} post gagal — klik
+                        detail untuk melihat error
+                      </p>
+                    )}
                   </div>
 
                   {/* Aksi */}
-                  <div
-                    className={cn(
-                      "flex shrink-0 items-center gap-1.5",
-                      view === "grid" && "self-end",
-                    )}
-                  >
+                  <div className="flex shrink-0 items-center gap-1.5">
                     {status === "published" && (
                       <Button
                         size="sm"

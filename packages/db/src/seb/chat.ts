@@ -104,13 +104,18 @@ function searchTokens(text: string) {
 async function findSebChatMediaAttachments(
   organizationId: string,
   message: string,
-  answer: string,
 ): Promise<SebChatMediaAttachment[]> {
-  const tokens = searchTokens(`${message} ${answer}`);
+  // Hanya pertanyaan user yang eksplisit minta visual (lihat gambar/video/
+  // contoh kreasi tertentu) yang boleh membawa lampiran media. Kata semata
+  // dari jawaban SEB (yang hampir selalu menyebut "reel"/"story") tidak cukup
+  // — itu membuat hampir setiap balasan melampirkan media.
   const visualIntent =
-    /\b(show|see|visual|image|photo|video|preview|example|creative|design|hook|thumbnail|reel|story|ad)\b/i.test(
-      `${message} ${answer}`,
+    /\b(show|see|look at|tunjukkan|lihat|contoh (?:gambar|video|konten|kreasi)| gambarku| videoku| postku| hasil posting)\b/i.test(
+      message,
     );
+  if (!visualIntent) return [];
+
+  const tokens = searchTokens(message);
 
   // Post terbaru dengan media (max 60)
   const posts = await db
@@ -191,15 +196,19 @@ async function findSebChatMediaAttachments(
     };
   });
 
-  return scored
-    .filter((item) => item.score > 0 || visualIntent)
-    .sort((a, b) => b.score - a.score)
-    .filter(
-      (item, index, all) =>
-        all.findIndex((other) => other.attachment.id === item.attachment.id) === index,
-    )
-    .slice(0, visualIntent ? 6 : 3)
-    .map((item) => item.attachment);
+  return (
+    scored
+      // Wajib ada kecocokan konteks nyata — "contoh visual" acak tanpa relevansi
+      // topik hanya menambah kebisingan.
+      .filter((item) => item.score >= 1)
+      .sort((a, b) => b.score - a.score)
+      .filter(
+        (item, index, all) =>
+          all.findIndex((other) => other.attachment.id === item.attachment.id) === index,
+      )
+      .slice(0, 3)
+      .map((item) => item.attachment)
+  );
 }
 
 /** Chat dengan SEB — buat/lanjut sesi, generate jawaban, attach media relevan */
@@ -276,7 +285,7 @@ export async function chatWithSeb({
   );
 
   const normalizedAnswer = normalizeSebChatAnswer(answer);
-  const attachments = await findSebChatMediaAttachments(organizationId, message, normalizedAnswer);
+  const attachments = await findSebChatMediaAttachments(organizationId, message);
   const saved = await db
     .insert(sebChatMessage)
     .values({
