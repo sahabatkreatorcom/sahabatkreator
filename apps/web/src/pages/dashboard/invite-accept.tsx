@@ -6,6 +6,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
+import { useSyncSession } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { useSeo } from "@/lib/seo";
 
@@ -14,6 +15,7 @@ export function InviteAcceptPage() {
 
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const syncSession = useSyncSession();
   const [accepted, setAccepted] = useState(false);
 
   const accept = useMutation({
@@ -29,10 +31,12 @@ export function InviteAcceptPage() {
       });
       if (error) throw new Error(error.message ?? "Undangan tidak valid");
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setAccepted(true);
       toast.success("Undangan diterima! Selamat bergabung.");
-      setTimeout(() => navigate("/dashboard", { replace: true }), 2000);
+      // Daftar org di ["me"] berubah setelah accept — sinkronkan cache
+      await syncSession();
+      navigate("/dashboard", { replace: true });
     },
     onError: (e: Error) => toast.error(e.message),
   });

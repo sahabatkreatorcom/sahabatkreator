@@ -209,10 +209,14 @@ function OrgSwitcher() {
 function UserMenu() {
   const { data } = useQuery(meQueryOptions);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const user = data?.user;
 
   async function handleSignOut() {
     await authClient.signOut();
+    // Hapus cache ["me"] — session sudah mati; cache authenticated:true lama
+    // membuat RequireAuth salah izinkan (ghost dashboard) sampai refetch
+    await queryClient.invalidateQueries({ queryKey: meQueryOptions.queryKey });
     navigate("/", { replace: true });
   }
 

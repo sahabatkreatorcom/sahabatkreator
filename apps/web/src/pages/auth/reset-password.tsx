@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useSyncSession } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { useSeo } from "@/lib/seo";
 
@@ -18,6 +19,7 @@ export function ResetPasswordPage() {
   });
 
   const navigate = useNavigate();
+  const syncSession = useSyncSession();
   const [params] = useSearchParams();
   const token = params.get("token");
 
@@ -56,6 +58,8 @@ export function ResetPasswordPage() {
       return;
     }
 
+    // Reset password mencabut semua session — sinkronkan cache ["me"]
+    await syncSession();
     toast.success("Password berhasil diubah. Silakan masuk kembali.");
     navigate("/login", { replace: true });
   }

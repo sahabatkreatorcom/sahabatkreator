@@ -1,5 +1,7 @@
 // Command Palette (Ctrl+K / Cmd+K) — pencarian cepat navigasi & aksi dashboard.
 // Filter fuzzy sederhana: semua kata query harus ada di label (case-insensitive).
+
+import { useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
   CalendarDays,
@@ -29,6 +31,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { meQueryOptions } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { useCommandPalette } from "@/lib/command-palette-store";
 import { useTheme } from "@/lib/theme";
@@ -183,6 +186,7 @@ export function CommandPalette() {
   const setOpen = useCommandPalette((s) => s.setOpen);
   const navigate = useNavigate();
   const { resolved, toggle } = useTheme();
+  const queryClient = useQueryClient();
 
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -235,6 +239,8 @@ export function CommandPalette() {
           setSigningOut(true);
           try {
             await authClient.signOut();
+            // Sinkronkan cache ["me"] — hindari ghost dashboard setelah logout
+            await queryClient.invalidateQueries({ queryKey: meQueryOptions.queryKey });
             n("/", { replace: true });
           } finally {
             setSigningOut(false);
@@ -242,7 +248,7 @@ export function CommandPalette() {
         },
       },
     ],
-    [resolved, toggle, signingOut],
+    [resolved, toggle, signingOut, queryClient],
   );
 
   const allCommands = useMemo(() => [...actionCommands, ...NAVIGATION_COMMANDS], [actionCommands]);

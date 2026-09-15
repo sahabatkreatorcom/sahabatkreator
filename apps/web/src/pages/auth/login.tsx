@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useSyncSession } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { useSeo } from "@/lib/seo";
 
@@ -18,6 +19,7 @@ export function LoginPage() {
   });
 
   const navigate = useNavigate();
+  const syncSession = useSyncSession();
   const [params] = useSearchParams();
   const redirectTo = params.get("redirect") ?? "/dashboard";
 
@@ -48,7 +50,7 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setUnverifiedEmail(null);
-    const { data, error } = await authClient.signIn.email({
+    const { error } = await authClient.signIn.email({
       email,
       password,
     });
@@ -68,6 +70,9 @@ export function LoginPage() {
 
     // Jika 2FA aktif, plugin twoFactorClient otomatis redirect ke /two-factor.
 
+    // Refetch /me sebelum navigate — cache guest (authenticated:false) masih
+    // fresh sehingga RequireAuth menendang balik ke login bila tidak disinkronkan
+    await syncSession();
     toast.success("Berhasil masuk. Selamat datang kembali!");
     navigate(redirectTo, { replace: true });
   }

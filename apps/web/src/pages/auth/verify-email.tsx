@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useSyncSession } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { useSeo } from "@/lib/seo";
 
@@ -30,6 +31,7 @@ export function VerifyEmailPage() {
   });
 
   const navigate = useNavigate();
+  const syncSession = useSyncSession();
   const [params] = useSearchParams();
   const token = params.get("token");
   const verified = params.get("verified");
@@ -103,7 +105,15 @@ export function VerifyEmailPage() {
           <p className="mt-2 text-[var(--text-secondary)] text-sm">
             Akun Anda sudah aktif. Lanjutkan untuk mulai menggunakan Sahabat Kreator.
           </p>
-          <Button className="mt-6" onClick={() => navigate("/dashboard", { replace: true })}>
+          <Button
+            className="mt-6"
+            onClick={async () => {
+              // auto-sign-in dari verifikasi → cache ["me"] perlu disinkronkan
+              // agar RequireAuth tidak menendang balik ke /login
+              await syncSession();
+              navigate("/dashboard", { replace: true });
+            }}
+          >
             Lanjut ke Dashboard
           </Button>
         </>

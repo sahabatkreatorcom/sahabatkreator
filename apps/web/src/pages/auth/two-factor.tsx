@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSyncSession } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { useSeo } from "@/lib/seo";
 
@@ -19,6 +20,7 @@ export function TwoFactorPage() {
   });
 
   const navigate = useNavigate();
+  const syncSession = useSyncSession();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -42,6 +44,7 @@ export function TwoFactorPage() {
       return;
     }
 
+    await syncSession();
     toast.success("Verifikasi berhasil!");
     navigate("/dashboard", { replace: true });
   }

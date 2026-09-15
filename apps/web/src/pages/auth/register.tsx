@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useSyncSession } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { useSeo } from "@/lib/seo";
 
@@ -28,6 +29,7 @@ export function RegisterPage() {
   });
 
   const navigate = useNavigate();
+  const syncSession = useSyncSession();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -78,6 +80,7 @@ export function RegisterPage() {
     }
 
     // Fallback bila verifikasi tidak diwajibkan (session langsung ada)
+    await syncSession();
     toast.success("Akun berhasil dibuat!");
     navigate("/dashboard", { replace: true });
   }

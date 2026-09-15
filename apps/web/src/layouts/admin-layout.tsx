@@ -1,4 +1,5 @@
 // Shell admin — sidebar khusus panel admin platform
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   Banknote,
@@ -27,6 +28,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
+import { meQueryOptions } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { useTheme } from "@/lib/theme";
 
@@ -55,9 +57,12 @@ export function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const { resolved, toggle } = useTheme();
+  const queryClient = useQueryClient();
 
   async function handleSignOut() {
     await authClient.signOut();
+    // Hapus cache ["me"] — sama seperti dashboard-layout (ghost dashboard fix)
+    await queryClient.invalidateQueries({ queryKey: meQueryOptions.queryKey });
     navigate("/", { replace: true });
   }
 

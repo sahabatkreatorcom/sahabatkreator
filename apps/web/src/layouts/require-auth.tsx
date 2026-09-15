@@ -1,5 +1,5 @@
 // Guard dashboard — redirect ke login jika belum ada session
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Navigate, Outlet, useLocation, useSearchParams } from "react-router";
 import { PageLoader } from "@/components/ui/spinner";
@@ -40,6 +40,26 @@ export const meQueryOptions = {
   staleTime: 60 * 1000,
   retry: false,
 } as const;
+
+/**
+ * Sinkronkan cache ["me"] dengan session server — WAJIB di-await sebelum
+ * navigate setelah status auth berubah (login, verifikasi email, 2FA, logout).
+ *
+ * Kenapa: /me guest sekarang balas 200 (bukan 401) agar console browser
+ * bersih. Akibatnya react-query menyimpan success-state "authenticated:false"
+ * yang masih fresh (staleTime 60s) — RequireAuth membaca cache lama dan
+ * menendang user balik ke /login sebelum refetch sempat jalan. Error-state
+ * dulu otomatis dianggap stale; success-state tidak.
+ *
+ * invalidateQueries() menandai cache stale + memicu refetch aktif,
+ * await memastikan data baru sudah masuk cache sebelum navigate.
+ */
+export function useSyncSession() {
+  const queryClient = useQueryClient();
+  return async () => {
+    await queryClient.invalidateQueries({ queryKey: meQueryOptions.queryKey });
+  };
+}
 
 export function RequireAuth({ children }: { children?: ReactNode }) {
   const location = useLocation();
