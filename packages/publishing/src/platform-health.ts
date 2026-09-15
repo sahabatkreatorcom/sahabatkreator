@@ -4,13 +4,13 @@
 import { db } from "@sahabatkreator/db";
 import { platformHealth } from "@sahabatkreator/db/schema";
 import { sql } from "drizzle-orm";
-import { META_GRAPH_VERSION } from "./config";
+import { GRAPH_FB_URL } from "./config";
 
 /** Endpoint health ringan per platform (GET tanpa auth, tidak mengonsumsi kuota API app) */
 const PLATFORM_HEALTH_ENDPOINTS: Record<string, string> = {
-  instagram: `https://graph.facebook.com/${META_GRAPH_VERSION}/107208775650959`, // Meta status page object
+  instagram: `${GRAPH_FB_URL}/107208775650959`, // Meta status page object
   instagram_standalone: "https://www.instagram.com/robots.txt",
-  facebook: `https://graph.facebook.com/${META_GRAPH_VERSION}/107208775650959`,
+  facebook: `${GRAPH_FB_URL}/107208775650959`,
   threads: "https://www.threads.net/robots.txt",
   tiktok: "https://www.tiktok.com/robots.txt",
   youtube: "https://www.youtube.com/robots.txt",

@@ -1,7 +1,7 @@
 // Helper bersama adapter Meta Graph — dipakai instagram.ts, instagram-standalone.ts,
 // facebook.ts, threads.ts (host Graph, kuota BUC hook, poll container IG)
 
-import { META_GRAPH_VERSION } from "../config";
+import { GRAPH_FB_URL, GRAPH_IG_URL, GRAPH_THREADS_URL } from "../config";
 import { httpRequest, throwFromResponse } from "../http";
 import { recordQuotaFromHeaders } from "../quota";
 import { PublishError, type PublishInput, type PublishResult } from "../types";
@@ -12,11 +12,10 @@ export function quotaHook(platform: string, input: PublishInput) {
     void recordQuotaFromHeaders(platform, input.platformAccountId, res.headers);
 }
 
-// Versi Graph API dari config terpusat (env @sahabatkreator/env/server — jangan hardcode per-module)
-const GRAPH_VERSION = META_GRAPH_VERSION;
-export const GRAPH_FB = `https://graph.facebook.com/${GRAPH_VERSION}`;
-export const GRAPH_IG = `https://graph.instagram.com/${GRAPH_VERSION}`;
-export const GRAPH_THREADS = "https://graph.threads.net/v1.0";
+// Endpoint Graph API — single source of truth di config.ts (jangan hardcode per-module)
+export const GRAPH_FB = GRAPH_FB_URL;
+export const GRAPH_IG = GRAPH_IG_URL;
+export const GRAPH_THREADS = GRAPH_THREADS_URL;
 
 export function firstImage(input: PublishInput) {
   return input.media.find((m) => m.type === "image");

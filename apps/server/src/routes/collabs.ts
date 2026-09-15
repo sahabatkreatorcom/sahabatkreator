@@ -5,6 +5,7 @@
 
 import { db } from "@sahabatkreator/db";
 import { platformSettings, socialAccount } from "@sahabatkreator/db/schema";
+import { GRAPH_FB_URL, GRAPH_IG_URL } from "@sahabatkreator/publishing";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -36,10 +37,7 @@ type GraphError = { error?: { code?: number; message?: string } };
 
 function graphHost(platform: string): string {
   // graph.facebook.com (jalur FB) atau graph.instagram.com (standalone)
-  const version = process.env.META_GRAPH_VERSION || "v26.0";
-  return platform === "instagram"
-    ? `https://graph.facebook.com/${version}`
-    : `https://graph.instagram.com/${version}`;
+  return platform === "instagram" ? GRAPH_FB_URL : GRAPH_IG_URL;
 }
 
 /** Muat akun IG milik org + token decrypt — throw pesan ramah bila tidak siap */

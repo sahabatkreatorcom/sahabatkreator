@@ -7,6 +7,7 @@
 import { db } from "@sahabatkreator/db";
 import { platformCredential, socialAccount } from "@sahabatkreator/db/schema";
 import { env } from "@sahabatkreator/env/server";
+import { TIKTOK_OPEN_API_URL } from "@sahabatkreator/publishing";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { logAdminAction } from "../lib/audit";
@@ -372,7 +373,7 @@ async function runTikTokSuite(): Promise<TestResult[]> {
     }),
     await runCheck("Endpoint API TikTok hidup (open.tiktokapis.com)", async () => {
       // Ping tanpa token — 401 berarti endpoint hidup & auth enforcement jalan (itu OK)
-      const res = await fetchJson("https://open.tiktokapis.com/v2/user/info/");
+      const res = await fetchJson(`${TIKTOK_OPEN_API_URL}/user/info/`);
       if (res.status === 401 || res.status === 403) {
         return {
           status: "pass",

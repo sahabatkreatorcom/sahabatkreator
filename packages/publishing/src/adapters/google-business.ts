@@ -3,6 +3,7 @@
 // platformAccountId = "accounts/{accountId}/locations/{locationId}"
 // Riset: docs/social-platforms/google-business.md (Sep 2026)
 
+import { GBP_API_URL } from "../config";
 import { httpRequest, throwFromResponse } from "../http";
 import {
   composeCaption,
@@ -54,17 +55,14 @@ async function publishGoogleBusiness(input: PublishInput): Promise<PublishResult
       : {}),
   };
 
-  const res = await httpRequest<{ name?: string }>(
-    `https://mybusiness.googleapis.com/v4/${location}/localPosts`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${input.accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
+  const res = await httpRequest<{ name?: string }>(`${GBP_API_URL}/v4/${location}/localPosts`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.accessToken}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(body),
+  });
   if (!res.ok) await throwFromResponse(res, "GBP localPost");
   const data = await res.json();
   if (!data.name) throw new PublishError("gbp_no_post_id", "GBP tanpa post name", true);

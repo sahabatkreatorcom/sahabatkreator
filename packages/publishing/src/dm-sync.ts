@@ -14,14 +14,13 @@ import { db, pushToOrganization } from "@sahabatkreator/db";
 import { dmConversation, dmMessage, socialAccount } from "@sahabatkreator/db/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { processAutomation } from "./automation";
-import { META_GRAPH_VERSION } from "./config";
+import { GRAPH_FB_URL, GRAPH_IG_URL } from "./config";
 import { decrypt } from "./crypto";
 import type { SyncResult } from "./engagement-sync";
 import { httpRequest } from "./http";
 
-const GRAPH_VERSION = META_GRAPH_VERSION;
-const GRAPH_FB = `https://graph.facebook.com/${GRAPH_VERSION}`;
-const GRAPH_IG = `https://graph.instagram.com/${GRAPH_VERSION}`;
+const GRAPH_FB = GRAPH_FB_URL;
+const GRAPH_IG = GRAPH_IG_URL;
 
 function generateId(entity: string): string {
   const bytes = crypto.getRandomValues(new Uint8Array(10));

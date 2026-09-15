@@ -6,7 +6,30 @@
 // - State CSRF disimpan server-side (tabel oauth_state, TTL 10 menit, sekali pakai)
 // - Redirect URI: {SERVER_URL}/api/oauth/{platform}/callback
 
-import { LINKEDIN_API_VERSION, META_GRAPH_VERSION } from "./config";
+import {
+  GBP_ACCOUNT_API_URL,
+  GOOGLE_OAUTH_AUTH_URL,
+  GOOGLE_OAUTH_TOKEN_URL,
+  GRAPH_FB_URL,
+  GRAPH_IG_URL,
+  GRAPH_THREADS_URL,
+  INSTAGRAM_OAUTH_AUTH_URL,
+  INSTAGRAM_OAUTH_TOKEN_URL,
+  LINKEDIN_API_VERSION,
+  LINKEDIN_OAUTH_AUTH_URL,
+  LINKEDIN_OAUTH_TOKEN_URL,
+  LINKEDIN_REST_URL,
+  LINKEDIN_USERINFO_URL,
+  META_DIALOG_URL,
+  PINTEREST_API_BASE_URL,
+  PINTEREST_OAUTH_URL,
+  PINTEREST_SANDBOX,
+  THREADS_OAUTH_AUTH_URL,
+  GRAPH_THREADS_OAUTH_URL,
+  TIKTOK_AUTH_URL,
+  TIKTOK_OPEN_API_URL,
+  YOUTUBE_API_URL,
+} from "./config";
 import { httpRequest } from "./http";
 import { PublishError } from "./types";
 
@@ -67,13 +90,11 @@ type OAuthConfig = {
   clientIdParam?: "client_id" | "client_key";
 };
 
-const GRAPH_VERSION = META_GRAPH_VERSION;
-
 export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
   // Instagram via FB Login — Graph API, Page-scoped
   instagram: {
-    authorizeUrl: `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`,
-    tokenUrl: `https://graph.facebook.com/${GRAPH_VERSION}/oauth/access_token`,
+    authorizeUrl: META_DIALOG_URL,
+    tokenUrl: `${GRAPH_FB_URL}/oauth/access_token`,
     scopes: [
       "pages_show_list",
       // Page di Business Manager hanya muncul di /me/accounts bila token punya
@@ -90,8 +111,8 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
   },
   // Instagram standalone — Business Login for Instagram (IG Login)
   instagram_standalone: {
-    authorizeUrl: "https://www.instagram.com/oauth/authorize",
-    tokenUrl: "https://api.instagram.com/oauth/access_token",
+    authorizeUrl: INSTAGRAM_OAUTH_AUTH_URL,
+    tokenUrl: INSTAGRAM_OAUTH_TOKEN_URL,
     scopes: [
       "instagram_business_basic",
       "instagram_business_content_publish",
@@ -101,8 +122,8 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
     ],
   },
   facebook: {
-    authorizeUrl: `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`,
-    tokenUrl: `https://graph.facebook.com/${GRAPH_VERSION}/oauth/access_token`,
+    authorizeUrl: META_DIALOG_URL,
+    tokenUrl: `${GRAPH_FB_URL}/oauth/access_token`,
     scopes: [
       "pages_show_list",
       // Sama dengan instagram: Page Business Manager butuh scope ini agar
@@ -114,8 +135,8 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
     ],
   },
   threads: {
-    authorizeUrl: "https://threads.net/oauth/authorize",
-    tokenUrl: "https://graph.threads.net/oauth/access_token",
+    authorizeUrl: THREADS_OAUTH_AUTH_URL,
+    tokenUrl: GRAPH_THREADS_OAUTH_URL,
     scopes: [
       "threads_basic",
       "threads_content_publish",
@@ -126,8 +147,8 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
     ],
   },
   tiktok: {
-    authorizeUrl: "https://www.tiktok.com/v2/auth/authorize/",
-    tokenUrl: "https://open.tiktokapis.com/v2/oauth/token/",
+    authorizeUrl: TIKTOK_AUTH_URL,
+    tokenUrl: `${TIKTOK_OPEN_API_URL}/oauth/token/`,
     // TikTok Login Kit v2: param kredensial bernama client_key, bukan client_id
     clientIdParam: "client_key",
     // Scope di authorize dipisah koma (docs Login Kit v2)
@@ -146,8 +167,8 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
   },
   // YouTube & GBP share Google OAuth (client sama, scope beda)
   youtube: {
-    authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
-    tokenUrl: "https://oauth2.googleapis.com/token",
+    authorizeUrl: GOOGLE_OAUTH_AUTH_URL,
+    tokenUrl: GOOGLE_OAUTH_TOKEN_URL,
     scopes: [
       "https://www.googleapis.com/auth/youtube.upload",
       "https://www.googleapis.com/auth/youtube.force-ssl", // reply komentar
@@ -164,8 +185,8 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
     },
   },
   google_business: {
-    authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
-    tokenUrl: "https://oauth2.googleapis.com/token",
+    authorizeUrl: GOOGLE_OAUTH_AUTH_URL,
+    tokenUrl: GOOGLE_OAUTH_TOKEN_URL,
     scopes: [
       "https://www.googleapis.com/auth/business.manage",
       "https://www.googleapis.com/auth/userinfo.profile",
@@ -179,15 +200,17 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
     },
   },
   pinterest: {
-    authorizeUrl: "https://www.pinterest.com/oauth/",
-    tokenUrl: "https://api.pinterest.com/v5/oauth/token",
+    authorizeUrl: PINTEREST_OAUTH_URL,
+    // Sandbox: exchange/refresh token lewat host api-sandbox (docs Developer tools → Sandbox,
+    // "insert -sandbox in the URL request path"); authorize tetap pinterest.com
+    tokenUrl: `${PINTEREST_API_BASE_URL}/oauth/token`,
     scopes: ["boards:read", "boards:write", "pins:read", "pins:write", "user_accounts:read"],
     scopeSeparator: ",",
     basicAuth: true,
   },
   linkedin: {
-    authorizeUrl: "https://www.linkedin.com/oauth/v2/authorization",
-    tokenUrl: "https://www.linkedin.com/oauth/v2/accessToken",
+    authorizeUrl: LINKEDIN_OAUTH_AUTH_URL,
+    tokenUrl: LINKEDIN_OAUTH_TOKEN_URL,
     scopes: ["openid", "profile", "email", "w_member_social"],
     scopeSeparator: " ",
   },
@@ -386,10 +409,9 @@ export async function refreshAccessToken(
  */
 async function metaWhoAmI(accessToken: string): Promise<string> {
   try {
-    const meRes = await httpRequest<{ name?: string; email?: string }>(
-      `https://graph.facebook.com/${GRAPH_VERSION}/me`,
-      { query: { access_token: accessToken, fields: "name,email" } },
-    );
+    const meRes = await httpRequest<{ name?: string; email?: string }>(`${GRAPH_FB_URL}/me`, {
+      query: { access_token: accessToken, fields: "name,email" },
+    });
     if (!meRes.ok) return "";
     const me = await meRes.json();
     if (!me.name) return "";
@@ -419,7 +441,7 @@ export async function fetchPlatformProfile(
             profile_picture_url?: string;
           };
         }>;
-      }>(`https://graph.facebook.com/${GRAPH_VERSION}/me/accounts`, {
+      }>(`${GRAPH_FB_URL}/me/accounts`, {
         query: {
           access_token: at,
           fields:
@@ -477,7 +499,7 @@ export async function fetchPlatformProfile(
         username?: string;
         account_type?: string;
         profile_picture_url?: string;
-      }>(`https://graph.instagram.com/${GRAPH_VERSION}/me`, {
+      }>(`${GRAPH_IG_URL}/me`, {
         query: { fields: "id,username,account_type,profile_picture_url", access_token: at },
       });
       if (!res.ok)
@@ -500,7 +522,7 @@ export async function fetchPlatformProfile(
           access_token: string;
           picture?: { data?: { url?: string } };
         }>;
-      }>(`https://graph.facebook.com/${GRAPH_VERSION}/me/accounts`, {
+      }>(`${GRAPH_FB_URL}/me/accounts`, {
         query: { access_token: at, fields: "id,name,access_token,picture{url}" },
       });
       if (!res.ok)
@@ -543,7 +565,7 @@ export async function fetchPlatformProfile(
         id?: string;
         username?: string;
         threads_profile_picture_url?: string;
-      }>("https://graph.threads.net/v1.0/me", {
+      }>(`${GRAPH_THREADS_URL}/me`, {
         query: { fields: "id,username,threads_profile_picture_url", access_token: at },
       });
       if (!res.ok)
@@ -561,7 +583,7 @@ export async function fetchPlatformProfile(
     case "tiktok": {
       const res = await httpRequest<{
         data?: { user?: { open_id?: string; display_name?: string; avatar_url?: string } };
-      }>("https://open.tiktokapis.com/v2/user/info/", {
+      }>(`${TIKTOK_OPEN_API_URL}/user/info/`, {
         query: { fields: "open_id,display_name,avatar_url" },
         headers: { Authorization: `Bearer ${at}` },
       });
@@ -588,7 +610,7 @@ export async function fetchPlatformProfile(
           id?: string;
           snippet?: { title?: string; thumbnails?: { default?: { url?: string } } };
         }>;
-      }>("https://www.googleapis.com/youtube/v3/channels", {
+      }>(`${YOUTUBE_API_URL}/channels`, {
         query: { part: "snippet", mine: "true" },
         headers: { Authorization: `Bearer ${at}` },
       });
@@ -612,7 +634,7 @@ export async function fetchPlatformProfile(
     case "google_business": {
       const res = await httpRequest<{
         accounts?: Array<{ name: string; accountName?: string }>;
-      }>("https://mybusinessaccountmanagement.googleapis.com/v1/accounts", {
+      }>(`${GBP_ACCOUNT_API_URL}/accounts`, {
         headers: { Authorization: `Bearer ${at}` },
       });
       if (!res.ok) {
@@ -642,7 +664,7 @@ export async function fetchPlatformProfile(
         id?: string;
         username?: string;
         profile_image?: string;
-      }>("https://api.pinterest.com/v5/user_account", {
+      }>(`${PINTEREST_API_BASE_URL}/user_account`, {
         headers: { Authorization: `Bearer ${at}` },
       });
       if (!res.ok)
@@ -658,11 +680,33 @@ export async function fetchPlatformProfile(
       // Dipakai flow pemilihan board: platformAccountId = board_id tujuan publish.
       const boardsRes = await httpRequest<{
         items?: Array<{ id: string; name: string; privacy?: string }>;
-      }>("https://api.pinterest.com/v5/boards", {
+      }>(`${PINTEREST_API_BASE_URL}/boards`, {
         query: { page_size: "250" }, // max per docs — satu halaman cukup utk hampir semua akun
         headers: { Authorization: `Bearer ${at}` },
       });
-      const boards = boardsRes.ok ? ((await boardsRes.json()).items ?? []) : [];
+      let boards = boardsRes.ok ? ((await boardsRes.json()).items ?? []) : [];
+
+      // Sandbox: board sandbox terpisah dari production dan awalnya kosong, tidak
+      // bisa dibuat lewat UI Pinterest — buat otomatis via API (scope boards:write
+      // sudah diminta) agar flow connect punya board yang bisa dipilih user.
+      if (boards.length === 0 && PINTEREST_SANDBOX) {
+        const createRes = await httpRequest<{ id?: string; name?: string }>(
+          `${PINTEREST_API_BASE_URL}/boards`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${at}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: "Sahabat Kreator (Sandbox)",
+              description: "Board uji otomatis — lingkungan Sandbox Pinterest",
+            }),
+          },
+        );
+        if (createRes.ok) {
+          const board = await createRes.json();
+          if (board.id) boards = [{ id: board.id, name: board.name ?? "Sandbox board" }];
+        }
+      }
+
       return {
         platformAccountId: me.id,
         username: me.username ?? me.id,
@@ -678,7 +722,7 @@ export async function fetchPlatformProfile(
         name?: string;
         email?: string;
         picture?: string;
-      }>("https://api.linkedin.com/v2/userinfo", {
+      }>(LINKEDIN_USERINFO_URL, {
         headers: { Authorization: `Bearer ${at}` },
       });
       if (!res.ok)
@@ -753,7 +797,7 @@ async function fetchLinkedInAdminOrganizations(at: string): Promise<LinkedInOrga
       role?: string;
       state?: string;
     }>;
-  }>("https://api.linkedin.com/rest/organizationAcls", {
+  }>(`${LINKEDIN_REST_URL}/rest/organizationAcls`, {
     query: {
       q: "roleAssignee",
       role: "ADMINISTRATOR",

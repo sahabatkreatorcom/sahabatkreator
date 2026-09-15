@@ -8,6 +8,8 @@ import { db } from "@sahabatkreator/db";
 import { postAnalytics, socialAccount } from "@sahabatkreator/db/schema";
 import {
   computeOptimalTimes,
+  GRAPH_FB_URL,
+  GRAPH_IG_URL,
   httpRequest,
   nextOccurrence,
   slotLabel,
@@ -19,9 +21,9 @@ import { decrypt } from "../lib/crypto";
 
 export const analyticsRoute = new Hono();
 
-const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v26.0";
-const GRAPH_FB = `https://graph.facebook.com/${GRAPH_VERSION}`;
-const GRAPH_IG = `https://graph.instagram.com/${GRAPH_VERSION}`;
+// Endpoint Graph API — single source of truth di packages/publishing/src/config.ts
+const GRAPH_FB = GRAPH_FB_URL;
+const GRAPH_IG = GRAPH_IG_URL;
 
 /** Page token IG jalur FB Login tersimpan di metadata (pola sama dengan analytics-sync) */
 function pageTokenOf(metadata: Record<string, unknown> | null): string | null {

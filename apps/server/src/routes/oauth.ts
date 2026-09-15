@@ -19,6 +19,11 @@ import {
   exchangeCodeForToken,
   fetchPlatformProfile,
   isOAuthPlatformSupported,
+  GRAPH_FB_URL,
+  GRAPH_THREADS_REVOKE_URL,
+  GOOGLE_OAUTH_REVOKE_URL,
+  LINKEDIN_OAUTH_REVOKE_URL,
+  PINTEREST_API_BASE_URL,
   type OAuthPlatform,
   type ReplizAccount,
   replizAuthorizeUrl,
@@ -26,6 +31,7 @@ import {
   replizGetFacebookPages,
   replizGetLinkedInOrganizations,
   replizGetYouTubeChannels,
+  TIKTOK_OPEN_API_URL,
 } from "@sahabatkreator/publishing";
 import { and, eq, lt } from "drizzle-orm";
 import { type Context, Hono } from "hono";
@@ -799,15 +805,15 @@ oauthRoute.post("/:platform/revoke", async (c) => {
     try {
       const cred = await getAppCredential(platform);
       const revokeUrls: Record<string, string> = {
-        meta: `https://graph.facebook.com/${env.META_GRAPH_VERSION}/me/permissions`,
-        instagram: `https://graph.facebook.com/${env.META_GRAPH_VERSION}/me/permissions`,
-        instagram_standalone: `https://graph.facebook.com/${env.META_GRAPH_VERSION}/me/permissions`,
-        threads: "https://graph.threads.net/revoke",
-        tiktok: "https://open.tiktokapis.com/v2/oauth/revoke/",
-        youtube: "https://oauth2.googleapis.com/revoke",
-        google_business: "https://oauth2.googleapis.com/revoke",
-        pinterest: "https://api.pinterest.com/v5/oauth/token",
-        linkedin: "https://www.linkedin.com/oauth/v2/revoke",
+        meta: `${GRAPH_FB_URL}/me/permissions`,
+        instagram: `${GRAPH_FB_URL}/me/permissions`,
+        instagram_standalone: `${GRAPH_FB_URL}/me/permissions`,
+        threads: GRAPH_THREADS_REVOKE_URL,
+        tiktok: `${TIKTOK_OPEN_API_URL}/oauth/revoke/`,
+        youtube: GOOGLE_OAUTH_REVOKE_URL,
+        google_business: GOOGLE_OAUTH_REVOKE_URL,
+        pinterest: `${PINTEREST_API_BASE_URL}/oauth/token`,
+        linkedin: LINKEDIN_OAUTH_REVOKE_URL,
       };
       const revokeUrl = revokeUrls[platform];
       if (revokeUrl && accessToken) {

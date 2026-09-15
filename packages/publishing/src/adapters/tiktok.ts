@@ -5,6 +5,7 @@
 // Flow Photo: content/init (PULL_FROM_URL, max 35 foto)
 // Upload URL-based: domain R2 harus terverifikasi di TikTok dev console.
 
+import { TIKTOK_PUBLISH_URL } from "../config";
 import { httpRequest, throwFromResponse } from "../http";
 import {
   composeCaption,
@@ -13,8 +14,6 @@ import {
   type PublishInput,
   type PublishResult,
 } from "../types";
-
-const TIKTOK_BASE = "https://open.tiktokapis.com/v2/post/publish";
 
 type TikTokInitResponse = {
   data?: {
@@ -68,7 +67,7 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
     const privacyLevel = String(
       input.platformSettings.privacy ?? input.platformSettings.privacyLevel ?? "PUBLIC_TO_EVERYONE",
     );
-    const res = await httpRequest<TikTokInitResponse>(`${TIKTOK_BASE}/video/init/`, {
+    const res = await httpRequest<TikTokInitResponse>(`${TIKTOK_PUBLISH_URL}/video/init/`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${input.accessToken}`,
@@ -112,7 +111,7 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
   if (photos.length > 35) {
     throw new PublishError("tiktok_photo_limit", "Maksimal 35 foto per post TikTok.", false);
   }
-  const res = await httpRequest<TikTokInitResponse>(`${TIKTOK_BASE}/content/init/`, {
+  const res = await httpRequest<TikTokInitResponse>(`${TIKTOK_PUBLISH_URL}/content/init/`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${input.accessToken}`,
@@ -162,7 +161,7 @@ async function checkTikTokStatus(input: {
   const res = await httpRequest<{
     data?: { status?: string; publicly_available_post_id?: string; fail_reason?: string };
     error?: { code?: string; message?: string; log_id?: string };
-  }>("https://open.tiktokapis.com/v2/post/publish/status/fetch/", {
+  }>(`${TIKTOK_PUBLISH_URL}/status/fetch/`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${input.accessToken}`,

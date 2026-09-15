@@ -4,13 +4,18 @@
 // Dipakai oleh posts-sync.ts (orchestration). Semua request lewat httpRequest
 // (timeout + retry 429/5xx + backoff).
 
-import { META_GRAPH_VERSION } from "./config";
+import {
+  GRAPH_FB_URL,
+  GRAPH_IG_URL,
+  PINTEREST_API_BASE_URL,
+  TIKTOK_OPEN_API_URL,
+  YOUTUBE_API_URL,
+} from "./config";
 import { httpRequest } from "./http";
 
-const GRAPH_VERSION = META_GRAPH_VERSION;
-const GRAPH_FB = `https://graph.facebook.com/${GRAPH_VERSION}`;
+const GRAPH_FB = GRAPH_FB_URL;
 /** IG standalone (Instagram API with Instagram Login) — host graph.instagram.com */
-export const GRAPH_IG = `https://graph.instagram.com/${GRAPH_VERSION}`;
+export const GRAPH_IG = GRAPH_IG_URL;
 
 /** Item konten eksternal hasil fetch (bentuk normal dari semua platform) */
 export type ExternalPost = {
@@ -254,7 +259,7 @@ export async function getTikTokVideos(
         }>;
       };
       error?: { code?: string; message?: string };
-    }>("https://open.tiktokapis.com/v2/video/list/", {
+    }>(`${TIKTOK_OPEN_API_URL}/video/list/`, {
       method: "POST",
       query: { fields },
       headers: {
@@ -307,7 +312,7 @@ export async function getYouTubeVideos(
     // Ambil uploads playlist ID dari channel
     const chRes = await httpRequest<{
       items?: Array<{ contentDetails?: { relatedPlaylists?: { uploads?: string } } }>;
-    }>("https://www.googleapis.com/youtube/v3/channels", {
+    }>(`${YOUTUBE_API_URL}/channels`, {
       query: { part: "contentDetails", id: channelId },
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -337,7 +342,7 @@ export async function getYouTubeVideos(
           thumbnails?: { medium?: { url?: string }; default?: { url?: string } };
         };
       }>;
-    }>("https://www.googleapis.com/youtube/v3/playlistItems", {
+    }>(`${YOUTUBE_API_URL}/playlistItems`, {
       query,
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -386,7 +391,7 @@ export async function getPinterestPins(
         media?: { images?: Record<string, { url?: string }> };
       }>;
       message?: string;
-    }>("https://api.pinterest.com/v5/pins", {
+    }>(`${PINTEREST_API_BASE_URL}/pins`, {
       query: { page_size: limit },
       headers: { Authorization: `Bearer ${accessToken}` },
     });

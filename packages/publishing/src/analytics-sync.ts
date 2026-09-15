@@ -22,14 +22,23 @@
 import { db } from "@sahabatkreator/db";
 import { accountAnalytics, post, postAnalytics, socialAccount } from "@sahabatkreator/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
-import { LINKEDIN_API_VERSION, META_GRAPH_VERSION } from "./config";
+import {
+  BSKY_APPVIEW_URL,
+  GRAPH_FB_URL,
+  GRAPH_IG_URL,
+  GRAPH_THREADS_URL,
+  LINKEDIN_API_VERSION,
+  LINKEDIN_REST_URL,
+  PINTEREST_API_BASE_URL,
+  TIKTOK_OPEN_API_URL,
+  YOUTUBE_API_URL,
+} from "./config";
 import { decrypt } from "./crypto";
 import { httpRequest } from "./http";
 
-const GRAPH_VERSION = META_GRAPH_VERSION;
-const GRAPH_FB = `https://graph.facebook.com/${GRAPH_VERSION}`;
-const GRAPH_IG = `https://graph.instagram.com/${GRAPH_VERSION}`;
-const GRAPH_THREADS = "https://graph.threads.net/v1.0";
+const GRAPH_FB = GRAPH_FB_URL;
+const GRAPH_IG = GRAPH_IG_URL;
+const GRAPH_THREADS = GRAPH_THREADS_URL;
 
 /** ID generator — pola sama dengan apps/server/src/lib/id.ts (prefix sk_) */
 function generateId(entity: string): string {
@@ -261,7 +270,7 @@ async function tiktokAccountMetrics(token: string): Promise<AccountMetrics> {
       };
     };
     error?: { message?: string };
-  }>("https://open.tiktokapis.com/v2/user/info/", {
+  }>(`${TIKTOK_OPEN_API_URL}/user/info/`, {
     query: { fields: "follower_count,following_count,likes_count,video_count" },
     headers: { Authorization: `Bearer ${token}` },
     retries: 1,
@@ -284,7 +293,7 @@ async function youtubeAccountMetrics(channelId: string, token: string): Promise<
     items?: Array<{
       statistics?: { subscriberCount?: string; videoCount?: string; viewCount?: string };
     }>;
-  }>("https://www.googleapis.com/youtube/v3/channels", {
+  }>(`${YOUTUBE_API_URL}/channels`, {
     query: { part: "statistics", id: channelId },
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -306,7 +315,7 @@ async function blueskyAccountMetrics(did: string): Promise<AccountMetrics> {
     followersCount?: number;
     followsCount?: number;
     postsCount?: number;
-  }>("https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile", {
+  }>(`${BSKY_APPVIEW_URL}/xrpc/app.bsky.actor.getProfile`, {
     query: { actor: did },
     retries: 1,
   });
@@ -328,7 +337,7 @@ async function pinterestAccountMetrics(token: string): Promise<AccountMetrics> {
     follower_count?: number;
     pin_count?: number;
     board_count?: number;
-  }>("https://api.pinterest.com/v5/user_account", {
+  }>(`${PINTEREST_API_BASE_URL}/user_account`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -463,7 +472,7 @@ async function tiktokPostMetrics(videoId: string, token: string): Promise<PostMe
       }>;
     };
     error?: { message?: string };
-  }>("https://open.tiktokapis.com/v2/video/list/", {
+  }>(`${TIKTOK_OPEN_API_URL}/video/list/`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -492,7 +501,7 @@ async function youtubePostMetrics(videoId: string, token: string): Promise<PostM
     items?: Array<{
       statistics?: { viewCount?: string; likeCount?: string; commentCount?: string };
     }>;
-  }>("https://www.googleapis.com/youtube/v3/videos", {
+  }>(`${YOUTUBE_API_URL}/videos`, {
     query: { part: "statistics", id: videoId },
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -513,7 +522,7 @@ async function youtubePostMetrics(videoId: string, token: string): Promise<PostM
 async function blueskyPostMetrics(uri: string): Promise<PostMetrics> {
   const res = await httpRequest<{
     thread?: { post?: { likeCount?: number; repostCount?: number; replyCount?: number } };
-  }>("https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread", {
+  }>(`${BSKY_APPVIEW_URL}/xrpc/app.bsky.feed.getPostThread`, {
     query: { uri },
     retries: 1,
   });
@@ -539,7 +548,7 @@ async function linkedinPostMetrics(postUrn: string, token: string): Promise<Post
     }>;
     likesSummary?: { totalLikes?: number };
     commentsSummary?: { aggregatedTotalComments?: number };
-  }>("https://api.linkedin.com/rest/socialActions", {
+  }>(`${LINKEDIN_REST_URL}/rest/socialActions`, {
     query: { ids: `List(${postUrn})` },
     headers: {
       Authorization: `Bearer ${token}`,
@@ -572,7 +581,7 @@ async function pinterestPostMetrics(pinId: string, token: string): Promise<PostM
         comment_count?: number;
       };
     };
-  }>(`https://api.pinterest.com/v5/pins/${pinId}`, {
+  }>(`${PINTEREST_API_BASE_URL}/pins/${pinId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {

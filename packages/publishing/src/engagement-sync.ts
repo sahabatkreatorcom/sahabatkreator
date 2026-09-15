@@ -16,14 +16,20 @@ import { db } from "@sahabatkreator/db";
 import { engagementItem, socialAccount } from "@sahabatkreator/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { processAutomation } from "./automation";
-import { META_GRAPH_VERSION } from "./config";
+import {
+  GBP_API_URL,
+  GRAPH_FB_URL,
+  GRAPH_IG_URL,
+  GRAPH_THREADS_URL,
+  TIKTOK_OPEN_API_URL,
+  YOUTUBE_API_URL,
+} from "./config";
 import { decrypt } from "./crypto";
 import { httpRequest } from "./http";
 
-const GRAPH_VERSION = META_GRAPH_VERSION;
-const GRAPH_FB = `https://graph.facebook.com/${GRAPH_VERSION}`;
-const GRAPH_IG = `https://graph.instagram.com/${GRAPH_VERSION}`;
-const GRAPH_THREADS = "https://graph.threads.net/v1.0";
+const GRAPH_FB = GRAPH_FB_URL;
+const GRAPH_IG = GRAPH_IG_URL;
+const GRAPH_THREADS = GRAPH_THREADS_URL;
 
 /** Item inbox hasil fetch (dipakai polling & webhook) */
 export type EngagementUpsert = {
@@ -394,7 +400,7 @@ async function syncTikTok(ctx: SyncContext): Promise<SyncResult> {
   const videosRes = await httpRequest<{
     data?: { videos?: Array<{ id: string; create_time?: number; title?: string }> };
     error?: { code?: string; message?: string };
-  }>("https://open.tiktokapis.com/v2/video/list/", {
+  }>(`${TIKTOK_OPEN_API_URL}/video/list/`, {
     method: "POST",
     headers,
     body: JSON.stringify({ max_count: 10 }),
@@ -419,7 +425,7 @@ async function syncTikTok(ctx: SyncContext): Promise<SyncResult> {
         }>;
       };
       error?: { code?: string; message?: string };
-    }>("https://open.tiktokapis.com/v2/comment/list/", {
+    }>(`${TIKTOK_OPEN_API_URL}/comment/list/`, {
       method: "POST",
       headers,
       body: JSON.stringify({ video_id: video.id, max_count: 50 }),
@@ -466,7 +472,7 @@ async function syncYouTube(ctx: SyncContext): Promise<SyncResult> {
         };
       };
     }>;
-  }>("https://www.googleapis.com/youtube/v3/commentThreads", {
+  }>(`${YOUTUBE_API_URL}/commentThreads`, {
     query: {
       part: "snippet",
       allThreadsRelatedToChannelId: channelId,
@@ -508,7 +514,7 @@ async function syncGoogleBusiness(ctx: SyncContext): Promise<SyncResult> {
   // platformAccountId = "accounts/123" → list locations → reviews per location
   const locRes = await httpRequest<{
     locations?: Array<{ name: string; locationName?: string }>;
-  }>(`https://mybusiness.googleapis.com/v1/${ctx.account.platformAccountId}/locations`, {
+  }>(`${GBP_API_URL}/v1/${ctx.account.platformAccountId}/locations`, {
     headers: { Authorization: `Bearer ${ctx.accessToken}` },
   });
   if (!locRes.ok) {
@@ -527,7 +533,7 @@ async function syncGoogleBusiness(ctx: SyncContext): Promise<SyncResult> {
         comment?: string;
         createTime?: string;
       }>;
-    }>(`https://mybusiness.googleapis.com/v4/${loc.name}/reviews`, {
+    }>(`${GBP_API_URL}/v4/${loc.name}/reviews`, {
       headers: { Authorization: `Bearer ${ctx.accessToken}` },
     });
     if (!revRes.ok) continue;

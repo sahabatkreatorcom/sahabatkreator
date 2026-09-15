@@ -1,5 +1,6 @@
 // @sahabatkreator/publishing — adapter platform + pipeline publish post
 
+export * from "./config";
 export { getAdapter, supportedPlatforms } from "./adapters";
 export {
   type AccountMetrics,

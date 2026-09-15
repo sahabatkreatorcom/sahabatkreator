@@ -3,7 +3,7 @@
 // platformAccountId = URN owner ("urn:li:person:{sub}" atau "urn:li:organization:{id}")
 // Riset: docs/social-platforms/linkedin.md (Sep 2026)
 
-import { LINKEDIN_API_VERSION } from "../config";
+import { LINKEDIN_API_VERSION, LINKEDIN_REST_URL } from "../config";
 import {
   downloadMedia,
   downloadMediaBlob,
@@ -67,7 +67,7 @@ async function publishLinkedIn(input: PublishInput): Promise<PublishResult> {
         video?: string;
         uploadToken?: string;
       };
-    }>("https://api.linkedin.com/rest/videos?action=initializeUpload", {
+    }>(`${LINKEDIN_REST_URL}/rest/videos?action=initializeUpload`, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -107,7 +107,7 @@ async function publishLinkedIn(input: PublishInput): Promise<PublishResult> {
     }
 
     const finalizeRes = await httpRequest(
-      "https://api.linkedin.com/rest/videos?action=finalizeUpload",
+      `${LINKEDIN_REST_URL}/rest/videos?action=finalizeUpload`,
       {
         method: "POST",
         headers,
@@ -127,7 +127,7 @@ async function publishLinkedIn(input: PublishInput): Promise<PublishResult> {
   } else if (image) {
     // Images API: initializeUpload → upload binary → post dengan media.id
     const initRes = await httpRequest<{ value?: { uploadUrl?: string; image?: string } }>(
-      "https://api.linkedin.com/rest/images?action=initializeUpload",
+      `${LINKEDIN_REST_URL}/rest/images?action=initializeUpload`,
       {
         method: "POST",
         headers,
@@ -158,7 +158,7 @@ async function publishLinkedIn(input: PublishInput): Promise<PublishResult> {
     body.content = { media: { id: init.image, altText: image.altText ?? undefined } };
   }
 
-  const res = await httpRequest("https://api.linkedin.com/rest/posts", {
+  const res = await httpRequest(`${LINKEDIN_REST_URL}/rest/posts`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),

@@ -12,14 +12,23 @@
 // - GBP: review reply via locations/{id}/reviews/{reviewId}/reply
 // - Pinterest: tidak ada comment API publik → null (catat lokal saja)
 
-import { BLUESKY_PDS_URL, LINKEDIN_API_VERSION, META_GRAPH_VERSION } from "./config";
+import {
+  BLUESKY_PDS_URL,
+  GBP_API_URL,
+  GRAPH_FB_URL,
+  GRAPH_IG_URL,
+  GRAPH_THREADS_URL,
+  LINKEDIN_API_VERSION,
+  LINKEDIN_REST_URL,
+  TIKTOK_OPEN_API_URL,
+  YOUTUBE_API_URL,
+} from "./config";
 import { httpRequest, throwFromResponse } from "./http";
 import { PublishError } from "./types";
 
-const GRAPH_VERSION = META_GRAPH_VERSION;
-const GRAPH_FB = `https://graph.facebook.com/${GRAPH_VERSION}`;
-const GRAPH_IG = `https://graph.instagram.com/${GRAPH_VERSION}`;
-const GRAPH_THREADS = "https://graph.threads.net/v1.0";
+const GRAPH_FB = GRAPH_FB_URL;
+const GRAPH_IG = GRAPH_IG_URL;
+const GRAPH_THREADS = GRAPH_THREADS_URL;
 const BSKY_PDS = BLUESKY_PDS_URL;
 
 /** Konteks reply yang dibutuhkan adapter */
@@ -157,7 +166,7 @@ async function replyTikTok(input: ReplyInput): Promise<ReplyResult> {
   const res = await httpRequest<{
     data?: { comment_id?: string };
     error?: { code?: string; message?: string };
-  }>("https://open.tiktokapis.com/v2/comment/reply/create/", {
+  }>(`${TIKTOK_OPEN_API_URL}/comment/reply/create/`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${input.accessToken}`,
@@ -194,26 +203,23 @@ async function replyYouTube(input: ReplyInput): Promise<ReplyResult> {
     if (!input.platformItemId) {
       throw new PublishError("no_platform_item", "Post YouTube tidak punya video ID.", false);
     }
-    const res = await httpRequest<{ id?: string }>(
-      "https://www.googleapis.com/youtube/v3/commentThreads",
-      {
-        method: "POST",
-        query: { part: "snippet" },
-        headers: {
-          Authorization: `Bearer ${input.accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          snippet: {
-            channelId: input.platformAccountId,
-            videoId: input.platformItemId,
-            topLevelComment: {
-              snippet: { textOriginal: input.content.slice(0, 10000) },
-            },
-          },
-        }),
+    const res = await httpRequest<{ id?: string }>(`${YOUTUBE_API_URL}/commentThreads`, {
+      method: "POST",
+      query: { part: "snippet" },
+      headers: {
+        Authorization: `Bearer ${input.accessToken}`,
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify({
+        snippet: {
+          channelId: input.platformAccountId,
+          videoId: input.platformItemId,
+          topLevelComment: {
+            snippet: { textOriginal: input.content.slice(0, 10000) },
+          },
+        },
+      }),
+    });
     if (!res.ok) await throwFromResponse(res, "YouTube first comment");
     const id = (await res.json()).id;
     if (!id) throw new PublishError("yt_no_comment_id", "YouTube first comment tanpa ID", true);
@@ -225,7 +231,7 @@ async function replyYouTube(input: ReplyInput): Promise<ReplyResult> {
     throw new PublishError("no_platform_item", "Item tidak punya ID komentar YouTube.", false);
   }
   const parentId = input.platformParentId ?? input.platformItemId!;
-  const res = await httpRequest<{ id?: string }>("https://www.googleapis.com/youtube/v3/comments", {
+  const res = await httpRequest<{ id?: string }>(`${YOUTUBE_API_URL}/comments`, {
     method: "POST",
     query: { part: "snippet" },
     headers: {
@@ -328,7 +334,7 @@ async function replyLinkedIn(input: ReplyInput): Promise<ReplyResult> {
   }
   const version = LINKEDIN_API_VERSION;
   const res = await httpRequest(
-    `https://api.linkedin.com/rest/socialActions/${encodeURIComponent(postUrn)}/comments`,
+    `${LINKEDIN_REST_URL}/rest/socialActions/${encodeURIComponent(postUrn)}/comments`,
     {
       method: "POST",
       headers: {
@@ -358,19 +364,16 @@ async function replyGoogleBusiness(input: ReplyInput): Promise<ReplyResult> {
   if (!input.platformItemId) {
     throw new PublishError("no_platform_item", "Item tidak punya ID review Google.", false);
   }
-  const res = await httpRequest(
-    `https://mybusiness.googleapis.com/v4/${input.platformItemId}/reply`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${input.accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        comment: input.content.slice(0, 4096),
-      }),
+  const res = await httpRequest(`${GBP_API_URL}/v4/${input.platformItemId}/reply`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${input.accessToken}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      comment: input.content.slice(0, 4096),
+    }),
+  });
   if (!res.ok) await throwFromResponse(res, "GBP review reply");
   return { replyId: input.platformItemId };
 }
