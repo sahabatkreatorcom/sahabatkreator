@@ -22,11 +22,29 @@ type CarouselResult = {
   designTips: string;
 };
 
+/** Label ramah untuk kode platform */
+const PLATFORM_LABELS: Record<string, string> = {
+  instagram: "Instagram",
+  facebook: "Facebook",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  linkedin: "LinkedIn",
+  pinterest: "Pinterest",
+  threads: "Threads",
+  x: "X",
+};
+
+/** Platform yang tidak mendukung upload multi-gambar (carousel) */
+const NO_CAROUSEL_PLATFORMS = new Set(["tiktok", "youtube", "threads"]);
+
 export function CarouselPanel({
+  platform,
   disabled,
   onApplyContent,
   onCreditsUsed,
 }: {
+  /** Platform konteks — carousel multi-gambar relevan untuk beberapa platform */
+  platform: string;
   disabled: boolean;
   onApplyContent: (text: string) => void;
   onCreditsUsed: () => void;
@@ -42,6 +60,7 @@ export function CarouselPanel({
         topic,
         slideCount,
         style,
+        platform,
       }),
     onSuccess: (data) => {
       setResult(data);
@@ -59,6 +78,19 @@ export function CarouselPanel({
 
   return (
     <div className="space-y-4">
+      <p className="text-[var(--text-muted)] text-xs">
+        Outline dibuat untuk konteks{" "}
+        <span className="font-medium text-[var(--text-secondary)]">
+          {PLATFORM_LABELS[platform] ?? platform}
+        </span>
+        {NO_CAROUSEL_PLATFORMS.has(platform) && (
+          <span className="text-[var(--warning)]">
+            {" "}
+            — platform ini tidak mendukung upload multi-gambar; gunakan outline sebagai storyboard
+            video/slide.
+          </span>
+        )}
+      </p>
       <div className="space-y-2">
         <Label htmlFor="carousel-topic">Topik Carousel</Label>
         <Input

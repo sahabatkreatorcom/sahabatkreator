@@ -321,7 +321,16 @@ aiRoute.post("/rewrite", async (c) => {
 
 const repurposeSchema = z.object({
   content: z.string().min(10).max(6000),
-  targetPlatform: z.enum(["instagram", "tiktok", "youtube", "linkedin", "twitter"]),
+  targetPlatform: z.enum([
+    "instagram",
+    "facebook",
+    "tiktok",
+    "youtube",
+    "linkedin",
+    "pinterest",
+    "threads",
+    "x",
+  ]),
   tone: z.string().max(40).optional(),
 });
 
@@ -329,14 +338,19 @@ const repurposeSchema = z.object({
 const REPURPOSE_GUIDE: Record<string, string> = {
   instagram:
     "Instagram feed: hook kuat 2 baris pertama, paragraf pendek, emoji secukupnya, 5-10 hashtag relevan di akhir, maksimal 2200 karakter.",
+  facebook:
+    "Facebook: nada percakapan hangat, paragraf pendek, cerita/pengalaman lebih longgar, CTA tanya-jawab untuk memancing komentar, 2-4 hashtag opsional.",
   tiktok:
     "TikTok caption: hook sangat pendek (1 kalimat) yang memancing rasa penasaran, bahasa lisan/trend-aware, CTA eksplisit (contoh: 'simpan ini dulu' / 'komen kalau setuju'), 3-5 hashtag, maksimal 150 karakter per bagian teks.",
   youtube:
     "YouTube: hasilkan JUDUL (maksimal 90 karakter, kaya keyword) dan DESKRIPSI (paragraf pembuka hook 2-3 kalimat, poin-poin isi dengan timestamp placeholder bila relevan, CTA subscribe, 3-5 hashtag). Format: 'JUDUL: <judul>' lalu baris kosong lalu 'DESKRIPSI: <deskripsi>'.",
   linkedin:
     "LinkedIn: profesional tapi personal, storytelling 3-5 paragraf pendek, hook reflektif di baris pertama, insight/takeaway konkret, tanpa emoji berlebihan, 3 hashtag profesional di akhir.",
-  twitter:
-    "X/Twitter: maksimal 280 karakter total, satu pesan tajam, tanpa hashtag berlebihan (maksimal 2), hook di kalimat pertama.",
+  pinterest:
+    "Pinterest: deskriptif dan kaya keyword untuk pencarian, judul jelas (maks 100 karakter), deskripsi 200-300 karakter yang menjelaskan nilai konten, sertakan kata kunci pencarian natural, 2-5 hashtag.",
+  threads:
+    "Threads: ringan dan konversasional seperti obrolan, maksimal 500 karakter, hook pertanyaan/pendapat di kalimat pertama, tanpa hashtag formal (opsional 1).",
+  x: "X/Twitter: maksimal 280 karakter total, satu pesan tajam, tanpa hashtag berlebihan (maksimal 2), hook di kalimat pertama.",
 };
 
 aiRoute.post("/repurpose", async (c) => {
@@ -379,7 +393,21 @@ const carouselSchema = z.object({
   topic: z.string().min(3).max(300),
   slideCount: z.number().int().min(4).max(10),
   style: z.enum(["edukasi", "promosi", "storytelling"]).default("edukasi"),
+  platform: z.enum(PLATFORMS).default("instagram"),
 });
+
+/** Nuansa konteks platform untuk outline carousel */
+const CAROUSEL_PLATFORM_CONTEXT: Record<string, string> = {
+  instagram:
+    "Konteks Instagram carousel: rasio 4:5 atau 1:1, teks slide harus besar dan terbaca di layar ponsel, hashtag di caption.",
+  facebook:
+    "Konteks Facebook multi-foto: narasi lebih longgar dan percakapan hangat, tiap slide boleh kalimat penuh.",
+  linkedin:
+    "Konteks LinkedIn carousel (PDF/dokumen): profesional, insight konkret, istilah industri yang tepat.",
+  x: "Konteks X/Twitter thread bergambar: tiap slide = satu pesan sangat padat, hook kuat di slide 1.",
+  pinterest:
+    "Konteks Pinterest multi-pin/idea pin: kaya keyword pencarian, judul tiap slide mengandung kata kunci.",
+};
 
 /** Pola narasi per gaya carousel */
 const CAROUSESEL_STYLE_GUIDE: Record<string, string> = {
@@ -405,12 +433,14 @@ aiRoute.post("/carousel", async (c) => {
     const usage = await consumeAiCredits(ctx.organization.id, limits.aiCreditsPerMonth, {
       userId: ctx.user.id,
       action: "carousel",
-      platform: "instagram",
+      platform: input.platform,
       model: config.model,
     });
 
     const voice = await brandVoicePrompt(ctx.organization.id);
-    const system = `Kamu adalah desainer konten carousel Instagram profesional untuk kreator UMKM Indonesia.\n${CAROUSESEL_STYLE_GUIDE[input.style]}${voice}\n\nHasilkan outline carousel dengan TEPAT ${input.slideCount} slide.\n\nKembalikan HANYA JSON valid (tanpa markdown fence) dengan format:\n{\n  "slides": [\n    { "title": "judul slide singkat (maks 8 kata)", "body": "isi slide 1-3 kalimat padat" }\n  ],\n  "caption": "caption Instagram lengkap untuk carousel (hook, ringkasan, CTA, 5-8 hashtag di akhir)",\n  "designTips": "2-3 tips desain singkat dalam satu paragraf (warna, tipografi, komposisi)"\n}\n\nSemua teks dalam Bahasa Indonesia. Jumlah slide di array HARUS tepat ${input.slideCount}.`;
+    const platformContext =
+      CAROUSEL_PLATFORM_CONTEXT[input.platform] ?? CAROUSEL_PLATFORM_CONTEXT.instagram;
+    const system = `Kamu adalah desainer konten carousel social media profesional untuk kreator UMKM Indonesia.\n${CAROUSESEL_STYLE_GUIDE[input.style]}${voice}\n${platformContext}\n\nHasilkan outline carousel dengan TEPAT ${input.slideCount} slide.\n\nKembalikan HANYA JSON valid (tanpa markdown fence) dengan format:\n{\n  "slides": [\n    { "title": "judul slide singkat (maks 8 kata)", "body": "isi slide 1-3 kalimat padat" }\n  ],\n  "caption": "caption ${input.platform} lengkap untuk carousel (hook, ringkasan, CTA, hashtag relevan di akhir)",\n  "designTips": "2-3 tips desain singkat dalam satu paragraf (warna, tipografi, komposisi)"\n}\n\nSemua teks dalam Bahasa Indonesia. Jumlah slide di array HARUS tepat ${input.slideCount}.`;
 
     const raw = await chatCompletion(config, system, input.topic, {
       temperature: 0.8,

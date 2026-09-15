@@ -8,13 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 
-/** Platform target yang didukung fitur repurpose */
+/** Platform target yang didukung fitur repurpose — harus sinkron dengan schema /ai/repurpose */
 export const REPURPOSE_PLATFORMS = [
   { value: "instagram", label: "Instagram" },
+  { value: "facebook", label: "Facebook" },
   { value: "tiktok", label: "TikTok" },
   { value: "youtube", label: "YouTube" },
   { value: "linkedin", label: "LinkedIn" },
-  { value: "twitter", label: "X/Twitter" },
+  { value: "pinterest", label: "Pinterest" },
+  { value: "threads", label: "Threads" },
+  { value: "x", label: "X" },
 ] as const;
 
 type RepurposeTarget = (typeof REPURPOSE_PLATFORMS)[number]["value"];
@@ -43,7 +46,8 @@ export function RepurposePanel({
     onSuccess: (data) => {
       onApplyContent(data.content);
       onCreditsUsed();
-      toast.success(`Konten berhasil diadaptasi untuk ${target}`);
+      const label = REPURPOSE_PLATFORMS.find((p) => p.value === target)?.label ?? target;
+      toast.success(`Konten berhasil diadaptasi untuk ${label}`);
     },
     onError: (e: Error) => toast.error(e.message),
   });

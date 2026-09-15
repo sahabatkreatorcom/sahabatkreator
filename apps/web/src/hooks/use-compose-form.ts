@@ -38,6 +38,18 @@ declare global {
   }
 }
 
+/** Platform yang diterima endpoint AI (zod enum di server) — selain ini di-fallback */
+const AI_PLATFORMS = new Set([
+  "instagram",
+  "facebook",
+  "tiktok",
+  "youtube",
+  "linkedin",
+  "pinterest",
+  "threads",
+  "x",
+]);
+
 /** Konflik jadwal dari endpoint /posts/conflicts */
 type ScheduleConflict = {
   socialAccountId: string;
@@ -426,8 +438,11 @@ export function useComposeForm() {
     setSelectedAccounts(preselect ? [preselect] : []);
   }
 
-  // Platform dominan untuk konteks AI (platform akun pertama terpilih)
-  const aiPlatform = accounts.find((a) => a.id === selectedAccounts[0])?.platform ?? "instagram";
+  // Platform dominan untuk konteks AI (platform akun pertama terpilih).
+  // instagram_standalone memakai konteks instagram; platform di luar dukungan
+  // AI (bluesky/google_business/manual) di-fallback agar tidak ditolak schema.
+  const rawAiPlatform = accounts.find((a) => a.id === selectedAccounts[0])?.platform ?? "instagram";
+  const aiPlatform = AI_PLATFORMS.has(rawAiPlatform) ? rawAiPlatform : "instagram";
 
   // Akun yang dipilih (objek penuh) — untuk preview & validasi
   const selectedAccountObjects = accounts.filter((a) => selectedAccounts.includes(a.id));

@@ -320,6 +320,7 @@ export function AiComposerPanel({
 
       {tab === "carousel" && (
         <CarouselPanel
+          platform={platform}
           disabled={disabled}
           onApplyContent={onApplyContent}
           onCreditsUsed={() => void refetchUsage()}
