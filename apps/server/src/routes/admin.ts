@@ -22,7 +22,7 @@ import {
 } from "@sahabatkreator/db/schema";
 import { env } from "@sahabatkreator/env/server";
 import { REPLIZ_PLATFORMS } from "@sahabatkreator/publishing";
-import { and, asc, count, desc, eq, ilike, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, lte, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { fireActivity } from "../lib/activity-log";
@@ -39,6 +39,15 @@ import {
 } from "../lib/sumopod";
 
 export const adminRoute = new Hono();
+
+/** Parse query param tanggal (YYYY-MM-DD) → Date. `endOfDay` menyetel jam 23:59:59.999. */
+function parseDateParam(value: string | undefined, endOfDay = false): Date | null {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  if (endOfDay) date.setHours(23, 59, 59, 999);
+  return date;
+}
 
 /** GET /admin/stats — dashboard statistik platform */
 adminRoute.get("/stats", async (c) => {
@@ -1265,18 +1274,24 @@ adminRoute.get("/billing/overview", async (c) => {
 
 // ---------- Holiday (kalender hari besar) ----------
 
-/** GET /admin/ai-usage — log pemakaian AI semua org (filter action/platform/org), paginasi */
+/** GET /admin/ai-usage — log pemakaian AI semua org (filter action/platform/org/tanggal), paginasi */
 adminRoute.get("/ai-usage", async (c) => {
   try {
     await requirePlatformAdmin(c);
     const page = Math.max(Number(c.req.query("page") ?? 1), 1);
     const perPage = Math.min(Number(c.req.query("perPage") ?? 50), 200);
     const action = c.req.query("action")?.trim() ?? "";
+    const platform = c.req.query("platform")?.trim() ?? "";
     const organizationId = c.req.query("organizationId")?.trim() ?? "";
+    const from = parseDateParam(c.req.query("from"));
+    const to = parseDateParam(c.req.query("to"), true);
 
     const conditions = [];
     if (action) conditions.push(eq(aiUsageLog.action, action));
+    if (platform) conditions.push(eq(aiUsageLog.platform, platform));
     if (organizationId) conditions.push(eq(aiUsageLog.organizationId, organizationId));
+    if (from) conditions.push(gte(aiUsageLog.createdAt, from));
+    if (to) conditions.push(lte(aiUsageLog.createdAt, to));
     const where = conditions.length ? and(...conditions) : undefined;
 
     const rows = await db
@@ -1301,8 +1316,18 @@ adminRoute.get("/ai-usage", async (c) => {
       .offset((page - 1) * perPage);
 
     const [total] = await db.select({ total: count() }).from(aiUsageLog).where(where);
+    const [sum] = await db
+      .select({ credits: sql<number>`coalesce(sum(${aiUsageLog.credits}), 0)::int` })
+      .from(aiUsageLog)
+      .where(where);
 
-    return c.json({ logs: rows, total: total?.total ?? 0, page, perPage });
+    return c.json({
+      logs: rows,
+      total: total?.total ?? 0,
+      page,
+      perPage,
+      summary: { credits: sum?.credits ?? 0 },
+    });
   } catch (error) {
     return errorResponse(error);
   }

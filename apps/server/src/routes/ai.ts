@@ -2,7 +2,7 @@
 
 import { db } from "@sahabatkreator/db";
 import { aiUsageLog, brandVoice, media, user as userTable } from "@sahabatkreator/db/schema";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { chatCompletion, consumeAiCredits, getAiConfig, getAiUsage } from "../lib/ai";
@@ -11,6 +11,15 @@ import { getOrgLimits } from "../lib/billing";
 import { aiRateLimit } from "../lib/rate-limit";
 
 export const aiRoute = new Hono();
+
+/** Parse query param tanggal (YYYY-MM-DD) → Date. `endOfDay` menyetel jam 23:59:59.999. */
+function parseDateParam(value: string | undefined, endOfDay = false): Date | null {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  if (endOfDay) date.setHours(23, 59, 59, 999);
+  return date;
+}
 
 // Rate limit khusus AI: 10 request / 60s per IP+user — panggilan LLM mahal
 // dan panjang; mencegah penyalahgunaan (script spam) yang menggerus kuota
@@ -91,6 +100,7 @@ aiRoute.get("/usage", async (c) => {
  * Log pemakaian AI (caption, hashtag, rewrite, SEB) untuk org aktif user.
  * Scope: organizationId = org aktif session (bukan semua org user) agar
  * konsisten dengan limit kredit yang juga per-org.
+ * Filter: action, platform, rentang tanggal (from/to).
  */
 aiRoute.get("/usage/history", async (c) => {
   try {
@@ -98,9 +108,15 @@ aiRoute.get("/usage/history", async (c) => {
     const page = Math.max(Number(c.req.query("page") ?? 1), 1);
     const perPage = Math.min(Number(c.req.query("perPage") ?? 50), 200);
     const action = c.req.query("action")?.trim() ?? "";
+    const platform = c.req.query("platform")?.trim() ?? "";
+    const from = parseDateParam(c.req.query("from"));
+    const to = parseDateParam(c.req.query("to"), true);
 
     const conditions = [eq(aiUsageLog.organizationId, ctx.organization.id)];
     if (action) conditions.push(eq(aiUsageLog.action, action));
+    if (platform) conditions.push(eq(aiUsageLog.platform, platform));
+    if (from) conditions.push(gte(aiUsageLog.createdAt, from));
+    if (to) conditions.push(lte(aiUsageLog.createdAt, to));
     const where = and(...conditions);
 
     const rows = await db
@@ -121,8 +137,26 @@ aiRoute.get("/usage/history", async (c) => {
       .offset((page - 1) * perPage);
 
     const [total] = await db.select({ total: count() }).from(aiUsageLog).where(where);
+    // Total kredit sesuai filter (bukan hanya halaman aktif) — untuk ringkasan UI
+    const [sum] = await db
+      .select({ credits: sql<number>`coalesce(sum(${aiUsageLog.credits}), 0)::int` })
+      .from(aiUsageLog)
+      .where(where);
 
-    return c.json({ logs: rows, total: total?.total ?? 0, page, perPage });
+    // Limit paket + pemakaian bulan berjalan — untuk progress bar kuota
+    const [limits, usage] = await Promise.all([
+      getOrgLimits(ctx.organization.id),
+      getAiUsage(ctx.organization.id),
+    ]);
+
+    return c.json({
+      logs: rows,
+      total: total?.total ?? 0,
+      page,
+      perPage,
+      summary: { credits: sum?.credits ?? 0 },
+      quota: { used: usage.used, limit: limits.aiCreditsPerMonth, period: usage.period },
+    });
   } catch (error) {
     return errorResponse(error);
   }
