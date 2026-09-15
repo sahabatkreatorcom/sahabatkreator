@@ -17,7 +17,7 @@ import {
   enqueuePostReminder,
   enqueuePublish,
 } from "@sahabatkreator/queue";
-import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { fireActivity } from "../lib/activity-log";
@@ -49,63 +49,6 @@ const createPostSchema = z.object({
       }),
     )
     .min(1),
-});
-
-/** GET /posts/grid — data Grid Planner: post IG terbaru + media utama (preview feed) */
-postsRoute.get("/grid", async (c) => {
-  try {
-    const ctx = await requireOrg(c);
-
-    // Post IG (semua status kecuali failed) + media cover via join postMedia + media
-    const rows = await db
-      .select({
-        postId: post.id,
-        groupId: post.postGroupId,
-        status: post.status,
-        content: post.content,
-        groupContent: postGroup.content,
-        scheduledAt: postGroup.scheduledAt,
-        platformPostUrl: post.platformPostUrl,
-        username: socialAccount.username,
-        // Media pertama (sortOrder 0) untuk cover grid
-        mediaUrl: mediaTable.url,
-        mediaType: mediaTable.type,
-        mediaThumb: mediaTable.thumbnailUrl,
-      })
-      .from(post)
-      .innerJoin(postGroup, eq(post.postGroupId, postGroup.id))
-      .innerJoin(
-        socialAccount,
-        and(eq(post.socialAccountId, socialAccount.id), eq(socialAccount.platform, "instagram")),
-      )
-      .leftJoin(postMedia, and(eq(postMedia.postId, post.id), eq(postMedia.sortOrder, 0)))
-      .leftJoin(mediaTable, eq(postMedia.mediaId, mediaTable.id))
-      .where(
-        and(
-          eq(post.organizationId, ctx.organization.id),
-          inArray(post.status, ["published", "scheduled", "draft", "publishing"]),
-        ),
-      )
-      .orderBy(desc(sql`coalesce(${postGroup.scheduledAt}, ${postGroup.createdAt})`))
-      .limit(90);
-
-    return c.json({
-      items: rows.map((r) => ({
-        postId: r.postId,
-        groupId: r.groupId,
-        status: r.status,
-        content: r.content ?? r.groupContent ?? "",
-        scheduledAt: r.scheduledAt,
-        platformPostUrl: r.platformPostUrl,
-        username: r.username,
-        mediaUrl: r.mediaUrl ?? null,
-        mediaType: r.mediaType ?? null,
-        mediaThumb: r.mediaThumb ?? null,
-      })),
-    });
-  } catch (error) {
-    return errorResponse(error);
-  }
 });
 
 /** GET /posts — list post groups org (filter: from, to, status, page/perPage).

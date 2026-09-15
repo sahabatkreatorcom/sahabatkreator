@@ -341,8 +341,7 @@ export function PlatformSettingsPanel({
                   {/* Instagram tip */}
                   {isInstagram && s.postType !== "story" && (
                     <p className="text-[11px] text-[var(--text-muted)]">
-                      Tip: video otomatis di-publish sebagai Reels di Instagram. Gunakan Grid
-                      Planner untuk preview feed.
+                      Tip: video otomatis di-publish sebagai Reels di Instagram.
                     </p>
                   )}
                 </div>

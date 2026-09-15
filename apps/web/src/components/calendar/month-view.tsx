@@ -2,14 +2,16 @@
 // Sel default menampilkan maksimal 3 post + catatan; klik "+N lainnya" untuk
 // memperluas sel (biar grid tetap ringkas).
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
-import { ChevronDown, ChevronUp, StickyNote } from "lucide-react";
+import { ChevronDown, ChevronUp, Sparkles, StickyNote } from "lucide-react";
 import { useState } from "react";
 import { PLATFORMS } from "@/lib/platforms";
 import { ExternalPostChip } from "./external-post-chip";
 import {
+  type CalendarHoliday,
   type CalendarNote,
   type CalendarPostGroup,
   DAYS_ID,
+  holidaysForDate,
   MONTHS_ID,
   toLocalISODate,
   withDragIndexes,
@@ -25,11 +27,15 @@ type MonthViewProps = {
   todayKey: string;
   /** Id post group yang terlibat konflik jadwal (ring amber) */
   conflictedGroupIds: Set<string>;
+  /** Hari besar per tanggal (kunci MM-DD recurring) */
+  holidaysByDate: Map<string, CalendarHoliday[]>;
   onAddNote: (dateKey: string) => void;
   onEditNote: (note: CalendarNote) => void;
   onReschedule: (groupId: string, dateKey: string) => void;
   /** Klik kartu post → buka modal detail */
   onSelectPost: (groupId: string) => void;
+  /** Klik chip hari besar → buka modal detail */
+  onSelectHoliday: (holiday: CalendarHoliday) => void;
 };
 
 export function MonthView({
@@ -38,10 +44,12 @@ export function MonthView({
   notesByDate,
   todayKey,
   conflictedGroupIds,
+  holidaysByDate,
   onAddNote,
   onEditNote,
   onReschedule,
   onSelectPost,
+  onSelectHoliday,
 }: MonthViewProps) {
   // Tanggal sel yang sedang diperluas (tampilkan semua post)
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -83,10 +91,12 @@ export function MonthView({
             const isToday = key === todayKey;
             const dayPosts = postsByDate.get(key) ?? [];
             const dayNotes = notesByDate.get(key) ?? [];
+            const dayHolidays = holidaysForDate(holidaysByDate, key);
             const isExpanded = expandedDate === key;
             // Collapsed: maksimal 3 post — sisanya via tombol expand
             const visiblePosts = isExpanded ? dayPosts : dayPosts.slice(0, MAX_COLLAPSED);
             const hiddenCount = dayPosts.length - visiblePosts.length;
+            const hiddenHolidays = isExpanded ? 0 : Math.max(0, dayHolidays.length - 2);
 
             return (
               <Droppable key={key} droppableId={`slot:${key}`}>
@@ -118,6 +128,22 @@ export function MonthView({
                     </div>
 
                     <div className="space-y-1">
+                      {/* Chip hari besar — klik untuk detail ide konten */}
+                      {(isExpanded ? dayHolidays : dayHolidays.slice(0, 2)).map((h) => (
+                        <button
+                          key={h.id}
+                          type="button"
+                          onClick={() => onSelectHoliday(h)}
+                          className="flex w-full items-center gap-1 truncate rounded border-[var(--accent-pink)] border-l-2 bg-[var(--accent-pink-light)]/60 px-1.5 py-1 text-left font-medium text-[10px] text-[var(--text-secondary)] hover:bg-[var(--accent-pink-light)]"
+                          title={`${h.name} — lihat ide konten`}
+                        >
+                          <Sparkles className="h-3 w-3 shrink-0 text-[var(--accent-pink)]" />
+                          <span className="truncate">{h.name}</span>
+                        </button>
+                      ))}
+                      {dayHolidays.length > 0 && (
+                        <div className="mb-1 border-[var(--border-light)] border-b" />
+                      )}
                       {withDragIndexes(visiblePosts).map(({ g, dragIndex }) =>
                         dragIndex === null ? (
                           <ExternalPostChip key={g.id} group={g} onSelect={onSelectPost} />
@@ -181,7 +207,9 @@ export function MonthView({
                           +{dayNotes.length - 2} catatan
                         </p>
                       )}
-                      {(hiddenCount > 0 || (!isExpanded && dayNotes.length > 2)) && (
+                      {(hiddenCount > 0 ||
+                        (!isExpanded && dayNotes.length > 2) ||
+                        hiddenHolidays > 0) && (
                         <button
                           type="button"
                           onClick={() => setExpandedDate(key)}
@@ -189,7 +217,11 @@ export function MonthView({
                         >
                           <ChevronDown className="h-3 w-3" />+
                           {hiddenCount > 0 ? `${hiddenCount} post` : ""}
-                          {hiddenCount > 0 && dayNotes.length > 2 ? " · " : ""}
+                          {hiddenCount > 0 && (dayNotes.length > 2 || hiddenHolidays > 0)
+                            ? " · "
+                            : ""}
+                          {hiddenHolidays > 0 ? `${hiddenHolidays} hari besar` : ""}
+                          {hiddenHolidays > 0 && dayNotes.length > 2 ? " · " : ""}
                           {dayNotes.length > 2 ? `${dayNotes.length - 2} catatan` : ""} lagi
                         </button>
                       )}
@@ -212,6 +244,18 @@ export function MonthView({
                             <ChevronUp className="h-3 w-3" />
                           </button>
                         </div>
+                        {dayHolidays.map((h) => (
+                          <button
+                            key={h.id}
+                            type="button"
+                            onClick={() => onSelectHoliday(h)}
+                            className="flex w-full items-center gap-1 truncate rounded border-[var(--accent-pink)] border-l-2 bg-[var(--accent-pink-light)]/60 px-1.5 py-1 text-left font-medium text-[10px] text-[var(--text-secondary)] hover:bg-[var(--accent-pink-light)]"
+                            title={`${h.name} — lihat ide konten`}
+                          >
+                            <Sparkles className="h-3 w-3 shrink-0 text-[var(--accent-pink)]" />
+                            <span className="truncate">{h.name}</span>
+                          </button>
+                        ))}
                         {withDragIndexes(dayPosts).map(({ g, dragIndex }) =>
                           dragIndex === null ? (
                             <ExternalPostChip key={g.id} group={g} onSelect={onSelectPost} />

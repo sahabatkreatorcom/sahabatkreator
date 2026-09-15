@@ -18,7 +18,6 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { HolidayIdeasWidget } from "@/components/dashboard/holiday-ideas-widget";
 import { TodayFocusCard } from "@/components/dashboard/today-focus-card";
-import { WeeklyHeatmap } from "@/components/dashboard/weekly-heatmap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -150,7 +149,7 @@ export function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Link to="/analytics">
+          <Link to="/performance/analitik">
             <Button variant="outline" size="sm">
               <BarChart3 className="h-4 w-4" />
               Analitik Detail
@@ -175,15 +174,22 @@ export function DashboardPage() {
               icon={Users}
               label="Total Followers"
               value={totals.followers}
-              href="/analytics"
+              href="/performance/analitik"
             />
-            <StatCard icon={Eye} label="Views" value={totals.views} href="/analytics" />
-            <StatCard icon={Heart} label="Likes" value={totals.likes} href="/analytics" />
-            <StatCard icon={Share2} label="Shares" value={totals.shares} href="/analytics" />
+            <StatCard icon={Eye} label="Views" value={totals.views} href="/performance/analitik" />
+            <StatCard
+              icon={Heart}
+              label="Likes"
+              value={totals.likes}
+              href="/performance/analitik"
+            />
+            <StatCard
+              icon={Share2}
+              label="Shares"
+              value={totals.shares}
+              href="/performance/analitik"
+            />
           </div>
-
-          {/* Aktivitas mingguan — heatmap hari × slot jam */}
-          <WeeklyHeatmap />
 
           <div className="grid gap-6 lg:grid-cols-3">
             {/* Upcoming posts */}

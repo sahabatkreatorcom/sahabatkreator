@@ -3,6 +3,7 @@ import {
   Activity,
   Banknote,
   Building2,
+  CalendarDays,
   CreditCard,
   FileText,
   FlaskConical,
@@ -23,7 +24,6 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { authClient } from "@/lib/auth-client";
@@ -35,6 +35,7 @@ const NAV_ITEMS = [
   { to: "/admin/organizations", label: "Organisasi", icon: Building2 },
   { to: "/admin/collabs", label: "Kolaborasi", icon: UsersRound },
   { to: "/admin/blog", label: "Blog", icon: FileText },
+  { to: "/admin/holidays", label: "Hari Besar", icon: CalendarDays },
   { to: "/admin/plans", label: "Paket & Harga", icon: KeyRound },
   { to: "/admin/billing", label: "Billing", icon: CreditCard },
   { to: "/admin/payment-config", label: "Konfigurasi Bayar", icon: Banknote },

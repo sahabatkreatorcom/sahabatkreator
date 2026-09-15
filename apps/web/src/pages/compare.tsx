@@ -44,7 +44,7 @@ const COMPARE_ROWS: CompareRow[] = [
   {
     label: "Fitur utama",
     values: {
-      sk: "Jadwal posting, kalender visual, analitik terpadu, inbox engagement, grid planner, AI konten, tren lokal",
+      sk: "Jadwal posting, kalender visual, analitik terpadu, inbox engagement, AI konten, tren lokal",
       buffer: "Jadwal posting, kalender, analitik dasar, AI assistant",
       hootsuite: "Jadwal, monitoring, analitik, inbox tim, listening",
       later: "Jadwal visual-first, link in bio, analitik IG/TikTok",

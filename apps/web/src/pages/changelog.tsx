@@ -59,7 +59,7 @@ const CHANGELOG: ChangelogEntry[] = [
     title: "Rilis Awal",
     highlights: [
       "Penjadwalan & publish multi-platform: Instagram, Facebook, TikTok, YouTube, LinkedIn, dan lainnya.",
-      "Kalender konten + grid planner untuk visual feed Instagram.",
+      "Kalender konten visual multi-view (bulan/minggu/hari).",
       "Kolaborasi tim dalam organisasi dengan peran & approval.",
       "Bantuan AI untuk caption, ide konten, dan hashtag.",
     ],

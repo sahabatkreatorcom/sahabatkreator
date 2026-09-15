@@ -26,6 +26,28 @@ export type CalendarNote = {
   color: string | null;
 };
 
+/** Hari besar (recurring tahunan — month/day tanpa tahun) dari tabel holiday */
+export type CalendarHoliday = {
+  id: string;
+  name: string;
+  description: string | null;
+  month: number;
+  day: number;
+  scope: "national" | "international";
+  category: string;
+  ideaTemplates: { angle: string; example: string }[] | null;
+  suggestedHashtags: string[] | null;
+};
+
+/** Group hari besar berdasarkan tanggal sel kalender (YYYY-MM-DD → MM-DD) */
+export function holidaysForDate(
+  holidaysByDate: Map<string, CalendarHoliday[]>,
+  dateKey: string,
+): CalendarHoliday[] {
+  // dateKey = YYYY-MM-DD lokal — ambil bagian MM-DD untuk match recurring
+  return holidaysByDate.get(dateKey.slice(5)) ?? [];
+}
+
 /** Pilihan warna catatan kalender */
 export const NOTE_COLORS = [
   { value: "#ec4899", label: "Pink (ide)" },

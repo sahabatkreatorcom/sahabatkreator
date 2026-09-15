@@ -71,7 +71,6 @@ const FEATURE_CATALOG: { key: string; label: string; hint: string }[] = [
   },
   { key: "reports_export", label: "Laporan CSV & PDF", hint: "Export + jadwal email laporan" },
   { key: "media_library", label: "Media library", hint: "Folder, import URL, alt text" },
-  { key: "grid_planner", label: "Grid planner IG", hint: "Preview feed sebelum posting" },
   {
     key: "automation",
     label: "Automation rules",

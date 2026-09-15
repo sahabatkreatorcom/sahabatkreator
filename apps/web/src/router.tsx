@@ -58,11 +58,18 @@ const DashboardPage = lazy(() =>
 const ActivityPage = lazy(() =>
   import("./pages/dashboard/activity").then((m) => ({ default: m.default })),
 );
+// Hub Intelijen — wrapper bertab untuk 9 halaman intelijen (nested route)
+const PerformancePage = lazy(() =>
+  import("./pages/dashboard/hubs").then((m) => ({ default: m.PerformancePage })),
+);
+const ResearchPage = lazy(() =>
+  import("./pages/dashboard/hubs").then((m) => ({ default: m.ResearchPage })),
+);
+const AssistantPage = lazy(() =>
+  import("./pages/dashboard/hubs").then((m) => ({ default: m.AssistantPage })),
+);
 const CalendarPage = lazy(() =>
   import("./pages/dashboard/calendar").then((m) => ({ default: m.CalendarPage })),
-);
-const GridPlannerPage = lazy(() =>
-  import("./pages/dashboard/grid-planner").then((m) => ({ default: m.GridPlannerPage })),
 );
 const QueuePage = lazy(() =>
   import("./pages/dashboard/queue").then((m) => ({ default: m.QueuePage })),
@@ -150,6 +157,9 @@ const AdminBlogPage = lazy(() =>
 );
 const AdminBlogEditorPage = lazy(() =>
   import("./pages/admin/blog-editor").then((m) => ({ default: m.AdminBlogEditorPage })),
+);
+const AdminHolidaysPage = lazy(() =>
+  import("./pages/admin/holidays").then((m) => ({ default: m.AdminHolidaysPage })),
 );
 const AdminPlansPage = lazy(() =>
   import("./pages/admin/plans").then((m) => ({ default: m.AdminPlansPage })),
@@ -267,23 +277,13 @@ export const router = createBrowserRouter([
       { path: "/dashboard", element: withFallback(<DashboardPage />) },
       { path: "/activity", element: withFallback(<ActivityPage />) },
       { path: "/calendar", element: withFallback(<CalendarPage />) },
-      { path: "/grid", element: withFallback(<GridPlannerPage />) },
       { path: "/queue", element: withFallback(<QueuePage />) },
-      { path: "/goals", element: withFallback(<GoalsPage />) },
-      { path: "/reports", element: withFallback(<ReportsPage />) },
       { path: "/compose", element: withFallback(<ComposePage />) },
       { path: "/media", element: withFallback(<MediaPage />) },
-      { path: "/analytics", element: withFallback(<AnalyticsPage />) },
-      { path: "/coach", element: withFallback(<CoachPage />) },
-      { path: "/seb", element: withFallback(<SebPage />) },
-      { path: "/strategy", element: withFallback(<StrategyPage />) },
-      { path: "/trends", element: withFallback(<TrendsPage />) },
       { path: "/engagement", element: withFallback(<EngagementPage />) },
       { path: "/inbox", element: withFallback(<InboxPage />) },
       { path: "/automation", element: withFallback(<AutomationPage />) },
       { path: "/products", element: withFallback(<ProductsPage />) },
-      { path: "/listening", element: withFallback(<ListeningPage />) },
-      { path: "/competitors", element: withFallback(<CompetitorsPage />) },
       { path: "/accounts", element: withFallback(<AccountsPage />) },
       { path: "/status", element: withFallback(<StatusPage />) },
       { path: "/onboarding", element: withFallback(<OnboardingPage />) },
@@ -291,6 +291,50 @@ export const router = createBrowserRouter([
       { path: "/settings", element: withFallback(<SettingsPage />) },
       { path: "/settings/billing", element: withFallback(<BillingPage />) },
       { path: "/create-organization", element: withFallback(<CreateOrgPage />) },
+
+      // ---------- Hub Intelijen — 3 halaman bertab ----------
+      {
+        path: "/performance",
+        element: withFallback(<PerformancePage />),
+        children: [
+          { index: true, element: <Navigate to="/performance/analitik" replace /> },
+          { path: "analitik", element: withFallback(<AnalyticsPage />) },
+          { path: "laporan", element: withFallback(<ReportsPage />) },
+          { path: "goal", element: withFallback(<GoalsPage />) },
+        ],
+      },
+      {
+        path: "/research",
+        element: withFallback(<ResearchPage />),
+        children: [
+          { index: true, element: <Navigate to="/research/listening" replace /> },
+          { path: "listening", element: withFallback(<ListeningPage />) },
+          { path: "kompetitor", element: withFallback(<CompetitorsPage />) },
+          { path: "tren", element: withFallback(<TrendsPage />) },
+        ],
+      },
+      {
+        path: "/assistant",
+        element: withFallback(<AssistantPage />),
+        children: [
+          { index: true, element: <Navigate to="/assistant/coach" replace /> },
+          { path: "coach", element: withFallback(<CoachPage />) },
+          { path: "seb", element: withFallback(<SebPage />) },
+          { path: "strategi", element: withFallback(<StrategyPage />) },
+        ],
+      },
+
+      // Redirect URL lama → tab di hub yang sesuai
+      { path: "/analytics", element: <Navigate to="/performance/analitik" replace /> },
+      { path: "/reports", element: <Navigate to="/performance/laporan" replace /> },
+      { path: "/goals", element: <Navigate to="/performance/goal" replace /> },
+      { path: "/listening", element: <Navigate to="/research/listening" replace /> },
+      { path: "/competitors", element: <Navigate to="/research/kompetitor" replace /> },
+      { path: "/trends", element: <Navigate to="/research/tren" replace /> },
+      { path: "/coach", element: <Navigate to="/assistant/coach" replace /> },
+      { path: "/seb", element: <Navigate to="/assistant/seb" replace /> },
+      { path: "/strategy", element: <Navigate to="/assistant/strategi" replace /> },
+      { path: "/grid", element: <Navigate to="/calendar" replace /> },
     ],
   },
 
@@ -309,6 +353,7 @@ export const router = createBrowserRouter([
       { path: "/admin/blog", element: withFallback(<AdminBlogPage />) },
       { path: "/admin/blog/new", element: withFallback(<AdminBlogEditorPage />) },
       { path: "/admin/blog/:id", element: withFallback(<AdminBlogEditorPage />) },
+      { path: "/admin/holidays", element: withFallback(<AdminHolidaysPage />) },
       { path: "/admin/plans", element: withFallback(<AdminPlansPage />) },
       { path: "/admin/billing", element: withFallback(<AdminBillingPage />) },
       { path: "/admin/payment-config", element: withFallback(<AdminPaymentConfigPage />) },

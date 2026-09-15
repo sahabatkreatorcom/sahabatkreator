@@ -185,6 +185,18 @@ const LEGACY_REDIRECTS: Record<string, string> = {
   "/privacy": "/kebijakan-privasi",
   "/about": "/tentang",
   "/bulan": "/blog",
+  // Nav Intelijen lama → hub bertab (halaman dashboard noindex, redirect cukup
+  // menyelamatkan bookmark/history browser)
+  "/analytics": "/performance/analitik",
+  "/reports": "/performance/laporan",
+  "/goals": "/performance/goal",
+  "/listening": "/research/listening",
+  "/competitors": "/research/kompetitor",
+  "/trends": "/research/tren",
+  "/coach": "/assistant/coach",
+  "/seb": "/assistant/seb",
+  "/strategy": "/assistant/strategi",
+  "/grid": "/calendar",
 };
 app.get("/*", async (c, next) => {
   const path = c.req.path.replace(/\/+$/, "") || "/";

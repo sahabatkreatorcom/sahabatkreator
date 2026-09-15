@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Lightbulb,
   Loader2,
   Plus,
   RefreshCw,
@@ -18,6 +19,7 @@ import { ManualReminderPanel } from "@/components/calendar/manual-reminder-panel
 import { MonthView } from "@/components/calendar/month-view";
 import { PostDetailModal } from "@/components/calendar/post-detail-modal";
 import {
+  type CalendarHoliday,
   type CalendarNote,
   type CalendarPostGroup,
   groupByDate,
@@ -71,6 +73,8 @@ export function CalendarPage() {
   const [conflictModalOpen, setConflictModalOpen] = useState(false);
   // Post group terpilih untuk modal detail (klik kartu post di grid)
   const [selectedGroup, setSelectedGroup] = useState<CalendarPostGroup | null>(null);
+  // Hari besar terpilih untuk modal detail (klik chip di month view)
+  const [holidayDetail, setHolidayDetail] = useState<CalendarHoliday | null>(null);
 
   // Rentang fetch: sekitar view aktif (bulatkan ke grid bulanan agar semua view tercover)
   const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -98,6 +102,26 @@ export function CalendarPage() {
         .catch(() => ({ conflicts: [] as ScheduleConflict[] })),
   });
   const conflicts = conflictsData?.conflicts ?? [];
+
+  // Hari besar aktif untuk penanda di month view. Dataset recurring kecil,
+  // jadi fetch semua tanpa filter bulan (staleTime 1 jam, pola widget dashboard).
+  const { data: holidaysData } = useQuery({
+    queryKey: ["calendar-holidays"],
+    queryFn: () => api.get<{ holidays: CalendarHoliday[] }>("/holiday"),
+    staleTime: 1000 * 60 * 60,
+  });
+  // Petakan ke kunci MM-DD (recurring, tanpa tahun) agar aman saat grid
+  // 6 minggu melintasi pergantian tahun (Desember → Januari)
+  const holidaysByDate = useMemo(() => {
+    const map = new Map<string, CalendarHoliday[]>();
+    for (const h of holidaysData?.holidays ?? []) {
+      const key = `${String(h.month).padStart(2, "0")}-${String(h.day).padStart(2, "0")}`;
+      const arr = map.get(key) ?? [];
+      arr.push(h);
+      map.set(key, arr);
+    }
+    return map;
+  }, [holidaysData?.holidays]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["calendar-posts"] });
@@ -228,6 +252,8 @@ export function CalendarPage() {
     notesByDate,
     todayKey,
     conflictedGroupIds,
+    holidaysByDate,
+    onSelectHoliday: (h: CalendarHoliday) => setHolidayDetail(h),
     onSelectPost: (groupId: string) => {
       const group = (postsData?.groups ?? []).find((g) => g.id === groupId);
       if (group) setSelectedGroup(group);
@@ -366,6 +392,49 @@ export function CalendarPage() {
 
       {/* Modal detail post (klik kartu post) */}
       <PostDetailModal group={selectedGroup} onClose={() => setSelectedGroup(null)} />
+
+      {/* Modal detail hari besar (klik chip di month view) */}
+      {holidayDetail && (
+        <Modal
+          open
+          onClose={() => setHolidayDetail(null)}
+          title={holidayDetail.name}
+          description={`${holidayDetail.day} ${MONTHS_ID[holidayDetail.month - 1]} · ${
+            holidayDetail.scope === "national" ? "Nasional Indonesia" : "Internasional"
+          }`}
+        >
+          <div className="space-y-4">
+            {holidayDetail.description && (
+              <p className="text-[var(--text-secondary)] text-sm">{holidayDetail.description}</p>
+            )}
+            {holidayDetail.ideaTemplates && holidayDetail.ideaTemplates.length > 0 && (
+              <ul className="space-y-2">
+                {holidayDetail.ideaTemplates.slice(0, 3).map((idea, i) => (
+                  <li key={i} className="flex gap-2 rounded-lg bg-[var(--bg-tertiary)] p-3">
+                    <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-pink)]" />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-xs">{idea.angle}</p>
+                      <p className="mt-0.5 text-[var(--text-secondary)] text-xs">{idea.example}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {holidayDetail.suggestedHashtags && holidayDetail.suggestedHashtags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {holidayDetail.suggestedHashtags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-[var(--accent-gold-light)] px-2 py-0.5 text-[var(--accent-gold)] text-xs"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {/* Modal catatan */}
       {noteModal && (

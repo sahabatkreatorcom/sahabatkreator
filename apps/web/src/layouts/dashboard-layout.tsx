@@ -5,13 +5,8 @@ import {
   BarChart3,
   CalendarDays,
   CreditCard,
-  FileBarChart,
-  Flame,
-  GraduationCap,
-  Grid3x3,
   Image as ImageIcon,
   Inbox,
-  Layers,
   LayoutDashboard,
   Link2,
   ListChecks,
@@ -28,8 +23,6 @@ import {
   ShieldCheck,
   Sparkles,
   Sun,
-  Swords,
-  Target,
   Users,
   X,
   Zap,
@@ -53,7 +46,6 @@ import { NotificationBell } from "@/components/ui/notification-bell";
 import { RateLimitBanner } from "@/components/ui/rate-limit-banner";
 import { authClient } from "@/lib/auth-client";
 import { useCommandPalette } from "@/lib/command-palette-store";
-import { initials } from "@/lib/format";
 import { useSeo } from "@/lib/seo";
 import { useTheme } from "@/lib/theme";
 import { meQueryOptions } from "./require-auth";
@@ -65,7 +57,6 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: "/dashboard", label: "Overview", icon: LayoutDashboard, end: true },
       { to: "/activity", label: "Aktivitas", icon: ActivityIcon },
       { to: "/calendar", label: "Kalender", icon: CalendarDays },
-      { to: "/grid", label: "Grid Planner", icon: Grid3x3 },
       { to: "/queue", label: "Antrian Post", icon: ListChecks },
       { to: "/compose", label: "Buat Konten", icon: PenSquare },
     ],
@@ -81,15 +72,9 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Intelijen",
     items: [
-      { to: "/analytics", label: "Analitik", icon: BarChart3 },
-      { to: "/reports", label: "Laporan", icon: FileBarChart },
-      { to: "/goals", label: "Goal", icon: Target },
-      { to: "/listening", label: "Listening", icon: Radar },
-      { to: "/competitors", label: "Kompetitor", icon: Swords },
-      { to: "/coach", label: "Coach", icon: GraduationCap },
-      { to: "/seb", label: "SEB", icon: Sparkles },
-      { to: "/strategy", label: "Strategi", icon: Layers },
-      { to: "/trends", label: "Tren", icon: Flame },
+      { to: "/performance", label: "Performa", icon: BarChart3 },
+      { to: "/research", label: "Riset", icon: Radar },
+      { to: "/assistant", label: "AI Asisten", icon: Sparkles },
     ],
   },
   {
