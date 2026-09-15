@@ -152,6 +152,16 @@ export function QueuePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Hapus satu jadwal (satu platform) — group dihapus otomatis bila kosong
+  const removeItem = useMutation({
+    mutationFn: (id: string) => api.delete(`/posts/item/${id}`),
+    onSuccess: () => {
+      toast("Jadwal dihapus");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const groups = data?.groups ?? [];
   const filtered = groups.filter((g) => {
     if (tab === "all") return true;
@@ -387,6 +397,25 @@ export function QueuePage() {
                                     {badge.label}
                                   </Badge>
                                 )}
+                                {["draft", "scheduled", "failed"].includes(p.status) && (
+                                  <button
+                                    type="button"
+                                    title={`Hapus jadwal ${cfg?.label ?? p.platform}`}
+                                    disabled={removeItem.isPending && removeItem.variables === p.id}
+                                    onClick={() => {
+                                      if (
+                                        confirm(
+                                          `Hapus jadwal untuk ${cfg?.label ?? p.platform} (@${p.username ?? "—"})?`,
+                                        )
+                                      ) {
+                                        removeItem.mutate(p.id);
+                                      }
+                                    }}
+                                    className="ml-auto shrink-0 rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--error-light)] hover:text-[var(--error)] disabled:opacity-50"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                               </div>
                               {p.errorMessage && (
                                 <p className="mt-1 font-mono text-[var(--error)] text-xs">
@@ -415,7 +444,7 @@ export function QueuePage() {
                       })}
                     </div>
 
-                    {/* Hapus */}
+                    {/* Hapus seluruh group (semua jadwal platform) */}
                     {canReschedule && (
                       <div className="mt-4 flex justify-end">
                         <Button
@@ -424,13 +453,13 @@ export function QueuePage() {
                           className="text-[var(--error)] hover:bg-[var(--error-light)]"
                           disabled={remove.isPending && remove.variables === group.id}
                           onClick={() => {
-                            if (confirm("Hapus post ini beserta semua jadwalnya?")) {
+                            if (confirm("Hapus semua jadwal post ini?")) {
                               remove.mutate(group.id);
                             }
                           }}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                          Hapus Post
+                          Hapus Semua
                         </Button>
                       </div>
                     )}

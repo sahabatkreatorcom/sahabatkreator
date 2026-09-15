@@ -183,6 +183,17 @@ export function validatePost(input: ValidatePostInput): ValidationIssue[] {
       }
     }
 
+    if (platform === "bluesky") {
+      // Bluesky belum mendukung video — hanya foto (gambar ≤ 1000 atau carousel ≤ 4).
+      if (videoMedia.length > 0) {
+        issues.push({
+          severity: "error",
+          platform: "bluesky",
+          message: "Bluesky belum mendukung video — lepas videonya atau pilih platform lain.",
+        });
+      }
+    }
+
     if (platform === "tiktok") {
       // Photo post TikTok hanya mendukung JPEG/WebP — PNG/GIF ditolak
       // platform dengan file_format_check_failed (gagal asinkron setelah submit).

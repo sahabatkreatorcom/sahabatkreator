@@ -17,7 +17,7 @@ import {
   enqueuePostReminder,
   enqueuePublish,
 } from "@sahabatkreator/queue";
-import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { fireActivity } from "../lib/activity-log";
@@ -620,6 +620,47 @@ postsRoute.patch("/:id", async (c) => {
     }
 
     return c.json({ ok: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** DELETE /posts/item/:id — hapus satu jadwal post (satu platform) dari group.
+ * Group dihapus otomatis bila ini jadwal terakhir (group kosong tidak berguna).
+ */
+postsRoute.delete("/item/:id", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+    const postId = c.req.param("id");
+
+    // Post harus milik org aktif (join group)
+    const [row] = await db
+      .select({
+        id: post.id,
+        platform: post.platform,
+        groupId: sql<string>`${post.postGroupId}`,
+      })
+      .from(post)
+      .innerJoin(postGroup, eq(post.postGroupId, postGroup.id))
+      .where(and(eq(post.id, postId), eq(postGroup.organizationId, ctx.organization.id)))
+      .limit(1);
+    if (!row?.groupId) return c.json({ message: "Post tidak ditemukan" }, 404);
+
+    await cancelPublishJob(row.id, row.platform);
+    await db.delete(post).where(eq(post.id, row.id));
+
+    // Group kosong → hapus (beserta pengingat manualnya bila aktif)
+    const [remaining] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(post)
+      .where(eq(post.postGroupId, row.groupId));
+    const groupDeleted = (remaining?.n ?? 0) === 0;
+    if (groupDeleted && row.groupId) {
+      await cancelPostReminder(row.groupId);
+      await db.delete(postGroup).where(eq(postGroup.id, row.groupId));
+    }
+
+    return c.json({ ok: true, groupDeleted });
   } catch (error) {
     return errorResponse(error);
   }

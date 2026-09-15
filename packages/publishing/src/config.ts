@@ -37,6 +37,10 @@ export const GRAPH_THREADS_URL = "https://graph.threads.net/v1.0";
 /** OAuth Threads (authorize di threads.net, token exchange & revoke di Graph API) */
 export const THREADS_OAUTH_AUTH_URL = "https://threads.net/oauth/authorize";
 export const GRAPH_THREADS_OAUTH_URL = "https://graph.threads.net/oauth/access_token";
+/** Upgrade short-lived → long-lived 60 hari (GET, grant_type=th_exchange_token) */
+export const GRAPH_THREADS_EXCHANGE_LONG_LIVED_URL = "https://graph.threads.net/access_token";
+/** Refresh long-lived token (GET, grant_type=th_refresh_token) */
+export const GRAPH_THREADS_REFRESH_URL = "https://graph.threads.net/refresh_access_token";
 export const GRAPH_THREADS_REVOKE_URL = "https://graph.threads.net/revoke";
 /** Dialog login Facebook (authorize Meta app) */
 export const META_DIALOG_URL = `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth`;

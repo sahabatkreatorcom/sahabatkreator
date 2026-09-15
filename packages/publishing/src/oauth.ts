@@ -12,6 +12,9 @@ import {
   GOOGLE_OAUTH_TOKEN_URL,
   GRAPH_FB_URL,
   GRAPH_IG_URL,
+  GRAPH_THREADS_EXCHANGE_LONG_LIVED_URL,
+  GRAPH_THREADS_OAUTH_URL,
+  GRAPH_THREADS_REFRESH_URL,
   GRAPH_THREADS_URL,
   INSTAGRAM_OAUTH_AUTH_URL,
   INSTAGRAM_OAUTH_TOKEN_URL,
@@ -25,7 +28,6 @@ import {
   PINTEREST_OAUTH_URL,
   PINTEREST_SANDBOX,
   THREADS_OAUTH_AUTH_URL,
-  GRAPH_THREADS_OAUTH_URL,
   TIKTOK_AUTH_URL,
   TIKTOK_OPEN_API_URL,
   YOUTUBE_API_URL,
@@ -320,7 +322,7 @@ export async function exchangeCodeForToken(
   }
 
   const data = await res.json();
-  const accessToken: string | undefined = data.access_token ?? data.data?.access_token; // TikTok: { data: { access_token } }
+  let accessToken: string | undefined = data.access_token ?? data.data?.access_token; // TikTok: { data: { access_token } }
   if (!accessToken) {
     throw new PublishError(
       "oauth_no_token",
@@ -329,10 +331,41 @@ export async function exchangeCodeForToken(
     );
   }
 
-  const expiresIn = Number(data.expires_in ?? data.data?.expires_in);
+  let expiresIn = Number(data.expires_in ?? data.data?.expires_in);
+
+  // Threads: token exchange awal hanya short-lived (~24 jam) — langsung upgrade
+  // ke long-lived 60 hari via grant_type=th_exchange_token (docs threads.md).
+  // Tanpa ini token mati dalam sehari dan refresh scheduler tidak sempat jalan.
+  if (platform === "threads") {
+    const longLived = await httpRequest<{ access_token?: string; expires_in?: number }>(
+      GRAPH_THREADS_EXCHANGE_LONG_LIVED_URL,
+      {
+        query: {
+          grant_type: "th_exchange_token",
+          client_secret: cred.clientSecret,
+          access_token: accessToken,
+        },
+      },
+    );
+    if (longLived.ok) {
+      const ld = await longLived.json();
+      if (ld.access_token) {
+        accessToken = ld.access_token;
+        if (ld.expires_in) expiresIn = ld.expires_in; // ~5184000 (60 hari)
+      }
+    }
+    // Gagal upgrade (mis. token private-profile) → lanjut dengan short-lived;
+    // refresh scheduler akan coba lagi dan menandai needsReconnect bila gagal.
+  }
+
   return {
     accessToken,
-    refreshToken: data.refresh_token ?? data.data?.refresh_token ?? undefined,
+    // Threads: token long-lived juga dipakai untuk refresh berikutnya
+    // (th_refresh_token) — simpan sebagai refreshToken supaya scheduler jalan.
+    refreshToken:
+      platform === "threads"
+        ? accessToken
+        : (data.refresh_token ?? data.data?.refresh_token ?? undefined),
     expiresAt:
       Number.isFinite(expiresIn) && expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000) : null,
     // Pakai scope yang di-grant platform bila tersedia (LinkedIn mengirim field "scope";
@@ -350,6 +383,48 @@ export async function refreshAccessToken(
   const config = OAUTH_CONFIGS[platform];
   if (!config?.tokenUrl) {
     throw new PublishError("oauth_not_supported", `OAuth ${platform} tidak didukung.`, false);
+  }
+
+  // Threads: flow non-standar — refresh long-lived via GET refresh_access_token
+  // dengan grant_type=th_refresh_token & param access_token (docs threads.md).
+  // Token long-lived Threads TIDAK menghasilkan refresh_token terpisah.
+  if (platform === "threads") {
+    const res = await httpRequest<{ access_token?: string; expires_in?: number }>(
+      GRAPH_THREADS_REFRESH_URL,
+      {
+        query: {
+          grant_type: "th_refresh_token",
+          access_token: refreshToken,
+        },
+      },
+    );
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new PublishError(
+        "oauth_refresh_failed",
+        `Refresh token ${platform} gagal (${res.status}): ${text.slice(0, 200)} — hubungkan ulang akun.`,
+        false,
+      );
+    }
+    const data = await res.json();
+    if (!data.access_token) {
+      throw new PublishError(
+        "oauth_no_token",
+        `Refresh ${platform} tidak berisi access_token`,
+        false,
+      );
+    }
+    const expiresIn = Number(data.expires_in);
+    return {
+      accessToken: data.access_token,
+      // Token hasil refresh = AT sekaligus "refresh token" berikutnya
+      refreshToken: data.access_token,
+      expiresAt:
+        Number.isFinite(expiresIn) && expiresIn > 0
+          ? new Date(Date.now() + expiresIn * 1000)
+          : null,
+      scopes: requestedScopes(platform, cred),
+    };
   }
 
   const body = new URLSearchParams({
