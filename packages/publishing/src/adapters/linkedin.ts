@@ -169,7 +169,12 @@ async function publishLinkedIn(input: PublishInput): Promise<PublishResult> {
   const postId = res.headers.get("x-restli-id") ?? "";
   if (!postId)
     throw new PublishError("linkedin_no_post_id", "LinkedIn tidak mengembalikan post ID", true);
-  return { status: "published", platformPostId: postId };
+  return {
+    status: "published",
+    platformPostId: postId,
+    // URN share → permalink feed (x-restli-id bentuknya urn:li:share:{id})
+    platformPostUrl: `https://www.linkedin.com/feed/update/${postId.includes(":") ? postId : `urn:li:share:${postId}`}/`,
+  };
 }
 
 export const linkedinAdapter: PlatformAdapter = {

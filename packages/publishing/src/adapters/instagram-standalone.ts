@@ -12,6 +12,7 @@ import {
   type PublishResult,
 } from "../types";
 import {
+  fetchGraphPermalink,
   firstImage,
   firstVideo,
   GRAPH_IG,
@@ -80,7 +81,11 @@ async function publishInstagramStandalone(input: PublishInput): Promise<PublishR
   const mediaId = (await publishRes.json()).id;
   if (!mediaId)
     throw new PublishError("ig_no_media_id", "Publish sukses tapi media ID kosong", true);
-  return { status: "published", platformPostId: mediaId };
+  return {
+    status: "published",
+    platformPostId: mediaId,
+    platformPostUrl: await fetchGraphPermalink(GRAPH_IG, input.accessToken, mediaId),
+  };
 }
 
 export const instagramStandaloneAdapter: PlatformAdapter = {
@@ -91,7 +96,11 @@ export const instagramStandaloneAdapter: PlatformAdapter = {
   async checkStatus({ accessToken, platformAccountId, handle }) {
     const r = await pollInstagram({ accessToken, platformAccountId, handle, mode: "standalone" });
     return r.status === "published"
-      ? { status: "published", platformPostId: r.platformPostId }
+      ? {
+          status: "published",
+          platformPostId: r.platformPostId,
+          platformPostUrl: r.platformPostUrl,
+        }
       : { status: "processing" };
   },
 };

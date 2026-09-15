@@ -64,7 +64,11 @@ async function publishPinterest(input: PublishInput): Promise<PublishResult> {
     if (!res.ok) await throwFromResponse(res, "Pinterest pin");
     const data = await res.json();
     if (!data.id) throw new PublishError("pinterest_no_pin_id", "Pinterest tanpa pin ID", true);
-    return { status: "published", platformPostId: data.id };
+    return {
+      status: "published",
+      platformPostId: data.id,
+      platformPostUrl: `https://www.pinterest.com/pin/${data.id}/`,
+    };
   }
 
   if (video) {
@@ -123,7 +127,7 @@ async function checkPinterestStatus(input: {
   media?: { url: string; type: string; thumbnailUrl?: string | null }[];
 }): Promise<
   | { status: "processing" }
-  | { status: "published"; platformPostId: string }
+  | { status: "published"; platformPostId: string; platformPostUrl?: string | null }
   | { status: "failed"; code: string; message: string; retryable: boolean }
 > {
   const mediaId = input.handle.replace("pin:", "");
@@ -171,7 +175,11 @@ async function checkPinterestStatus(input: {
     if (!pinRes.ok) await throwFromResponse(pinRes, "Pinterest video pin");
     const pin = await pinRes.json();
     if (!pin.id) return { status: "processing" };
-    return { status: "published", platformPostId: pin.id };
+    return {
+      status: "published",
+      platformPostId: pin.id,
+      platformPostUrl: `https://www.pinterest.com/pin/${pin.id}/`,
+    };
   }
   if (status === "failed") {
     return {
@@ -205,7 +213,12 @@ export const pinterestAdapter: PlatformAdapter = {
       platformSettings: platformSettings ?? {},
       media,
     });
-    if (r.status === "published") return { status: "published", platformPostId: r.platformPostId };
+    if (r.status === "published")
+      return {
+        status: "published",
+        platformPostId: r.platformPostId,
+        platformPostUrl: r.platformPostUrl,
+      };
     if (r.status === "failed")
       return { status: "failed", code: r.code, message: r.message, retryable: r.retryable };
     return { status: "processing" };

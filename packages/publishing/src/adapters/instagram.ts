@@ -11,6 +11,7 @@ import {
   type PublishResult,
 } from "../types";
 import {
+  fetchGraphPermalink,
   firstImage,
   firstVideo,
   GRAPH_FB,
@@ -132,7 +133,11 @@ async function publishInstagramViaFb(input: PublishInput): Promise<PublishResult
   const mediaId = (await res.json()).id;
   if (!mediaId)
     throw new PublishError("ig_no_media_id", "Publish sukses tapi media ID kosong", true);
-  return { status: "published", platformPostId: mediaId };
+  return {
+    status: "published",
+    platformPostId: mediaId,
+    platformPostUrl: await fetchGraphPermalink(GRAPH_FB, input.accessToken, mediaId),
+  };
 }
 
 export const instagramAdapter: PlatformAdapter = {
@@ -144,7 +149,11 @@ export const instagramAdapter: PlatformAdapter = {
   async checkStatus({ accessToken, platformAccountId, handle }) {
     const r = await pollInstagram({ accessToken, platformAccountId, handle, mode: "fb" });
     return r.status === "published"
-      ? { status: "published", platformPostId: r.platformPostId }
+      ? {
+          status: "published",
+          platformPostId: r.platformPostId,
+          platformPostUrl: r.platformPostUrl,
+        }
       : { status: "processing" };
   },
 };

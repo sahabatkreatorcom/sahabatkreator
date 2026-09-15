@@ -90,7 +90,10 @@ export async function pollInstagram(input: {
   platformAccountId: string;
   handle: string;
   mode: "fb" | "standalone";
-}): Promise<{ status: "processing" } | { status: "published"; platformPostId: string }> {
+}): Promise<
+  | { status: "processing" }
+  | { status: "published"; platformPostId: string; platformPostUrl?: string | null }
+> {
   const [, containerId] = input.handle.split(":");
   if (!containerId) return { status: "processing" };
   const base = input.mode === "fb" ? GRAPH_FB : GRAPH_IG;
@@ -110,7 +113,11 @@ export async function pollInstagram(input: {
     if (!pub.ok) await throwFromResponse(pub, "IG publish");
     const mediaId = (await pub.json()).id;
     if (!mediaId) return { status: "processing" };
-    return { status: "published", platformPostId: mediaId };
+    return {
+      status: "published",
+      platformPostId: mediaId,
+      platformPostUrl: await fetchGraphPermalink(base, input.accessToken, mediaId),
+    };
   }
   if (status_code === "EXPIRED" || status_code === "ERROR") {
     throw new PublishError(
@@ -120,4 +127,25 @@ export async function pollInstagram(input: {
     );
   }
   return { status: "processing" };
+}
+
+/**
+ * Ambil permalink konten Graph (IG/Threads) — best-effort: kegagalan diabaikan
+ * (URL null, post tetap sukses). 1 call GET {id}?fields=permalink.
+ */
+export async function fetchGraphPermalink(
+  base: string,
+  accessToken: string,
+  mediaId: string,
+): Promise<string | null> {
+  try {
+    const res = await httpRequest<{ permalink?: string }>(`${base}/${mediaId}`, {
+      query: { fields: "permalink", access_token: accessToken },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.permalink ?? null;
+  } catch {
+    return null;
+  }
 }

@@ -80,6 +80,8 @@ export type PlatformAdapter = {
     accessToken: string;
     platformAccountId: string;
     handle: string;
+    /** Handle/username akun (dari socialAccount.username) — TikTok pakai untuk URL post */
+    accountHandle?: string;
     /** Data post dari DB — dibutuhkan Pinterest video untuk membuat pin final */
     content?: string;
     hashtags?: string[];

@@ -157,9 +157,15 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
 async function checkTikTokStatus(input: {
   accessToken: string;
   handle: string;
+  accountHandle?: string;
 }): Promise<AsyncStatus> {
   const res = await httpRequest<{
-    data?: { status?: string; publicly_available_post_id?: string; fail_reason?: string };
+    data?: {
+      status?: string;
+      publicly_available_post_id?: string;
+      share_url?: string;
+      fail_reason?: string;
+    };
     error?: { code?: string; message?: string; log_id?: string };
   }>(`${TIKTOK_PUBLISH_URL}/status/fetch/`, {
     method: "POST",
@@ -181,9 +187,16 @@ async function checkTikTokStatus(input: {
   }
   const status = data.data?.status;
   if (status === "PUBLISH_COMPLETE") {
+    const postId = data.data?.publicly_available_post_id ?? input.handle;
     return {
       status: "published",
-      platformPostId: data.data?.publicly_available_post_id ?? input.handle,
+      platformPostId: postId,
+      // share_url bila tersedia; fallback URL kanonik tiktok.com/@user/video/{id}
+      platformPostUrl:
+        data.data?.share_url ??
+        (input.accountHandle
+          ? `https://www.tiktok.com/@${input.accountHandle}/video/${postId}`
+          : null),
     };
   }
   if (status === "FAILED" || status === "PUBLISH_FAILED") {
@@ -199,15 +212,20 @@ async function checkTikTokStatus(input: {
 
 type AsyncStatus =
   | { status: "processing" }
-  | { status: "published"; platformPostId: string }
+  | { status: "published"; platformPostId: string; platformPostUrl?: string | null }
   | { status: "failed"; code: string; message: string; retryable: boolean };
 
 export const tiktokAdapter: PlatformAdapter = {
   platform: "tiktok",
   publish: publishTikTok,
-  async checkStatus({ accessToken, handle }) {
-    const r = await checkTikTokStatus({ accessToken, handle });
-    if (r.status === "published") return { status: "published", platformPostId: r.platformPostId };
+  async checkStatus({ accessToken, handle, accountHandle }) {
+    const r = await checkTikTokStatus({ accessToken, handle, accountHandle });
+    if (r.status === "published")
+      return {
+        status: "published",
+        platformPostId: r.platformPostId,
+        platformPostUrl: r.platformPostUrl,
+      };
     if (r.status === "failed")
       return { status: "failed", code: r.code, message: r.message, retryable: r.retryable };
     return { status: "processing" };

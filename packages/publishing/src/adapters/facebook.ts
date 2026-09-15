@@ -51,6 +51,7 @@ async function publishFacebook(input: PublishInput, scheduledAt?: Date): Promise
     return {
       status: "published",
       platformPostId: data.id,
+      platformPostUrl: `https://www.facebook.com/${pageId}/videos/${data.id}`,
       scheduledOnPlatform: Boolean(scheduleValid),
     };
   }
@@ -76,9 +77,11 @@ async function publishFacebook(input: PublishInput, scheduledAt?: Date): Promise
     );
     if (!res.ok) await throwFromResponse(res, "FB photo");
     const data = await res.json();
+    const postId = data.post_id ?? data.id ?? "";
     return {
       status: "published",
-      platformPostId: data.post_id ?? data.id ?? "",
+      platformPostId: postId,
+      platformPostUrl: `https://www.facebook.com/${pageId}/posts/${postId}`,
       scheduledOnPlatform: Boolean(scheduleValid),
     };
   }
@@ -104,6 +107,7 @@ async function publishFacebook(input: PublishInput, scheduledAt?: Date): Promise
   return {
     status: "published",
     platformPostId: data.id,
+    platformPostUrl: `https://www.facebook.com/${pageId}/posts/${String(data.id).split("_")[1] ?? data.id}`,
     scheduledOnPlatform: Boolean(scheduleValid),
   };
 }

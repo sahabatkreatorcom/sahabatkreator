@@ -514,6 +514,7 @@ export async function pollPost(postId: string): Promise<"published" | "failed" |
       accessTokenEnc: socialAccount.accessTokenEnc,
       refreshTokenEnc: socialAccount.refreshTokenEnc,
       platformAccountId: socialAccount.platformAccountId,
+      username: socialAccount.username,
       metadata: socialAccount.metadata,
     })
     .from(socialAccount)
@@ -544,6 +545,7 @@ export async function pollPost(postId: string): Promise<"published" | "failed" |
     accessToken,
     platformAccountId: account.platformAccountId,
     handle: row.handle,
+    accountHandle: account.username,
     content: row.content ?? undefined,
     hashtags: row.hashtags as string[] | undefined,
     platformSettings: (row.platformSettings as Record<string, unknown>) ?? undefined,
@@ -623,6 +625,7 @@ export async function pollInFlightPosts(
           accessTokenEnc: socialAccount.accessTokenEnc,
           refreshTokenEnc: socialAccount.refreshTokenEnc,
           platformAccountId: socialAccount.platformAccountId,
+          username: socialAccount.username,
           metadata: socialAccount.metadata,
         })
         .from(socialAccount)
@@ -660,6 +663,7 @@ export async function pollInFlightPosts(
         accessToken,
         platformAccountId: account.platformAccountId,
         handle: row.handle,
+        accountHandle: account.username,
         content: row.content ?? undefined,
         hashtags: row.hashtags as string[] | undefined,
         platformSettings: (row.platformSettings as Record<string, unknown>) ?? undefined,

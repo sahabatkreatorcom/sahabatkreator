@@ -9,7 +9,13 @@ import {
   type PublishInput,
   type PublishResult,
 } from "../types";
-import { firstImage, firstVideo, GRAPH_THREADS, quotaHook } from "./meta-shared";
+import {
+  fetchGraphPermalink,
+  firstImage,
+  firstVideo,
+  GRAPH_THREADS,
+  quotaHook,
+} from "./meta-shared";
 
 async function publishThreads(input: PublishInput): Promise<PublishResult> {
   const userId = input.platformAccountId;
@@ -59,7 +65,11 @@ async function publishThreads(input: PublishInput): Promise<PublishResult> {
     const data = await res.json();
     if (!data.id)
       throw new PublishError("threads_no_id", "Threads tidak mengembalikan media ID", true);
-    return { status: "published", platformPostId: data.id };
+    return {
+      status: "published",
+      platformPostId: data.id,
+      platformPostUrl: await fetchGraphPermalink(GRAPH_THREADS, input.accessToken, data.id),
+    };
   }
 
   // Media → container lalu publish
@@ -93,7 +103,11 @@ async function publishThreads(input: PublishInput): Promise<PublishResult> {
   const mediaId = (await pub.json()).id;
   if (!mediaId)
     throw new PublishError("threads_no_media_id", "Threads publish tanpa media ID", true);
-  return { status: "published", platformPostId: mediaId };
+  return {
+    status: "published",
+    platformPostId: mediaId,
+    platformPostUrl: await fetchGraphPermalink(GRAPH_THREADS, input.accessToken, mediaId),
+  };
 }
 
 export const threadsAdapter: PlatformAdapter = {
