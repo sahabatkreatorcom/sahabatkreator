@@ -8,6 +8,7 @@ import {
   OrganizationSection,
   SessionsSection,
 } from "@/components/settings/account-data-sections";
+import { AiUsageHistory } from "@/components/settings/ai-usage-history";
 import { PushNotificationSettings } from "@/components/settings/push-notification-settings";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -390,6 +391,9 @@ export function SettingsPage() {
 
       {/* Notifikasi push */}
       <PushNotificationSettings />
+
+      {/* Riwayat pemakaian AI */}
+      <AiUsageHistory />
 
       {/* Organisasi */}
       <OrganizationSection />

@@ -1,8 +1,8 @@
 // API AI — generate caption, hashtag, rewrite, saran reply via OpenRouter
 
 import { db } from "@sahabatkreator/db";
-import { brandVoice, media } from "@sahabatkreator/db/schema";
-import { and, eq } from "drizzle-orm";
+import { aiUsageLog, brandVoice, media, user as userTable } from "@sahabatkreator/db/schema";
+import { and, count, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { chatCompletion, consumeAiCredits, getAiConfig, getAiUsage } from "../lib/ai";
@@ -80,6 +80,49 @@ aiRoute.get("/usage", async (c) => {
       limit: limits.aiCreditsPerMonth,
       period: usage.period,
     });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+// ---------- GET /ai/usage/history — riwayat pemakaian AI org milik user ----------
+
+/**
+ * Log pemakaian AI (caption, hashtag, rewrite, SEB) untuk org aktif user.
+ * Scope: organizationId = org aktif session (bukan semua org user) agar
+ * konsisten dengan limit kredit yang juga per-org.
+ */
+aiRoute.get("/usage/history", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+    const page = Math.max(Number(c.req.query("page") ?? 1), 1);
+    const perPage = Math.min(Number(c.req.query("perPage") ?? 50), 200);
+    const action = c.req.query("action")?.trim() ?? "";
+
+    const conditions = [eq(aiUsageLog.organizationId, ctx.organization.id)];
+    if (action) conditions.push(eq(aiUsageLog.action, action));
+    const where = and(...conditions);
+
+    const rows = await db
+      .select({
+        id: aiUsageLog.id,
+        userName: userTable.name,
+        action: aiUsageLog.action,
+        platform: aiUsageLog.platform,
+        model: aiUsageLog.model,
+        credits: aiUsageLog.credits,
+        createdAt: aiUsageLog.createdAt,
+      })
+      .from(aiUsageLog)
+      .leftJoin(userTable, eq(aiUsageLog.userId, userTable.id))
+      .where(where)
+      .orderBy(desc(aiUsageLog.createdAt))
+      .limit(perPage)
+      .offset((page - 1) * perPage);
+
+    const [total] = await db.select({ total: count() }).from(aiUsageLog).where(where);
+
+    return c.json({ logs: rows, total: total?.total ?? 0, page, perPage });
   } catch (error) {
     return errorResponse(error);
   }

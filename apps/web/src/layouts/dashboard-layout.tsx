@@ -237,6 +237,10 @@ function UserMenu() {
         <Settings className="h-4 w-4" />
         Pengaturan
       </DropdownItem>
+      <DropdownItem onClick={() => navigate("/settings/billing")}>
+        <CreditCard className="h-4 w-4" />
+        Billing
+      </DropdownItem>
       {user?.role === "admin" && (
         <DropdownItem onClick={() => navigate("/admin")}>
           <ShieldCheck className="h-4 w-4" />

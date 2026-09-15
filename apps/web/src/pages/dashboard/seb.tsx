@@ -1,10 +1,10 @@
-// Halaman SEB — AI coach proaktif: report, rekomendasi, experiment, brand knowledge, chat
+// Halaman SEB — AI coach proaktif: report, rekomendasi, experiment, brand knowledge
+// (chat SEB ada di tombol floating kanan bawah di semua halaman)
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bot, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { BrandKnowledgePanel } from "@/components/seb/brand-knowledge-panel";
-import { SebChatPanel } from "@/components/seb/chat-panel";
 import { ExperimentPanel } from "@/components/seb/experiment-panel";
 import { RecommendationCard } from "@/components/seb/recommendation-card";
 import { ReportCard } from "@/components/seb/report-card";
@@ -93,8 +93,8 @@ export function SebPage() {
             SEB
           </h1>
           <p className="mt-1 text-[var(--text-secondary)] text-sm">
-            AI coach proaktif — menganalisis konten & performa Anda, memberi rekomendasi harian, dan
-            siap diajak chat kapan pun.
+            AI coach proaktif — menganalisis konten & performa Anda dan memberi rekomendasi harian.
+            Butuh ngobrol? Klik tombol SEB di kanan bawah kapan saja.
           </p>
         </div>
         <div className="flex gap-2">
@@ -109,23 +109,20 @@ export function SebPage() {
         </div>
       </div>
 
-      {/* Report terbaru + chat */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-4">
-          {generateReport.isPending ? (
-            <div className="card flex items-center justify-center gap-2 p-6 text-[var(--text-secondary)] text-sm">
-              <Loader2 className="h-4 w-4 animate-spin text-[var(--accent-gold)]" />
-              SEB sedang menganalisis data 90 hari terakhir…
-            </div>
-          ) : (
-            <ReportCard
-              report={data.latestReport}
-              onRegenerate={() => generateReport.mutate()}
-              regenerating={generateReport.isPending}
-            />
-          )}
-        </div>
-        <SebChatPanel />
+      {/* Report terbaru (chat SEB ada di floating button kanan bawah) */}
+      <div>
+        {generateReport.isPending ? (
+          <div className="card flex items-center justify-center gap-2 p-6 text-[var(--text-secondary)] text-sm">
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--accent-gold)]" />
+            SEB sedang menganalisis data 90 hari terakhir…
+          </div>
+        ) : (
+          <ReportCard
+            report={data.latestReport}
+            onRegenerate={() => generateReport.mutate()}
+            regenerating={generateReport.isPending}
+          />
+        )}
       </div>
 
       {/* Tab konten */}
