@@ -109,66 +109,71 @@ export function SebPage() {
         </div>
       </div>
 
-      {/* Report terbaru (chat SEB ada di floating button kanan bawah) */}
-      <div>
-        {generateReport.isPending ? (
-          <div className="card flex items-center justify-center gap-2 p-6 text-[var(--text-secondary)] text-sm">
-            <Loader2 className="h-4 w-4 animate-spin text-[var(--accent-gold)]" />
-            SEB sedang menganalisis data 90 hari terakhir…
-          </div>
-        ) : (
-          <ReportCard
-            report={data.latestReport}
-            onRegenerate={() => generateReport.mutate()}
-            regenerating={generateReport.isPending}
-          />
-        )}
-      </div>
-
-      {/* Tab konten */}
-      <div className="flex gap-1.5 border-[var(--border-light)] border-b">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={cn(
-              "-mb-px border-b-2 px-3 py-2 font-medium text-sm transition-colors",
-              tab === t.key
-                ? "border-[var(--accent-gold)] text-[var(--accent-gold)]"
-                : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-            )}
-          >
-            {t.label}
-            {t.key === "recommendations" && pendingCount > 0 && (
-              <span className="ml-1.5 rounded-full bg-[var(--accent-gold)] px-1.5 py-0.5 text-[10px] text-white">
-                {pendingCount}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {tab === "recommendations" && (
-        <div className="space-y-3">
-          {recommendations.length === 0 ? (
-            <div className="card p-8 text-center">
-              <p className="font-medium">Belum ada rekomendasi</p>
-              <p className="mt-1 text-[var(--text-secondary)] text-sm">
-                Generate report untuk mendapat rekomendasi hasil analisis SEB.
-              </p>
+      {/* Layout 2 kolom: report (kiri) + tab konten (kanan) */}
+      <div className="grid items-start gap-6 lg:grid-cols-[360px_1fr]">
+        {/* Kolom kiri — report terbaru (chat SEB ada di floating button kanan bawah) */}
+        <div className="min-w-0">
+          {generateReport.isPending ? (
+            <div className="card flex items-center justify-center gap-2 p-6 text-[var(--text-secondary)] text-sm">
+              <Loader2 className="h-4 w-4 animate-spin text-[var(--accent-gold)]" />
+              SEB sedang menganalisis data 90 hari terakhir…
             </div>
           ) : (
-            recommendations.map((r) => <RecommendationCard key={r.id} recommendation={r} />)
+            <ReportCard
+              report={data.latestReport}
+              onRegenerate={() => generateReport.mutate()}
+              regenerating={generateReport.isPending}
+            />
           )}
         </div>
-      )}
 
-      {tab === "experiments" && <ExperimentPanel experiments={data.experiments} />}
+        {/* Kolom kanan — tab Rekomendasi / Experiment / Brand Knowledge */}
+        <div className="min-w-0 space-y-4">
+          <div className="flex gap-1.5 border-[var(--border-light)] border-b">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={cn(
+                  "-mb-px border-b-2 px-3 py-2 font-medium text-sm transition-colors",
+                  tab === t.key
+                    ? "border-[var(--accent-gold)] text-[var(--accent-gold)]"
+                    : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                )}
+              >
+                {t.label}
+                {t.key === "recommendations" && pendingCount > 0 && (
+                  <span className="ml-1.5 rounded-full bg-[var(--accent-gold)] px-1.5 py-0.5 text-[10px] text-white">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
 
-      {tab === "brand" && (
-        <BrandKnowledgePanel brandKnowledge={data.brandKnowledge} canManage={isAdmin} />
-      )}
+          {tab === "recommendations" && (
+            <div className="space-y-3">
+              {recommendations.length === 0 ? (
+                <div className="card p-8 text-center">
+                  <p className="font-medium">Belum ada rekomendasi</p>
+                  <p className="mt-1 text-[var(--text-secondary)] text-sm">
+                    Generate report untuk mendapat rekomendasi hasil analisis SEB.
+                  </p>
+                </div>
+              ) : (
+                recommendations.map((r) => <RecommendationCard key={r.id} recommendation={r} />)
+              )}
+            </div>
+          )}
+
+          {tab === "experiments" && <ExperimentPanel experiments={data.experiments} />}
+
+          {tab === "brand" && (
+            <BrandKnowledgePanel brandKnowledge={data.brandKnowledge} canManage={isAdmin} />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

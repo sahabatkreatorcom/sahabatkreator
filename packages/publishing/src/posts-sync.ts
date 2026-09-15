@@ -23,6 +23,7 @@ import {
   getTikTokVideos,
   getYouTubeVideos,
 } from "./posts-sync-api";
+import { refreshAccountToken } from "./token-refresh";
 
 /** Platform yang didukung posts-sync (punya API list konten terbit). */
 export const POSTS_SYNC_PLATFORMS = new Set<string>([
@@ -88,6 +89,7 @@ type SyncableAccount = {
   platformAccountId: string;
   username: string;
   accessTokenEnc: string | null;
+  refreshTokenEnc: string | null;
   metadata: Record<string, unknown> | null;
 };
 
@@ -110,6 +112,7 @@ export async function syncWorkspacePosts(
       platformAccountId: socialAccount.platformAccountId,
       username: socialAccount.username,
       accessTokenEnc: socialAccount.accessTokenEnc,
+      refreshTokenEnc: socialAccount.refreshTokenEnc,
       metadata: socialAccount.metadata,
     })
     .from(socialAccount)
@@ -243,7 +246,18 @@ async function syncAccountPosts(account: SyncableAccount, since: Date): Promise<
     return { ...base, error: "Token decrypt gagal" };
   }
 
-  const fetched = await fetchExternalPosts(account, accessToken, since);
+  let fetched = await fetchExternalPosts(account, accessToken, since);
+
+  // Token ditolak platform (401/invalid) → coba refresh token + retry sekali
+  // sebelum menyerah. Bila refresh juga gagal (RT ikut dicabut), error asli
+  // yang di-return → akun ditandai needsReconnect oleh pemanggil.
+  if ("error" in fetched && isPermanentTokenError(fetched.error)) {
+    const healed = await refreshAccountToken(account);
+    if (healed) {
+      accessToken = healed;
+      fetched = await fetchExternalPosts(account, accessToken, since);
+    }
+  }
   if ("error" in fetched) {
     return { ...base, error: fetched.error };
   }

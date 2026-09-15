@@ -271,6 +271,10 @@ export function PlatformSettingsPanel({
                         />
                         Konten untuk anak-anak (Made for Kids)
                       </label>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        Tip: video vertikal 9:16 (atau persegi) ≤ 3 menit otomatis menjadi Shorts —
+                        tidak perlu pengaturan khusus. Video lain tayang sebagai video biasa.
+                      </p>
                     </>
                   )}
 

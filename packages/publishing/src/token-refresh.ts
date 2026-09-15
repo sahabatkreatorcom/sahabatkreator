@@ -165,6 +165,53 @@ export async function refreshDueTokens(limit = 20): Promise<TokenRefreshResult> 
   return result;
 }
 
+/**
+ * Refresh token satu akun atas permintaan (self-heal posts-sync saat token
+ * ditolak platform 401 — mis. AT dicabut/lewat masa aktif sebelum jadwal worker).
+ * Return access token baru, atau null bila akun tidak punya RT / kredensial app
+ * tidak ada / refresh gagal — pemanggil melanjutkan dengan error asli sehingga
+ * akun ditandai needsReconnect.
+ *
+ * Token baru dipropagasikan ke semua row se-org dengan username platform sama:
+ * Pinterest (dan LinkedIn) menyimpan token user-level yang sama di banyak
+ * entitas (board/company) — refresh satu row merotasi RT, row lain harus ikut
+ * agar tidak mati bergantian.
+ */
+export async function refreshAccountToken(account: {
+  organizationId: string;
+  platform: string;
+  username: string;
+  refreshTokenEnc: string | null;
+}): Promise<string | null> {
+  if (!account.refreshTokenEnc) return null;
+  try {
+    const refreshToken = decrypt(account.refreshTokenEnc);
+    const cred = await getAppCredential(account.platform as OAuthPlatform);
+    if (!cred) return null;
+    const token = await refreshAccessToken(account.platform as OAuthPlatform, cred, refreshToken);
+
+    await db
+      .update(socialAccount)
+      .set({
+        accessTokenEnc: encrypt(token.accessToken),
+        ...(token.refreshToken ? { refreshTokenEnc: encrypt(token.refreshToken) } : {}),
+        tokenExpiresAt: token.expiresAt ?? null,
+        needsReconnect: false,
+        lastError: null,
+      })
+      .where(
+        and(
+          eq(socialAccount.organizationId, account.organizationId),
+          eq(socialAccount.platform, account.platform as never),
+          eq(socialAccount.username, account.username),
+        ),
+      );
+    return token.accessToken;
+  } catch {
+    return null;
+  }
+}
+
 /** Hitung akun yang perlu dihubungkan ulang (untuk notifikasi/dashboard) */
 export async function countNeedsReconnect(): Promise<number> {
   const [row] = await db
