@@ -6,7 +6,6 @@
 
 import { db } from "@sahabatkreator/db";
 import { platformCredential, socialAccount } from "@sahabatkreator/db/schema";
-import { env } from "@sahabatkreator/env/server";
 import {
   BSKY_APPVIEW_URL,
   GBP_ACCOUNT_API_URL,
@@ -228,6 +227,78 @@ async function getStoredAccount(platform: string): Promise<{
 // Suite diagnostik Meta (Instagram / Facebook)
 // ---------------------------------------------------------------------------
 
+/**
+ * Resolusi verify token webhook — cermin runtime (webhook-platform.ts):
+ * DB platform_credential extraConfig (form Admin → Kredensial) → fallback env.
+ * Nilai token tidak pernah dikirim ke client — hanya status & sumbernya.
+ */
+const VERIFY_TOKEN_RESOLUTION = {
+  instagram: {
+    dbPlatform: "instagram",
+    envKeys: ["META_WEBHOOK_VERIFY_TOKEN"],
+    cardLabel: "kartu Instagram",
+  },
+  // /webhooks/meta membaca kredensial kartu Instagram — IG bisnis & FB
+  // satu aplikasi Meta (verify token & app secret dibagikan)
+  facebook: {
+    dbPlatform: "instagram",
+    envKeys: ["META_WEBHOOK_VERIFY_TOKEN"],
+    cardLabel: "kartu Instagram (IG & FB satu aplikasi Meta)",
+  },
+  instagram_standalone: {
+    dbPlatform: "instagram_standalone",
+    envKeys: ["INSTAGRAM_WEBHOOK_VERIFY_TOKEN", "META_WEBHOOK_VERIFY_TOKEN"],
+    cardLabel: "kartu Instagram Login",
+  },
+  threads: {
+    dbPlatform: "threads",
+    envKeys: ["THREADS_WEBHOOK_VERIFY_TOKEN", "META_WEBHOOK_VERIFY_TOKEN"],
+    cardLabel: "kartu Threads",
+  },
+} satisfies Record<
+  "instagram" | "facebook" | "instagram_standalone" | "threads",
+  { dbPlatform: string; envKeys: string[]; cardLabel: string }
+>;
+
+type VerifyTokenPlatform = keyof typeof VERIFY_TOKEN_RESOLUTION;
+
+async function getVerifyTokenInfo(platform: VerifyTokenPlatform): Promise<{
+  value: string | null;
+  source: "db" | "env" | null;
+  envKey: string | null;
+}> {
+  const resolution = VERIFY_TOKEN_RESOLUTION[platform];
+
+  const [cred] = await db
+    .select({ extraConfigEnc: platformCredential.extraConfigEnc })
+    .from(platformCredential)
+    .where(
+      and(
+        eq(platformCredential.platform, resolution.dbPlatform as never),
+        eq(platformCredential.isActive, true),
+      ),
+    )
+    .limit(1);
+  if (cred?.extraConfigEnc) {
+    try {
+      const extra = JSON.parse(decrypt(cred.extraConfigEnc)) as Record<string, unknown>;
+      if (typeof extra.webhookVerifyToken === "string" && extra.webhookVerifyToken.length >= 8) {
+        return { value: extra.webhookVerifyToken, source: "db", envKey: null };
+      }
+    } catch {
+      // decrypt/parse gagal (ENCRYPTION_KEY ganti?) — lanjut ke fallback env
+    }
+  }
+
+  for (const key of resolution.envKeys) {
+    const value = process.env[key];
+    if (value && value.length >= 8) {
+      return { value, source: "env", envKey: key };
+    }
+  }
+  return { value: null, source: null, envKey: null };
+}
+
 type MetaDebugTokenResponse = {
   data?: {
     app_id?: string;
@@ -317,20 +388,29 @@ async function checkMetaAppToken(
   };
 }
 
-/** Check (c): webhook verify token env terisi */
-function checkVerifyTokenEnv(
-  value: string | undefined,
-  envKey: string,
-): Omit<TestResult, "name" | "durationMs"> {
-  if (value && value.length >= 8) {
+/** Check (c): webhook verify token terisi — DB (form admin) dulu, fallback env.
+ * Cermin resolusi runtime /webhooks/* — supaya test hijau = webhook benar-benar siap. */
+async function checkVerifyToken(
+  platform: VerifyTokenPlatform,
+): Promise<Omit<TestResult, "name" | "durationMs">> {
+  const resolution = VERIFY_TOKEN_RESOLUTION[platform];
+  const { value, source, envKey } = await getVerifyTokenInfo(platform);
+  if (value && source === "db") {
+    return {
+      status: "pass",
+      message: `Verify token terisi via Admin Panel (${resolution.cardLabel}) — handshake webhook (hub.verify_token) siap dipakai.`,
+    };
+  }
+  if (value && source === "env" && envKey) {
     return {
       status: "pass",
       message: `${envKey} terisi — handshake webhook (hub.verify_token) siap dipakai.`,
     };
   }
+  const envHint = resolution.envKeys.join(" atau ");
   return {
     status: "fail",
-    message: `${envKey} belum diisi (minimal 8 karakter) di .env root — webhook handshake GET akan selalu 403.`,
+    message: `Verify token belum diisi. Isi via Admin Panel → Kredensial Platform (${resolution.cardLabel}) atau env ${envHint} — handshake GET webhook akan selalu 403.`,
   };
 }
 
@@ -393,11 +473,9 @@ async function checkUserToken(
   };
 }
 
-/** Suite lengkap Instagram/Facebook/Threads — verify token env beda per platform */
+/** Suite lengkap Meta (IG bisnis/IG Login/FB/Threads) — verify token dari DB kredensial masing-masing aplikasi, fallback env */
 async function runMetaSuite(
-  platform: PlatformKey,
-  verifyTokenEnv: string | undefined,
-  verifyTokenKey: string,
+  platform: VerifyTokenPlatform,
   socialAccountPlatform: string,
 ): Promise<TestResult[]> {
   const cred = await getCredential(platform);
@@ -410,9 +488,7 @@ async function runMetaSuite(
     await runCheck("App token valid (Graph /oauth/access_token_info)", () =>
       checkMetaAppToken(cred),
     ),
-    await runCheck("Webhook verify token env terisi", () =>
-      Promise.resolve(checkVerifyTokenEnv(verifyTokenEnv, verifyTokenKey)),
-    ),
+    await runCheck("Webhook verify token tersedia", () => checkVerifyToken(platform)),
     await runCheck("User token tersimpan — scopes & expiry (/debug_token)", () =>
       checkUserToken(userToken, cred),
     ),
@@ -777,12 +853,12 @@ async function runBlueskySuite(): Promise<TestResult[]> {
 
   return [
     await runCheck("AppView publik Bluesky hidup (public.api.bsky.app)", async () => {
-      // Ping describeFeedGenerators — endpoint publik tanpa auth
-      const res = await fetchJson(`${BSKY_APPVIEW_URL}/xrpc/app.bsky.feed.describeFeedGenerator`);
+      // Ping _health — endpoint health check publik AppView tanpa auth
+      const res = await fetchJson<{ version?: string }>(`${BSKY_APPVIEW_URL}/_health`);
       if (res.ok) {
         return {
           status: "pass",
-          message: "AppView publik merespons OK — jaringan ke Bluesky sehat.",
+          message: `AppView publik merespons OK${res.data?.version ? ` (versi ${res.data.version.slice(0, 12)}…)` : ""} — jaringan ke Bluesky sehat.`,
         };
       }
       return {
@@ -930,29 +1006,17 @@ apiTestsRoute.post("/run/:platform", async (c) => {
         results = await runBlueskySuite();
         break;
       case "threads":
-        // Threads — app terpisah, verify token env sendiri (fallback ke Meta)
-        results = await runMetaSuite(
-          "threads",
-          env.THREADS_WEBHOOK_VERIFY_TOKEN ?? env.META_WEBHOOK_VERIFY_TOKEN,
-          "THREADS_WEBHOOK_VERIFY_TOKEN",
-          "threads",
-        );
+        // Threads — app terpisah (verify token DB kartu Threads / env sendiri)
+        results = await runMetaSuite("threads", "threads");
         break;
       case "instagram_standalone":
         // Instagram Login — aplikasi terpisah, verify token & secret app sendiri
-        results = await runMetaSuite(
-          "instagram_standalone",
-          env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN,
-          "INSTAGRAM_WEBHOOK_VERIFY_TOKEN",
-          "instagram_standalone",
-        );
+        results = await runMetaSuite("instagram_standalone", "instagram_standalone");
         break;
       default:
         // Instagram & Facebook — satu aplikasi Meta
         results = await runMetaSuite(
           platform,
-          env.META_WEBHOOK_VERIFY_TOKEN,
-          "META_WEBHOOK_VERIFY_TOKEN",
           // User token IG business disimpan di platform "instagram"
           "instagram",
         );

@@ -4,6 +4,7 @@ import { auth } from "@sahabatkreator/auth";
 import { db } from "@sahabatkreator/db";
 import {
   activityLog,
+  aiUsageLog,
   auditLog,
   bridgeConfig,
   holiday,
@@ -1257,6 +1258,51 @@ adminRoute.get("/billing/overview", async (c) => {
       page,
       perPage,
     });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+// ---------- Holiday (kalender hari besar) ----------
+
+/** GET /admin/ai-usage — log pemakaian AI semua org (filter action/platform/org), paginasi */
+adminRoute.get("/ai-usage", async (c) => {
+  try {
+    await requirePlatformAdmin(c);
+    const page = Math.max(Number(c.req.query("page") ?? 1), 1);
+    const perPage = Math.min(Number(c.req.query("perPage") ?? 50), 200);
+    const action = c.req.query("action")?.trim() ?? "";
+    const organizationId = c.req.query("organizationId")?.trim() ?? "";
+
+    const conditions = [];
+    if (action) conditions.push(eq(aiUsageLog.action, action));
+    if (organizationId) conditions.push(eq(aiUsageLog.organizationId, organizationId));
+    const where = conditions.length ? and(...conditions) : undefined;
+
+    const rows = await db
+      .select({
+        id: aiUsageLog.id,
+        organizationId: aiUsageLog.organizationId,
+        organizationName: organization.name,
+        userName: userTable.name,
+        userEmail: userTable.email,
+        action: aiUsageLog.action,
+        platform: aiUsageLog.platform,
+        model: aiUsageLog.model,
+        credits: aiUsageLog.credits,
+        createdAt: aiUsageLog.createdAt,
+      })
+      .from(aiUsageLog)
+      .leftJoin(organization, eq(aiUsageLog.organizationId, organization.id))
+      .leftJoin(userTable, eq(aiUsageLog.userId, userTable.id))
+      .where(where)
+      .orderBy(desc(aiUsageLog.createdAt))
+      .limit(perPage)
+      .offset((page - 1) * perPage);
+
+    const [total] = await db.select({ total: count() }).from(aiUsageLog).where(where);
+
+    return c.json({ logs: rows, total: total?.total ?? 0, page, perPage });
   } catch (error) {
     return errorResponse(error);
   }

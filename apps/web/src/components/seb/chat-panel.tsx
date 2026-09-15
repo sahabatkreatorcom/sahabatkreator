@@ -33,7 +33,13 @@ function AttachmentGrid({ attachments }: { attachments: SebChatAttachment[] }) {
   );
 }
 
-export function SebChatPanel({ onError }: { onError?: (message: string) => void }) {
+export function SebChatPanel({
+  onError,
+  className,
+}: {
+  onError?: (message: string) => void;
+  className?: string;
+}) {
   const queryClient = useQueryClient();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -98,7 +104,7 @@ export function SebChatPanel({ onError }: { onError?: (message: string) => void 
   const busy = sendMessage.isPending;
 
   return (
-    <div className="card flex h-[560px] flex-col overflow-hidden p-0">
+    <div className={cn("card flex h-[560px] flex-col overflow-hidden p-0", className)}>
       {/* Header sesi */}
       <div className="flex items-center gap-2 border-[var(--border-light)] border-b p-3">
         <div className="flex flex-1 gap-1.5 overflow-x-auto">

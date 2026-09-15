@@ -33,6 +33,7 @@ export {
   type ChatMessage,
   callSebModel,
   getSebSettings,
+  logSebUsage,
   SEB_CATEGORIES,
   SEB_EXPERIMENT_STATUSES,
   SEB_PLATFORMS,

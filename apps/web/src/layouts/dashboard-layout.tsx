@@ -102,18 +102,18 @@ type NavItem = {
   end?: boolean;
 };
 
-/** Tombol pencarian cepat (Ctrl+K) — ada di sidebar desktop & mobile */
+/** Tombol pencarian cepat (Ctrl+K) di topbar navbar */
 function SearchCommandButton() {
   const setOpen = useCommandPalette((s) => s.setOpen);
   return (
     <button
       type="button"
       onClick={() => setOpen(true)}
-      className="flex w-full items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 text-left text-[var(--text-muted)] text-sm transition-colors hover:border-[var(--accent-gold)] hover:text-[var(--text-primary)]"
+      className="hidden h-9 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-3 text-[var(--text-muted)] text-sm transition-colors hover:border-[var(--accent-gold)] hover:text-[var(--text-primary)] md:flex"
       aria-label="Pencarian cepat (Ctrl K)"
     >
       <Search className="h-4 w-4 shrink-0" />
-      <span className="flex-1">Cari perintah…</span>
+      <span>Cari perintah…</span>
       <kbd className="rounded border border-[var(--border)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 font-medium text-[10px]">
         Ctrl K
       </kbd>
@@ -309,11 +309,6 @@ export function DashboardLayout() {
         ))}
       </nav>
 
-      {/* Pencarian cepat Ctrl+K */}
-      <div className="px-3 pb-3">
-        <SearchCommandButton />
-      </div>
-
       {/* Upgrade card */}
       <div className="p-3">
         <div className="rounded-[var(--radius-lg)] bg-gradient p-4 text-white">
@@ -376,6 +371,7 @@ export function DashboardLayout() {
             >
               <Menu className="h-5 w-5" />
             </button>
+            <SearchCommandButton />
           </div>
           <div className="flex items-center gap-2">
             <NotificationBell />

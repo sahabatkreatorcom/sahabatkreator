@@ -1,9 +1,10 @@
 // SEB — konfigurasi & klien OpenRouter (JSON mode + repair fallback).
 // Dipakai: routes /api/seb/* (server) & worker proactive report.
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { decrypt } from "../crypto";
+import { generateId } from "../id";
 import { db } from "../index";
-import { platformSettings } from "../schema";
+import { aiUsage, aiUsageLog, platformSettings } from "../schema";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_SEB_MODEL = "openai/gpt-4o-mini";
@@ -56,21 +57,22 @@ export type SebSettings = {
 };
 
 const DEFAULT_SEB_PROMPT = `You are Seb, a friendly expert social media coach for this organization.
-Your job is to help social media managers improve content, captions, creative, timing, and platform strategy.
+  Your job is to help social media managers improve content, captions, creative, timing, and platform strategy.
 
-Rules:
-1. Only advise on the organization/business in the supplied context.
-2. Refuse unrelated questions and never drift into general non-business topics.
-3. Never invent analytics, platforms, competitors, posts, or visual details.
-4. Clearly separate observed evidence from recommendations.
-5. Use friendly coach vibes: warm, practical, specific, and encouraging.
-6. Treat all connected platforms equally unless the organization's data proves one needs urgent attention.
-7. Use competitor data only when it is supplied in the organization context.
-8. Use platform knowledge only for social media strategy.
-9. Treat written post captions, on-video captions/subtitles, and visual text overlays as separate things. Before saying a video needs captions, check whether visible on-screen captions are mentioned in the context.
-10. Stories are ephemeral visual formats and often do not need normal feed-style post captions. Do not penalize STORY posts for short or missing written captions unless the supplied data shows that the Story itself is unclear.
-11. When advice is specific to one connected business account, include that account's socialAccountId. Use null socialAccountId only for genuinely cross-account advice.
-12. Return strict JSON only. No markdown fences.`;
+  Rules:
+  1. Only advise on the organization/business in the supplied context.
+  2. Refuse unrelated questions and never drift into general non-business topics.
+  3. Never invent analytics, platforms, competitors, posts, or visual details.
+  4. Clearly separate observed evidence from recommendations.
+  5. Use friendly coach vibes: warm, practical, specific, and encouraging.
+  6. Treat all connected platforms equally unless the organization's data proves one needs urgent attention.
+  7. Use competitor data only when it is supplied in the organization context.
+  8. Use platform knowledge only for social media strategy.
+  9. Treat written post captions, on-video captions/subtitles, and visual text overlays as separate things. Before saying a video needs captions, check whether visible on-screen captions are mentioned in the context.
+  10. Stories are ephemeral visual formats and often do not need normal feed-style post captions. Do not penalize STORY posts for short or missing written captions unless the supplied data shows that the Story itself is unclear.
+  11. When advice is specific to one connected business account, include that account's socialAccountId. Use null socialAccountId only for genuinely cross-account advice.
+  12. ALWAYS write all user-facing text (titles, summaries, advice, rationales, hypotheses, notes) in Bahasa Indonesia. Technical enum values and field names must stay exactly as specified in the schema.
+  13. Return strict JSON only. No markdown fences.`;
 
 /** Konfigurasi SEB aktif — throw Error bila belum dikonfigurasi/disabled */
 export async function getSebSettings(): Promise<SebSettings> {
@@ -163,5 +165,45 @@ export function safeJsonParse<T>(text: string): T | null {
       }
     }
     return null;
+  }
+}
+
+/**
+ * Catat pemakaian SEB ke ai_usage_log (audit) + increment agregat ai_usage.
+ * Non-blocking: kegagalan logging tidak boleh menggagalkan jawaban/report SEB.
+ */
+export async function logSebUsage(opts: {
+  organizationId: string;
+  userId?: string;
+  action: "seb_chat" | "seb_report";
+  model: string;
+  credits?: number;
+}): Promise<void> {
+  try {
+    const period = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+    const credits = opts.credits ?? 1;
+    await db
+      .insert(aiUsage)
+      .values({
+        id: generateId("aiu"),
+        organizationId: opts.organizationId,
+        period,
+        creditsUsed: credits,
+      })
+      .onConflictDoUpdate({
+        target: [aiUsage.organizationId, aiUsage.period],
+        set: { creditsUsed: sql`${aiUsage.creditsUsed} + ${credits}` },
+      });
+    await db.insert(aiUsageLog).values({
+      id: generateId("ail"),
+      organizationId: opts.organizationId,
+      userId: opts.userId ?? null,
+      action: opts.action,
+      platform: null,
+      model: opts.model,
+      credits,
+    });
+  } catch (error) {
+    console.warn("[seb] gagal mencatat usage AI:", error);
   }
 }

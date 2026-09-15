@@ -13,7 +13,17 @@ export const meRoute = new Hono();
 meRoute.get("/", async (c) => {
   try {
     const ctx = await getAuthContext(c);
-    if (!ctx) return c.json({ authenticated: false }, 401);
+    // Guest → 200 + authenticated:false (bukan 401) — halaman login/register
+    // memanggil /me untuk cek session; 401 menimbulkan error console yang
+    // tampak seperti bug padahal kondisi normal.
+    if (!ctx)
+      return c.json({
+        authenticated: false,
+        user: null,
+        organization: null,
+        organizations: [],
+        limits: null,
+      });
 
     // Ambil flag 2FA terbaru dari tabel user
     const [userRow] = await db

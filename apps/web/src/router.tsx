@@ -1,5 +1,6 @@
 import { lazy, type ReactNode, Suspense } from "react";
 import { createBrowserRouter, Navigate } from "react-router";
+import { AppShell } from "./components/layout/floating-chat";
 // Admin
 import { AdminLayout } from "./layouts/admin-layout";
 import { AuthLayout } from "./layouts/auth-layout";
@@ -182,6 +183,9 @@ const AdminApiTestsPage = lazy(() =>
 const AdminApiQuotaPage = lazy(() =>
   import("./pages/admin/api-quota").then((m) => ({ default: m.AdminApiQuotaPage })),
 );
+const AdminAiUsagePage = lazy(() =>
+  import("./pages/admin/ai-usage").then((m) => ({ default: m.AdminAiUsagePage })),
+);
 const AdminContactPage = lazy(() =>
   import("./pages/admin/contact-inbox").then((m) => ({ default: m.AdminContactPage })),
 );
@@ -196,179 +200,186 @@ const AdminOrgActivityPage = lazy(() =>
 );
 
 export const router = createBrowserRouter([
-  // ---------- Marketing (public, SEO) ----------
+  // Shell global — floating AI chat tampil di semua halaman
   {
-    element: <MarketingLayout />,
+    element: <AppShell />,
     children: [
-      { path: "/", element: <LandingPage /> },
-      { path: "/harga", element: <PricingPage /> },
-      { path: "/blog", element: <BlogListPage /> },
-      { path: "/blog/:slug", element: <BlogPostPage /> },
-      { path: "/tentang", element: <AboutPage /> },
-      { path: "/kontak", element: <ContactPage /> },
-      { path: "/faq", element: <FaqPage /> },
-      { path: "/changelog", element: <ChangelogPage /> },
-      { path: "/compare", element: <ComparePage /> },
-      // Dokumen legal — URL sederhana per dokumen (SEO friendly)
-      { path: "/syarat-ketentuan", element: <LegalPage doc="syarat-ketentuan" /> },
-      { path: "/kebijakan-privasi", element: <LegalPage doc="kebijakan-privasi" /> },
-      { path: "/kebijakan-cookie", element: <LegalPage doc="kebijakan-cookie" /> },
-      { path: "/penghapusan-data", element: <LegalPage doc="penghapusan-data" /> },
-      // Status penghapusan data end-user (confirmation URL dari platform callback)
-      { path: "/penghapusan-data/status", element: <DeletionStatusPage /> },
-      { path: "/kebijakan-refund", element: <LegalPage doc="kebijakan-refund" /> },
-      // English privacy policy — for Meta/LinkedIn App Review (international reviewers)
-      { path: "/privacy-policy", element: <LegalPage doc="privacy-policy" /> },
-      // English terms of service — for Meta/LinkedIn App Review (international reviewers)
-      { path: "/terms-of-service", element: <LegalPage doc="terms-of-service" /> },
-      // Redirect path lama → path baru. Path statis ditangani server-side
-      // 301 permanen (lihat apps/server/src/index.ts LEGACY_REDIRECTS);
-      // di sini hanya pola dinamis yang tidak bisa di-handle server.
-      { path: "/fitur", element: <Navigate to="/#fitur" replace /> },
-      { path: "/rss.xml", element: <Navigate to="/blog" replace /> },
-      { path: "/legal/:doc", element: <LegalRedirect /> },
-      { path: "/ketentuan/:doc", element: <LegalRedirect /> },
-    ],
-  },
-
-  // ---------- Auth ----------
-  {
-    element: <AuthLayout />,
-    children: [
-      // Halaman guest — redirect ke dashboard bila session masih aktif
+      // ---------- Marketing (public, SEO) ----------
       {
-        element: <RedirectIfAuthenticated />,
+        element: <MarketingLayout />,
         children: [
-          { path: "/login", element: <LoginPage /> },
-          { path: "/register", element: <RegisterPage /> },
-          { path: "/forgot-password", element: <ForgotPasswordPage /> },
-          { path: "/reset-password", element: <ResetPasswordPage /> },
-        ],
-      },
-      // verify-email & two-factor — bagian flow login, session parsial wajar ada
-      { path: "/verify-email", element: <VerifyEmailPage /> },
-      { path: "/two-factor", element: <TwoFactorPage /> },
-    ],
-  },
-
-  // ---------- Undangan org (publik) ----------
-  { path: "/team/invite/:id", element: <InviteAcceptPage /> },
-
-  // ---------- Laporan publik via share link (publik, read-only) ----------
-  { path: "/r/:token", element: <PublicReportPage /> },
-
-  // ---------- Landing push notification (auth, fullscreen tanpa sidebar) ----------
-  {
-    element: <RequireAuth />,
-    children: [
-      { path: "/post-failed", element: <PostFailedPage /> },
-      { path: "/publish-ready", element: <PublishReadyPage /> },
-    ],
-  },
-
-  // ---------- Dashboard (protected) ----------
-  {
-    element: (
-      <RequireAuth>
-        <DashboardLayout />
-      </RequireAuth>
-    ),
-    children: [
-      { path: "/dashboard", element: withFallback(<DashboardPage />) },
-      { path: "/activity", element: withFallback(<ActivityPage />) },
-      { path: "/calendar", element: withFallback(<CalendarPage />) },
-      { path: "/queue", element: withFallback(<QueuePage />) },
-      { path: "/compose", element: withFallback(<ComposePage />) },
-      { path: "/media", element: withFallback(<MediaPage />) },
-      { path: "/engagement", element: withFallback(<EngagementPage />) },
-      { path: "/inbox", element: withFallback(<InboxPage />) },
-      { path: "/automation", element: withFallback(<AutomationPage />) },
-      { path: "/products", element: withFallback(<ProductsPage />) },
-      { path: "/accounts", element: withFallback(<AccountsPage />) },
-      { path: "/status", element: withFallback(<StatusPage />) },
-      { path: "/onboarding", element: withFallback(<OnboardingPage />) },
-      { path: "/team", element: withFallback(<TeamPage />) },
-      { path: "/settings", element: withFallback(<SettingsPage />) },
-      { path: "/settings/billing", element: withFallback(<BillingPage />) },
-      { path: "/create-organization", element: withFallback(<CreateOrgPage />) },
-
-      // ---------- Hub Intelijen — 3 halaman bertab ----------
-      {
-        path: "/performance",
-        element: withFallback(<PerformancePage />),
-        children: [
-          { index: true, element: <Navigate to="/performance/analitik" replace /> },
-          { path: "analitik", element: withFallback(<AnalyticsPage />) },
-          { path: "laporan", element: withFallback(<ReportsPage />) },
-          { path: "goal", element: withFallback(<GoalsPage />) },
-        ],
-      },
-      {
-        path: "/research",
-        element: withFallback(<ResearchPage />),
-        children: [
-          { index: true, element: <Navigate to="/research/listening" replace /> },
-          { path: "listening", element: withFallback(<ListeningPage />) },
-          { path: "kompetitor", element: withFallback(<CompetitorsPage />) },
-          { path: "tren", element: withFallback(<TrendsPage />) },
-        ],
-      },
-      {
-        path: "/assistant",
-        element: withFallback(<AssistantPage />),
-        children: [
-          { index: true, element: <Navigate to="/assistant/coach" replace /> },
-          { path: "coach", element: withFallback(<CoachPage />) },
-          { path: "seb", element: withFallback(<SebPage />) },
-          { path: "strategi", element: withFallback(<StrategyPage />) },
+          { path: "/", element: <LandingPage /> },
+          { path: "/harga", element: <PricingPage /> },
+          { path: "/blog", element: <BlogListPage /> },
+          { path: "/blog/:slug", element: <BlogPostPage /> },
+          { path: "/tentang", element: <AboutPage /> },
+          { path: "/kontak", element: <ContactPage /> },
+          { path: "/faq", element: <FaqPage /> },
+          { path: "/changelog", element: <ChangelogPage /> },
+          { path: "/compare", element: <ComparePage /> },
+          // Dokumen legal — URL sederhana per dokumen (SEO friendly)
+          { path: "/syarat-ketentuan", element: <LegalPage doc="syarat-ketentuan" /> },
+          { path: "/kebijakan-privasi", element: <LegalPage doc="kebijakan-privasi" /> },
+          { path: "/kebijakan-cookie", element: <LegalPage doc="kebijakan-cookie" /> },
+          { path: "/penghapusan-data", element: <LegalPage doc="penghapusan-data" /> },
+          // Status penghapusan data end-user (confirmation URL dari platform callback)
+          { path: "/penghapusan-data/status", element: <DeletionStatusPage /> },
+          { path: "/kebijakan-refund", element: <LegalPage doc="kebijakan-refund" /> },
+          // English privacy policy — for Meta/LinkedIn App Review (international reviewers)
+          { path: "/privacy-policy", element: <LegalPage doc="privacy-policy" /> },
+          // English terms of service — for Meta/LinkedIn App Review (international reviewers)
+          { path: "/terms-of-service", element: <LegalPage doc="terms-of-service" /> },
+          // Redirect path lama → path baru. Path statis ditangani server-side
+          // 301 permanen (lihat apps/server/src/index.ts LEGACY_REDIRECTS);
+          // di sini hanya pola dinamis yang tidak bisa di-handle server.
+          { path: "/fitur", element: <Navigate to="/#fitur" replace /> },
+          { path: "/rss.xml", element: <Navigate to="/blog" replace /> },
+          { path: "/legal/:doc", element: <LegalRedirect /> },
+          { path: "/ketentuan/:doc", element: <LegalRedirect /> },
         ],
       },
 
-      // Redirect URL lama → tab di hub yang sesuai
-      { path: "/analytics", element: <Navigate to="/performance/analitik" replace /> },
-      { path: "/reports", element: <Navigate to="/performance/laporan" replace /> },
-      { path: "/goals", element: <Navigate to="/performance/goal" replace /> },
-      { path: "/listening", element: <Navigate to="/research/listening" replace /> },
-      { path: "/competitors", element: <Navigate to="/research/kompetitor" replace /> },
-      { path: "/trends", element: <Navigate to="/research/tren" replace /> },
-      { path: "/coach", element: <Navigate to="/assistant/coach" replace /> },
-      { path: "/seb", element: <Navigate to="/assistant/seb" replace /> },
-      { path: "/strategy", element: <Navigate to="/assistant/strategi" replace /> },
-      { path: "/grid", element: <Navigate to="/calendar" replace /> },
+      // ---------- Auth ----------
+      {
+        element: <AuthLayout />,
+        children: [
+          // Halaman guest — redirect ke dashboard bila session masih aktif
+          {
+            element: <RedirectIfAuthenticated />,
+            children: [
+              { path: "/login", element: <LoginPage /> },
+              { path: "/register", element: <RegisterPage /> },
+              { path: "/forgot-password", element: <ForgotPasswordPage /> },
+              { path: "/reset-password", element: <ResetPasswordPage /> },
+            ],
+          },
+          // verify-email & two-factor — bagian flow login, session parsial wajar ada
+          { path: "/verify-email", element: <VerifyEmailPage /> },
+          { path: "/two-factor", element: <TwoFactorPage /> },
+        ],
+      },
+
+      // ---------- Undangan org (publik) ----------
+      { path: "/team/invite/:id", element: <InviteAcceptPage /> },
+
+      // ---------- Laporan publik via share link (publik, read-only) ----------
+      { path: "/r/:token", element: <PublicReportPage /> },
+
+      // ---------- Landing push notification (auth, fullscreen tanpa sidebar) ----------
+      {
+        element: <RequireAuth />,
+        children: [
+          { path: "/post-failed", element: <PostFailedPage /> },
+          { path: "/publish-ready", element: <PublishReadyPage /> },
+        ],
+      },
+
+      // ---------- Dashboard (protected) ----------
+      {
+        element: (
+          <RequireAuth>
+            <DashboardLayout />
+          </RequireAuth>
+        ),
+        children: [
+          { path: "/dashboard", element: withFallback(<DashboardPage />) },
+          { path: "/activity", element: withFallback(<ActivityPage />) },
+          { path: "/calendar", element: withFallback(<CalendarPage />) },
+          { path: "/queue", element: withFallback(<QueuePage />) },
+          { path: "/compose", element: withFallback(<ComposePage />) },
+          { path: "/media", element: withFallback(<MediaPage />) },
+          { path: "/engagement", element: withFallback(<EngagementPage />) },
+          { path: "/inbox", element: withFallback(<InboxPage />) },
+          { path: "/automation", element: withFallback(<AutomationPage />) },
+          { path: "/products", element: withFallback(<ProductsPage />) },
+          { path: "/accounts", element: withFallback(<AccountsPage />) },
+          { path: "/status", element: withFallback(<StatusPage />) },
+          { path: "/onboarding", element: withFallback(<OnboardingPage />) },
+          { path: "/team", element: withFallback(<TeamPage />) },
+          { path: "/settings", element: withFallback(<SettingsPage />) },
+          { path: "/settings/billing", element: withFallback(<BillingPage />) },
+          { path: "/create-organization", element: withFallback(<CreateOrgPage />) },
+
+          // ---------- Hub Intelijen — 3 halaman bertab ----------
+          {
+            path: "/performance",
+            element: withFallback(<PerformancePage />),
+            children: [
+              { index: true, element: <Navigate to="/performance/analitik" replace /> },
+              { path: "analitik", element: withFallback(<AnalyticsPage />) },
+              { path: "laporan", element: withFallback(<ReportsPage />) },
+              { path: "goal", element: withFallback(<GoalsPage />) },
+            ],
+          },
+          {
+            path: "/research",
+            element: withFallback(<ResearchPage />),
+            children: [
+              { index: true, element: <Navigate to="/research/listening" replace /> },
+              { path: "listening", element: withFallback(<ListeningPage />) },
+              { path: "kompetitor", element: withFallback(<CompetitorsPage />) },
+              { path: "tren", element: withFallback(<TrendsPage />) },
+            ],
+          },
+          {
+            path: "/assistant",
+            element: withFallback(<AssistantPage />),
+            children: [
+              { index: true, element: <Navigate to="/assistant/coach" replace /> },
+              { path: "coach", element: withFallback(<CoachPage />) },
+              { path: "seb", element: withFallback(<SebPage />) },
+              { path: "strategi", element: withFallback(<StrategyPage />) },
+            ],
+          },
+
+          // Redirect URL lama → tab di hub yang sesuai
+          { path: "/analytics", element: <Navigate to="/performance/analitik" replace /> },
+          { path: "/reports", element: <Navigate to="/performance/laporan" replace /> },
+          { path: "/goals", element: <Navigate to="/performance/goal" replace /> },
+          { path: "/listening", element: <Navigate to="/research/listening" replace /> },
+          { path: "/competitors", element: <Navigate to="/research/kompetitor" replace /> },
+          { path: "/trends", element: <Navigate to="/research/tren" replace /> },
+          { path: "/coach", element: <Navigate to="/assistant/coach" replace /> },
+          { path: "/seb", element: <Navigate to="/assistant/seb" replace /> },
+          { path: "/strategy", element: <Navigate to="/assistant/strategi" replace /> },
+          { path: "/grid", element: <Navigate to="/calendar" replace /> },
+        ],
+      },
+
+      // ---------- Admin (superadmin) ----------
+      {
+        element: (
+          <RequireAdmin>
+            <AdminLayout />
+          </RequireAdmin>
+        ),
+        children: [
+          { path: "/admin", element: withFallback(<AdminDashboardPage />) },
+          { path: "/admin/users", element: withFallback(<AdminUsersPage />) },
+          { path: "/admin/organizations", element: withFallback(<AdminOrganizationsPage />) },
+          { path: "/admin/collabs", element: withFallback(<AdminCollabsPage />) },
+          { path: "/admin/blog", element: withFallback(<AdminBlogPage />) },
+          { path: "/admin/blog/new", element: withFallback(<AdminBlogEditorPage />) },
+          { path: "/admin/blog/:id", element: withFallback(<AdminBlogEditorPage />) },
+          { path: "/admin/holidays", element: withFallback(<AdminHolidaysPage />) },
+          { path: "/admin/plans", element: withFallback(<AdminPlansPage />) },
+          { path: "/admin/billing", element: withFallback(<AdminBillingPage />) },
+          { path: "/admin/payment-config", element: withFallback(<AdminPaymentConfigPage />) },
+          { path: "/admin/credentials", element: withFallback(<AdminCredentialsPage />) },
+          { path: "/admin/api-access", element: withFallback(<AdminApiAccessPage />) },
+          { path: "/admin/api-tests", element: withFallback(<AdminApiTestsPage />) },
+          { path: "/admin/api-quota", element: withFallback(<AdminApiQuotaPage />) },
+          { path: "/admin/ai-usage", element: withFallback(<AdminAiUsagePage />) },
+          { path: "/admin/contact", element: withFallback(<AdminContactPage />) },
+          { path: "/admin/settings", element: withFallback(<AdminSettingsPage />) },
+          { path: "/admin/logs", element: withFallback(<AdminLogsPage />) },
+          { path: "/admin/org-activity", element: withFallback(<AdminOrgActivityPage />) },
+        ],
+      },
+
+      // 404 — semua path tak dikenal (sebelumnya Navigate ke / = soft-404 buruk
+      // untuk SEO; halaman nyata + noindex lebih benar)
+      { path: "*", element: <NotFoundPage /> },
     ],
   },
-
-  // ---------- Admin (superadmin) ----------
-  {
-    element: (
-      <RequireAdmin>
-        <AdminLayout />
-      </RequireAdmin>
-    ),
-    children: [
-      { path: "/admin", element: withFallback(<AdminDashboardPage />) },
-      { path: "/admin/users", element: withFallback(<AdminUsersPage />) },
-      { path: "/admin/organizations", element: withFallback(<AdminOrganizationsPage />) },
-      { path: "/admin/collabs", element: withFallback(<AdminCollabsPage />) },
-      { path: "/admin/blog", element: withFallback(<AdminBlogPage />) },
-      { path: "/admin/blog/new", element: withFallback(<AdminBlogEditorPage />) },
-      { path: "/admin/blog/:id", element: withFallback(<AdminBlogEditorPage />) },
-      { path: "/admin/holidays", element: withFallback(<AdminHolidaysPage />) },
-      { path: "/admin/plans", element: withFallback(<AdminPlansPage />) },
-      { path: "/admin/billing", element: withFallback(<AdminBillingPage />) },
-      { path: "/admin/payment-config", element: withFallback(<AdminPaymentConfigPage />) },
-      { path: "/admin/credentials", element: withFallback(<AdminCredentialsPage />) },
-      { path: "/admin/api-access", element: withFallback(<AdminApiAccessPage />) },
-      { path: "/admin/api-tests", element: withFallback(<AdminApiTestsPage />) },
-      { path: "/admin/api-quota", element: withFallback(<AdminApiQuotaPage />) },
-      { path: "/admin/contact", element: withFallback(<AdminContactPage />) },
-      { path: "/admin/settings", element: withFallback(<AdminSettingsPage />) },
-      { path: "/admin/logs", element: withFallback(<AdminLogsPage />) },
-      { path: "/admin/org-activity", element: withFallback(<AdminOrgActivityPage />) },
-    ],
-  },
-
-  // 404 — semua path tak dikenal (sebelumnya Navigate ke / = soft-404 buruk
-  // untuk SEO; halaman nyata + noindex lebih benar)
-  { path: "*", element: <NotFoundPage /> },
 ]);

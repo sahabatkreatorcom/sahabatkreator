@@ -1,4 +1,4 @@
-// API User — hak data pribadi (UU PDP): ekspor + hapus akun
+// API User — hak data pribadi (UU PDP): ekspor + hapus akun + sesi perangkat
 
 import { auth } from "@sahabatkreator/auth";
 import { db } from "@sahabatkreator/db";
@@ -9,10 +9,11 @@ import {
   post,
   postGroup,
   product,
+  session as sessionTable,
   socialAccount,
   user as userTable,
 } from "@sahabatkreator/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { logAdminAction } from "../lib/audit";
@@ -29,6 +30,88 @@ async function userOrgIds(userId: string): Promise<string[]> {
     .where(eq(member.userId, userId));
   return rows.map((r) => r.organizationId);
 }
+
+// ---------------------------------------------------------------------------
+// Sesi perangkat aktif — list + revoke
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /user/sessions — daftar sesi perangkat user.
+ * Token session TIDAK dikirim ke client (sensitif — itu kredensial cookie);
+ * revoke berbasis row id, token dicari ulang di server.
+ */
+userRoute.get("/sessions", async (c) => {
+  try {
+    const ctx = await getAuthContext(c);
+    if (!ctx) return c.json({ message: "Tidak terautentikasi" }, 401);
+
+    const currentSession = await auth.api.getSession({ headers: c.req.raw.headers });
+
+    const rows = await db
+      .select({
+        id: sessionTable.id,
+        token: sessionTable.token,
+        userAgent: sessionTable.userAgent,
+        ipAddress: sessionTable.ipAddress,
+        createdAt: sessionTable.createdAt,
+        expiresAt: sessionTable.expiresAt,
+      })
+      .from(sessionTable)
+      .where(and(eq(sessionTable.userId, ctx.user.id), gt(sessionTable.expiresAt, new Date())))
+      .orderBy(desc(sessionTable.createdAt));
+
+    return c.json({
+      sessions: rows.map((s) => ({
+        id: s.id,
+        userAgent: s.userAgent ?? "",
+        ipAddress: s.ipAddress,
+        createdAt: s.createdAt,
+        expiresAt: s.expiresAt,
+        current: currentSession?.session?.token === s.token,
+      })),
+    });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** POST /user/sessions/revoke — cabut sesi berdasarkan row id */
+userRoute.post("/sessions/revoke", async (c) => {
+  try {
+    const ctx = await getAuthContext(c);
+    if (!ctx) return c.json({ message: "Tidak terautentikasi" }, 401);
+
+    const { id } = z.object({ id: z.string().min(1) }).parse(await c.req.json());
+
+    // Pastikan sesi milik user ini lalu ambil token untuk revoke via better-auth
+    const [target] = await db
+      .select({ token: sessionTable.token })
+      .from(sessionTable)
+      .where(and(eq(sessionTable.id, id), eq(sessionTable.userId, ctx.user.id)))
+      .limit(1);
+    if (!target) return c.json({ message: "Sesi tidak ditemukan" }, 404);
+
+    await auth.api.revokeSession({ headers: c.req.raw.headers, body: { token: target.token } });
+
+    return c.json({ ok: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** POST /user/sessions/revoke-others — cabut semua sesi kecuali sesi ini */
+userRoute.post("/sessions/revoke-others", async (c) => {
+  try {
+    const ctx = await getAuthContext(c);
+    if (!ctx) return c.json({ message: "Tidak terautentikasi" }, 401);
+
+    await auth.api.revokeOtherSessions({ headers: c.req.raw.headers });
+
+    return c.json({ ok: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
 
 /**
  * GET /user/export-data — ekspor seluruh data user (hak akses UU PDP).

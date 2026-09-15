@@ -2,6 +2,7 @@
 import {
   Activity,
   Banknote,
+  Bot,
   Building2,
   CalendarDays,
   CreditCard,
@@ -43,6 +44,7 @@ const NAV_ITEMS = [
   { to: "/admin/api-access", label: "Pengajuan API", icon: ShieldCheck },
   { to: "/admin/api-tests", label: "Tes API", icon: FlaskConical },
   { to: "/admin/api-quota", label: "Kuota API", icon: Gauge },
+  { to: "/admin/ai-usage", label: "Pemakaian AI", icon: Bot },
   { to: "/admin/contact", label: "Inbox Kontak", icon: Inbox },
   { to: "/admin/settings", label: "Pengaturan", icon: Settings },
   { to: "/admin/logs", label: "Log & Audit", icon: ScrollText },

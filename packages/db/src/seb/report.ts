@@ -18,6 +18,7 @@ import { collectSebContext, isSameSebLocalDate, type SebContext } from "./contex
 import {
   callSebModel,
   getSebSettings,
+  logSebUsage,
   SEB_CATEGORIES,
   SEB_PLATFORMS,
   SEB_PRIORITIES,
@@ -131,8 +132,8 @@ function fallbackSebReport(context: SebContext): SebAdviceResponse {
   const postCount = context.posts.length;
 
   return {
-    title: "Seb social media coaching report",
-    summary: `Seb reviewed ${postCount} recent posts${platforms.length ? ` across ${platforms.join(", ")}` : ""}. The AI response needed format repair, so this report focuses on safe, evidence-based next steps from the available account data.`,
+    title: "Report coaching media sosial dari Seb",
+    summary: `Seb telah meninjau ${postCount} konten terbaru${platforms.length ? ` di ${platforms.join(", ")}` : ""}. Respons AI memerlukan perbaikan format, jadi report ini berfokus pada langkah aman berbasis data akun yang tersedia.`,
     overallScore: postCount > 0 ? 62 : 40,
     scoreBreakdown: {
       captions: postCount > 0 ? 60 : 35,
@@ -146,60 +147,60 @@ function fallbackSebReport(context: SebContext): SebAdviceResponse {
     confidence: 0.35,
     recommendations: [
       {
-        title: "Strengthen the first impression on every post",
+        title: "Perkuat kesan pertama di setiap konten",
         advice:
-          "Review the opening line, first frame, or thumbnail before publishing. Make the viewer benefit obvious immediately and remove any slow setup that delays the hook.",
+          "Tinjau baris pembuka, frame pertama, atau thumbnail sebelum publish. Buat manfaat bagi penonton langsung terasa dan hapus pembukaan bertele-tele yang menunda hook.",
         rationale:
-          "Seb could not reliably parse the model response, but hook clarity is a safe high-impact improvement across all social platforms.",
+          "Seb tidak dapat mengurai respons model dengan andal, tapi kejelasan hook adalah perbaikan aman berdampak besar di semua platform media sosial.",
         category: "creative",
         priority: "high",
         platform: null,
         confidence: 0.45,
         evidence: {
-          basedOn: `${postCount} posts available in Seb context`,
-          metrics: ["post history"],
+          basedOn: `${postCount} konten tersedia dalam konteks Seb`,
+          metrics: ["riwayat konten"],
         },
-        citations: [{ type: "post", label: "Recent organization posts", id: "recent-posts" }],
+        citations: [{ type: "post", label: "Konten organisasi terbaru", id: "recent-posts" }],
         impactBaseline: {
           metric: "engagementRate",
-          current: "Use current 30-day average as baseline",
+          current: "Gunakan rata-rata 30 hari terakhir sebagai baseline",
         },
       },
       {
-        title: "Use brand knowledge to tighten advice quality",
+        title: "Lengkapi brand knowledge agar saran lebih tajam",
         advice:
-          "Fill in Seb brand knowledge for audience, positioning, products, offers, voice rules, and topics to avoid. This gives Seb stronger boundaries and more specific recommendations.",
+          "Isi brand knowledge Seb untuk audiens, positioning, produk, penawaran, aturan tone, dan topik yang harus dihindari. Ini memberi Seb batasan kuat dan rekomendasi lebih spesifik.",
         rationale:
-          "Brand context improves caption, creative, and competitor advice while keeping Seb focused on this business only.",
+          "Konteks brand meningkatkan kualitas saran caption, kreatif, dan kompetitor sekaligus menjaga Seb tetap fokus pada bisnis ini saja.",
         category: "brand",
         priority: "medium",
         platform: null,
         confidence: 0.5,
         evidence: {
-          basedOn: "Seb brand knowledge availability",
-          metrics: ["brand context completeness"],
+          basedOn: "Ketersediaan brand knowledge Seb",
+          metrics: ["kelengkapan konteks brand"],
         },
         citations: [
-          { type: "platform_knowledge", label: "Seb brand knowledge", id: "seb-brand-knowledge" },
+          { type: "platform_knowledge", label: "Brand knowledge Seb", id: "seb-brand-knowledge" },
         ],
       },
     ],
     experiments: [
       {
-        title: "Test clearer hooks for seven days",
+        title: "Uji hook yang lebih jelas selama tujuh hari",
         hypothesis:
-          "Posts with a direct benefit in the first line or first frame will outperform vague openings.",
+          "Konten dengan manfaat langsung di baris atau frame pertama akan berkinerja lebih baik daripada pembukaan yang samar.",
         platform: null,
         metric: "engagementRate",
-        baseline: { current: "Current 30-day average engagement rate" },
+        baseline: { current: "Rata-rata engagement rate 30 hari terakhir" },
       },
     ],
     brandKnowledgeUpdates: null,
-    progressNotes: ["Fallback report created because the model response was not valid JSON."],
+    progressNotes: ["Fallback report dibuat karena respons model bukan JSON valid."],
   };
 }
 
-const REPORT_PROMPT = `Create a proactive Seb social media coaching report for this organization. Use all supplied data, include competitor opportunities, progress tracking, confidence, citations, impact baselines, and advice for all connected platforms equally. When scoring captions, separate written post captions from on-video captions/subtitles/text overlays. Do not penalize STORY posts for short or missing written captions because Stories often rely on visual text and stickers instead. Return strict JSON with this shape: {"title":"string","summary":"string","overallScore":0-100,"scoreBreakdown":{"captions":0-100,"visualHooks":0-100,"videoQuality":0-100,"platformFit":0-100,"brandConsistency":0-100,"competitorGap":0-100,"postingRhythm":0-100},"confidence":0-1,"recommendations":[{"title":"string","advice":"string","rationale":"string","category":"content_strategy|caption|creative|video|timing|hashtag|platform|competitor|brand","priority":"low|medium|high","platform":"instagram|facebook|tiktok|youtube|pinterest|linkedin|bluesky|threads|google_business|null","confidence":0-1,"evidence":{"basedOn":"string","postIds":["id"],"metrics":["string"]},"citations":[{"type":"post|analytics|competitor|platform_knowledge","label":"string","id":"string"}],"impactBaseline":{"metric":"string","current":"string"}}],"experiments":[{"title":"string","hypothesis":"string","platform":"instagram|facebook|tiktok|youtube|pinterest|linkedin|bluesky|threads|google_business|null","metric":"string","baseline":{"current":"string"}}],"brandKnowledgeUpdates":{"learnedInsights":["string"]},"progressNotes":["string"]}.
+const REPORT_PROMPT = `Create a proactive Seb social media coaching report for this organization. Use all supplied data, include competitor opportunities, progress tracking, confidence, citations, impact baselines, and advice for all connected platforms equally. When scoring captions, separate written post captions from on-video captions/subtitles/text overlays. Do not penalize STORY posts for short or missing written captions because Stories often rely on visual text and stickers instead. Write ALL human-readable text (title, summary, advice, rationale, hypothesis, progress notes) in Bahasa Indonesia; keep enum values and field names exactly as the schema specifies. Return strict JSON with this shape: {"title":"string","summary":"string","overallScore":0-100,"scoreBreakdown":{"captions":0-100,"visualHooks":0-100,"videoQuality":0-100,"platformFit":0-100,"brandConsistency":0-100,"competitorGap":0-100,"postingRhythm":0-100},"confidence":0-1,"recommendations":[{"title":"string","advice":"string","rationale":"string","category":"content_strategy|caption|creative|video|timing|hashtag|platform|competitor|brand","priority":"low|medium|high","platform":"instagram|facebook|tiktok|youtube|pinterest|linkedin|bluesky|threads|google_business|null","confidence":0-1,"evidence":{"basedOn":"string","postIds":["id"],"metrics":["string"]},"citations":[{"type":"post|analytics|competitor|platform_knowledge","label":"string","id":"string"}],"impactBaseline":{"metric":"string","current":"string"}}],"experiments":[{"title":"string","hypothesis":"string","platform":"instagram|facebook|tiktok|youtube|pinterest|linkedin|bluesky|threads|google_business|null","metric":"string","baseline":{"current":"string"}}],"brandKnowledgeUpdates":{"learnedInsights":["string"]},"progressNotes":["string"]}.
 
 Context:
 `;
@@ -297,7 +298,7 @@ export async function generateSebReport({
         category: normalizeCategory(rec.category),
         priority: normalizePriority(rec.priority),
         status: "new" as const,
-        title: rec.title || "Improve content performance",
+        title: rec.title || "Tingkatkan performa konten",
         advice: rec.advice || "",
         rationale: rec.rationale ?? null,
         evidence: rec.evidence ?? {},
@@ -311,8 +312,10 @@ export async function generateSebReport({
       id: generateId("sebexp"),
       organizationId,
       reportId: reportId ?? "",
-      title: experiment.title || "Seb content experiment",
-      hypothesis: experiment.hypothesis || "Testing this idea may improve social performance.",
+      title: experiment.title || "Eksperimen konten dari Seb",
+      hypothesis:
+        experiment.hypothesis ||
+        "Menguji ide ini kemungkinan dapat meningkatkan performa media sosial.",
       platform: normalizePlatform(experiment.platform),
       metric: experiment.metric || "engagement_rate",
       status: "planned" as const,
@@ -323,8 +326,8 @@ export async function generateSebReport({
       organizationId,
       trigger,
       status: "completed" as const,
-      title: parsed.title || "Seb daily social media coaching report",
-      summary: parsed.summary || "Seb reviewed your recent content and analytics.",
+      title: parsed.title || "Report coaching media sosial harian dari Seb",
+      summary: parsed.summary || "Seb telah meninjau konten & analitik Anda terbaru.",
       overallScore: clampScore(parsed.overallScore),
       scoreBreakdown: parsed.scoreBreakdown ?? {},
       confidence: clamp01(parsed.confidence),
@@ -403,17 +406,18 @@ export async function generateSebReport({
     await notifyOrganization({
       organizationId,
       type: "system",
-      title: "Seb report is ready",
-      body: "Seb has finished your latest social media coaching report.",
+      title: "Report Seb sudah siap",
+      body: "Seb telah menyelesaikan report coaching media sosial terbaru Anda.",
       linkUrl: "/dashboard/seb",
     });
+    await logSebUsage({ organizationId, userId, action: "seb_report", model: settings.model });
 
     if (recommendationValues.some((r) => r.priority === "high")) {
       await notifyOrganization({
         organizationId,
         type: "warning",
-        title: "Seb found high-priority advice",
-        body: "A new Seb report includes high-priority social media recommendations.",
+        title: "Seb menemukan saran prioritas tinggi",
+        body: "Report Seb terbaru memuat rekomendasi media sosial berprioritas tinggi.",
         linkUrl: "/dashboard/seb",
       });
     }

@@ -4,7 +4,13 @@ import { generateId } from "../id";
 import { db } from "../index";
 import { media, post, postMedia, sebChatMessage, sebChatSession, socialAccount } from "../schema";
 import { collectSebContext } from "./context";
-import { callSebModel, getSebSettings, type SebSettings, safeJsonParse } from "./settings";
+import {
+  callSebModel,
+  getSebSettings,
+  logSebUsage,
+  type SebSettings,
+  safeJsonParse,
+} from "./settings";
 
 export type SebChatMediaAttachment = {
   id: string;
@@ -254,7 +260,7 @@ export async function chatWithSeb({
     [
       {
         role: "system",
-        content: `${settings.systemPrompt}\nYou are in chat mode. Ignore any report-mode JSON-only instruction for this reply. Return clean plain text only, with short paragraphs or simple numbered lists. Do not wrap the answer in JSON, markdown fences, or a response/message/content object. Answer conversationally but stay strictly scoped to this organization's social media. Treat all posting times, scheduled times, and timing recommendations in the organization timezone from context.timezone, using local date/time fields when present instead of inferring wall-clock times from UTC timestamps. If asked unrelated questions, kindly redirect back to social media advice. When visual examples would help, say what to look at and Seb will attach matching image or video previews separately. If discussing captions, separate written post captions from on-video captions/subtitles/text overlays, and remember STORY posts often do not need normal feed-style captions.`,
+        content: `${settings.systemPrompt}\nYou are in chat mode. Ignore any report-mode JSON-only instruction for this reply. Return clean plain text only, with short paragraphs or simple numbered lists. Do not wrap the answer in JSON, markdown fences, or a response/message/content object. ALWAYS answer in Bahasa Indonesia dengan gaya coaching yang ramah dan membumi. Answer conversationally but stay strictly scoped to this organization's social media. Treat all posting times, scheduled times, and timing recommendations in the organization timezone from context.timezone, using local date/time fields when present instead of inferring wall-clock times from UTC timestamps. If asked unrelated questions, kindly redirect back to social media advice. When visual examples would help, say what to look at and Seb will attach matching image or video previews separately. If discussing captions, separate written post captions from on-video captions/subtitles/text overlays, and remember STORY posts often do not need normal feed-style post captions.`,
       },
       {
         role: "user",
@@ -285,6 +291,7 @@ export async function chatWithSeb({
     .update(sebChatSession)
     .set({ updatedAt: new Date() })
     .where(eq(sebChatSession.id, session.id));
+  await logSebUsage({ organizationId, userId, action: "seb_chat", model: settings.model });
 
   return { session, message: saved };
 }

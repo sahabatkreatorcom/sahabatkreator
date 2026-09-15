@@ -1,16 +1,7 @@
 // Section Pengaturan: Organisasi, Sesi Perangkat, Data Pribadi (ekspor + hapus akun)
 // Kepatuhan UU PDP: hak akses (ekspor) & hak penghapusan (delete account).
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  AlertTriangle,
-  Building2,
-  Download,
-  Loader2,
-  LogOut,
-  Monitor,
-  RefreshCw,
-  Trash2,
-} from "lucide-react";
+import { AlertTriangle, Building2, Download, Loader2, LogOut, Monitor, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +82,7 @@ type Session = {
   ipAddress: string | null;
   createdAt: string;
   expiresAt: string;
+  current: boolean;
 };
 
 function deviceLabel(ua: string): string {
@@ -112,28 +104,31 @@ function browserLabel(ua: string): string {
 }
 
 export function SessionsSection() {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["user-sessions"],
-    queryFn: () => authClient.listSessions(),
+    queryFn: () => api.get<{ sessions: Session[] }>("/user/sessions"),
   });
 
   const revoke = useMutation({
-    mutationFn: (id: string) =>
-      authClient.revokeSession({ token: id }).catch(() => {
-        // better-auth revoke pakai token — beberapa versi pakai id
-        throw new Error("Gagal mencabut sesi");
-      }),
-    onSuccess: () => toast.success("Sesi dicabut"),
-    onError: (e: Error) => toast.error(e.message),
+    mutationFn: (id: string) => api.post("/user/sessions/revoke", { id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-sessions"] });
+      toast.success("Sesi dicabut");
+    },
+    onError: (e: Error) => toast.error(e.message || "Gagal mencabut sesi"),
   });
 
   const revokeOthers = useMutation({
-    mutationFn: () => authClient.revokeOtherSessions(),
-    onSuccess: () => toast.success("Semua sesi lain dicabut"),
+    mutationFn: () => api.post("/user/sessions/revoke-others"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-sessions"] });
+      toast.success("Semua sesi lain dicabut");
+    },
     onError: () => toast.error("Gagal mencabut sesi lain"),
   });
 
-  const sessions = data?.data ?? [];
+  const sessions = data?.sessions ?? [];
 
   return (
     <div className="card space-y-4 p-6">
@@ -176,7 +171,7 @@ export function SessionsSection() {
         <div className="space-y-2">
           {sessions.map((s) => {
             const ua = String(s.userAgent ?? "");
-            const isCurrent = Boolean((s as { current?: boolean }).current);
+            const isCurrent = s.current;
             return (
               <div
                 key={s.id}
