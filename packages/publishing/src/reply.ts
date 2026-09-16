@@ -375,14 +375,30 @@ async function replyBluesky(input: ReplyInput): Promise<ReplyResult> {
 
 async function replyLinkedIn(input: ReplyInput): Promise<ReplyResult> {
   // POST /rest/socialActions/{postUrn}/comments
-  const postUrn = input.platformItemId?.startsWith("urn:li:share:")
-    ? input.platformItemId
-    : input.platformItemId?.startsWith("urn:li:")
-      ? input.platformItemId
-      : null;
-  if (!postUrn) {
+  // LinkedIn Comments API: object di body harus pakai format urn:li:activity:{id}
+  // Bila platformPostId masih bentuk urn:li:share:{id}, konversi ke urn:li:activity:{id}
+  const rawUrn = input.platformItemId;
+  if (!rawUrn) {
     throw new PublishError("linkedin_no_urn", "Item LinkedIn tidak punya URN post.", false);
   }
+
+  // Ekstrak ID dari share URN → activity URN
+  // urn:li:share:123456 → urn:li:activity:123456
+  // urn:li:activity:123456 → tetap
+  // urn:li:ugcPost:123456 → tetap (ugcPost juga valid)
+  let postUrn = rawUrn;
+  let objectUrn = rawUrn;
+  if (rawUrn.startsWith("urn:li:share:")) {
+    const id = rawUrn.replace("urn:li:share:", "");
+    postUrn = rawUrn;
+    objectUrn = `urn:li:activity:${id}`;
+  } else if (rawUrn.startsWith("urn:li:")) {
+    postUrn = rawUrn;
+    objectUrn = rawUrn;
+  } else {
+    throw new PublishError("linkedin_no_urn", "Item LinkedIn tidak punya URN post.", false);
+  }
+
   const version = LINKEDIN_API_VERSION;
   const res = await httpRequest(
     `${LINKEDIN_REST_URL}/rest/socialActions/${encodeURIComponent(postUrn)}/comments`,
@@ -395,11 +411,10 @@ async function replyLinkedIn(input: ReplyInput): Promise<ReplyResult> {
         "X-Restli-Protocol-Version": "2.0.0",
       },
       body: JSON.stringify({
-        // platformAccountId sudah URN lengkap (person / organization) — jangan dibungkus lagi
         actor: input.platformAccountId.startsWith("urn:li:")
           ? input.platformAccountId
           : `urn:li:person:${input.platformAccountId}`,
-        object: postUrn,
+        object: objectUrn,
         message: { text: input.content.slice(0, 1250) },
       }),
     },

@@ -91,9 +91,12 @@ async function sendFirstComment(
       accountMetadata: account.metadata,
     });
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     console.error(
       `[publishing] First comment post gagal (${platform}):`,
-      error instanceof Error ? error.message : error,
+      errMsg,
+      `\n  platformPostId: ${platformPostId}`,
+      `\n  platformAccountId: ${account.platformAccountId}`,
     );
   }
 }
