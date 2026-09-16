@@ -1,12 +1,17 @@
-// Sinkronisasi DM (direct message) Instagram/Facebook via Messenger Platform
-// Riset: docs/social-platforms/{meta-instagram,meta-facebook}.md
+// Sinkronisasi DM (direct message) Instagram/Facebook/LinkedIn
+// Riset: docs/social-platforms/{meta-instagram,meta-facebook,linkedin}.md
 //
-// Endpoint: GET /{id}/conversations?platform=instagram&fields=participants,messages{...}
+// Endpoint per platform:
 // - instagram (jalur FB Login): graph.facebook.com + Page token
 // - instagram_standalone (IG Login): graph.instagram.com
 // - facebook: graph.facebook.com tanpa param platform
+// - linkedin / linkedin_org: api.linkedin.com/v2/messages (Messaging API v2)
 //
-// Permission yang dibutuhkan: instagram_manage_messages / pages_messaging.
+// Permission yang dibutuhkan:
+// - instagram: instagram_manage_messages
+// - facebook: pages_messaging
+// - linkedin: messaging product (r_member_social + w_member_social)
+//
 // Selama belum di-approve (app mode development), endpoint balas error code 3/10 —
 // di-skip diam-diam agar sync komentar tetap jalan tanpa spam log.
 
@@ -14,7 +19,7 @@ import { db, pushToOrganization } from "@sahabatkreator/db";
 import { dmConversation, dmMessage, socialAccount } from "@sahabatkreator/db/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { processAutomation } from "./automation";
-import { GRAPH_FB_URL, GRAPH_IG_URL } from "./config";
+import { GRAPH_FB_URL, GRAPH_IG_URL, LINKEDIN_API_VERSION, LINKEDIN_REST_URL } from "./config";
 import { decrypt } from "./crypto";
 import type { SyncResult } from "./engagement-sync";
 import { httpRequest } from "./http";
@@ -184,7 +189,7 @@ export async function upsertDMConversation(input: {
   return fresh.length;
 }
 
-/** Sync DM satu akun (instagram / instagram_standalone / facebook) */
+/** Sync DM satu akun (instagram / instagram_standalone / facebook / linkedin) */
 export async function syncAccountDMs(ctx: {
   account: {
     id: string;
@@ -196,6 +201,9 @@ export async function syncAccountDMs(ctx: {
   accessToken: string;
 }): Promise<SyncResult> {
   const platform = ctx.account.platform;
+  if (platform === "linkedin" || platform === "linkedin_org") {
+    return syncLinkedInDMs(ctx);
+  }
   if (platform !== "instagram" && platform !== "instagram_standalone" && platform !== "facebook") {
     return { platform, newItems: 0 };
   }
@@ -275,18 +283,47 @@ export async function syncAccountDMs(ctx: {
 }
 
 /**
- * Kirim balasan DM via Messenger Send API.
+ * Kirim balasan DM via platform API.
  * - Instagram (kedua jalur): POST /{ig-id}/messages
  * - Facebook Page: POST /me/messages
+ * - LinkedIn: POST /v2/messages (Messaging API v2)
  * Return platformMessageId (message_id response) untuk disimpan sebagai outbound.
  */
 export async function sendDMReply(input: {
-  platform: "instagram" | "instagram_standalone" | "facebook";
+  platform: "instagram" | "instagram_standalone" | "facebook" | "linkedin" | "linkedin_org";
   accessToken: string;
   platformAccountId: string;
   partnerId: string;
   text: string;
 }): Promise<{ platformMessageId: string }> {
+  // LinkedIn DM reply
+  if (input.platform === "linkedin" || input.platform === "linkedin_org") {
+    const res = await httpRequest<{ id?: string }>(`${LINKEDIN_REST_URL}/v2/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${input.accessToken}`,
+        "Content-Type": "application/json",
+        "LinkedIn-Version": LINKEDIN_API_VERSION,
+        "X-Restli-Protocol-Version": "2.0.0",
+      },
+      body: JSON.stringify({
+        body: input.text,
+        messageType: "MEMBER_TO_MEMBER",
+        recipients: [input.partnerId],
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Gagal kirim DM LinkedIn: ${body.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    if (!data.id) {
+      throw new Error("LinkedIn tidak mengembalikan message ID");
+    }
+    return { platformMessageId: data.id };
+  }
+
+  // Meta platforms (Instagram/Facebook)
   const base = input.platform === "instagram_standalone" ? GRAPH_IG : GRAPH_FB;
   const url =
     input.platform === "facebook"
@@ -311,6 +348,138 @@ export async function sendDMReply(input: {
     throw new Error("Platform tidak mengembalikan message ID");
   }
   return { platformMessageId: data.message_id };
+}
+
+// ---------------------------------------------------------------------------
+// LinkedIn — DM via Messaging API v2
+// ---------------------------------------------------------------------------
+
+type LinkedInMessage = {
+  id: string;
+  body?: string;
+  createdAt?: number;
+  sender?: { "~": string }; // Person URN like "urn:li:person:xxxx"
+  conversationUrn?: string;
+};
+
+type LinkedInConversation = {
+  conversationUrn: string;
+  participants?: Array<{ "~": string }>;
+  lastActivityAt?: number;
+  lastMessagePreview?: string;
+  unreadCount?: number;
+};
+
+/**
+ * Sync DM LinkedIn via Messaging API v2.
+ * Endpoint: GET /v2/conversations + GET /v2/messages?conversationUrn={urn}
+ *
+ * Scope yang dibutuhkan: r_member_social + w_member_social (atau messaging product).
+ * Bila scope tidak tersedia, LinkedIn mengembalikan 403/401 — di-skip gracefully.
+ *
+ * Note: linkedin_org (Community Management API) tidak mendukung reading DMs.
+ * Hanya linkedin (personal) yang bisa sync DM.
+ */
+async function syncLinkedInDMs(ctx: {
+  account: {
+    id: string;
+    organizationId: string;
+    platform: string;
+    platformAccountId: string;
+    metadata: Record<string, unknown> | null;
+  };
+  accessToken: string;
+}): Promise<SyncResult> {
+  const { account, accessToken } = ctx;
+
+  // LinkedIn org accounts cannot read DMs via Community Management API
+  if (account.platform === "linkedin_org") {
+    return { platform: account.platform, newItems: 0 };
+  }
+
+  const headers = {
+    Authorization: `Bearer ${accessToken}`,
+    "LinkedIn-Version": LINKEDIN_API_VERSION,
+    "X-Restli-Protocol-Version": "2.0.0",
+  };
+
+  // 1. Fetch conversations (inbox)
+  const convRes = await httpRequest<{
+    elements?: LinkedInConversation[];
+    paging?: { count: number; start: number; total: number };
+  }>(`${LINKEDIN_REST_URL}/v2/conversations`, {
+    query: {
+      q: "criteria",
+      folder: "inbox",
+      count: 25,
+    },
+    headers,
+    retries: 1,
+  });
+
+  if (!convRes.ok) {
+    const body = await convRes.text().catch(() => "");
+    // 403/401 = scope messaging belum di-grant — skip tanpa error
+    if (convRes.status === 403 || convRes.status === 401) {
+      return { platform: account.platform, newItems: 0 };
+    }
+    return { platform: account.platform, newItems: 0, error: `LI conversations: ${body.slice(0, 150)}` };
+  }
+
+  const conversations = (await convRes.json()).elements ?? [];
+  let newItems = 0;
+
+  for (const conv of conversations) {
+    if (!conv.conversationUrn) continue;
+
+    // 2. Fetch messages for this conversation
+    const msgRes = await httpRequest<{
+      elements?: LinkedInMessage[];
+    }>(`${LINKEDIN_REST_URL}/v2/messages`, {
+      query: {
+        conversationUrn: conv.conversationUrn,
+        count: 25,
+      },
+      headers,
+      retries: 1,
+    });
+
+    if (!msgRes.ok) continue;
+    const messages = (await msgRes.json()).elements ?? [];
+    if (messages.length === 0) continue;
+
+    // Extract partner info from participants
+    const participantUrns = conv.participants ?? [];
+    const myUrn = account.platformAccountId;
+    const partnerUrn =
+      participantUrns.find((p) => p["~"] !== myUrn) ?? participantUrns[0];
+    const partnerId = partnerUrn?.["~"] ?? "unknown";
+
+    // Map messages
+    const mapped = messages
+      .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
+      .map((msg) => ({
+        platformMessageId: msg.id,
+        direction:
+          (msg.sender?.["~"] === myUrn ? "outbound" : "inbound") as "inbound" | "outbound",
+        senderId: msg.sender?.["~"] ?? null,
+        text: msg.body ?? null,
+        occurredAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
+      }));
+
+    newItems += await upsertDMConversation({
+      organizationId: account.organizationId,
+      socialAccountId: account.id,
+      platformConversationId: conv.conversationUrn,
+      partner: {
+        id: partnerId,
+        name: null, // LinkedIn API v2 tidak mengembalikan nama di conversations endpoint
+      },
+      messages: mapped,
+    });
+  }
+
+  return { platform: account.platform, newItems };
 }
 
 // ---------------------------------------------------------------------------
@@ -345,7 +514,7 @@ export async function syncDueDMAccounts(
     .where(
       and(
         eq(socialAccount.isConnected, true),
-        inArray(socialAccount.platform, ["instagram", "instagram_standalone", "facebook"]),
+        inArray(socialAccount.platform, ["instagram", "instagram_standalone", "facebook", "linkedin", "linkedin_org"]),
       ),
     )
     .limit(maxAccounts * 2);

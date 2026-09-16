@@ -16,6 +16,7 @@
 // - youtube: /youtube/v3/channels?part=statistics + /videos?part=statistics (batch id)
 // - bluesky: app.bsky.actor.getProfile (public XRPC) + getPostThread
 // - linkedin: /rest/socialActions/{urn} (post) — member followers tidak tersedia
+//   (dipakai juga oleh linkedin_org: post organization)
 // - pinterest: /v5/user_account?fields=follower_count + pin metrics via /v5/pins/{id} (aggregated)
 // - google_business: businessprofileperformance.googleapis.com fetchMultiDailyMetricsTimeSeries
 
@@ -191,8 +192,8 @@ export async function fetchAccountMetrics(
     case "pinterest":
       return pinterestAccountMetrics(accessToken);
     case "linkedin":
-      // Member personal: tidak ada endpoint follower count — skip
-      return {};
+    case "linkedin_org":
+      return linkedinAccountMetrics(platformAccountId, accessToken);
     default:
       return {};
   }
@@ -349,6 +350,42 @@ async function pinterestAccountMetrics(token: string): Promise<AccountMetrics> {
   return { followers: data.follower_count ?? null, posts: data.pin_count ?? null };
 }
 
+/**
+ * LinkedIn — organization entity profile (followerCount, name).
+ * Untuk personal profile, follower count tidak tersedia tanpa scope tambahan.
+ * Untuk organization pages, gunakan endpoint v2/entities/{orgUrn} yang tersedia
+ * dengan scope r_organization_social.
+ */
+async function linkedinAccountMetrics(
+  platformAccountId: string,
+  token: string,
+): Promise<AccountMetrics> {
+  // Hanya fetch untuk organization URN (urn:li:organization:{id})
+  if (!platformAccountId.startsWith("urn:li:organization:")) {
+    return {};
+  }
+  const res = await httpRequest<{
+    followerCount?: number;
+    name?: string;
+    localizedDescription?: string;
+  }>(`${LINKEDIN_REST_URL}/v2/entities/${encodeURIComponent(platformAccountId)}`, {
+    query: { projection: "(followerCount,name,localizedDescription)" },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "LinkedIn-Version": LINKEDIN_API_VERSION,
+      "X-Restli-Protocol-Version": "2.0.0",
+    },
+  });
+  if (!res.ok) {
+    // May fail if scope r_organization_followers is not granted — graceful fallback
+    return {};
+  }
+  const data = await res.json();
+  return {
+    followers: data.followerCount ?? null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Fetch metrik post per platform
 // ---------------------------------------------------------------------------
@@ -358,6 +395,7 @@ export async function fetchPostMetrics(
   platformPostId: string,
   accessToken: string,
   metadata: Record<string, unknown> | null,
+  ownerUrn?: string,
 ): Promise<PostMetrics> {
   switch (platform) {
     case "instagram":
@@ -375,7 +413,8 @@ export async function fetchPostMetrics(
     case "bluesky":
       return blueskyPostMetrics(platformPostId);
     case "linkedin":
-      return linkedinPostMetrics(platformPostId, accessToken);
+    case "linkedin_org":
+      return linkedinPostMetrics(platformPostId, accessToken, ownerUrn);
     case "pinterest":
       return pinterestPostMetrics(platformPostId, accessToken);
     default:
@@ -539,34 +578,86 @@ async function blueskyPostMetrics(uri: string): Promise<PostMetrics> {
   };
 }
 
-/** LinkedIn socialActions — likes + comments (urn:li:share:xxx / person) */
-async function linkedinPostMetrics(postUrn: string, token: string): Promise<PostMetrics> {
-  const res = await httpRequest<{
-    elements?: Array<{
-      likesSummary?: { totalLikes?: number };
-      commentsSummary?: { aggregatedTotalComments?: number };
-    }>;
+/**
+ * LinkedIn socialActions — likes + comments per-post (urn:li:share:* / ugcPost:*).
+ * Pakai endpoint single-entity `/{urn}`, BUKAN `?ids=List(...)`, karena:
+ * - respons batch memakai key `results` yang di-key URN (bukan `elements`)
+ * - BATCH_GET tidak didukung di Development tier Community Management API
+ * Post tanpa social action mengembalikan objek kosong — bukan error.
+ *
+ * Bila ownerUrn (organizationalEntity) tersedia, ALSO fetch impressions/clicks/shares
+ * via organizationalEntityShareStatistics — endpoint ini memberikan metrik komprehensif
+ * yang tidak tersedia di socialActions.
+ */
+async function linkedinPostMetrics(
+  postUrn: string,
+  token: string,
+  ownerUrn?: string,
+): Promise<PostMetrics> {
+  // 1. Social actions: likes + comments
+  const actionsRes = await httpRequest<{
     likesSummary?: { totalLikes?: number };
     commentsSummary?: { aggregatedTotalComments?: number };
-  }>(`${LINKEDIN_REST_URL}/rest/socialActions`, {
-    query: { ids: `List(${postUrn})` },
+  }>(`${LINKEDIN_REST_URL}/rest/socialActions/${encodeURIComponent(postUrn)}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "LinkedIn-Version": LINKEDIN_API_VERSION,
       "X-Restli-Protocol-Version": "2.0.0",
     },
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`LinkedIn socialActions: ${text.slice(0, 150)}`);
+
+  let likes: number | null = null;
+  let comments: number | null = null;
+  if (actionsRes.ok) {
+    const data = await actionsRes.json();
+    likes = data.likesSummary?.totalLikes ?? null;
+    comments = data.commentsSummary?.aggregatedTotalComments ?? null;
   }
-  // Batch response: { elements: [{...likesSummary, commentsSummary}] } atau objek tunggal
-  const data = await res.json();
-  const el = data.elements?.[0] ?? data;
-  return {
-    likes: el?.likesSummary?.totalLikes ?? null,
-    comments: el?.commentsSummary?.aggregatedTotalComments ?? null,
-  };
+
+  // 2. Share statistics (impressions, clicks, shares) — requires organizationalEntity
+  //    Only available for organization pages with r_organization_social scope
+  if (ownerUrn?.startsWith("urn:li:organization:")) {
+    try {
+      const statsRes = await httpRequest<{
+        elements?: Array<{
+          totalShareStatistics?: {
+            impressionCount?: number;
+            uniqueImpressionsCount?: number;
+            clickCount?: number;
+            shareCount?: number;
+            likeCount?: number;
+            commentCount?: number;
+          };
+        }>;
+      }>(
+        `${LINKEDIN_REST_URL}/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${encodeURIComponent(ownerUrn)}&shares=List(${encodeURIComponent(postUrn)})`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "LinkedIn-Version": LINKEDIN_API_VERSION,
+            "X-Restli-Protocol-Version": "2.0.0",
+          },
+        },
+      );
+      if (statsRes.ok) {
+        const stats = (await statsRes.json()).elements?.[0]?.totalShareStatistics;
+        if (stats) {
+          return {
+            likes: stats.likeCount ?? likes,
+            comments: stats.commentCount ?? comments,
+            impressions: stats.impressionCount ?? null,
+            reach: stats.uniqueImpressionsCount ?? null,
+            shares: stats.shareCount ?? null,
+            websiteClicks: stats.clickCount ?? null,
+          };
+        }
+      }
+    } catch {
+      // Share statistics endpoint may fail for personal posts or missing scope — fallback to socialActions only
+    }
+  }
+
+  return { likes, comments };
 }
 
 /** Pinterest pin metrics — impressions/saves/clicks via pin detail (aggregated stats) */
@@ -686,6 +777,7 @@ export async function syncAccountAnalytics(
         p.platformPostId!,
         accessToken,
         account.metadata,
+        account.platformAccountId,
       );
       await upsertPostAnalytics(
         {
@@ -746,6 +838,8 @@ export async function syncDueAnalyticsAccounts(
     "youtube",
     "bluesky",
     "pinterest",
+    "linkedin",
+    "linkedin_org",
   ]);
   const candidates = accounts.filter((a) => a.accessTokenEnc && supported.has(a.platform));
 

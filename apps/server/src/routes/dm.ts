@@ -201,14 +201,14 @@ dmRoute.post("/:id/reply", async (c) => {
             false,
           );
         }
-        // Page token bila ada (jalur instagram/facebook)
+        // Token: page access token (IG/FB) atau user token (LinkedIn)
         const token =
           (typeof row.metadata?.pageAccessToken === "string"
             ? (row.metadata.pageAccessToken as string)
             : null) ?? accessToken;
 
         const result = await sendDMReply({
-          platform: row.platform as "instagram" | "instagram_standalone" | "facebook",
+          platform: row.platform as "instagram" | "instagram_standalone" | "facebook" | "linkedin" | "linkedin_org",
           accessToken: token,
           platformAccountId: row.platformAccountId,
           partnerId: row.conversation.partnerId,

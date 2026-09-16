@@ -57,6 +57,8 @@ const PLATFORM_STYLE: Record<string, string> = {
   tiktok: "TikTok: pendek, punchy, trend-aware, hashtag relevan, maksimal 2200 karakter.",
   youtube: "YouTube: kaya keyword, CTA jelas, SEO-friendly.",
   linkedin: "LinkedIn: profesional tapi personal, storytelling, tanpa emoji berlebihan.",
+  linkedin_org:
+    "LinkedIn halaman company: profesional, informatif, sudut pandang brand/perusahaan, CTA jelas, tanpa emoji berlebihan.",
   pinterest: "Pinterest: kaya keyword, deskriptif, search-optimized.",
   threads: "Threads: maksimal 500 karakter, ringan dan konversasional.",
   x: "X/Twitter: maksimal 280 karakter, tajam dan langsung.",
@@ -68,6 +70,7 @@ const PLATFORMS = [
   "tiktok",
   "youtube",
   "linkedin",
+  "linkedin_org",
   "pinterest",
   "threads",
   "x",
@@ -327,6 +330,7 @@ const repurposeSchema = z.object({
     "tiktok",
     "youtube",
     "linkedin",
+    "linkedin_org",
     "pinterest",
     "threads",
     "x",
@@ -346,6 +350,8 @@ const REPURPOSE_GUIDE: Record<string, string> = {
     "YouTube: hasilkan JUDUL (maksimal 90 karakter, kaya keyword) dan DESKRIPSI (paragraf pembuka hook 2-3 kalimat, poin-poin isi dengan timestamp placeholder bila relevan, CTA subscribe, 3-5 hashtag). Format: 'JUDUL: <judul>' lalu baris kosong lalu 'DESKRIPSI: <deskripsi>'.",
   linkedin:
     "LinkedIn: profesional tapi personal, storytelling 3-5 paragraf pendek, hook reflektif di baris pertama, insight/takeaway konkret, tanpa emoji berlebihan, 3 hashtag profesional di akhir.",
+  linkedin_org:
+    "LinkedIn Company Page: nada profesional merek, ceritakan dampak/bisnis, data-driven storytelling, ringkas dan berwibawa, gunakan hashtags industri, postingan harus mencerminkan values perusahaan.",
   pinterest:
     "Pinterest: deskriptif dan kaya keyword untuk pencarian, judul jelas (maks 100 karakter), deskripsi 200-300 karakter yang menjelaskan nilai konten, sertakan kata kunci pencarian natural, 2-5 hashtag.",
   threads:

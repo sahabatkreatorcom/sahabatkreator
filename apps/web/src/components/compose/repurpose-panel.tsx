@@ -15,6 +15,7 @@ export const REPURPOSE_PLATFORMS = [
   { value: "tiktok", label: "TikTok" },
   { value: "youtube", label: "YouTube" },
   { value: "linkedin", label: "LinkedIn" },
+  { value: "linkedin_org", label: "LinkedIn (Company)" },
   { value: "pinterest", label: "Pinterest" },
   { value: "threads", label: "Threads" },
   { value: "x", label: "X" },
