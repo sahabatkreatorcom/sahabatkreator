@@ -198,6 +198,9 @@ const AdminLogsPage = lazy(() =>
 const AdminOrgActivityPage = lazy(() =>
   import("./pages/admin/org-activity").then((m) => ({ default: m.AdminOrgActivityPage })),
 );
+const AdminMonitoringPage = lazy(() =>
+  import("./pages/admin/monitoring").then((m) => ({ default: m.AdminMonitoringPage })),
+);
 
 export const router = createBrowserRouter([
   // Shell global — floating AI chat tampil di semua halaman
@@ -374,6 +377,7 @@ export const router = createBrowserRouter([
           { path: "/admin/settings", element: withFallback(<AdminSettingsPage />) },
           { path: "/admin/logs", element: withFallback(<AdminLogsPage />) },
           { path: "/admin/org-activity", element: withFallback(<AdminOrgActivityPage />) },
+          { path: "/admin/monitoring", element: withFallback(<AdminMonitoringPage />) },
         ],
       },
 
