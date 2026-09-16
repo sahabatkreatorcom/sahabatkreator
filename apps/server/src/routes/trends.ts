@@ -5,7 +5,7 @@ import { brandVoice } from "@sahabatkreator/db/schema";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { chatCompletion, consumeAiCredits, getAiConfig } from "../lib/ai";
+import { aiCreditCost, chatCompletion, consumeAiCredits, getAiConfig } from "../lib/ai";
 import { errorResponse, requireOrg } from "../lib/auth-guard";
 import { getOrgLimits } from "../lib/billing";
 import { fetchDailyTrendsID } from "../lib/trends";
@@ -56,11 +56,13 @@ trendsRoute.post("/ideas", async (c) => {
     }
 
     const limits = await getOrgLimits(ctx.organization.id);
+    const action = "trend_ideas";
     const usage = await consumeAiCredits(ctx.organization.id, limits.aiCreditsPerMonth, {
       userId: ctx.user.id,
-      action: "trend_ideas",
+      action,
       platform: input.platform,
       model: config.model,
+      credits: aiCreditCost(action),
     });
 
     // Brand voice sebagai konteks prompt (konsisten dengan AI suite)

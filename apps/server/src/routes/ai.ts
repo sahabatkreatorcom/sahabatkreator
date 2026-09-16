@@ -5,7 +5,7 @@ import { aiUsageLog, brandVoice, media, user as userTable } from "@sahabatkreato
 import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { chatCompletion, consumeAiCredits, getAiConfig, getAiUsage } from "../lib/ai";
+import { aiCreditCost, chatCompletion, consumeAiCredits, getAiConfig, getAiUsage } from "../lib/ai";
 import { errorResponse, HTTPError, requireOrg } from "../lib/auth-guard";
 import { getOrgLimits } from "../lib/billing";
 import { aiRateLimit } from "../lib/rate-limit";
@@ -185,11 +185,13 @@ aiRoute.post("/caption", async (c) => {
     }
 
     const limits = await getOrgLimits(ctx.organization.id);
+    const action = "caption";
     const usage = await consumeAiCredits(ctx.organization.id, limits.aiCreditsPerMonth, {
       userId: ctx.user.id,
-      action: "caption",
+      action,
       platform: input.platform,
       model: config.model,
+      credits: aiCreditCost(action),
     });
 
     const style = PLATFORM_STYLE[input.platform] ?? "";
@@ -232,11 +234,13 @@ aiRoute.post("/hashtag", async (c) => {
     }
 
     const limits = await getOrgLimits(ctx.organization.id);
+    const action = "hashtag";
     const usage = await consumeAiCredits(ctx.organization.id, limits.aiCreditsPerMonth, {
       userId: ctx.user.id,
-      action: "hashtag",
+      action,
       platform: input.platform,
       model: config.model,
+      credits: aiCreditCost(action),
     });
 
     const system = `Kamu adalah ahli social media marketing Indonesia. Hasilkan hashtag yang relevan, campuran populer dan niche, dalam Bahasa Indonesia/Inggris sesuai konteks.\nKembalikan HANYA JSON array of string, contoh: ["#hashtag1", "#hashtag2"]. Tanpa teks lain.`;
@@ -298,11 +302,13 @@ aiRoute.post("/rewrite", async (c) => {
     }
 
     const limits = await getOrgLimits(ctx.organization.id);
+    const action = "rewrite";
     const usage = await consumeAiCredits(ctx.organization.id, limits.aiCreditsPerMonth, {
       userId: ctx.user.id,
-      action: "rewrite",
+      action,
       platform: input.platform,
       model: config.model,
+      credits: aiCreditCost(action),
     });
 
     const style = PLATFORM_STYLE[input.platform] ?? "";
@@ -370,11 +376,13 @@ aiRoute.post("/repurpose", async (c) => {
     }
 
     const limits = await getOrgLimits(ctx.organization.id);
+    const action = "repurpose";
     const usage = await consumeAiCredits(ctx.organization.id, limits.aiCreditsPerMonth, {
       userId: ctx.user.id,
-      action: "repurpose",
+      action,
       platform: input.targetPlatform,
       model: config.model,
+      credits: aiCreditCost(action),
     });
 
     const guide = REPURPOSE_GUIDE[input.targetPlatform];
@@ -436,11 +444,13 @@ aiRoute.post("/carousel", async (c) => {
     }
 
     const limits = await getOrgLimits(ctx.organization.id);
+    const action = "carousel";
     const usage = await consumeAiCredits(ctx.organization.id, limits.aiCreditsPerMonth, {
       userId: ctx.user.id,
-      action: "carousel",
+      action,
       platform: input.platform,
       model: config.model,
+      credits: aiCreditCost(action),
     });
 
     const voice = await brandVoicePrompt(ctx.organization.id);
@@ -511,11 +521,13 @@ aiRoute.post("/reply", async (c) => {
     }
 
     const limits = await getOrgLimits(ctx.organization.id);
+    const action = "reply";
     const usage = await consumeAiCredits(ctx.organization.id, limits.aiCreditsPerMonth, {
       userId: ctx.user.id,
-      action: "reply",
+      action,
       platform: input.platform,
       model: config.model,
+      credits: aiCreditCost(action),
     });
 
     const system = `Kamu adalah admin social media yang menanggapi komentar pelanggan/follower. Balas dengan gaya ${input.tone} dalam Bahasa Indonesia.\nMaksimal 2-3 kalimat. Jika komentar negatif, tunjukkan empati dan tawarkan solusi.\nKembalikan HANYA teks balasan.`;
@@ -569,11 +581,12 @@ aiRoute.post("/alt-text", async (c) => {
     }
 
     const limits = await getOrgLimits(ctx.organization.id);
+    const action = "alt-text";
     const usage = await consumeAiCredits(ctx.organization.id, limits.aiCreditsPerMonth, {
       userId: ctx.user.id,
-      action: "alt-text",
+      action,
       model: config.model,
-      credits: 1,
+      credits: aiCreditCost(action),
     });
 
     // Konteks media untuk prompt — nama file biasanya paling informatif

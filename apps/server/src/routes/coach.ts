@@ -5,7 +5,7 @@ import { brandVoice } from "@sahabatkreator/db/schema";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { chatCompletion, consumeAiCredits, getAiConfig } from "../lib/ai";
+import { aiCreditCost, chatCompletion, consumeAiCredits, getAiConfig } from "../lib/ai";
 import { errorResponse, requireOrg } from "../lib/auth-guard";
 import { getOrgLimits } from "../lib/billing";
 import { getCoachSummary } from "../lib/coach";
@@ -41,10 +41,12 @@ coachRoute.post("/advice", async (c) => {
     }
 
     const limits = await getOrgLimits(ctx.organization.id);
+    const action = "coach_advice";
     const usage = await consumeAiCredits(ctx.organization.id, limits.aiCreditsPerMonth, {
       userId: ctx.user.id,
-      action: "coach_advice",
+      action,
       model: config.model,
+      credits: aiCreditCost(action),
     });
 
     const summary = await getCoachSummary(ctx.organization.id);

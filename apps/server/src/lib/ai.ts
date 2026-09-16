@@ -17,6 +17,31 @@ export type AiConfig = {
   model: string;
 };
 
+/**
+ * Biaya kredit per aksi AI — tiered berdasarkan kompleksitas prompt & token usage.
+ * Caption/hashtag: ~500-800 token → 1 kredit
+ * Rewrite/reply/alt-text: ~500-1000 token → 1 kredit
+ * Carousel: ~1000-1500 token, multi-step → 2 kredit
+ * SebCoach: ~3000-5000 token, context panjang → 3 kredit
+ * Trends: ~4000-6000 token, analisis berat → 3 kredit
+ */
+export const AI_CREDIT_COST: Record<string, number> = {
+  caption: 1,
+  hashtag: 1,
+  rewrite: 1,
+  reply: 1,
+  "alt-text": 1,
+  repurpose: 1,
+  carousel: 2,
+  coach_advice: 3,
+  trend_ideas: 3,
+};
+
+/** Ambil biaya kredit untuk action (default 1) */
+export function aiCreditCost(action: string): number {
+  return AI_CREDIT_COST[action] ?? 1;
+}
+
 // Cache in-memory konfigurasi AI — query platformSettings dihindari tiap request
 const AI_CONFIG_CACHE_MS = 60_000;
 let cachedAiConfig: { config: AiConfig | null; at: number } | null = null;

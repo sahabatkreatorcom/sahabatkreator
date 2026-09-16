@@ -95,7 +95,7 @@ export function AiUsageHistory() {
         <h2 className="font-semibold text-xl">Riwayat Pemakaian AI</h2>
         <p className="mt-1 text-[var(--text-secondary)] text-sm">
           Semua generate AI di organisasi ini — caption, hashtag, rewrite, saran reply, dan SEB.
-          Satu entri = satu kredit.
+          Setiap aksi mengonsumsi kredit sesuai kompleksitas (1-3 kredit).
         </p>
       </div>
 
