@@ -347,44 +347,48 @@ async function syncFacebook(ctx: SyncContext): Promise<SyncResult> {
 
 async function syncThreads(ctx: SyncContext): Promise<SyncResult> {
   const userId = ctx.account.platformAccountId;
-  const convRes = await httpRequest<{
+
+  // Step 1: Fetch user's threads (media containers)
+  const threadsRes = await httpRequest<{
     data?: Array<{
       id: string;
-      thread_items?: Array<{
-        post: {
-          id: string;
-          text?: string;
-          username?: string;
-          timestamp?: string;
-          has_media?: boolean;
-        };
-        reply?: string; // role "reply" vs "post"
-      }>;
+      timestamp?: string;
     }>;
-  }>(`${GRAPH_THREADS}/${userId}/threads_conversations`, {
-    query: { fields: "id,thread_items", limit: 20, access_token: ctx.accessToken },
+  }>(`${GRAPH_THREADS}/${userId}/threads`, {
+    query: { fields: "id,timestamp", limit: 20, access_token: ctx.accessToken },
   });
-  if (!convRes.ok) {
-    const text = await convRes.text().catch(() => "");
-    return { platform: "threads", newItems: 0, error: `Threads conv: ${text.slice(0, 150)}` };
+  if (!threadsRes.ok) {
+    const text = await threadsRes.text().catch(() => "");
+    return { platform: "threads", newItems: 0, error: `Threads list: ${text.slice(0, 150)}` };
   }
-  const conversations = (await convRes.json()).data ?? [];
+  const threads = (await threadsRes.json()).data ?? [];
 
+  // Step 2: For each thread, fetch replies using thread_replies field
   const items: EngagementUpsert[] = [];
-  for (const conv of conversations) {
-    // Hanya balasan dari orang lain (bukan post kita sendiri) → skip item pertama (post root)
-    const replies = (conv.thread_items ?? []).slice(1);
-    for (const item of replies) {
-      if (!item?.post) continue;
+  for (const thread of threads) {
+    const repliesRes = await httpRequest<{
+      data?: Array<{
+        id: string;
+        text?: string;
+        username?: string;
+        timestamp?: string;
+      }>;
+    }>(`${GRAPH_THREADS}/${thread.id}/replies`, {
+      query: { fields: "id,text,username,timestamp", access_token: ctx.accessToken },
+    });
+    if (!repliesRes.ok) continue;
+    const replies = (await repliesRes.json()).data ?? [];
+
+    for (const reply of replies) {
       items.push({
         socialAccountId: ctx.account.id,
         organizationId: ctx.account.organizationId,
         type: "comment",
-        platformItemId: item.post.id,
-        parentId: conv.id,
-        authorUsername: item.post.username ? `@${item.post.username}` : null,
-        content: item.post.text ?? null,
-        occurredAt: item.post.timestamp ? new Date(item.post.timestamp) : null,
+        platformItemId: reply.id,
+        parentId: thread.id,
+        authorUsername: reply.username ? `@${reply.username}` : null,
+        content: reply.text ?? null,
+        occurredAt: reply.timestamp ? new Date(reply.timestamp) : null,
       });
     }
   }
