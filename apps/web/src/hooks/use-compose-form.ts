@@ -45,6 +45,8 @@ const AI_PLATFORMS = new Set([
   "tiktok",
   "youtube",
   "linkedin",
+  // Halaman company LinkedIn — endpoint AI punya style sendiri untuk platform ini
+  "linkedin_org",
   "pinterest",
   "threads",
   "x",

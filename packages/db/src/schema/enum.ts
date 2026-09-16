@@ -10,6 +10,9 @@ export const platformEnum = pgEnum("platform", [
   "youtube",
   "pinterest",
   "linkedin",
+  // Halaman company LinkedIn via app terpisah (Community Management API) —
+  // app ini tidak punya permission `openid`, jadi profil person tidak tersedia.
+  "linkedin_org",
   "bluesky",
   "google_business",
   "manual",

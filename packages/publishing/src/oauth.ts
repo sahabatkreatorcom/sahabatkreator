@@ -44,6 +44,8 @@ export type OAuthPlatform =
   | "youtube"
   | "pinterest"
   | "linkedin"
+  // App LinkedIn terpisah (Community Management API) — hanya halaman company
+  | "linkedin_org"
   | "google_business"
   | "bluesky";
 
@@ -91,6 +93,14 @@ type OAuthConfig = {
    */
   clientIdParam?: "client_id" | "client_key";
 };
+
+/**
+ * Scope yang menandakan token punya akses menulis/mengelola organization (company page).
+ * Community Management API hanya memberi `rw_organization_admin` (+ r_organization_social /
+ * w_organization_social) — `r_organization_admin` tidak termasuk (itu milik Advertising API),
+ * jadi gate picker multi-company harus menerima keduanya.
+ */
+export const LINKEDIN_ORG_ACCESS_SCOPES = ["rw_organization_admin", "r_organization_admin"];
 
 export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
   // Instagram via FB Login — Graph API, Page-scoped
@@ -214,6 +224,23 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
     authorizeUrl: LINKEDIN_OAUTH_AUTH_URL,
     tokenUrl: LINKEDIN_OAUTH_TOKEN_URL,
     scopes: ["openid", "profile", "email", "w_member_social"],
+    scopeSeparator: " ",
+  },
+  // Community Management API (app LinkedIn KEDUA, terpisah dari app personal).
+  // Product ini hanya tersedia self-serve bila jadi SATU-SATUNYA product di app-nya
+  // → app tanpa `openid`: tidak ada /v2/userinfo, entitas = halaman company dari
+  // organizationAcls. Scope = 3 grup resmi (Posts API pakai r_/w_organization_social,
+  // Social Metadata & komentar pakai r_/w_organization_social_feed).
+  linkedin_org: {
+    authorizeUrl: LINKEDIN_OAUTH_AUTH_URL,
+    tokenUrl: LINKEDIN_OAUTH_TOKEN_URL,
+    scopes: [
+      "rw_organization_admin", // /rest/organizationAcls + Organization Lookup
+      "r_organization_social", // /rest/posts — baca post organization
+      "w_organization_social", // /rest/posts — publish post organization
+      "r_organization_social_feed", // /rest/socialActions — baca komentar
+      "w_organization_social_feed", // /rest/socialActions — balas komentar
+    ],
     scopeSeparator: " ",
   },
   // Bluesky: atproto OAuth (PKCE + PAR + DPoP) kompleks — fase 1 pakai app password.
@@ -817,10 +844,10 @@ export async function fetchPlatformProfile(
         extra: { email: me.email },
       };
 
-      // Multi-company (#15): bila scope r_organization_admin di-grant (product LinkedIn
+      // Multi-company (#15): bila scope akses organization di-grant (product LinkedIn
       // ter-approve), ambil daftar company tempat user ADMIN → user pilih profil pribadi
       // vs company via picker. Tanpa scope / fetch gagal → person-only (flow lama tetap jalan).
-      if (token.scopes.includes("r_organization_admin")) {
+      if (LINKEDIN_ORG_ACCESS_SCOPES.some((scope) => token.scopes.includes(scope))) {
         const organizations = await fetchLinkedInAdminOrganizations(at);
         if (organizations.length > 0) {
           profile.extra = {
@@ -831,6 +858,31 @@ export async function fetchPlatformProfile(
         }
       }
       return profile;
+    }
+
+    case "linkedin_org": {
+      // App Community Management API TIDAK punya scope `openid` → /v2/userinfo
+      // tidak tersedia, jadi identitas user tidak diambil sama sekali. Satu-satunya
+      // entitas = halaman company tempat user ADMIN (organizationAcls).
+      // `strict` → error HTTP di-throw dengan pesan jelas, bukan picker kosong.
+      const organizations = await fetchLinkedInAdminOrganizations(at, { strict: true });
+      if (organizations.length === 0) {
+        throw new PublishError(
+          "oauth_no_organization",
+          "Tidak ada halaman company LinkedIn yang bisa dihubungkan. Pastikan Anda berperan ADMIN di halaman company tersebut.",
+          false,
+        );
+      }
+      // Identitas profil tidak dipakai flow ini — callback selalu mengarahkan user
+      // ke picker (profile.extra.organizations). Nilai di bawah hanya placeholder.
+      const primary = organizations[0]!;
+      return {
+        platformAccountId: `urn:li:organization:${primary.id}`,
+        username: primary.name,
+        displayName: primary.name,
+        avatarUrl: null,
+        extra: { organizations },
+      };
     }
 
     case "bluesky":
@@ -857,53 +909,96 @@ export type LinkedInOrganization = {
 };
 
 /**
- * GET /rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR — company tempat user ADMIN.
- * Butuh scope r_organization_admin (product LinkedIn ter-approve).
- * Return [] bila gagal (scope belum granted / product belum approved) — caller fallback person-only.
+ * GET /rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED — company tempat user
+ * ADMIN. Butuh scope `rw_organization_admin` dari product ter-approve (Community Management API,
+ * bukan self-serve). Return [] bila gagal (scope belum granted / product belum approved) — caller
+ * fallback ke person-only.
+ *
+ * Bentuk respons (doc resmi li-lms-2026-08, update 30 Apr 2026): URN organization dikembalikan
+ * sebagai `organizationTarget` pada contoh paginasi dan sebagai `organization` pada contoh lain —
+ * kedua field diterima. Finder ini TIDAK memuat `localizedName`/`vanityName` (tidak ada projection
+ * resmi untuk itu), jadi nama diambil via Organization Lookup `GET /rest/organizations/{id}`.
+ *
+ * `strict: true` (dipakai flow `linkedin_org`) → error HTTP di-throw, bukan dianggap "tanpa
+ * company", supaya kegagalan scope/review app tidak tersamar sebagai picker kosong.
  */
-async function fetchLinkedInAdminOrganizations(at: string): Promise<LinkedInOrganization[]> {
-  const version = LINKEDIN_API_VERSION;
+async function fetchLinkedInAdminOrganizations(
+  at: string,
+  opts: { strict?: boolean } = {},
+): Promise<LinkedInOrganization[]> {
+  const headers = {
+    Authorization: `Bearer ${at}`,
+    "LinkedIn-Version": LINKEDIN_API_VERSION,
+    "X-Restli-Protocol-Version": "2.0.0",
+  };
   const res = await httpRequest<{
     elements?: Array<{
-      organizationReference?: string;
-      organization?: string | { id?: number | string; localizedName?: string; vanityName?: string };
-      // Resolusi projection "organization~" (Rest.li decoration)
-      "organization~"?: { id?: number | string; localizedName?: string; vanityName?: string };
+      organizationTarget?: string;
+      organization?: string | { id?: number | string };
       role?: string;
       state?: string;
     }>;
   }>(`${LINKEDIN_REST_URL}/rest/organizationAcls`, {
-    query: {
-      q: "roleAssignee",
-      role: "ADMINISTRATOR",
-      state: "APPROVED",
-      projection:
-        "(elements*(organizationReference,role,state,organization~(id,localizedName,vanityName)))",
-    },
-    headers: {
-      Authorization: `Bearer ${at}`,
-      "LinkedIn-Version": version,
-      "X-Restli-Protocol-Version": "2.0.0",
-    },
+    query: { q: "roleAssignee", role: "ADMINISTRATOR", state: "APPROVED" },
+    headers,
     retries: 0, // gagal cepat — 403 scope berarti product belum approved, jangan retry
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    if (opts.strict) {
+      throw new PublishError(
+        "oauth_org_lookup_failed",
+        `Gagal mengambil daftar halaman company LinkedIn (HTTP ${res.status}) — pastikan app Community Management API sudah approved & user adalah ADMIN halaman.`,
+        false,
+      );
+    }
+    return [];
+  }
 
   const data = await res.json();
   const seen = new Set<string>();
   const organizations: LinkedInOrganization[] = [];
   for (const el of data.elements ?? []) {
-    // organizationAcls mengembalikan organizationReference URN + resolusi "organization~"
-    const resolved =
-      el["organization~"] ?? (typeof el.organization === "object" ? el.organization : null);
-    const id = resolved?.id != null ? String(resolved.id) : null;
+    const id = linkedinOrganizationId(el.organizationTarget ?? el.organization);
     if (!id || seen.has(id)) continue;
     seen.add(id);
+    const detail = await fetchLinkedInOrganization(id, at);
     organizations.push({
       id,
-      name: resolved?.localizedName ?? resolved?.vanityName ?? id,
-      vanityName: resolved?.vanityName ?? null,
+      name: detail?.name ?? id, // fallback: Organization Lookup gagal → tampilkan ID
+      vanityName: detail?.vanityName ?? null,
     });
   }
   return organizations;
+}
+
+/** Organization ID numerik dari URN `urn:li:organization:{id}` (atau objek `organization`). */
+function linkedinOrganizationId(
+  value: string | { id?: number | string } | undefined,
+): string | null {
+  const raw = typeof value === "string" ? value : value?.id != null ? String(value.id) : null;
+  if (!raw) return null;
+  const id = raw.startsWith("urn:li:") ? raw.slice(raw.lastIndexOf(":") + 1) : raw;
+  return /^\d+$/.test(id) ? id : null;
+}
+
+/** Organization Lookup admin — `localizedName` + `vanityName`; null bila gagal (403/dsb). */
+async function fetchLinkedInOrganization(
+  id: string,
+  at: string,
+): Promise<{ name: string; vanityName: string | null } | null> {
+  const res = await httpRequest<{ localizedName?: string; vanityName?: string }>(
+    `${LINKEDIN_REST_URL}/rest/organizations/${id}`,
+    {
+      headers: {
+        Authorization: `Bearer ${at}`,
+        "LinkedIn-Version": LINKEDIN_API_VERSION,
+        "X-Restli-Protocol-Version": "2.0.0",
+      },
+      retries: 0,
+    },
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  const name = data.localizedName ?? data.vanityName;
+  return name ? { name, vanityName: data.vanityName ?? null } : null;
 }

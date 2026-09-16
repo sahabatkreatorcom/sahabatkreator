@@ -38,6 +38,8 @@ const PLATFORM_RATE_LIMITS: Record<string, { max: number; duration: number }> = 
   youtube: { max: 1, duration: 5_000 },
   pinterest: { max: 1, duration: 5_000 },
   linkedin: { max: 1, duration: 3_000 },
+  // Halaman company LinkedIn (app Community Management API) — limit sama
+  linkedin_org: { max: 1, duration: 3_000 },
   bluesky: { max: 1, duration: 2_000 },
   google_business: { max: 1, duration: 3_000 },
   manual: { max: 1, duration: 1_000 },

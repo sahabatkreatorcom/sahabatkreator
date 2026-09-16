@@ -52,6 +52,8 @@ export type Platform =
   | "youtube"
   | "pinterest"
   | "linkedin"
+  // Halaman company LinkedIn (app Community Management API) — koneksi terpisah
+  | "linkedin_org"
   | "bluesky"
   | "google_business"
   | "manual";
@@ -114,6 +116,13 @@ export const PLATFORMS: Record<Platform, PlatformConfig> = {
   },
   linkedin: {
     label: "LinkedIn",
+    icon: LinkedinIcon,
+    color: "#0A66C2",
+    status: "ready",
+  },
+  linkedin_org: {
+    // Label dibedakan agar user paham ini halaman company, bukan profil pribadi
+    label: "LinkedIn (Halaman Company)",
     icon: LinkedinIcon,
     color: "#0A66C2",
     status: "ready",

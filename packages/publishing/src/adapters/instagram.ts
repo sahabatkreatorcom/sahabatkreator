@@ -91,8 +91,10 @@ async function publishInstagramViaFb(input: PublishInput): Promise<PublishResult
       query: {
         image_url: image?.url,
         video_url: video?.url,
-        // Video feed biasa; Reels ditentukan via platformSettings bila user memilih
-        media_type: video ? String(input.platformSettings.mediaType ?? "VIDEO") : undefined,
+        // Video tunggal WAJIB REELS — Meta sudah tidak menerima media_type=VIDEO
+        // utk container tunggal ([100] Invalid parameter). Semua video API tunggal
+        // kini tayang sebagai Reels; carousel item tidak terpengaruh.
+        media_type: video ? "REELS" : undefined,
         caption,
         access_token: input.accessToken,
       },

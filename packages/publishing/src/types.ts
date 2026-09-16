@@ -101,6 +101,7 @@ export const PLATFORM_DAILY_LIMITS: Record<string, number> = {
   youtube: 50, // bucket ~100/hari; aman di bawah
   pinterest: 100, // trial 300/hari → aman
   linkedin: 50, // member 150/hari → aman
+  linkedin_org: 50, // organization share 150/hari → aman
   bluesky: 200, // 5.000 poin/jam ÷ 3 = ~1.666/jam; konservatif per hari
   google_business: 100,
   manual: 0,

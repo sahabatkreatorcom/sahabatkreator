@@ -30,6 +30,7 @@ export const PLATFORM_LABELS: Record<string, string> = {
   youtube: "YouTube",
   pinterest: "Pinterest",
   linkedin: "LinkedIn",
+  linkedin_org: "LinkedIn (Halaman Company)",
   bluesky: "Bluesky",
   google_business: "Google Business",
   manual: "Manual",
@@ -48,8 +49,9 @@ export type PlatformHealthRow = {
 /**
  * Ping satu platform dan klasifikasikan status:
  * - 2xx/3xx dalam < 10s → operational
- * - 2xx/3xx tapi lambat (≥ 10s) atau 429 → degraded
+ * - 2xx/3xx tapi lambat (≥ 10s) → degraded
  * - 5xx / network error → outage
+ * - 4xx (termasuk 429) → operational (platform tetap hidup, hanya menolak probe anonim)
  * Latensi dihitung untuk ditampilkan di halaman status.
  */
 async function checkPlatform(
@@ -77,15 +79,6 @@ async function checkPlatform(
         checkedAt: new Date(),
       };
     }
-    if (res.status === 429) {
-      return {
-        platform,
-        status: "degraded",
-        message: "Rate limit dari platform (429)",
-        latencyMs,
-        checkedAt: new Date(),
-      };
-    }
     if (res.status >= 500) {
       return {
         platform,
@@ -95,7 +88,10 @@ async function checkPlatform(
         checkedAt: new Date(),
       };
     }
-    // 4xx lain (mis. robots.txt 404) dianggap platform tetap hidup
+    // 4xx (termasuk 429 rate-limit utk probe anonim, mis. robots.txt Threads,
+    // dan robots.txt 404) → platform tetap hidup. Probe ini tidak memakai
+    // token app, jadi 429 hanya berarti edge platform menolak ping anonim
+    // — bukan tanda gangguan layanan platform.
     return {
       platform,
       status: "operational",

@@ -30,6 +30,7 @@ const CONNECTABLE: Platform[] = [
   "youtube",
   "pinterest",
   "linkedin",
+  "linkedin_org",
   "google_business",
 ];
 

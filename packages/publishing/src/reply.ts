@@ -447,6 +447,8 @@ export async function sendReply(input: ReplyInput): Promise<ReplyResult> {
     case "bluesky":
       return replyBluesky(input);
     case "linkedin":
+    case "linkedin_org":
+      // linkedin_org = post atas nama company; komentar pakai Comments API yang sama
       return replyLinkedIn(input);
     case "google_business":
       return replyGoogleBusiness(input);

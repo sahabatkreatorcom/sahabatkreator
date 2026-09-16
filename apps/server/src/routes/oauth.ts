@@ -65,6 +65,9 @@ const ENV_CREDENTIAL_KEYS: Record<string, { id: keyof typeof env; secret: keyof 
   google_business: { id: "GOOGLE_CLIENT_ID", secret: "GOOGLE_CLIENT_SECRET" },
   pinterest: { id: "PINTEREST_APP_ID", secret: "PINTEREST_APP_SECRET" },
   linkedin: { id: "LINKEDIN_CLIENT_ID", secret: "LINKEDIN_CLIENT_SECRET" },
+  // App LinkedIn KEDUA (Community Management API) — kredensial & callback terpisah,
+  // karena product itu wajib jadi satu-satunya product di app-nya.
+  linkedin_org: { id: "LINKEDIN_ORG_CLIENT_ID", secret: "LINKEDIN_ORG_CLIENT_SECRET" },
 };
 
 /** Kredensial app per platform: platform_credential (DB, admin-managed) → fallback env */
@@ -255,8 +258,7 @@ oauthRoute.get("/:platform/callback", async (c) => {
     ) {
       const person = profile.extra.person as { sub: string; name: string };
       const pending = buildPendingLinkedIn({
-        personSub: person.sub,
-        personName: person.name,
+        person: { sub: person.sub, name: person.name },
         organizations: profile.extra.organizations as RawLinkedInOrganization[],
         accessToken: token.accessToken,
         refreshToken: token.refreshToken,
@@ -268,6 +270,33 @@ oauthRoute.get("/:platform/callback", async (c) => {
         userId: stateRow.userId,
         organizationId: stateRow.organizationId,
         platform: "linkedin",
+        pagesData: pending.pagesData,
+        expiresAt: pending.expiresAt,
+      });
+      return c.redirect(`${env.WEB_URL}/accounts?pending=${encodeURIComponent(pending.id)}`);
+    }
+
+    // LinkedIn company-only (app Community Management API). Flow ini TIDAK punya
+    // profil person (app tanpa `openid` → /v2/userinfo tidak tersedia), jadi user
+    // selalu memilih salah satu halaman company yang dia admin.
+    if (platform === "linkedin_org") {
+      const organizations = (profile.extra?.organizations ?? []) as RawLinkedInOrganization[];
+      if (organizations.length === 0) {
+        return failRedirect("Tidak ada halaman company LinkedIn yang bisa dihubungkan.");
+      }
+      const pending = buildPendingLinkedIn({
+        organizations,
+        accessToken: token.accessToken,
+        refreshToken: token.refreshToken,
+        expiresAt: token.expiresAt,
+        scopes: token.scopes,
+        platform: "linkedin_org",
+      });
+      await db.insert(oauthPendingSelection).values({
+        id: pending.id,
+        userId: stateRow.userId,
+        organizationId: stateRow.organizationId,
+        platform: "linkedin_org",
         pagesData: pending.pagesData,
         expiresAt: pending.expiresAt,
       });
@@ -814,6 +843,7 @@ oauthRoute.post("/:platform/revoke", async (c) => {
         google_business: GOOGLE_OAUTH_REVOKE_URL,
         pinterest: `${PINTEREST_API_BASE_URL}/oauth/token`,
         linkedin: LINKEDIN_OAUTH_REVOKE_URL,
+        linkedin_org: LINKEDIN_OAUTH_REVOKE_URL,
       };
       const revokeUrl = revokeUrls[platform];
       if (revokeUrl && accessToken) {

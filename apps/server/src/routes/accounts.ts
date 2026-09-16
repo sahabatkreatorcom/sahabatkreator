@@ -161,6 +161,7 @@ accountsRoute.post("/pending/:id/select", async (c) => {
       row.platform !== "facebook" &&
       row.platform !== "youtube" &&
       row.platform !== "linkedin" &&
+      row.platform !== "linkedin_org" &&
       row.platform !== "pinterest"
     ) {
       return c.json({ message: "Platform tidak mendukung pemilihan multi-akun" }, 400);

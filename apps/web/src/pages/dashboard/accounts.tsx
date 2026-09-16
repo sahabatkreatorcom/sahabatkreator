@@ -689,20 +689,26 @@ function PagePickerModal({
 
   const isInstagramFlow = data?.platform === "instagram";
   const isLinkedInFlow = data?.platform === "linkedin";
+  // linkedin_org = app Community Management API tanpa `openid` → hanya halaman company
+  const isLinkedInOrgFlow = data?.platform === "linkedin_org";
   const isPinterestFlow = data?.platform === "pinterest";
 
-  const title = isLinkedInFlow
-    ? "Pilih Profil LinkedIn"
-    : isInstagramFlow
-      ? "Pilih Halaman Instagram"
+  const title = isLinkedInOrgFlow
+    ? "Pilih Halaman Company LinkedIn"
+    : isLinkedInFlow
+      ? "Pilih Profil LinkedIn"
+      : isInstagramFlow
+        ? "Pilih Halaman Instagram"
+        : isPinterestFlow
+          ? "Pilih Board Pinterest"
+          : "Pilih Halaman Facebook";
+  const description = isLinkedInOrgFlow
+    ? "Pilih halaman company yang akan dihubungkan — hanya halaman tempat Anda ADMIN yang tampil"
+    : isLinkedInFlow
+      ? "Pilih profil yang akan dihubungkan — profil pribadi atau halaman company yang Anda kelola"
       : isPinterestFlow
-        ? "Pilih Board Pinterest"
-        : "Pilih Halaman Facebook";
-  const description = isLinkedInFlow
-    ? "Pilih profil yang akan dihubungkan — profil pribadi atau halaman company yang Anda kelola"
-    : isPinterestFlow
-      ? "Pilih board tujuan publish Pin — setiap board menjadi satu akun terhubung"
-      : "Akun Meta Anda mengelola beberapa halaman — pilih satu untuk dihubungkan";
+        ? "Pilih board tujuan publish Pin — setiap board menjadi satu akun terhubung"
+        : "Akun Meta Anda mengelola beberapa halaman — pilih satu untuk dihubungkan";
 
   return (
     <Modal open onClose={onClose} title={title} description={description} size="lg">
@@ -755,7 +761,7 @@ function PagePickerModal({
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm">{page.pageName}</p>
                     <p className="text-[var(--text-muted)] text-xs">
-                      {isLinkedInFlow
+                      {isLinkedInFlow || isLinkedInOrgFlow
                         ? page.isPersonal
                           ? "Profil pribadi"
                           : "Halaman company"

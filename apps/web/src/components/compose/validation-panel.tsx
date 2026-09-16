@@ -62,6 +62,7 @@ const CAPTION_LIMITS: Record<string, number> = {
   facebook: 63206,
   x: 280,
   linkedin: 3000,
+  linkedin_org: 3000,
   tiktok: 2200,
   youtube: 5000,
   threads: 500,

@@ -60,10 +60,19 @@ export const env = createEnv({
     PINTEREST_APP_SECRET: z.string().optional(),
     LINKEDIN_CLIENT_ID: z.string().optional(),
     LINKEDIN_CLIENT_SECRET: z.string().optional(),
-    // Scope organization LinkedIn ekstra (mis. "r_organization_admin w_organization_social").
-    // KOSONGKAN sampai product LinkedIn (Community Management API dsb.) di-approve —
-    // scope tak terdaftar di app membuat consent ditolak invalid_scope.
+    // Scope organization LinkedIn ekstra untuk app `linkedin` (personal).
+    // KOSONGKAN selama app LinkedIn personal belum punya product organization —
+    // scope org hanya boleh diminta oleh app Community Management API (platform
+    // `linkedin_org`), karena FAQ resmi melarang app dengan product lain ikut
+    // Development Tier Community Management API.
+    // Catatan: Community Management API TIDAK memberi `r_organization_admin` (itu milik
+    // Advertising API) — pakai `rw_organization_admin`; scope tak terdaftar → invalid_scope.
     LINKEDIN_EXTRA_SCOPES: z.string().optional(),
+    // App LinkedIn KEDUA (Community Management API) — khusus halaman company:
+    // posting/analytics/komentar sebagai organization. Product ini tidak boleh
+    // digabung dengan app personal (Share on LinkedIn / OpenID Connect).
+    LINKEDIN_ORG_CLIENT_ID: z.string().optional(),
+    LINKEDIN_ORG_CLIENT_SECRET: z.string().optional(),
     // Webhook verify token — Instagram & Facebook (satu aplikasi Meta,
     // subscribe webhook di developer console). Threads punya app & token sendiri.
     META_WEBHOOK_VERIFY_TOKEN: z.string().optional(),

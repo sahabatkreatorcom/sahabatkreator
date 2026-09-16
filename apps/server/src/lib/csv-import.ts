@@ -87,6 +87,7 @@ const VALID_PLATFORMS = new Set([
   "youtube",
   "pinterest",
   "linkedin",
+  "linkedin_org",
   "bluesky",
   "google_business",
   "manual",

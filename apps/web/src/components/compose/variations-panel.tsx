@@ -33,6 +33,7 @@ const CHAR_LIMITS: Record<string, number> = {
 const HASHTAG_LIMITS: Record<string, number> = {
   instagram: 30,
   linkedin: 5,
+  linkedin_org: 5,
   threads: 1,
   pinterest: 20,
 };

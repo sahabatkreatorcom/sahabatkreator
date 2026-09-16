@@ -197,6 +197,8 @@ const PLATFORMS = [
   "youtube",
   "pinterest",
   "linkedin",
+  // Halaman company LinkedIn (app Community Management API)
+  "linkedin_org",
   "bluesky",
   "google_business",
 ];

@@ -31,6 +31,7 @@ export const RESIZE_PRESETS = [
   { platform: "tiktok", label: "TikTok 9:16" },
   { platform: "youtube", label: "YouTube 16:9" },
   { platform: "linkedin", label: "LinkedIn 1.91:1" },
+  { platform: "linkedin_org", label: "LinkedIn Page 1.91:1" },
 ] as const;
 
 /** Batas karakter per platform */
@@ -39,6 +40,7 @@ export const CHAR_LIMITS: Record<string, number> = {
   facebook: 63206,
   x: 280,
   linkedin: 3000,
+  linkedin_org: 3000,
   tiktok: 2200,
   youtube: 5000,
   threads: 500,

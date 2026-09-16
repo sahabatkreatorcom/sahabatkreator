@@ -22,6 +22,9 @@ const ADAPTERS: Record<string, PlatformAdapter> = {
   youtube: youtubeAdapter,
   bluesky: blueskyAdapter,
   linkedin: linkedinAdapter,
+  // Halaman company LinkedIn (app Community Management API) — API sama,
+  // beda app OAuth & scope; adapter LinkedIn dipakai ulang.
+  linkedin_org: linkedinAdapter,
   pinterest: pinterestAdapter,
   google_business: googleBusinessAdapter,
   repliz: replizAdapter,

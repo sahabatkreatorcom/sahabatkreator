@@ -43,6 +43,8 @@ const HEURISTIC_HOURS: Record<string, number[]> = {
   tiktok: [11, 16, 20, 21, 17, 22],
   youtube: [12, 17, 20, 18, 13, 19],
   linkedin: [8, 9, 12, 10, 13, 7],
+  // Company page: audiens B2B — pola jam sama dengan member LinkedIn
+  linkedin_org: [8, 9, 12, 10, 13, 7],
   pinterest: [20, 21, 22, 19, 11, 18],
   bluesky: [8, 20, 21, 9, 19, 7],
   google_business: [9, 10, 11, 8, 12, 13],

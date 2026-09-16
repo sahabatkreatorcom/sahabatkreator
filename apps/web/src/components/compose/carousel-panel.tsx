@@ -29,6 +29,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   tiktok: "TikTok",
   youtube: "YouTube",
   linkedin: "LinkedIn",
+  linkedin_org: "LinkedIn (Halaman Company)",
   pinterest: "Pinterest",
   threads: "Threads",
   x: "X",

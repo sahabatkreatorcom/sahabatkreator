@@ -150,6 +150,7 @@ export function PlatformSettingsPanel({
                     "youtube",
                     "bluesky",
                     "linkedin",
+                    "linkedin_org",
                   ].includes(account.platform) && (
                     <div className="space-y-1.5">
                       <Label className="text-xs">First comment (komentar pertama otomatis)</Label>

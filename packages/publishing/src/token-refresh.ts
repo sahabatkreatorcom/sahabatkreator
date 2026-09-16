@@ -23,6 +23,8 @@ const ENV_KEYS: Partial<Record<OAuthPlatform, { id: string; secret: string }>> =
   google_business: { id: "GOOGLE_CLIENT_ID", secret: "GOOGLE_CLIENT_SECRET" },
   pinterest: { id: "PINTEREST_APP_ID", secret: "PINTEREST_APP_SECRET" },
   linkedin: { id: "LINKEDIN_CLIENT_ID", secret: "LINKEDIN_CLIENT_SECRET" },
+  // App Community Management API (halaman company) — kredensial terpisah
+  linkedin_org: { id: "LINKEDIN_ORG_CLIENT_ID", secret: "LINKEDIN_ORG_CLIENT_SECRET" },
 };
 
 async function getAppCredential(platform: OAuthPlatform): Promise<AppCredential | null> {

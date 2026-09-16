@@ -54,21 +54,30 @@ export function buildPendingPages(platform: "instagram" | "facebook", pages: Raw
 
 /**
  * Bangun data pending LinkedIn (multi-company, note.md #15).
- * Opsi = profil pribadi + setiap company tempat user ADMIN.
+ * Opsi = profil pribadi (bila ada) + setiap company tempat user ADMIN.
+ * `person` kosong untuk platform `linkedin_org` (app Community Management API
+ * tanpa `openid` → tidak ada profil person, hanya halaman company).
  * LinkedIn tidak punya token per-company (semua pakai token user-level) —
  * token/refresh/expiry/scope disalin ke tiap entitas supaya select() seragam.
  */
 export function buildPendingLinkedIn(params: {
-  personSub: string;
-  personName: string;
+  person?: { sub: string; name: string };
   organizations: RawLinkedInOrganization[];
   accessToken: string;
   refreshToken?: string;
   expiresAt?: Date | null;
   scopes: string[];
+  platform?: "linkedin" | "linkedin_org";
 }) {
-  const { personSub, personName, organizations, accessToken, refreshToken, expiresAt, scopes } =
-    params;
+  const {
+    person,
+    organizations,
+    accessToken,
+    refreshToken,
+    expiresAt,
+    scopes,
+    platform = "linkedin",
+  } = params;
   const shared = {
     pageAccessTokenEnc: encrypt(accessToken),
     refreshTokenEnc: refreshToken ? encrypt(refreshToken) : null,
@@ -76,13 +85,17 @@ export function buildPendingLinkedIn(params: {
     scopes,
   };
   const pagesData: PendingPageData[] = [
-    {
-      pageId: `urn:li:person:${personSub}`,
-      pageName: personName,
-      igUserId: null,
-      igUsername: null,
-      ...shared,
-    },
+    ...(person
+      ? [
+          {
+            pageId: `urn:li:person:${person.sub}`,
+            pageName: person.name,
+            igUserId: null,
+            igUsername: null,
+            ...shared,
+          },
+        ]
+      : []),
     ...organizations.map((org) => ({
       pageId: `urn:li:organization:${org.id}`,
       pageName: org.name,
@@ -93,7 +106,7 @@ export function buildPendingLinkedIn(params: {
   ];
   return {
     id: generateId("oauthpend"),
-    platform: "linkedin" as const,
+    platform,
     pagesData: JSON.stringify(pagesData),
     expiresAt: new Date(Date.now() + OAUTH_PENDING_TTL_MS),
   };
@@ -139,6 +152,8 @@ export function buildPendingPinterest(params: {
  * - facebook: pakai page id, page access token langsung sebagai access token
  * - linkedin: pakai URN owner (urn:li:person:{sub} | urn:li:organization:{id}),
  *   access token = token user-level (LinkedIn tidak punya token per-company)
+ * - linkedin_org: sama seperti linkedin, tapi HANYA entitas organization
+ *   (app Community Management API tanpa `openid` → tidak ada person)
  * - pinterest: pakai board id (publish butuh board_id), token user-level + RT rotating
  *
  * Return { account, existing } — existing=true bila re-connect (update token).
@@ -146,7 +161,7 @@ export function buildPendingPinterest(params: {
 export async function upsertSocialAccount(params: {
   organizationId: string;
   userId: string;
-  platform: "instagram" | "facebook" | "youtube" | "linkedin" | "pinterest";
+  platform: "instagram" | "facebook" | "youtube" | "linkedin" | "linkedin_org" | "pinterest";
   page: PendingPageData;
   /** User access token fallback (dipakai facebook bila page token tak ada) */
   userAccessToken: string;
@@ -163,12 +178,15 @@ export async function upsertSocialAccount(params: {
   let effectiveScopes: string[];
   let refreshTokenEnc: string | null = null;
 
-  if (platform === "linkedin") {
+  if (platform === "linkedin" || platform === "linkedin_org") {
     platformAccountId = page.pageId; // URN lengkap person/organization
     username = page.pageName;
     accessTokenEnc = page.pageAccessTokenEnc; // token user-level (terenkripsi)
     metadata = {
-      ownerType: page.pageId.startsWith("urn:li:organization:") ? "organization" : "person",
+      ownerType:
+        platform === "linkedin_org" || page.pageId.startsWith("urn:li:organization:")
+          ? "organization"
+          : "person",
     };
     effectiveExpiresAt = page.tokenExpiresAt ? new Date(page.tokenExpiresAt) : null;
     effectiveScopes = page.scopes ?? scopes;

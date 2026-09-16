@@ -40,6 +40,7 @@ const PLATFORM_WEB_URLS: Record<string, string> = {
   twitter: "https://x.com/compose/post",
   youtube: "https://studio.youtube.com/",
   linkedin: "https://www.linkedin.com/feed/",
+  linkedin_org: "https://www.linkedin.com/feed/",
   pinterest: "https://www.pinterest.com/",
   threads: "https://www.threads.net/",
   bluesky: "https://bsky.app/intent/compose",
