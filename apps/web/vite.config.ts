@@ -136,6 +136,7 @@ export default defineConfig({
           },
         ],
       },
+      buildBase: true,
       pwaAssets: { disabled: true },
       // Dev SW: injectManifest tidak didukung devOptions type module secara stabil —
       // dev-sw.js gagal eval "import outside module". Solusi: matikan SW di dev,
