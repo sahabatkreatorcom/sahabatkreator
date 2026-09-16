@@ -1632,14 +1632,13 @@ adminRoute.get("/monitoring/overview", requirePlatformAdmin, async (c) => {
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    // 1. Connected accounts overview
+    // 1. Connected accounts — simple count per platform
     const accountsByPlatform = await db
       .select({
         platform: socialAccount.platform,
         total: count(),
-        needsReconnect: sql<number>`sum(case when ${socialAccount.needsReconnect} = true then 1 else 0 end)`,
-        tokenExpiringSoon: sql<number>`sum(case when ${socialAccount.tokenExpiresAt} < ${sevenDaysFromNow} and ${socialAccount.needsReconnect} = false then 1 else 0 end)`,
-        tokenExpired: sql<number>`sum(case when ${socialAccount.tokenExpiresAt} < ${now} and ${socialAccount.needsReconnect} = true then 1 else 0 end)`,
+        needsReconnect: sql<number>`cast(sum(case when ${socialAccount.needsReconnect} = true then 1 else 0 end) as int)`,
+        tokenExpiringSoon: sql<number>`cast(sum(case when ${socialAccount.tokenExpiresAt} < ${sevenDaysFromNow}::timestamp and ${socialAccount.needsReconnect} = false then 1 else 0 end) as int)`,
       })
       .from(socialAccount)
       .where(eq(socialAccount.isConnected, true))
@@ -1654,8 +1653,8 @@ adminRoute.get("/monitoring/overview", requirePlatformAdmin, async (c) => {
       .select({
         platform: platformCredential.platform,
         isActive: platformCredential.isActive,
-        hasClientSecret: sql<boolean>`length(${platformCredential.clientSecretEnc}) > 0`,
-        hasExtraConfig: sql<boolean>`length(${platformCredential.extraConfigEnc}) > 0`,
+        hasClientSecret: sql<boolean>`(length(${platformCredential.clientSecretEnc}) > 0)`,
+        hasExtraConfig: sql<boolean>`(length(${platformCredential.extraConfigEnc}) > 0)`,
       })
       .from(platformCredential);
 
@@ -1719,7 +1718,7 @@ adminRoute.get("/monitoring/overview", requirePlatformAdmin, async (c) => {
       .select({
         platform: socialAccount.platform,
         type: engagementItem.type,
-        unread: sql<number>`sum(case when ${engagementItem.status} = 'unread' then 1 else 0 end)`,
+        unread: sql<number>`cast(sum(case when ${engagementItem.status} = 'unread' then 1 else 0 end) as int)`,
         total: count(),
       })
       .from(engagementItem)
