@@ -35,7 +35,7 @@ const GRAPH_THREADS = GRAPH_THREADS_URL;
 export type EngagementUpsert = {
   socialAccountId: string;
   organizationId: string;
-  type: "comment" | "mention" | "dm" | "review";
+  type: "comment" | "mention" | "dm" | "review" | "post";
   platformItemId: string;
   parentId?: string | null;
   /** ID penulis di platform (IG/FB/Threads user id) — kunci data deletion callback */

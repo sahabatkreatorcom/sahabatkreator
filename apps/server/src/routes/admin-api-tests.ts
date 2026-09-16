@@ -496,12 +496,12 @@ async function runMetaSuite(
   ];
 
   // Threads: test replies endpoint untuk verifikasi threads_read_replies
-  if (platform === "threads" && userToken?.accessToken) {
+  if (platform === "threads" && userToken) {
     results.push(
       await runCheck("Threads replies endpoint (GET /{thread-id}/replies)", async () => {
         // Step 1: Get user's threads
         const threadsRes = await fetchJson<{ data?: Array<{ id: string }> }>(
-          `${GRAPH_THREADS_URL}/me/threads?fields=id&limit=1&access_token=${userToken.accessToken}`,
+          `${GRAPH_THREADS_URL}/me/threads?fields=id&limit=1&access_token=${userToken}`,
         );
         if (!threadsRes.ok || !threadsRes.data?.data?.length) {
           return {
@@ -509,11 +509,11 @@ async function runMetaSuite(
             message: "Tidak ada thread ditemukan. Buat minimal 1 thread di Threads untuk test.",
           };
         }
-        const threadId = threadsRes.data.data[0].id;
+        const threadId = threadsRes.data.data[0]!.id;
 
         // Step 2: Call replies endpoint (trigger verification)
         const repliesRes = await fetchJson<{ data?: Array<{ id: string }> }>(
-          `${GRAPH_THREADS_URL}/${threadId}/replies?fields=id&access_token=${userToken.accessToken}`,
+          `${GRAPH_THREADS_URL}/${threadId}/replies?fields=id&access_token=${userToken}`,
         );
         if (repliesRes.ok) {
           return {

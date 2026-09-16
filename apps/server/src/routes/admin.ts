@@ -7,7 +7,6 @@ import {
   aiUsageLog,
   auditLog,
   bridgeConfig,
-  engagementItem,
   holiday,
   member,
   organization,
@@ -15,9 +14,7 @@ import {
   plan,
   platformCredential,
   platformEnum,
-  platformHealth,
   platformSettings,
-  post,
   socialAccount,
   subscription,
   user as userTable,
@@ -1616,137 +1613,6 @@ adminRoute.post("/holidays/import", async (c) => {
       errorRows: results.filter((r) => r.status === "error").length,
       imported,
       rows: results,
-    });
-  } catch (error) {
-    return errorResponse(error);
-  }
-});
-
-// ---------------------------------------------------------------------------
-// GET /admin/monitoring/overview — aggregated monitoring data
-// ---------------------------------------------------------------------------
-
-adminRoute.get("/monitoring/overview", requirePlatformAdmin, async (c) => {
-  try {
-    const now = new Date();
-    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-    // 1. Connected accounts — simple count per platform
-    const accountsByPlatform = await db
-      .select({
-        platform: socialAccount.platform,
-        total: count(),
-        needsReconnect: sql<number>`cast(sum(case when ${socialAccount.needsReconnect} = true then 1 else 0 end) as int)`,
-        tokenExpiringSoon: sql<number>`cast(sum(case when ${socialAccount.tokenExpiresAt} < ${sevenDaysFromNow}::timestamp and ${socialAccount.needsReconnect} = false then 1 else 0 end) as int)`,
-      })
-      .from(socialAccount)
-      .where(eq(socialAccount.isConnected, true))
-      .groupBy(socialAccount.platform);
-
-    const totalConnected = accountsByPlatform.reduce((sum, p) => sum + p.total, 0);
-    const totalNeedsReconnect = accountsByPlatform.reduce((sum, p) => sum + p.needsReconnect, 0);
-    const totalExpiringSoon = accountsByPlatform.reduce((sum, p) => sum + p.tokenExpiringSoon, 0);
-
-    // 2. Platform credentials status
-    const credentials = await db
-      .select({
-        platform: platformCredential.platform,
-        isActive: platformCredential.isActive,
-        hasClientSecret: sql<boolean>`(length(${platformCredential.clientSecretEnc}) > 0)`,
-        hasExtraConfig: sql<boolean>`(length(${platformCredential.extraConfigEnc}) > 0)`,
-      })
-      .from(platformCredential);
-
-    // 3. Recent posts (last 24h)
-    const recentPostsStats = await db
-      .select({
-        status: post.status,
-        total: count(),
-      })
-      .from(post)
-      .where(gte(post.createdAt, twentyFourHoursAgo))
-      .groupBy(post.status);
-
-    const recentPostsByStatus: Record<string, number> = {};
-    for (const row of recentPostsStats) {
-      recentPostsByStatus[row.status] = row.total;
-    }
-
-    // Failed posts (last 24h)
-    const failedPosts = await db
-      .select({
-        id: post.id,
-        platform: post.platform,
-        errorCode: post.errorCode,
-        errorMessage: post.errorMessage,
-        createdAt: post.createdAt,
-        orgId: post.organizationId,
-      })
-      .from(post)
-      .where(and(eq(post.status, "failed"), gte(post.createdAt, twentyFourHoursAgo)))
-      .orderBy(desc(post.createdAt))
-      .limit(10);
-
-    // 4. Webhook logs (last 24h)
-    const webhookStats = await db
-      .select({
-        result: webhookLog.result,
-        total: count(),
-      })
-      .from(webhookLog)
-      .where(gte(webhookLog.createdAt, twentyFourHoursAgo))
-      .groupBy(webhookLog.result);
-
-    const webhookByResult: Record<string, number> = {};
-    for (const row of webhookStats) {
-      webhookByResult[row.result] = row.total;
-    }
-
-    // 5. Platform health
-    const health = await db
-      .select({
-        platform: platformHealth.platform,
-        status: platformHealth.status,
-        message: platformHealth.message,
-        checkedAt: platformHealth.checkedAt,
-      })
-      .from(platformHealth);
-
-    // 6. Engagement (unread items)
-    const engagementStats = await db
-      .select({
-        platform: socialAccount.platform,
-        type: engagementItem.type,
-        unread: sql<number>`cast(sum(case when ${engagementItem.status} = 'unread' then 1 else 0 end) as int)`,
-        total: count(),
-      })
-      .from(engagementItem)
-      .innerJoin(socialAccount, eq(engagementItem.socialAccountId, socialAccount.id))
-      .groupBy(socialAccount.platform, engagementItem.type);
-
-    const totalUnread = engagementStats.reduce((sum, e) => sum + e.unread, 0);
-
-    return c.json({
-      connectedAccounts: {
-        total: totalConnected,
-        needsReconnect: totalNeedsReconnect,
-        tokenExpiringSoon: totalExpiringSoon,
-        byPlatform: accountsByPlatform,
-      },
-      platformCredentials: credentials,
-      recentPosts: {
-        last24h: recentPostsByStatus,
-        failedPosts,
-      },
-      webhookLogs: {
-        last24h: webhookByResult,
-      },
-      platformHealth: health,
-      engagement: {
-        totalUnread,
-        byPlatform: engagementStats,
-      },
     });
   } catch (error) {
     return errorResponse(error);

@@ -54,9 +54,9 @@ ENV VITE_SERVER_URL=${SERVER_URL} \
     VITE_INDEXABLE=${INDEXABLE} \
     VITE_GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID}
 COPY . .
-RUN --mount=type=cache,target=/root/.bun/install/cache bun run build; \
-    mkdir -p apps/server/web-dist && \
-    cp -r apps/web/dist/. apps/server/web-dist/
+RUN --mount=type=cache,target=/root/.bun/install/cache bun run build \
+    && mkdir -p apps/server/web-dist \
+    && cp -r apps/web/dist/. apps/server/web-dist/
 
 # --- runtime: image final -------------------------------------------------------
 # Termasuk node_modules lengkap + source packages/db (drizzle-kit + schema)

@@ -51,7 +51,6 @@ const NAV_ITEMS = [
   { to: "/admin/settings", label: "Pengaturan", icon: Settings },
   { to: "/admin/logs", label: "Log & Audit", icon: ScrollText },
   { to: "/admin/org-activity", label: "Log Aktivitas", icon: Activity },
-  { to: "/admin/monitoring", label: "Monitoring", icon: Activity },
 ];
 
 export function AdminLayout() {
