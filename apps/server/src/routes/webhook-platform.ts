@@ -189,6 +189,15 @@ async function processMetaPayload(raw: string, platformsCsv: string): Promise<nu
           mediaUrl: value?.media_url ?? null,
           occurredAt: null,
         });
+      } else if (change?.field === "threads" && value?.id) {
+        items.push({
+          socialAccountId: account.id,
+          organizationId: account.organizationId,
+          type: "post",
+          platformItemId: String(value.id),
+          content: value?.text ?? null,
+          occurredAt: value?.timestamp ? new Date(value.timestamp) : null,
+        });
       }
     }
   }
