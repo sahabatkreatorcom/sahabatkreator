@@ -8,15 +8,6 @@ dist
 build
 *.tsbuildinfo
 
-# Transpiled .js alongside .ts sources (tsc without outDir)
-apps/server/src/**/*.js
-apps/server/scripts/**/*.js
-apps/web/src/**/*.js
-apps/web/scripts/**/*.js
-apps/worker/src/**/*.js
-packages/*/src/**/*.js
-packages/db/scripts/**/*.js
-
 # Environment variables
 .env
 .env*.local

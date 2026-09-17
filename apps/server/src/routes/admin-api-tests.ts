@@ -10,7 +10,6 @@ import {
   BSKY_APPVIEW_URL,
   GBP_ACCOUNT_API_URL,
   GRAPH_FB_URL,
-  GRAPH_THREADS_URL,
   LINKEDIN_USERINFO_URL,
   PINTEREST_API_BASE_URL,
   PINTEREST_SANDBOX,
@@ -482,7 +481,7 @@ async function runMetaSuite(
   const cred = await getCredential(platform);
   const userToken = await getStoredUserToken(socialAccountPlatform);
 
-  const results: TestResult[] = [
+  return [
     await runCheck("Kredensial app tersimpan & format valid", () =>
       Promise.resolve(checkMetaCredentialFormat(cred)),
     ),
@@ -494,42 +493,6 @@ async function runMetaSuite(
       checkUserToken(userToken, cred),
     ),
   ];
-
-  // Threads: test replies endpoint untuk verifikasi threads_read_replies
-  if (platform === "threads" && userToken) {
-    results.push(
-      await runCheck("Threads replies endpoint (GET /{thread-id}/replies)", async () => {
-        // Step 1: Get user's threads
-        const threadsRes = await fetchJson<{ data?: Array<{ id: string }> }>(
-          `${GRAPH_THREADS_URL}/me/threads?fields=id&limit=1&access_token=${userToken}`,
-        );
-        if (!threadsRes.ok || !threadsRes.data?.data?.length) {
-          return {
-            status: "warn",
-            message: "Tidak ada thread ditemukan. Buat minimal 1 thread di Threads untuk test.",
-          };
-        }
-        const threadId = threadsRes.data.data[0]!.id;
-
-        // Step 2: Call replies endpoint (trigger verification)
-        const repliesRes = await fetchJson<{ data?: Array<{ id: string }> }>(
-          `${GRAPH_THREADS_URL}/${threadId}/replies?fields=id&access_token=${userToken}`,
-        );
-        if (repliesRes.ok) {
-          return {
-            status: "pass",
-            message: `Replies endpoint OK — thread ${threadId} berhasil dipanggil. Ini akan trigger verifikasi threads_read_replies.`,
-          };
-        }
-        return {
-          status: "fail",
-          message: `Replies endpoint gagal (HTTP ${repliesRes.status}). Cek permissions & thread ID.`,
-        };
-      }),
-    );
-  }
-
-  return results;
 }
 
 // ---------------------------------------------------------------------------

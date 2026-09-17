@@ -51,7 +51,7 @@ export const paymentStatusEnum = pgEnum("payment_status", [
 ]);
 
 // ---------- Engagement ----------
-export const engagementTypeEnum = pgEnum("engagement_type", ["comment", "mention", "dm", "review", "post"]);
+export const engagementTypeEnum = pgEnum("engagement_type", ["comment", "mention", "dm", "review"]);
 
 export const engagementStatusEnum = pgEnum("engagement_status", [
   "unread",
