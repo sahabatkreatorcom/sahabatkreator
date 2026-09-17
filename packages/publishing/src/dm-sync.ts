@@ -23,6 +23,7 @@ import { GRAPH_FB_URL, GRAPH_IG_URL, LINKEDIN_API_VERSION, LINKEDIN_REST_URL } f
 import { decrypt } from "./crypto";
 import type { SyncResult } from "./engagement-sync";
 import { httpRequest } from "./http";
+import { PublishError } from "./types";
 
 const GRAPH_FB = GRAPH_FB_URL;
 const GRAPH_IG = GRAPH_IG_URL;
@@ -350,7 +351,10 @@ export async function sendDMReply(input: {
 
   const res = await httpRequest<{ message_id?: string; recipient_id?: string }>(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${input.accessToken}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
       recipient: { id: input.partnerId },
       message: { text: input.text },
@@ -359,11 +363,19 @@ export async function sendDMReply(input: {
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Gagal kirim DM: ${body.slice(0, 200)}`);
+    throw new PublishError(
+      "dm_send_failed",
+      `Gagal kirim DM ${input.platform} (${res.status}): ${body.slice(0, 300)}`,
+      res.status === 429 || res.status >= 500,
+    );
   }
   const data = await res.json();
   if (!data.message_id) {
-    throw new Error("Platform tidak mengembalikan message ID");
+    throw new PublishError(
+      "dm_send_no_id",
+      `Platform ${input.platform} tidak mengembalikan message ID`,
+      true,
+    );
   }
   return { platformMessageId: data.message_id };
 }
