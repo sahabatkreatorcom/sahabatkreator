@@ -2,7 +2,12 @@
 
 import { db } from "@sahabatkreator/db";
 import { engagementItem, savedResponse, socialAccount } from "@sahabatkreator/db/schema";
-import { PublishError, sendReply, syncAccountEngagement } from "@sahabatkreator/publishing";
+import {
+  moderateComment,
+  PublishError,
+  sendReply,
+  syncAccountEngagement,
+} from "@sahabatkreator/publishing";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -115,7 +120,14 @@ engagementRoute.patch("/comments/:id", async (c) => {
 
     // Org-scope: pastikan item milik org (join socialAccount)
     const [row] = await db
-      .select({ id: engagementItem.id })
+      .select({
+        id: engagementItem.id,
+        platform: socialAccount.platform,
+        platformItemId: engagementItem.platformItemId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        metadata: socialAccount.metadata,
+        isConnected: socialAccount.isConnected,
+      })
       .from(engagementItem)
       .innerJoin(socialAccount, eq(engagementItem.socialAccountId, socialAccount.id))
       .where(
@@ -128,12 +140,42 @@ engagementRoute.patch("/comments/:id", async (c) => {
       .limit(1);
     if (!row) throw new HTTPError(404, "Komentar tidak ditemukan");
 
+    if (!row.isConnected || !row.accessTokenEnc) {
+      throw new PublishError(
+        "account_not_connected",
+        "Akun platform tidak terhubung atau token tidak tersedia — hubungkan ulang akun.",
+        false,
+      );
+    }
+
+    let accessToken: string;
+    try {
+      accessToken = decrypt(row.accessTokenEnc);
+    } catch {
+      throw new PublishError(
+        "token_decrypt_failed",
+        "Token akun tidak bisa dibaca — hubungkan ulang akun.",
+        false,
+      );
+    }
+
+    await moderateComment(
+      {
+        platform: row.platform,
+        accessToken,
+        platformItemId: row.platformItemId,
+        hidden: input.hidden,
+        accountMetadata: row.metadata,
+      },
+      "hide",
+    );
+
     await db
       .update(engagementItem)
       .set({ hidden: input.hidden })
       .where(eq(engagementItem.id, row.id));
 
-    return c.json({ ok: true, hidden: input.hidden });
+    return c.json({ ok: true, hidden: input.hidden, platformSynced: true });
   } catch (error) {
     return errorResponse(error);
   }
@@ -144,8 +186,17 @@ engagementRoute.delete("/comments/:id", async (c) => {
   try {
     const ctx = await requirePermission(c, "engagement.moderate");
 
-    const rows = await db
-      .delete(engagementItem)
+    const [row] = await db
+      .select({
+        id: engagementItem.id,
+        platform: socialAccount.platform,
+        platformItemId: engagementItem.platformItemId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        metadata: socialAccount.metadata,
+        isConnected: socialAccount.isConnected,
+      })
+      .from(engagementItem)
+      .innerJoin(socialAccount, eq(engagementItem.socialAccountId, socialAccount.id))
       .where(
         and(
           eq(engagementItem.id, c.req.param("id")),
@@ -153,10 +204,51 @@ engagementRoute.delete("/comments/:id", async (c) => {
           eq(engagementItem.type, "comment"),
         ),
       )
+      .limit(1);
+    if (!row) throw new HTTPError(404, "Komentar tidak ditemukan");
+
+    if (!row.isConnected || !row.accessTokenEnc) {
+      throw new PublishError(
+        "account_not_connected",
+        "Akun platform tidak terhubung atau token tidak tersedia — hubungkan ulang akun.",
+        false,
+      );
+    }
+
+    let accessToken: string;
+    try {
+      accessToken = decrypt(row.accessTokenEnc);
+    } catch {
+      throw new PublishError(
+        "token_decrypt_failed",
+        "Token akun tidak bisa dibaca — hubungkan ulang akun.",
+        false,
+      );
+    }
+
+    await moderateComment(
+      {
+        platform: row.platform,
+        accessToken,
+        platformItemId: row.platformItemId,
+        accountMetadata: row.metadata,
+      },
+      "delete",
+    );
+
+    const rows = await db
+      .delete(engagementItem)
+      .where(
+        and(
+          eq(engagementItem.id, row.id),
+          eq(engagementItem.organizationId, ctx.organization.id),
+          eq(engagementItem.type, "comment"),
+        ),
+      )
       .returning({ id: engagementItem.id });
     if (rows.length === 0) throw new HTTPError(404, "Komentar tidak ditemukan");
 
-    return c.json({ ok: true });
+    return c.json({ ok: true, platformSynced: true });
   } catch (error) {
     return errorResponse(error);
   }

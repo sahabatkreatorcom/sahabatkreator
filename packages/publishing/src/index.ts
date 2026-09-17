@@ -36,6 +36,7 @@ export {
 } from "./engagement-sync";
 export * from "./http";
 export * from "./oauth";
+export { moderateComment, type CommentModerationInput } from "./moderation";
 export {
   computeOptimalTimes,
   nextOccurrence,
