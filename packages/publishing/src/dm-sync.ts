@@ -49,7 +49,9 @@ type MetaMessage = {
 type MetaConversation = {
   id: string;
   updated_time?: string;
-  participants?: { data?: Array<{ id: string; name?: string; username?: string }> };
+  participants?: {
+    data?: Array<{ id: string; name?: string; username?: string; profile_pic?: string }>;
+  };
   messages?: { data?: MetaMessage[] };
 };
 
@@ -71,7 +73,12 @@ export async function upsertDMConversation(input: {
   organizationId: string;
   socialAccountId: string;
   platformConversationId: string;
-  partner: { id: string; username?: string | null; name?: string | null };
+  partner: {
+    id: string;
+    username?: string | null;
+    name?: string | null;
+    avatarUrl?: string | null;
+  };
   messages: Array<{
     platformMessageId: string;
     direction: "inbound" | "outbound";
@@ -107,6 +114,7 @@ export async function upsertDMConversation(input: {
       partnerId: input.partner.id,
       partnerUsername: input.partner.username ?? null,
       partnerName: input.partner.name ?? null,
+      partnerAvatarUrl: input.partner.avatarUrl ?? null,
       lastMessageAt: new Date(0), // di-set ulang di bawah dari pesan terbaru
     });
   }
@@ -155,6 +163,7 @@ export async function upsertDMConversation(input: {
       partnerId: input.partner.id,
       partnerUsername: input.partner.username ?? null,
       partnerName: input.partner.name ?? null,
+      partnerAvatarUrl: input.partner.avatarUrl ?? null,
       lastMessageAt: latest.occurredAt,
       lastMessagePreview: preview,
       lastMessageDirection: latest.direction,
@@ -243,7 +252,7 @@ export async function syncAccountDMs(ctx: {
       query: {
         platform: platform === "facebook" ? undefined : "instagram",
         fields:
-          "id,updated_time,participants{id,name,username},messages.limit(25){id,created_time,from{id,name,username},message,attachments}",
+          "id,updated_time,participants{id,name,username,profile_pic},messages.limit(25){id,created_time,from{id,name,username},message,attachments}",
         limit: 25,
         access_token: token,
       },
@@ -305,6 +314,7 @@ export async function syncAccountDMs(ctx: {
         id: partner.id,
         username: partner.username ?? null,
         name: partner.name ?? null,
+        avatarUrl: partner.profile_pic ?? null,
       },
       messages: mapped,
     });

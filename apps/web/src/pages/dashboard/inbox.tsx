@@ -1,16 +1,16 @@
 // Inbox DM — percakapan direct message Instagram/Facebook (master-detail)
 // List kiri: percakapan dengan badge unread. Thread kanan: bubble + composer.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Inbox, Loader2, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { InboxHeader } from "@/components/inbox/inbox-header";
 import {
   ConversationList,
   ConversationListHeader,
   type DmConversation,
 } from "@/components/inbox/conversation-list";
 import { MessageThread } from "@/components/inbox/message-thread";
-import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 
 export default function InboxPage() {
@@ -19,11 +19,13 @@ export default function InboxPage() {
   const [q, setQ] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [page, setPage] = useState(1);
+  const [lastManualSyncAt, setLastManualSyncAt] = useState<Date | null>(null);
 
   const syncNow = useMutation({
     mutationFn: () =>
       api.post<{ accounts: number; newMessages: number; errors: string[] }>("/dm/sync-now"),
     onSuccess: (res) => {
+      setLastManualSyncAt(new Date());
       queryClient.invalidateQueries({ queryKey: ["dm-conversations"] });
       queryClient.invalidateQueries({ queryKey: ["dm-unread-count"] });
       if (res.errors.length > 0) {
@@ -39,13 +41,13 @@ export default function InboxPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ["dm-conversations", unreadOnly, q, page],
     queryFn: () =>
       api.get<{ conversations: DmConversation[]; page: number }>(
         `/dm?unread=${unreadOnly}&page=${page}&perPage=20${q ? `&q=${encodeURIComponent(q)}` : ""}`,
       ),
-    refetchInterval: 30_000,
+  refetchInterval: 30_000,
   });
 
   const { data: unread } = useQuery({
@@ -68,25 +70,13 @@ export default function InboxPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-bold text-2xl">Inbox DM</h1>
-          <p className="mt-1 text-[var(--text-secondary)] text-sm">
-            Percakapan direct message Instagram &amp; Facebook — sync otomatis tiap 15 menit.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {unreadMessages > 0 && (
-            <span className="rounded-full bg-[var(--accent-gold-light)] px-3 py-1 font-semibold text-[var(--accent-gold)] text-sm">
-              {unreadMessages} pesan belum dibaca
-            </span>
-          )}
-          <Button size="sm" variant="outline" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
-            {syncNow.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            {syncNow.isPending ? "Menyinkronkan..." : "Sinkronkan"}
-          </Button>
-        </div>
-      </div>
+      <InboxHeader
+        unreadMessages={unreadMessages}
+        isSyncing={syncNow.isPending}
+        isRefreshing={isFetching && !isLoading}
+        lastManualSyncAt={lastManualSyncAt}
+        onSync={() => syncNow.mutate()}
+      />
 
       <div className="grid h-[calc(100vh-13rem)] min-h-[30rem] grid-cols-1 gap-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-light)] bg-[var(--bg-secondary)] md:grid-cols-5">
         {/* List percakapan — mobile: full width, desktop: 2/5 */}
@@ -109,6 +99,18 @@ export default function InboxPage() {
           {isLoading ? (
             <div className="flex flex-1 items-center justify-center p-8">
               <Inbox className="h-8 w-8 animate-pulse text-[var(--text-muted)]" />
+            </div>
+          ) : isError ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+              <p className="font-medium text-sm">Inbox tidak dapat dimuat</p>
+              <p className="text-[var(--text-secondary)] text-xs">Periksa koneksi lalu coba lagi.</p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="rounded-[var(--radius-md)] bg-[var(--accent-gold)] px-3 py-2 font-medium text-white text-xs"
+              >
+                Coba lagi
+              </button>
             </div>
           ) : (
             <ConversationList

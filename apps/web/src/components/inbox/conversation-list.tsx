@@ -33,8 +33,7 @@ export function ConversationList({
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
         <MessagesSquare className="h-10 w-10 text-[var(--text-muted)]" />
         <p className="text-[var(--text-secondary)] text-sm">
-          Belum ada percakapan. DM Instagram/Facebook muncul di sini setelah akun tersambung dan
-          di-sync worker.
+          Belum ada percakapan. Klik <strong>Sinkronkan sekarang</strong> untuk mengambil pesan terbaru.
         </p>
       </div>
     );
