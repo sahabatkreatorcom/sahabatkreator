@@ -179,57 +179,58 @@ engagementRoute.post("/sync-now", async (c) => {
 
     console.log(`[engagement] sync-now: ${accounts.length} connected accounts`);
 
-    // TODO(performance): sync dijalankan sinkron karena frontend membaca hasil
-    // (newItems/errors) di response. Jika jadi lambat, ubah jadi fire-and-forget
-    // (job queue + response 202) dan tampilkan progres via polling/websocket.
+    // Proses paralel (Promise.allSettled) — satu akun gagal tidak hentikan lainnya.
+    // Backend worker juga pakai pola ini (packages/publishing engagement-sync.ts).
+    const settled = await Promise.allSettled(
+      accounts
+        .filter((a) => a.platform !== "manual" && a.accessTokenEnc)
+        .map(async (account) => {
+          let accessToken: string;
+          try {
+            accessToken = decrypt(account.accessTokenEnc!);
+          } catch {
+            console.warn(`[engagement] sync-now: decrypt failed for ${account.platform} (${account.id})`);
+            return {
+              platform: account.platform,
+              newItems: 0,
+              error: "Token akun tidak bisa dibaca — hubungkan ulang akun",
+            };
+          }
+          const result = await syncAccountEngagement({
+            account: {
+              id: account.id,
+              organizationId: account.organizationId,
+              platform: account.platform,
+              platformAccountId: account.platformAccountId,
+              accessTokenEnc: account.accessTokenEnc,
+              metadata: account.metadata,
+            },
+            accessToken,
+          });
+          // Update lastSyncedAt agar worker polling tidak double-sync segera
+          await db
+            .update(socialAccount)
+            .set({ lastSyncedAt: new Date() })
+            .where(eq(socialAccount.id, account.id));
+          return result;
+        }),
+    );
+
     const results: { platform: string; newItems: number; error?: string }[] = [];
-    let newItems = 0;
-
-    for (const account of accounts) {
-      // Akun manual / tanpa token tidak bisa sync — skip
-      if (account.platform === "manual" || !account.accessTokenEnc) {
-        results.push({ platform: account.platform, newItems: 0 });
-        continue;
+    for (const outcome of settled) {
+      if (outcome.status === "fulfilled") {
+        results.push(outcome.value);
+        console.log(
+          `[engagement] sync-now: ${outcome.value.platform}: newItems=${outcome.value.newItems}` +
+            (outcome.value.error ? ` error=${outcome.value.error}` : ""),
+        );
+      } else {
+        const errMsg = outcome.reason instanceof Error ? outcome.reason.message.slice(0, 200) : String(outcome.reason);
+        console.warn(`[engagement] sync-now: rejected: ${errMsg}`);
+        results.push({ platform: "unknown", newItems: 0, error: errMsg });
       }
-
-      let accessToken: string;
-      try {
-        accessToken = decrypt(account.accessTokenEnc);
-      } catch {
-        console.warn(`[engagement] sync-now: decrypt failed for ${account.platform} (${account.id})`);
-        results.push({
-          platform: account.platform,
-          newItems: 0,
-          error: "Token akun tidak bisa dibaca — hubungkan ulang akun",
-        });
-        continue;
-      }
-
-      // Fungsi sync yang sama dengan worker polling (packages/publishing)
-      const result = await syncAccountEngagement({
-        account: {
-          id: account.id,
-          organizationId: account.organizationId,
-          platform: account.platform,
-          platformAccountId: account.platformAccountId,
-          accessTokenEnc: account.accessTokenEnc,
-          metadata: account.metadata,
-        },
-        accessToken,
-      });
-      results.push(result);
-      newItems += result.newItems;
-      console.log(
-        `[engagement] sync-now: ${account.platform} (${account.id}): newItems=${result.newItems}` +
-          (result.error ? ` error=${result.error}` : ""),
-      );
-
-      // Update lastSyncedAt agar worker polling tidak double-sync segera
-      await db
-        .update(socialAccount)
-        .set({ lastSyncedAt: new Date() })
-        .where(eq(socialAccount.id, account.id));
     }
+    let newItems = results.reduce((sum, r) => sum + r.newItems, 0);
 
     const errors = results.filter((r) => r.error);
     console.log(
