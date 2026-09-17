@@ -36,15 +36,40 @@ function generateId(entity: string): string {
   return `sk_${entity}_${id}`;
 }
 
+// Attachment Meta: image_data/video_data berbentuk objek { url, preview_url } pada
+// endpoint /conversations (bukan string) — lihat Graph API message attachments.
+type MetaAttachment = {
+  image_data?: { url?: string; preview_url?: string } | string;
+  video_data?: { url?: string; preview_url?: string } | string;
+  file_url?: string;
+  name?: string;
+  mime_type?: string;
+};
+
 type MetaMessage = {
   id: string;
   created_time?: string;
   from?: { id?: string; name?: string; username?: string };
   message?: string;
-  attachments?: {
-    data?: Array<{ image_data?: string; video_data?: string; name?: string; mime_type?: string }>;
-  };
+  attachments?: { data?: MetaAttachment[] };
 };
+
+/** URL media dari attachment Meta — dukung bentuk objek (image_data/video_data) dan string */
+function metaAttachmentUrl(att: MetaAttachment): string | null {
+  const image = typeof att.image_data === "string" ? att.image_data : att.image_data?.url;
+  const video = typeof att.video_data === "string" ? att.video_data : att.video_data?.url;
+  return image ?? video ?? att.file_url ?? null;
+}
+
+/** Jenis media dari attachment Meta — mime_type dulu, fallback dari field yang ada */
+function metaAttachmentType(att: MetaAttachment): string | null {
+  const fromMime = att.mime_type?.split("/")[0];
+  if (fromMime) return fromMime;
+  if (att.image_data) return "image";
+  if (att.video_data) return "video";
+  if (att.file_url) return "file";
+  return null;
+}
 
 type MetaConversation = {
   id: string;
@@ -90,9 +115,12 @@ export async function upsertDMConversation(input: {
     occurredAt: Date;
   }>;
 }): Promise<number> {
-  // 1. Upsert conversation (ambil id existing bila sudah ada)
+  // Tanpa pesan tidak ada yang di-upsert; hindari reduce pada array kosong
+  if (input.messages.length === 0) return 0;
+
+  // 1. Upsert conversation (ambil id + lastMessageAt existing bila sudah ada)
   const [existing] = await db
-    .select({ id: dmConversation.id })
+    .select({ id: dmConversation.id, lastMessageAt: dmConversation.lastMessageAt })
     .from(dmConversation)
     .where(
       and(
@@ -157,6 +185,10 @@ export async function upsertDMConversation(input: {
       ? "[Media message]"
       : "";
 
+  // Jangan regresi: polling bisa mengembalikan pesan lebih lama daripada balasan
+  // lokal yang belum/tidak ada di response API. Preview hanya maju, tidak mundur.
+  const advanceLastMessage = !existing || latest.occurredAt >= existing.lastMessageAt;
+
   await db
     .update(dmConversation)
     .set({
@@ -164,9 +196,13 @@ export async function upsertDMConversation(input: {
       partnerUsername: input.partner.username ?? null,
       partnerName: input.partner.name ?? null,
       partnerAvatarUrl: input.partner.avatarUrl ?? null,
-      lastMessageAt: latest.occurredAt,
-      lastMessagePreview: preview,
-      lastMessageDirection: latest.direction,
+      ...(advanceLastMessage
+        ? {
+            lastMessageAt: latest.occurredAt,
+            lastMessagePreview: preview,
+            lastMessageDirection: latest.direction,
+          }
+        : {}),
       unreadCount: sql`${dmConversation.unreadCount} + ${newInbound}`,
     })
     .where(eq(dmConversation.id, conversationId));
@@ -225,17 +261,20 @@ export async function syncAccountDMs(ctx: {
   const base = platform === "instagram_standalone" ? GRAPH_IG : GRAPH_FB;
   // Jalur instagram (FB Login) butuh Page token; facebook juga (metadata.pageAccessToken)
   // Instagram Messaging via Facebook Login addresses the connected Page, not the IG user node.
-  const apiAccountId =
-    platform === "instagram" && typeof ctx.account.metadata?.pageId === "string"
-      ? ctx.account.metadata.pageId
-      : ctx.account.platformAccountId;
-  if (platform === "instagram" && apiAccountId === ctx.account.platformAccountId) {
+  const pageId =
+    typeof ctx.account.metadata?.pageId === "string" ? ctx.account.metadata.pageId : null;
+  if (platform === "instagram" && !pageId) {
     return {
       platform,
       newItems: 0,
       error: "Instagram Messaging membutuhkan Page ID akun yang terhubung.",
     };
   }
+  const apiAccountId = platform === "instagram" && pageId ? pageId : ctx.account.platformAccountId;
+  // Pesan/participant bisa memakai ID IG (platformAccountId) maupun Page ID tergantung
+  // jalur & tipe pesan — anggap keduanya sebagai "diri sendiri" saat klasifikasi.
+  const selfIds = new Set<string>([ctx.account.platformAccountId]);
+  if (pageId) selfIds.add(pageId);
   const hasPageToken = typeof ctx.account.metadata?.pageAccessToken === "string";
   const token =
     (typeof ctx.account.metadata?.pageAccessToken === "string"
@@ -286,25 +325,26 @@ export async function syncAccountDMs(ctx: {
     const messages = conv.messages?.data ?? [];
     if (messages.length === 0) continue;
 
-    // Partner = participant yang bukan akun kita
+    // Partner = participant yang bukan akun kita (IG id maupun Page id)
     const participants = conv.participants?.data ?? [];
-    const partner =
-      participants.find((p) => p.id !== ctx.account.platformAccountId) ?? participants[0];
+    const partner = participants.find((p) => !selfIds.has(p.id)) ?? participants[0];
     if (!partner) continue;
 
-    const mapped = messages.map((msg) => ({
-      platformMessageId: msg.id,
-      direction: (msg.from?.id === ctx.account.platformAccountId ? "outbound" : "inbound") as
-        | "inbound"
-        | "outbound",
-      senderId: msg.from?.id ?? null,
-      senderUsername: msg.from?.username ?? null,
-      text: msg.message ?? null,
-      mediaUrl:
-        msg.attachments?.data?.[0]?.image_data ?? msg.attachments?.data?.[0]?.video_data ?? null,
-      mediaType: msg.attachments?.data?.[0]?.mime_type?.split("/")[0] ?? null,
-      occurredAt: msg.created_time ? new Date(msg.created_time) : new Date(),
-    }));
+    const mapped = messages.map((msg) => {
+      const att = msg.attachments?.data?.[0];
+      return {
+        platformMessageId: msg.id,
+        direction: (msg.from?.id && selfIds.has(msg.from.id) ? "outbound" : "inbound") as
+          | "inbound"
+          | "outbound",
+        senderId: msg.from?.id ?? null,
+        senderUsername: msg.from?.username ?? null,
+        text: msg.message ?? null,
+        mediaUrl: att ? metaAttachmentUrl(att) : null,
+        mediaType: att ? metaAttachmentType(att) : null,
+        occurredAt: msg.created_time ? new Date(msg.created_time) : new Date(),
+      };
+    });
 
     newItems += await upsertDMConversation({
       organizationId: ctx.account.organizationId,
@@ -406,17 +446,26 @@ export async function sendDMReply(input: {
 // LinkedIn — DM via Messaging API v2
 // ---------------------------------------------------------------------------
 
+// LinkedIn (Restli) mengembalikan URN sebagai string atau objek { "~": urn }
+type LinkedInUrn = string | { "~": string };
+
+/** Ambil nilai URN dari representasi LinkedIn (string atau { "~": urn }) */
+function linkedInUrn(value: LinkedInUrn | null | undefined): string | null {
+  if (!value) return null;
+  return typeof value === "string" ? value : (value["~"] ?? null);
+}
+
 type LinkedInMessage = {
   id: string;
   body?: string;
   createdAt?: number;
-  sender?: { "~": string }; // Person URN like "urn:li:person:xxxx"
+  sender?: LinkedInUrn; // Person URN like "urn:li:person:xxxx"
   conversationUrn?: string;
 };
 
 type LinkedInConversation = {
   conversationUrn: string;
-  participants?: Array<{ "~": string }>;
+  participants?: LinkedInUrn[];
   lastActivityAt?: number;
   lastMessagePreview?: string;
   unreadCount?: number;
@@ -504,19 +553,22 @@ async function syncLinkedInDMs(ctx: {
     const messages = (await msgRes.json()).elements ?? [];
     if (messages.length === 0) continue;
 
-    // Extract partner info from participants
-    const participantUrns = conv.participants ?? [];
+    // Extract partner info from participants (normalisasi URN string maupun objek)
+    const participantUrns = (conv.participants ?? [])
+      .map(linkedInUrn)
+      .filter((urn): urn is string => urn !== null);
     const myUrn = account.platformAccountId;
-    const partnerUrn = participantUrns.find((p) => p["~"] !== myUrn) ?? participantUrns[0];
-    const partnerId = partnerUrn?.["~"] ?? "unknown";
+    const partnerId = participantUrns.find((urn) => urn !== myUrn) ?? "unknown";
 
     // Map messages
     const mapped = messages
       .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
       .map((msg) => ({
         platformMessageId: msg.id,
-        direction: (msg.sender?.["~"] === myUrn ? "outbound" : "inbound") as "inbound" | "outbound",
-        senderId: msg.sender?.["~"] ?? null,
+        direction: (linkedInUrn(msg.sender) === myUrn ? "outbound" : "inbound") as
+          | "inbound"
+          | "outbound",
+        senderId: linkedInUrn(msg.sender),
         text: msg.body ?? null,
         occurredAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
       }));
