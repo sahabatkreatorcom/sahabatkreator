@@ -286,7 +286,10 @@ dmRoute.post("/:id/reply", async (c) => {
             | "linkedin"
             | "linkedin_org",
           accessToken: token,
-          platformAccountId: row.platformAccountId,
+          platformAccountId:
+            row.platform === "instagram" && typeof row.metadata?.pageId === "string"
+              ? row.metadata.pageId
+              : row.platformAccountId,
           partnerId: row.conversation.partnerId,
           text: input.content,
         });

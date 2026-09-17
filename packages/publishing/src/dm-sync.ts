@@ -215,6 +215,18 @@ export async function syncAccountDMs(ctx: {
 
   const base = platform === "instagram_standalone" ? GRAPH_IG : GRAPH_FB;
   // Jalur instagram (FB Login) butuh Page token; facebook juga (metadata.pageAccessToken)
+  // Instagram Messaging via Facebook Login addresses the connected Page, not the IG user node.
+  const apiAccountId =
+    platform === "instagram" && typeof ctx.account.metadata?.pageId === "string"
+      ? ctx.account.metadata.pageId
+      : ctx.account.platformAccountId;
+  if (platform === "instagram" && apiAccountId === ctx.account.platformAccountId) {
+    return {
+      platform,
+      newItems: 0,
+      error: "Instagram Messaging membutuhkan Page ID akun yang terhubung.",
+    };
+  }
   const hasPageToken = typeof ctx.account.metadata?.pageAccessToken === "string";
   const token =
     (typeof ctx.account.metadata?.pageAccessToken === "string"
@@ -222,11 +234,11 @@ export async function syncAccountDMs(ctx: {
       : null) ?? ctx.accessToken;
 
   console.log(
-    `[dm-sync] ${platform} syncing: platformAccountId=${ctx.account.platformAccountId} hasPageToken=${hasPageToken} tokenLen=${token.length}`,
+    `[dm-sync] ${platform} syncing: apiAccountId=${apiAccountId} platformAccountId=${ctx.account.platformAccountId} hasPageToken=${hasPageToken} tokenLen=${token.length}`,
   );
 
   const convRes = await httpRequest<{ data?: MetaConversation[] }>(
-    `${base}/${ctx.account.platformAccountId}/conversations`,
+    `${base}/${apiAccountId}/conversations`,
     {
       query: {
         platform: platform === "facebook" ? undefined : "instagram",
