@@ -718,9 +718,10 @@ export async function syncAccountAnalytics(
 
   for (const p of targets) {
     try {
+      if (!p.platformPostId) continue;
       const metrics = await fetchPostMetrics(
         account.platform,
-        p.platformPostId!,
+        p.platformPostId,
         accessToken,
         account.metadata,
         account.platformAccountId,
@@ -815,7 +816,8 @@ export async function syncDueAnalyticsAccounts(
     const batch = due.slice(i, i + BATCH_SIZE);
     const settled = await Promise.allSettled(
       batch.map(async (account) => {
-        const accessToken = decrypt(account.accessTokenEnc!);
+        if (!account.accessTokenEnc) return { platform: account.platform, accountSaved: false, postsSynced: 0, error: "Token tidak tersedia" };
+        const accessToken = decrypt(account.accessTokenEnc);
         return syncAccountAnalytics(account, accessToken);
       }),
     );

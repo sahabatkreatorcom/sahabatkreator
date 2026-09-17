@@ -63,7 +63,8 @@ type MonitoringResponse = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function safeCount(table: { _: unknown }): Promise<number> {
+// biome-ignore lint/suspicious/noExplicitAny: Drizzle table type is complex, runtime-cast safe
+async function safeCount(table: any): Promise<number> {
   try {
     const [result] = await db.select({ value: count() }).from(table);
     return result?.value ?? 0;
@@ -72,18 +73,15 @@ async function safeCount(table: { _: unknown }): Promise<number> {
   }
 }
 
-async function safeCountSince(
-  table: { _: unknown },
-  dateColumn: { _: unknown },
-  daysAgo: number,
-): Promise<number> {
+// biome-ignore lint/suspicious/noExplicitAny: Drizzle table type is complex, runtime-cast safe
+async function safeCountSince(table: any, dateColumn: any, daysAgo: number): Promise<number> {
   try {
     const since = new Date();
     since.setDate(since.getDate() - daysAgo);
     const [result] = await db
       .select({ value: count() })
       .from(table)
-      .where(sql`${dateColumn as string} >= ${since}`);
+      .where(sql`${dateColumn} >= ${since}`);
     return result?.value ?? 0;
   } catch {
     return -1;
@@ -153,7 +151,9 @@ monitoringRoute.get("/", async (c) => {
       const [result] = await db
         .select({ value: count() })
         .from(payment)
-        .where(sql`${payment.status} != 'succeeded' AND ${payment.createdAt} >= NOW() - INTERVAL '24 hours'`);
+        .where(
+          sql`${payment.status} != 'succeeded' AND ${payment.createdAt} >= NOW() - INTERVAL '24 hours'`,
+        );
       failedPaymentsLast24h = result?.value ?? 0;
     } catch {
       failedPaymentsLast24h = -1;

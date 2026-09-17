@@ -1069,13 +1069,16 @@ apiTestsRoute.post("/trigger/instagram-insights", requirePlatformAdmin, async (c
     );
 
     if (!mediaRes.ok || !mediaRes.data?.data?.length) {
-      return c.json({
-        error: "Failed to get media list",
-        details: mediaRes.data?.error?.message ?? "No media found",
-      }, 400);
+      return c.json(
+        {
+          error: "Failed to get media list",
+          details: mediaRes.data?.error?.message ?? "No media found",
+        },
+        400,
+      );
     }
 
-    const mediaId = mediaRes.data.data[0].id;
+    const mediaId = mediaRes.data.data[0]?.id;
 
     // Step 2: Get insights for first media (triggers instagram_business_manage_insights)
     const insightsRes = await fetchJson<{
@@ -1086,11 +1089,14 @@ apiTestsRoute.post("/trigger/instagram-insights", requirePlatformAdmin, async (c
     );
 
     if (!insightsRes.ok) {
-      return c.json({
-        error: "Failed to get media insights",
-        details: insightsRes.data?.error?.message ?? "Unknown error",
-        mediaId,
-      }, 400);
+      return c.json(
+        {
+          error: "Failed to get media insights",
+          details: insightsRes.data?.error?.message ?? "Unknown error",
+          mediaId,
+        },
+        400,
+      );
     }
 
     return c.json({
@@ -1124,10 +1130,13 @@ apiTestsRoute.post("/trigger/human-agent", requirePlatformAdmin, async (c) => {
     );
 
     if (!profileRes.ok || !profileRes.data?.id) {
-      return c.json({
-        error: "Failed to get Instagram account ID",
-        details: profileRes.data?.error?.message,
-      }, 400);
+      return c.json(
+        {
+          error: "Failed to get Instagram account ID",
+          details: profileRes.data?.error?.message,
+        },
+        400,
+      );
     }
 
     const igUserId = profileRes.data.id;

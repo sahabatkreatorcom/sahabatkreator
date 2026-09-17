@@ -131,7 +131,8 @@ export async function syncWorkspacePosts(
     );
 
     for (const [idx, s] of settled.entries()) {
-      const account = batch[idx]!;
+      const account = batch[idx];
+      if (!account) continue;
       if (s.status === "fulfilled") {
         results.push(s.value);
         // Token permanen invalid → tandai needsReconnect (bukan deactivate —
@@ -280,8 +281,8 @@ async function syncAccountPosts(account: SyncableAccount, since: Date): Promise<
     );
   const nativeByPlatformPostId = new Map(
     nativeRows
-      .filter((r) => r.platformPostId)
-      .map((r) => [r.platformPostId!, { id: r.id, externalId: r.externalId }]),
+      .filter((r): r is typeof r & { platformPostId: string } => !!r.platformPostId)
+      .map((r) => [r.platformPostId, { id: r.id, externalId: r.externalId }]),
   );
 
   let imported = 0;
