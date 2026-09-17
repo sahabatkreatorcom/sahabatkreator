@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   FlaskConical,
   Loader2,
-  MessageSquare,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,7 +30,6 @@ type PlatformSummary = {
   results: TestResult[] | null;
 };
 
-/** Platform yang punya suite diagnostik (harus sinkron dengan server) */
 const TESTABLE_PLATFORMS = [
   "instagram",
   "instagram_standalone",
@@ -46,34 +44,20 @@ const TESTABLE_PLATFORMS = [
   "bluesky",
 ] as const;
 
-const STATUS_META: Record<
-  TestStatus,
-  { icon: typeof CheckCircle2; label: string; className: string }
-> = {
-  pass: {
-    icon: CheckCircle2,
-    label: "Lolos",
-    className: "text-emerald-600 dark:text-emerald-400",
-  },
-  fail: {
-    icon: XCircle,
-    label: "Gagal",
-    className: "text-red-600 dark:text-red-400",
-  },
-  warn: {
-    icon: AlertTriangle,
-    label: "Perhatian",
-    className: "text-amber-600 dark:text-amber-400",
-  },
+const STATUS_META: Record<TestStatus, { icon: typeof CheckCircle2; label: string; className: string }> = {
+  pass: { icon: CheckCircle2, label: "Lolos", className: "text-emerald-600 dark:text-emerald-400" },
+  fail: { icon: XCircle, label: "Gagal", className: "text-red-600 dark:text-red-400" },
+  warn: { icon: AlertTriangle, label: "Perhatian", className: "text-amber-600 dark:text-amber-400" },
 };
 
-/** Ringkasan warna badge card per hasil terakhir */
 function cardBadge(results: TestResult[] | null) {
   if (!results) return { variant: "secondary" as const, label: "Belum dites" };
-  const fail = results.filter((r) => r.status === "fail").length;
-  const warn = results.filter((r) => r.status === "warn").length;
-  if (fail > 0) return { variant: "danger" as const, label: `${fail} gagal` };
-  if (warn > 0) return { variant: "warning" as const, label: `${warn} perhatian` };
+  if (results.some((result) => result.status === "fail")) {
+    return { variant: "danger" as const, label: `${results.filter((result) => result.status === "fail").length} gagal` };
+  }
+  if (results.some((result) => result.status === "warn")) {
+    return { variant: "warning" as const, label: `${results.filter((result) => result.status === "warn").length} perhatian` };
+  }
   return { variant: "success" as const, label: "Semua lolos" };
 }
 
@@ -87,260 +71,23 @@ function ResultRow({ result }: { result: TestResult }) {
         <p className="font-medium text-sm">{result.name}</p>
         <p className="mt-0.5 text-[var(--text-secondary)] text-xs">{result.message}</p>
       </div>
-      <span className="shrink-0 text-[var(--text-muted)] text-xs tabular-nums">
-        {result.durationMs} ms
-      </span>
+      <span className="shrink-0 text-[var(--text-muted)] text-xs tabular-nums">{result.durationMs} ms</span>
     </li>
   );
 }
 
-function PlatformCard({
-  summary,
-  onRun,
-  running,
-}: {
-  summary: PlatformSummary;
-  onRun: (platform: string) => void;
-  running: boolean;
-}) {
+function PlatformCard({ summary, onRun, running }: { summary: PlatformSummary; onRun: (platform: string) => void; running: boolean }) {
   const cfg = PLATFORMS[summary.platform as keyof typeof PLATFORMS] ?? PLATFORMS.manual;
   const Icon = cfg.icon;
   const badge = cardBadge(summary.results);
-
   return (
     <div className="card flex flex-col overflow-hidden p-0">
-      {/* Header */}
       <div className="flex items-center gap-3 border-[var(--border-light)] border-b p-4 pb-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bg-tertiary)]">
-          <Icon className="h-4.5 w-4.5" style={{ color: cfg.color }} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="font-semibold text-sm">{cfg.label}</p>
-            <Badge variant={badge.variant}>{badge.label}</Badge>
-          </div>
-          {summary.lastRun && (
-            <p className="mt-0.5 text-[var(--text-muted)] text-xs">
-              Terakhir dites {new Date(summary.lastRun).toLocaleString("id-ID")}
-            </p>
-          )}
-        </div>
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bg-tertiary)]"><Icon className="h-4.5 w-4.5" style={{ color: cfg.color }} /></div>
+        <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="font-semibold text-sm">{cfg.label}</p><Badge variant={badge.variant}>{badge.label}</Badge></div>{summary.lastRun && <p className="mt-0.5 text-[var(--text-muted)] text-xs">Terakhir dites {new Date(summary.lastRun).toLocaleString("id-ID")}</p>}</div>
       </div>
-
-      {/* Hasil check */}
-      <div className="flex-1 px-4">
-        {summary.results && summary.results.length > 0 ? (
-          <ul className="divide-y divide-[var(--border-light)]">
-            {summary.results.map((r) => (
-              <ResultRow key={r.name} result={r} />
-            ))}
-          </ul>
-        ) : (
-          <p className="py-4 text-[var(--text-muted)] text-sm">
-            Belum ada hasil. Jalankan tes untuk memverifikasi konfigurasi platform ini.
-          </p>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-end border-[var(--border-light)] border-t px-4 py-3">
-        <Button
-          size="sm"
-          disabled={running}
-          onClick={() => onRun(summary.platform)}
-          className="bg-[var(--accent-gold)] text-white hover:bg-[var(--accent-gold)]/90"
-        >
-          {running ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <FlaskConical className="h-3.5 w-3.5" />
-          )}
-          Jalankan Tes
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-type DmTestResult = {
-  platform: string;
-  account: string;
-  calls: number;
-  success: number;
-  failed: number;
-  errors: string[];
-};
-
-function InsightsPermissionTest() {
-  const instagramTest = useMutation({
-    mutationFn: async () => {
-      const response = await api.post<{ success: boolean; message?: string } | undefined>(
-        "/admin/api-tests/trigger/instagram-insights",
-      );
-      if (!response) throw new Error("Server tidak mengembalikan hasil test Instagram");
-      return response;
-    },
-    onSuccess: (res) => {
-      if (!res) {
-        toast.error("Server tidak mengembalikan hasil test Instagram");
-        return;
-      }
-      const message = res.message ?? "Test Instagram selesai";
-      res.success ? toast.success(message) : toast.error(message);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const facebookTest = useMutation({
-    mutationFn: async () => {
-      const response = await api.post<
-        | {
-            success: boolean;
-            results: Array<{ account: string; success: boolean; message: string }>;
-          }
-        | undefined
-      >("/admin/api-tests/trigger/facebook-insights");
-      if (!response) throw new Error("Server tidak mengembalikan hasil test Facebook");
-      return response;
-    },
-    onSuccess: (res) => {
-      if (!res?.results) {
-        toast.error("Server tidak mengembalikan hasil test Facebook");
-        return;
-      }
-      const failed = res.results.filter((result) => !result.success).length;
-      if (failed > 0) toast.error(`${failed} Facebook Page Insights call gagal`);
-      else toast.success(`${res.results.length} Facebook Page Insights call berhasil`);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="font-semibold text-sm">Test Insights API Access</p>
-          <p className="mt-1 text-[var(--text-secondary)] text-xs">
-            Jalankan panggilan API nyata untuk mencatat penggunaan Insights di Meta Developer
-            Console.
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <Button
-            size="sm"
-            disabled={instagramTest.isPending}
-            onClick={() => instagramTest.mutate()}
-          >
-            {instagramTest.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            Instagram
-          </Button>
-          <Button size="sm" disabled={facebookTest.isPending} onClick={() => facebookTest.mutate()}>
-            {facebookTest.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            Facebook
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DmPermissionTest() {
-  const dmTest = useMutation({
-    mutationFn: async () => {
-      const response = await api.post<
-        { success: boolean; results: DmTestResult[]; nextSteps: string[] } | undefined
-      >("/admin/api-tests/trigger/dm-permissions");
-      if (!response) throw new Error("Server tidak mengembalikan hasil test DM");
-      return response;
-    },
-    onSuccess: (res) => {
-      if (!res?.results) {
-        toast.error("Server tidak mengembalikan hasil test DM");
-        return;
-      }
-      if (res.results.length === 0) {
-        toast.warning("Tidak ada akun IG/FB terhubung untuk diuji");
-        return;
-      }
-      const totalSuccess = res.results.reduce((sum, r) => sum + r.success, 0);
-      const totalFailed = res.results.reduce((sum, r) => sum + r.failed, 0);
-      if (totalFailed > 0) {
-        toast.error(`DM test: ${totalFailed} gagal dari ${totalSuccess + totalFailed} calls`);
-      } else {
-        toast.success(`DM test: ${totalSuccess} calls berhasil! Cek Meta Developer Console.`);
-      }
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const results = dmTest.data?.results ?? [];
-
-  return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
-          <div>
-            <p className="font-semibold text-sm">Test DM Permissions (Instagram & Facebook)</p>
-            <p className="mt-1 text-[var(--text-secondary)] text-xs">
-              Generate 10 test API calls ke conversations endpoint untuk setiap akun. Diperlukan
-              untuk mengajukan <code>instagram_business_manage_messages</code> &{" "}
-              <code>pages_messaging</code> di Meta App Review.
-            </p>
-          </div>
-        </div>
-        <Button
-          size="sm"
-          disabled={dmTest.isPending}
-          onClick={() => dmTest.mutate()}
-          className="shrink-0 bg-blue-600 text-white hover:bg-blue-700"
-        >
-          {dmTest.isPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <MessageSquare className="h-3.5 w-3.5" />
-          )}
-          {dmTest.isPending ? "Running..." : "Jalankan Test"}
-        </Button>
-      </div>
-
-      {results.length > 0 && (
-        <div className="mt-4 space-y-3">
-          {results.map((r) => (
-            <div
-              key={r.platform + r.account}
-              className="flex items-center gap-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] p-3"
-            >
-              {r.failed === 0 ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-              ) : (
-                <XCircle className="h-4 w-4 shrink-0 text-red-600" />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-sm">
-                  {r.platform === "instagram" ? "Instagram" : "Facebook"} — {r.account}
-                </p>
-                {r.errors.length > 0 && (
-                  <p className="mt-0.5 text-red-600 text-xs">{r.errors[0]}</p>
-                )}
-              </div>
-              <Badge variant={r.failed === 0 ? "success" : "danger"}>
-                {r.success}/{r.calls}
-              </Badge>
-            </div>
-          ))}
-
-          {dmTest.data?.nextSteps && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-800 text-xs dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
-              <p className="font-medium">Next Steps:</p>
-              <ul className="mt-1 list-inside list-disc space-y-0.5">
-                {dmTest.data.nextSteps.map((step, i) => (
-                  <li key={i}>{step}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="flex-1 px-4">{summary.results && summary.results.length > 0 ? <ul className="divide-y divide-[var(--border-light)]">{summary.results.map((result) => <ResultRow key={result.name} result={result} />)}</ul> : <p className="py-4 text-[var(--text-muted)] text-sm">Belum ada hasil. Jalankan tes untuk memverifikasi konfigurasi platform ini.</p>}</div>
+      <div className="flex items-center justify-end border-[var(--border-light)] border-t px-4 py-3"><Button size="sm" disabled={running} onClick={() => onRun(summary.platform)} className="bg-[var(--accent-gold)] text-white hover:bg-[var(--accent-gold)]/90">{running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FlaskConical className="h-3.5 w-3.5" />}Jalankan Tes</Button></div>
     </div>
   );
 }
@@ -419,10 +166,6 @@ export function AdminApiTestsPage() {
           </div>
         </div>
       </div>
-
-      {/* DM Permission Test Section */}
-      <InsightsPermissionTest />
-      <DmPermissionTest />
 
       {/* Platform cards grid */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-4">

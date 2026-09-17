@@ -16,7 +16,6 @@ import {
   LINKEDIN_REST_URL,
   LINKEDIN_USERINFO_URL,
   PINTEREST_API_BASE_URL,
-  PINTEREST_SANDBOX,
   TIKTOK_OPEN_API_URL,
   YOUTUBE_API_URL,
 } from "@sahabatkreator/publishing";
@@ -748,95 +747,50 @@ async function runGoogleBusinessSuite(): Promise<TestResult[]> {
   ];
 }
 
-// ---------------------------------------------------------------------------
-// Suite diagnostik Pinterest
-// ---------------------------------------------------------------------------
-
 async function runPinterestSuite(): Promise<TestResult[]> {
   const cred = await getCredential("pinterest");
   const account = await getStoredAccount("pinterest");
 
   return [
-    await runCheck("Kredensial app tersimpan & format valid", async () => {
+    await runCheck("Kredensial Pinterest tersimpan", async () => {
       if (!cred) {
         return {
           status: "fail",
           message:
-            "Kredensial Pinterest belum tersimpan. Isi di Admin Panel → Kredensial Platform (atau env PINTEREST_APP_ID/PINTEREST_APP_SECRET).",
+            "Kredensial Pinterest belum tersimpan. Isi di Admin Panel atau env PINTEREST_APP_ID/PINTEREST_APP_SECRET.",
         };
       }
-      // App ID Pinterest numerik; secret 32 karakter
-      if (!/^\d{8,20}$/.test(cred.clientId)) {
-        return {
-          status: "warn",
-          message: "App ID terdeteksi bukan numerik standar Pinterest — periksa developer console.",
-        };
-      }
-      const sourceLabel = cred.source === "db" ? "Admin Panel (DB)" : "env";
       return {
-        status: "pass",
-        message: `Kredensial valid (sumber: ${sourceLabel}, App ID ${cred.clientId.length} digit, secret ${cred.clientSecret.length} karakter).`,
-      };
-    }),
-    await runCheck("Lingkungan API aktif (production vs sandbox)", async () => {
-      const host = PINTEREST_API_BASE_URL.includes("api-sandbox")
-        ? "api-sandbox.pinterest.com"
-        : "api.pinterest.com";
-      return {
-        status: PINTEREST_SANDBOX ? "warn" : "pass",
-        message: PINTEREST_SANDBOX
-          ? `Menggunakan SANDBOX (${host}) — pin hanya tersimpan di lingkungan uji, bukan akun production. Token sandbox berlaku 30 hari.`
-          : `Menggunakan production (${host}).`,
+        status: /^\d{8,20}$/.test(cred.clientId) ? "pass" : "warn",
+        message: /^\d{8,20}$/.test(cred.clientId)
+          ? "Kredensial Pinterest valid."
+          : "App ID Pinterest terlihat tidak standar — periksa Developer Console.",
       };
     }),
     await runCheck("Endpoint Pinterest API hidup", async () => {
-      // Ping /user_account tanpa token — 401 berarti hidup
       const res = await fetchJson(`${PINTEREST_API_BASE_URL}/user_account`);
-      if (res.status === 401) {
-        return {
-          status: "pass",
-          message:
-            "Endpoint merespons HTTP 401 (auth diperlukan) — API Pinterest hidup & terjangkau.",
-        };
-      }
-      return {
-        status: "fail",
-        message: `Endpoint tidak terjangkau (HTTP ${res.status}) — cek koneksi / nilai PINTEREST_API_BASE_URL.`,
-      };
+      return res.status === 401
+        ? { status: "pass", message: "Endpoint Pinterest hidup (auth diperlukan)." }
+        : { status: "fail", message: `Endpoint tidak terjangkau (HTTP ${res.status}).` };
     }),
     await runCheck("User token valid — panggil /user_account", async () => {
       if (!account?.accessToken) {
-        return {
-          status: "warn",
-          message:
-            "Belum ada akun Pinterest terhubung. Hubungkan minimal satu akun untuk memvalidasi token.",
-        };
+        return { status: "warn", message: "Belum ada akun Pinterest terhubung." };
       }
-      const res = await fetchJson<{ username?: string; account_type?: string }>(
+      const res = await fetchJson<{ username?: string }>(
         `${PINTEREST_API_BASE_URL}/user_account`,
         { headers: { Authorization: `Bearer ${account.accessToken}` } },
       );
       if (res.ok && res.data?.username) {
-        return {
-          status: "pass",
-          message: `Token valid — user @${res.data.username} (tipe ${res.data.account_type ?? "n/a"}).`,
-        };
+        return { status: "pass", message: `Token valid — @${res.data.username}.` };
       }
-      if (res.status === 401) {
-        return {
-          status: "fail",
-          message:
-            "Token ditolak (401) — token expired atau bukan untuk lingkungan API ini; connect ulang.",
-        };
-      }
-      return { status: "fail", message: `Gagal (HTTP ${res.status}) — periksa token akun.` };
+      return {
+        status: "fail",
+        message: res.status === 401 ? "Token ditolak (401) — hubungkan ulang Pinterest." : `Gagal (HTTP ${res.status}).`,
+      };
     }),
   ];
 }
-
-// ---------------------------------------------------------------------------
-// Suite diagnostik LinkedIn
-// ---------------------------------------------------------------------------
 
 async function runLinkedInSuite(): Promise<TestResult[]> {
   const cred = await getCredential("linkedin");
@@ -848,61 +802,37 @@ async function runLinkedInSuite(): Promise<TestResult[]> {
         return {
           status: "fail",
           message:
-            "Kredensial LinkedIn belum tersimpan. Isi di Admin Panel → Kredensial Platform (atau env LINKEDIN_CLIENT_ID/LINKEDIN_CLIENT_SECRET).",
+            "Kredensial LinkedIn belum tersimpan. Isi di Admin Panel atau env LINKEDIN_CLIENT_ID/LINKEDIN_CLIENT_SECRET.",
         };
       }
-      // Client ID LinkedIn: 77-78 karakter alfanumerik
-      if (cred.clientId.length < 20) {
-        return {
-          status: "warn",
-          message: "Client ID terlihat terlalu pendek — pastikan sesuai LinkedIn Developer Apps.",
-        };
-      }
-      const sourceLabel = cred.source === "db" ? "Admin Panel (DB)" : "env";
       return {
-        status: "pass",
-        message: `Kredensial valid (sumber: ${sourceLabel}, Client ID ${cred.clientId.length} karakter).`,
+        status: cred.clientId.length >= 20 ? "pass" : "warn",
+        message:
+          cred.clientId.length >= 20
+            ? "Kredensial LinkedIn valid."
+            : "Client ID LinkedIn terlihat terlalu pendek — periksa Developer Apps.",
       };
     }),
-    await runCheck("Endpoint LinkedIn API hidup (api.linkedin.com)", async () => {
-      // Ping userinfo tanpa token — 401/403 berarti endpoint hidup
+    await runCheck("Endpoint LinkedIn API hidup", async () => {
       const res = await fetchJson(LINKEDIN_USERINFO_URL);
-      if (res.status === 401 || res.status === 403) {
-        return {
-          status: "pass",
-          message: `Endpoint merespons HTTP ${res.status} (auth diperlukan) — API LinkedIn hidup & terjangkau.`,
-        };
-      }
-      return {
-        status: "fail",
-        message: `Endpoint tidak terjangkau (HTTP ${res.status}) — cek koneksi jaringan.`,
-      };
+      return res.status === 401 || res.status === 403
+        ? { status: "pass", message: `Endpoint hidup (HTTP ${res.status}, auth diperlukan).` }
+        : { status: "fail", message: `Endpoint tidak terjangkau (HTTP ${res.status}).` };
     }),
-    await runCheck("User token valid — OpenID userinfo (sub)", async () => {
+    await runCheck("User token valid — OpenID userinfo", async () => {
       if (!account?.accessToken) {
-        return {
-          status: "warn",
-          message:
-            "Belum ada akun LinkedIn terhubung. Hubungkan minimal satu akun untuk memvalidasi token.",
-        };
+        return { status: "warn", message: "Belum ada akun LinkedIn terhubung." };
       }
       const res = await fetchJson<{ sub?: string; name?: string }>(LINKEDIN_USERINFO_URL, {
         headers: { Authorization: `Bearer ${account.accessToken}` },
       });
       if (res.ok && res.data?.sub) {
-        return {
-          status: "pass",
-          message: `Token valid — profil: ${res.data.name ?? res.data.sub}.`,
-        };
+        return { status: "pass", message: `Token valid — profil: ${res.data.name ?? res.data.sub}.` };
       }
-      if (res.status === 401) {
-        return {
-          status: "fail",
-          message:
-            "Token ditolak (401) — expired; refresh token LinkedIn 1x pakai perlu dijalankan ulang.",
-        };
-      }
-      return { status: "fail", message: `Gagal (HTTP ${res.status}) — periksa token akun.` };
+      return {
+        status: "fail",
+        message: res.status === 401 ? "Token ditolak (401) — hubungkan ulang LinkedIn." : `Gagal (HTTP ${res.status}).`,
+      };
     }),
   ];
 }
