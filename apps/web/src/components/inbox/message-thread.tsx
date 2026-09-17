@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { SavedResponsesPicker } from "@/components/ui/saved-responses-picker";
 import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
-import { PLATFORMS } from "@/lib/platforms";
 
 export type ThreadConversation = {
   id: string;
@@ -18,6 +17,7 @@ export type ThreadConversation = {
   partnerUsername: string | null;
   partnerName: string | null;
   partnerAvatarUrl: string | null;
+  assignedMemberId: string | null;
 };
 
 type Message = {
@@ -93,6 +93,7 @@ export function MessageThread({
     onSuccess: () => {
       toast.success("Percakapan di-assign");
       queryClient.invalidateQueries({ queryKey: ["dm-conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["dm-thread", conversationId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -148,7 +149,7 @@ export function MessageThread({
               <UserCog className="h-4 w-4 text-[var(--text-muted)]" />
               <select
                 className="h-8 max-w-36 rounded-[var(--radius-md)] border border-[var(--border-light)] bg-[var(--bg-primary)] px-2 text-xs"
-                defaultValue=""
+                value={conv.assignedMemberId ?? ""}
                 onChange={(e) => assign.mutate(e.target.value === "" ? null : e.target.value)}
                 aria-label="Assign ke anggota tim"
               >

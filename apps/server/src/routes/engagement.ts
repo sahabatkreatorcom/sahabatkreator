@@ -6,7 +6,11 @@ import { PublishError, sendReply, syncAccountEngagement } from "@sahabatkreator/
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { errorResponse, HTTPError, requireOrg } from "../lib/auth-guard";
+import {
+  errorResponse,
+  HTTPError,
+  requirePermission,
+} from "../lib/auth-guard";
 import { decrypt } from "../lib/crypto";
 import { generateId } from "../lib/id";
 
@@ -15,7 +19,7 @@ export const engagementRoute = new Hono();
 /** GET /engagement — list inbox items (filter: type, status, platform, hidden) */
 engagementRoute.get("/", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.view");
     const type = c.req.query("type");
     const status = c.req.query("status");
     const platform = c.req.query("platform");
@@ -66,17 +70,24 @@ engagementRoute.get("/", async (c) => {
 
     // Hitung unread per type untuk badge — agregasi di SQL (count + group by),
     // bukan load semua baris lalu dihitung di memory
+    const countConditions = [
+      eq(engagementItem.organizationId, ctx.organization.id),
+      eq(engagementItem.status, "unread"),
+      eq(engagementItem.hidden, false),
+    ];
+    if (platform && platform !== "all") {
+      countConditions.push(eq(socialAccount.platform, platform as "instagram"));
+    }
+
     const countRows = await db
       .select({
         type: engagementItem.type,
         count: sql<number>`count(*)::int`,
       })
       .from(engagementItem)
+      .innerJoin(socialAccount, eq(engagementItem.socialAccountId, socialAccount.id))
       .where(
-        and(
-          eq(engagementItem.organizationId, ctx.organization.id),
-          eq(engagementItem.status, "unread"),
-        ),
+        and(...countConditions),
       )
       .groupBy(engagementItem.type);
 
@@ -99,7 +110,7 @@ engagementRoute.get("/", async (c) => {
 /** PATCH /engagement/comments/:id — hide/unhide komentar { hidden: boolean } */
 engagementRoute.patch("/comments/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.moderate");
     const input = z.object({ hidden: z.boolean() }).parse(await c.req.json());
 
     // Org-scope: pastikan item milik org (join socialAccount)
@@ -111,6 +122,7 @@ engagementRoute.patch("/comments/:id", async (c) => {
         and(
           eq(engagementItem.id, c.req.param("id")),
           eq(engagementItem.organizationId, ctx.organization.id),
+          eq(engagementItem.type, "comment"),
         ),
       )
       .limit(1);
@@ -130,7 +142,7 @@ engagementRoute.patch("/comments/:id", async (c) => {
 /** DELETE /engagement/comments/:id — hapus komentar dari inbox (org-scoped) */
 engagementRoute.delete("/comments/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.moderate");
 
     const rows = await db
       .delete(engagementItem)
@@ -138,6 +150,7 @@ engagementRoute.delete("/comments/:id", async (c) => {
         and(
           eq(engagementItem.id, c.req.param("id")),
           eq(engagementItem.organizationId, ctx.organization.id),
+          eq(engagementItem.type, "comment"),
         ),
       )
       .returning({ id: engagementItem.id });
@@ -155,7 +168,7 @@ engagementRoute.delete("/comments/:id", async (c) => {
  */
 engagementRoute.post("/sync-now", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.view");
     console.log(`[engagement] sync-now triggered for org ${ctx.organization.id}`);
 
     // Semua akun terhubung org (manual tidak punya API utk sync)
@@ -185,9 +198,17 @@ engagementRoute.post("/sync-now", async (c) => {
       accounts
         .filter((a) => a.platform !== "manual" && a.accessTokenEnc)
         .map(async (account) => {
+          const accessTokenEnc = account.accessTokenEnc;
+          if (!accessTokenEnc) {
+            return {
+              platform: account.platform,
+              newItems: 0,
+              error: "Token akun tidak tersedia — hubungkan ulang akun",
+            };
+          }
           let accessToken: string;
           try {
-            accessToken = decrypt(account.accessTokenEnc!);
+            accessToken = decrypt(accessTokenEnc);
           } catch {
             console.warn(`[engagement] sync-now: decrypt failed for ${account.platform} (${account.id})`);
             return {
@@ -230,7 +251,7 @@ engagementRoute.post("/sync-now", async (c) => {
         results.push({ platform: "unknown", newItems: 0, error: errMsg });
       }
     }
-    let newItems = results.reduce((sum, r) => sum + r.newItems, 0);
+    const newItems = results.reduce((sum, r) => sum + r.newItems, 0);
 
     const errors = results.filter((r) => r.error);
     console.log(
@@ -251,7 +272,7 @@ engagementRoute.post("/sync-now", async (c) => {
 /** PATCH /engagement/:id — update status/label/assignment */
 engagementRoute.patch("/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.view");
     const input = z
       .object({
         status: z.enum(["unread", "read", "replied", "archived"]).optional(),
@@ -296,7 +317,7 @@ engagementRoute.patch("/:id", async (c) => {
 /** POST /engagement/:id/reply — balas item via API platform (fallback: catat lokal) */
 engagementRoute.post("/:id/reply", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.reply");
     const input = z.object({ content: z.string().min(1).max(2000) }).parse(await c.req.json());
 
     // Join item + akun (perlu token & platformAccountId utk kirim reply)
@@ -384,7 +405,7 @@ engagementRoute.post("/:id/reply", async (c) => {
 /** POST /engagement/batch-read — tandai beberapa item sebagai read */
 engagementRoute.post("/batch-read", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.view");
     const input = z.object({ ids: z.array(z.string()).min(1) }).parse(await c.req.json());
 
     await db
@@ -407,7 +428,7 @@ engagementRoute.post("/batch-read", async (c) => {
 
 engagementRoute.get("/saved-responses", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.view");
     const responses = await db
       .select()
       .from(savedResponse)
@@ -421,7 +442,7 @@ engagementRoute.get("/saved-responses", async (c) => {
 
 engagementRoute.post("/saved-responses", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.view");
     const input = z
       .object({
         name: z.string().min(1).max(100),
@@ -444,7 +465,7 @@ engagementRoute.post("/saved-responses", async (c) => {
 
 engagementRoute.delete("/saved-responses/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.view");
     await db
       .delete(savedResponse)
       .where(

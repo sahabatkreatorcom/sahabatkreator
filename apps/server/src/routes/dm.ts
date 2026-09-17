@@ -4,14 +4,14 @@ import { db } from "@sahabatkreator/db";
 import {
   dmConversation,
   dmMessage,
+  member,
   socialAccount,
-  user as userTable,
 } from "@sahabatkreator/db/schema";
 import { PublishError, sendDMReply } from "@sahabatkreator/publishing";
 import { and, asc, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { errorResponse, requireOrg } from "../lib/auth-guard";
+import { errorResponse, requirePermission } from "../lib/auth-guard";
 import { decrypt } from "../lib/crypto";
 import { generateId } from "../lib/id";
 
@@ -24,9 +24,17 @@ export const dmRoute = new Hono();
  */
 dmRoute.get("/", async (c) => {
   try {
-    const ctx = await requireOrg(c);
-    const page = Math.max(Number(c.req.query("page") ?? 1), 1);
-    const perPage = Math.min(Number(c.req.query("perPage") ?? 20), 50);
+    const ctx = await requirePermission(c, "engagement.view");
+    const pagination = z
+      .object({
+        page: z.coerce.number().int().min(1).default(1),
+        perPage: z.coerce.number().int().min(1).max(50).default(20),
+      })
+      .parse({
+        page: c.req.query("page"),
+        perPage: c.req.query("perPage"),
+      });
+    const { page, perPage } = pagination;
     const platform = c.req.query("platform");
     const unreadOnly = c.req.query("unread") === "true";
     const q = c.req.query("q");
@@ -39,12 +47,11 @@ dmRoute.get("/", async (c) => {
     if (platform) conditions.push(eq(socialAccount.platform, platform as "instagram"));
     if (unreadOnly) conditions.push(gt(dmConversation.unreadCount, 0));
     if (q) {
-      conditions.push(
-        or(
-          ilike(dmConversation.partnerName, `%${q}%`),
-          ilike(dmConversation.partnerUsername, `%${q}%`),
-        )!,
+      const searchCondition = or(
+        ilike(dmConversation.partnerName, `%${q}%`),
+        ilike(dmConversation.partnerUsername, `%${q}%`),
       );
+      if (searchCondition) conditions.push(searchCondition);
     }
     if (assignedTo === "unassigned") {
       conditions.push(sql`${dmConversation.assignedMemberId} IS NULL`);
@@ -83,7 +90,7 @@ dmRoute.get("/", async (c) => {
 /** GET /dm/unread-count — badge sidebar/notifikasi */
 dmRoute.get("/unread-count", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.view");
     const [row] = await db
       .select({
         conversations: sql<number>`count(*)::int`,
@@ -112,7 +119,7 @@ dmRoute.get("/unread-count", async (c) => {
  */
 dmRoute.get("/:id/messages", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.view");
     const id = c.req.param("id");
 
     // Conversation + akun (pastikan milik org)
@@ -127,6 +134,7 @@ dmRoute.get("/:id/messages", async (c) => {
         partnerAvatarUrl: dmConversation.partnerAvatarUrl,
         platformAccountId: socialAccount.platformAccountId,
         unreadCount: dmConversation.unreadCount,
+        assignedMemberId: dmConversation.assignedMemberId,
       })
       .from(dmConversation)
       .innerJoin(socialAccount, eq(dmConversation.socialAccountId, socialAccount.id))
@@ -163,7 +171,7 @@ dmRoute.get("/:id/messages", async (c) => {
 /** POST /dm/:id/reply — kirim balasan via Messenger Send API + simpan outbound */
 dmRoute.post("/:id/reply", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.reply");
     const input = z.object({ content: z.string().min(1).max(2000) }).parse(await c.req.json());
 
     const [row] = await db
@@ -264,17 +272,22 @@ dmRoute.post("/:id/reply", async (c) => {
 /** PATCH /dm/:id — update assignedMemberId (assignment ke anggota tim) */
 dmRoute.patch("/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.reply");
     const input = z.object({ assignedMemberId: z.string().nullable() }).parse(await c.req.json());
 
     // Validasi member bila di-assign (harus user valid — sederhana: cek exists)
     if (input.assignedMemberId) {
-      const [user] = await db
-        .select({ id: userTable.id })
-        .from(userTable)
-        .where(eq(userTable.id, input.assignedMemberId))
+      const [assignedMember] = await db
+        .select({ id: member.id })
+        .from(member)
+        .where(
+          and(
+            eq(member.userId, input.assignedMemberId),
+            eq(member.organizationId, ctx.organization.id),
+          ),
+        )
         .limit(1);
-      if (!user) return c.json({ message: "User tidak ditemukan" }, 404);
+      if (!assignedMember) return c.json({ message: "User bukan anggota organisasi ini" }, 404);
     }
 
     const [updated] = await db
@@ -298,7 +311,7 @@ dmRoute.patch("/:id", async (c) => {
 /** POST /dm/mark-all-read — reset semua unread percakapan org */
 dmRoute.post("/mark-all-read", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "engagement.view");
     const result = await db
       .update(dmConversation)
       .set({ unreadCount: 0 })

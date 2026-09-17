@@ -58,3 +58,4 @@ temp
 # Better Fullstack recovery snapshots
 .bts/recovery
 docs/
+meta-scope.md

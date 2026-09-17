@@ -261,14 +261,17 @@ function EngagementCard({ item }: { item: Item }) {
 
           {item.type === "review" && item.rating != null && (
             <div className="mt-1 flex gap-0.5">
-              {[...Array(5)].map((_, i) => (
-                <Star
-                  key={i}
-                  className={`h-3.5 w-3.5 ${
-                    i < item.rating! ? "fill-yellow-400 text-yellow-400" : "text-[var(--border)]"
-                  }`}
-                />
-              ))}
+              {[...Array(5)].map((_, i) => {
+                const rating = item.rating ?? 0;
+                return (
+                  <Star
+                    key={i}
+                    className={`h-3.5 w-3.5 ${
+                      i < rating ? "fill-yellow-400 text-yellow-400" : "text-[var(--border)]"
+                    }`}
+                  />
+                );
+              })}
             </div>
           )}
 
@@ -341,38 +344,42 @@ function EngagementCard({ item }: { item: Item }) {
                 Arsipkan
               </Button>
 
-              {/* Moderasi (M12): hide/unhide & delete */}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => toggleHidden.mutate()}
-                disabled={toggleHidden.isPending}
-                title={item.hidden ? "Tampilkan komentar" : "Sembunyikan komentar"}
-              >
-                {toggleHidden.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : item.hidden ? (
-                  <Eye className="h-3.5 w-3.5" />
-                ) : (
-                  <EyeOff className="h-3.5 w-3.5" />
-                )}
-                {item.hidden ? "Tampilkan" : "Sembunyikan"}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => removeItem.mutate()}
-                disabled={removeItem.isPending}
-                className="text-red-500 hover:text-red-600"
-                title="Hapus komentar"
-              >
-                {removeItem.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="h-3.5 w-3.5" />
-                )}
-                Hapus
-              </Button>
+              {/* Moderasi (M12): hide/unhide & delete komentar */}
+              {item.type === "comment" && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => toggleHidden.mutate()}
+                    disabled={toggleHidden.isPending}
+                    title={item.hidden ? "Tampilkan komentar" : "Sembunyikan komentar"}
+                  >
+                    {toggleHidden.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : item.hidden ? (
+                      <Eye className="h-3.5 w-3.5" />
+                    ) : (
+                      <EyeOff className="h-3.5 w-3.5" />
+                    )}
+                    {item.hidden ? "Tampilkan" : "Sembunyikan"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => removeItem.mutate()}
+                    disabled={removeItem.isPending}
+                    className="text-red-500 hover:text-red-600"
+                    title="Hapus komentar"
+                  >
+                    {removeItem.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                    Hapus
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </div>

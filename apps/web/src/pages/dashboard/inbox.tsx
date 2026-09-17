@@ -1,7 +1,7 @@
 // Inbox DM — percakapan direct message Instagram/Facebook (master-detail)
 // List kiri: percakapan dengan badge unread. Thread kanan: bubble + composer.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Inbox } from "lucide-react";
+import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
 import { useState } from "react";
 import {
   ConversationList,
@@ -16,12 +16,13 @@ export default function InboxPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["dm-conversations", unreadOnly, q],
+    queryKey: ["dm-conversations", unreadOnly, q, page],
     queryFn: () =>
-      api.get<{ conversations: DmConversation[] }>(
-        `/dm?unread=${unreadOnly}${q ? `&q=${encodeURIComponent(q)}` : ""}`,
+      api.get<{ conversations: DmConversation[]; page: number }>(
+        `/dm?unread=${unreadOnly}&page=${page}&perPage=20${q ? `&q=${encodeURIComponent(q)}` : ""}`,
       ),
     refetchInterval: 30_000,
   });
@@ -65,9 +66,15 @@ export default function InboxPage() {
         <div className={`min-h-0 flex-col md:col-span-2 ${selectedId ? "hidden md:flex" : "flex"}`}>
           <ConversationListHeader
             q={q}
-            onQChange={setQ}
+            onQChange={(value) => {
+              setQ(value);
+              setPage(1);
+            }}
             unreadOnly={unreadOnly}
-            onUnreadOnlyChange={setUnreadOnly}
+            onUnreadOnlyChange={(value) => {
+              setUnreadOnly(value);
+              setPage(1);
+            }}
             onMarkAllRead={() => markAllRead.mutate()}
             unreadTotal={unreadMessages}
             canMarkAll={unreadMessages > 0 && !markAllRead.isPending}
@@ -82,6 +89,29 @@ export default function InboxPage() {
               selectedId={selectedId}
               onSelect={setSelectedId}
             />
+          )}
+          {!isLoading && (page > 1 || conversations.length === 20) && (
+            <div className="flex items-center justify-between border-[var(--border-light)] border-t p-2">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(current - 1, 1))}
+                disabled={page === 1}
+                className="flex items-center gap-1 rounded px-2 py-1 text-xs disabled:opacity-40"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Sebelumnya
+              </button>
+              <span className="text-[var(--text-muted)] text-xs">Halaman {page}</span>
+              <button
+                type="button"
+                onClick={() => setPage((current) => current + 1)}
+                disabled={conversations.length < 20}
+                className="flex items-center gap-1 rounded px-2 py-1 text-xs disabled:opacity-40"
+              >
+                Berikutnya
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           )}
         </div>
 

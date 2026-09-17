@@ -1170,7 +1170,7 @@ apiTestsRoute.post("/trigger/instagram-insights", requirePlatformAdmin, async (c
       data?: Array<{ id: string }>;
       error?: { message?: string };
     }>(
-      `https://graph.facebook.com/v19.0/me/media?fields=id&limit=1&access_token=${encodeURIComponent(userToken)}`,
+      `${GRAPH_FB_URL}/me/media?fields=id,caption,comments_count,like_count&limit=1&access_token=${encodeURIComponent(userToken)}`,
     );
 
     if (!mediaRes.ok || !mediaRes.data?.data?.length) {
@@ -1190,7 +1190,7 @@ apiTestsRoute.post("/trigger/instagram-insights", requirePlatformAdmin, async (c
       data?: Array<{ name: string; values: Array<{ value: number }> }>;
       error?: { message?: string };
     }>(
-      `https://graph.facebook.com/v19.0/${mediaId}/insights?metric=impressions,reach,engagement&access_token=${encodeURIComponent(userToken)}`,
+      `${GRAPH_FB_URL}/${mediaId}/insights?metric=impressions,reach,engagement&access_token=${encodeURIComponent(userToken)}`,
     );
 
     if (!insightsRes.ok) {
@@ -1216,6 +1216,65 @@ apiTestsRoute.post("/trigger/instagram-insights", requirePlatformAdmin, async (c
 });
 
 /**
+ * POST /admin/api-tests/trigger/facebook-insights
+ * Trigger a Page Insights call for pages_manage/read_insights verification.
+ */
+apiTestsRoute.post("/trigger/facebook-insights", requirePlatformAdmin, async (c) => {
+  try {
+    const accounts = await db
+      .select({
+        platformAccountId: socialAccount.platformAccountId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        metadata: socialAccount.metadata,
+        username: socialAccount.username,
+      })
+      .from(socialAccount)
+      .where(eq(socialAccount.platform, "facebook" as never))
+      .limit(5);
+
+    const results: Array<{ account: string; success: boolean; message: string }> = [];
+    for (const account of accounts) {
+      if (!account.accessTokenEnc) continue;
+      try {
+        const token = decrypt(account.accessTokenEnc);
+        const pageToken =
+          typeof account.metadata === "object" &&
+          account.metadata !== null &&
+          typeof (account.metadata as Record<string, unknown>).pageAccessToken === "string"
+            ? ((account.metadata as Record<string, unknown>).pageAccessToken as string)
+            : token;
+        const res = await fetchJson<{
+          data?: Array<{ name: string; values?: Array<{ value: number }> }>;
+          error?: { message?: string };
+        }>(
+          `${GRAPH_FB_URL}/${account.platformAccountId}/insights?metric=page_impressions&period=day&access_token=${encodeURIComponent(pageToken)}`,
+        );
+        results.push({
+          account: account.username ?? account.platformAccountId,
+          success: res.ok,
+          message: res.ok
+            ? "Facebook Page Insights API call completed"
+            : (res.data?.error?.message ?? `HTTP ${res.status}`),
+        });
+      } catch (error) {
+        results.push({
+          account: account.username ?? account.platformAccountId,
+          success: false,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (results.length === 0) {
+      return c.json({ error: "No Facebook Page account connected" }, 400);
+    }
+    return c.json({ success: results.every((result) => result.success), results });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+});
+
+/**
  * POST /admin/api-tests/trigger/human-agent
  * Trigger Human Agent permission by sending a test message with human_agent flag
  */
@@ -1230,9 +1289,7 @@ apiTestsRoute.post("/trigger/human-agent", requirePlatformAdmin, async (c) => {
     const profileRes = await fetchJson<{
       id?: string;
       error?: { message?: string };
-    }>(
-      `https://graph.facebook.com/v19.0/me?fields=id&access_token=${encodeURIComponent(userToken)}`,
-    );
+    }>(`${GRAPH_FB_URL}/me?fields=id,email&access_token=${encodeURIComponent(userToken)}`);
 
     if (!profileRes.ok || !profileRes.data?.id) {
       return c.json(

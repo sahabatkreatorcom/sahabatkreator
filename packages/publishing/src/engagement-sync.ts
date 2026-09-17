@@ -14,7 +14,7 @@
 
 import { db } from "@sahabatkreator/db";
 import { engagementItem, socialAccount } from "@sahabatkreator/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { processAutomation } from "./automation";
 import {
   GBP_API_URL,
@@ -81,13 +81,14 @@ export async function upsertEngagementItems(items: EngagementUpsert[]): Promise<
     })
     .from(engagementItem)
     .where(
-      and(
-        eq(engagementItem.socialAccountId, unique[0]!.socialAccountId),
-        inArray(
-          engagementItem.platformItemId,
-          unique.map((i) => i.platformItemId),
+        or(
+          ...unique.map((item) =>
+            and(
+              eq(engagementItem.socialAccountId, item.socialAccountId),
+              eq(engagementItem.platformItemId, item.platformItemId),
+            ),
+          ),
         ),
-      ),
     );
   const existingKeys = new Set(existing.map((r) => `${r.socialAccountId}:${r.platformItemId}`));
 

@@ -171,6 +171,58 @@ type DmTestResult = {
   errors: string[];
 };
 
+function InsightsPermissionTest() {
+  const instagramTest = useMutation({
+    mutationFn: () =>
+      api.post<{ success: boolean; message: string }>(
+        "/admin/api-tests/trigger/instagram-insights",
+      ),
+    onSuccess: (res) => (res.success ? toast.success(res.message) : toast.error(res.message)),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const facebookTest = useMutation({
+    mutationFn: () =>
+      api.post<{
+        success: boolean;
+        results: Array<{ account: string; success: boolean; message: string }>;
+      }>("/admin/api-tests/trigger/facebook-insights"),
+    onSuccess: (res) => {
+      const failed = res.results.filter((result) => !result.success).length;
+      if (failed > 0) toast.error(`${failed} Facebook Page Insights call gagal`);
+      else toast.success(`${res.results.length} Facebook Page Insights call berhasil`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-semibold text-sm">Test Insights API Access</p>
+          <p className="mt-1 text-[var(--text-secondary)] text-xs">
+            Jalankan panggilan API nyata untuk mencatat penggunaan Insights di Meta Developer
+            Console.
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button
+            size="sm"
+            disabled={instagramTest.isPending}
+            onClick={() => instagramTest.mutate()}
+          >
+            {instagramTest.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Instagram
+          </Button>
+          <Button size="sm" disabled={facebookTest.isPending} onClick={() => facebookTest.mutate()}>
+            {facebookTest.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Facebook
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DmPermissionTest() {
   const dmTest = useMutation({
     mutationFn: () =>
@@ -342,6 +394,7 @@ export function AdminApiTestsPage() {
       </div>
 
       {/* DM Permission Test Section */}
+      <InsightsPermissionTest />
       <DmPermissionTest />
 
       {/* Platform cards grid */}
