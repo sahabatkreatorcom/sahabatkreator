@@ -17,7 +17,6 @@
 // - bluesky: app.bsky.actor.getProfile (public XRPC) + getPostThread
 // - linkedin: /rest/socialActions/{urn} (post) — member followers tidak tersedia
 //   (dipakai juga oleh linkedin_org: post organization)
-// - pinterest: /v5/user_account?fields=follower_count + pin metrics via /v5/pins/{id} (aggregated)
 // - google_business: businessprofileperformance.googleapis.com fetchMultiDailyMetricsTimeSeries
 
 import { db } from "@sahabatkreator/db";
@@ -30,7 +29,6 @@ import {
   GRAPH_THREADS_URL,
   LINKEDIN_API_VERSION,
   LINKEDIN_REST_URL,
-  PINTEREST_API_BASE_URL,
   TIKTOK_OPEN_API_URL,
   YOUTUBE_API_URL,
 } from "./config";
@@ -189,8 +187,6 @@ export async function fetchAccountMetrics(
       return youtubeAccountMetrics(platformAccountId, accessToken);
     case "bluesky":
       return blueskyAccountMetrics(platformAccountId);
-    case "pinterest":
-      return pinterestAccountMetrics(accessToken);
     case "linkedin":
     case "linkedin_org":
       return linkedinAccountMetrics(platformAccountId, accessToken);
@@ -332,24 +328,6 @@ async function blueskyAccountMetrics(did: string): Promise<AccountMetrics> {
   };
 }
 
-/** Pinterest — user_account dengan follower_count */
-async function pinterestAccountMetrics(token: string): Promise<AccountMetrics> {
-  const res = await httpRequest<{
-    follower_count?: number;
-    pin_count?: number;
-    board_count?: number;
-  }>(`${PINTEREST_API_BASE_URL}/user_account`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Pinterest akun: ${text.slice(0, 150)}`);
-  }
-  // Response /v5/user_account FLAT (bukan wrapper { data })
-  const data = await res.json();
-  return { followers: data.follower_count ?? null, posts: data.pin_count ?? null };
-}
-
 /**
  * LinkedIn — organization entity profile (followerCount, name).
  * Untuk personal profile, follower count tidak tersedia tanpa scope tambahan.
@@ -415,8 +393,6 @@ export async function fetchPostMetrics(
     case "linkedin":
     case "linkedin_org":
       return linkedinPostMetrics(platformPostId, accessToken, ownerUrn);
-    case "pinterest":
-      return pinterestPostMetrics(platformPostId, accessToken);
     default:
       return {};
   }
@@ -660,36 +636,6 @@ async function linkedinPostMetrics(
   return { likes, comments };
 }
 
-/** Pinterest pin metrics — impressions/saves/clicks via pin detail (aggregated stats) */
-async function pinterestPostMetrics(pinId: string, token: string): Promise<PostMetrics> {
-  const res = await httpRequest<{
-    data?: {
-      metrics?: {
-        impressions?: number;
-        saves?: number;
-        clicks?: number;
-        reactions?: number;
-        comment_count?: number;
-      };
-    };
-  }>(`${PINTEREST_API_BASE_URL}/pins/${pinId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Pinterest pin: ${text.slice(0, 150)}`);
-  }
-  const metrics = (await res.json()).data?.metrics;
-  if (!metrics) return {};
-  return {
-    impressions: metrics.impressions ?? null,
-    saves: metrics.saves ?? null,
-    websiteClicks: metrics.clicks ?? null,
-    likes: metrics.reactions ?? null,
-    comments: metrics.comment_count ?? null,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Sync satu akun (metrik akun + post published terbaru)
 // ---------------------------------------------------------------------------
@@ -829,6 +775,8 @@ export async function syncDueAnalyticsAccounts(
     .limit(maxAccounts * 3);
 
   // Filter: platform dengan dukungan analytics + belum ada snapshot hari ini
+  // Pinterest dikecualikan — Developer Guidelines melarang penyimpanan data analytics.
+  // Pinterest analytics di-fetch on-demand via endpoint /analytics/pinterest.
   const supported = new Set([
     "instagram",
     "instagram_standalone",
@@ -837,7 +785,6 @@ export async function syncDueAnalyticsAccounts(
     "tiktok",
     "youtube",
     "bluesky",
-    "pinterest",
     "linkedin",
     "linkedin_org",
   ]);

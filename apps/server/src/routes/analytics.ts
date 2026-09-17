@@ -12,6 +12,7 @@ import {
   GRAPH_IG_URL,
   httpRequest,
   nextOccurrence,
+  PINTEREST_API_BASE_URL,
   slotLabel,
 } from "@sahabatkreator/publishing";
 import { and, eq, gte, sql } from "drizzle-orm";
@@ -603,6 +604,133 @@ analyticsRoute.get("/hashtags", async (c) => {
       .slice(0, 20);
 
     return c.json({ days, hashtags });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Pinterest Analytics — On-demand fetch (Developer Guidelines compliance)
+// Pinterest melarang penyimpanan data analytics. Endpoint ini fetch langsung
+// dari API setiap kali diminta, dengan in-memory cache 5 menit untuk
+// mencegah rate limit.
+// ---------------------------------------------------------------------------
+
+type PinterestCache = {
+  data: unknown;
+  expiresAt: number;
+};
+const pinterestCache = new Map<string, PinterestCache>();
+const PINTEREST_CACHE_TTL_MS = 5 * 60 * 1000; // 5 menit
+
+analyticsRoute.get("/pinterest", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+
+    // Cari akun Pinterest yang terhubung
+    const accounts = await db
+      .select()
+      .from(socialAccount)
+      .where(
+        and(
+          eq(socialAccount.organizationId, ctx.organization.id),
+          eq(socialAccount.platform, "pinterest"),
+          eq(socialAccount.isConnected, true),
+        ),
+      );
+
+    if (accounts.length === 0) {
+      return c.json({ account: null, pins: [] });
+    }
+
+    const account = accounts[0];
+    if (!account?.accessTokenEnc) {
+      return c.json({ account: null, pins: [], error: "Token tidak tersedia" });
+    }
+
+    // Check cache
+    const cacheKey = `pinterest_${account.id}`;
+    const cached = pinterestCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return c.json(cached.data);
+    }
+
+    // Decrypt token
+    let token: string;
+    try {
+      token = decrypt(account.accessTokenEnc);
+    } catch {
+      return c.json({ account: null, pins: [], error: "Gagal decrypt token" });
+    }
+
+    // Fetch account info
+    const accountRes = await httpRequest<{
+      follower_count?: number;
+      pin_count?: number;
+      board_count?: number;
+      username?: string;
+    }>(`${PINTEREST_API_BASE_URL}/user_account`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!accountRes.ok) {
+      const text = await accountRes.text().catch(() => "");
+      console.warn(`[pinterest-analytics] Account fetch failed: ${text.slice(0, 150)}`);
+      return c.json({
+        account: null,
+        pins: [],
+        error: `Pinterest API error: ${accountRes.status}`,
+      });
+    }
+
+    const accountData = await accountRes.json();
+
+    // Fetch recent pins (top 10 by engagement)
+    const pinsRes = await httpRequest<{
+      items?: Array<{
+        id: string;
+        title?: string;
+        link?: string;
+        created_at?: string;
+        media?: { images?: Record<string, { url?: string }> };
+        board?: { name?: string };
+      }>;
+    }>(`${PINTEREST_API_BASE_URL}/pins`, {
+      query: { page_size: "10", sort: "MOST_RECENT" },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    let pins: Array<{
+      id: string;
+      title: string;
+      thumbnail: string | null;
+      createdAt: string;
+    }> = [];
+
+    if (pinsRes.ok) {
+      const pinsData = await pinsRes.json();
+      pins = (pinsData.items ?? []).map((pin) => ({
+        id: pin.id,
+        title: pin.title ?? "",
+        thumbnail: pin.media?.images?.["236x"]?.url ?? null,
+        createdAt: pin.created_at ?? "",
+      }));
+    }
+
+    const result = {
+      account: {
+        username: accountData.username ?? account.username,
+        followerCount: accountData.follower_count ?? null,
+        pinCount: accountData.pin_count ?? null,
+        boardCount: accountData.board_count ?? null,
+      },
+      pins,
+    };
+
+    // Cache result
+    pinterestCache.set(cacheKey, { data: result, expiresAt: Date.now() + PINTEREST_CACHE_TTL_MS });
+
+    return c.json(result);
   } catch (error) {
     return errorResponse(error);
   }

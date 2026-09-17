@@ -19,20 +19,20 @@ import {
   getFacebookPageStories,
   getInstagramMedia,
   getInstagramStories,
-  getPinterestPins,
   getTikTokVideos,
   getYouTubeVideos,
 } from "./posts-sync-api";
 import { refreshAccountToken } from "./token-refresh";
 
-/** Platform yang didukung posts-sync (punya API list konten terbit). */
+/** Platform yang didukung posts-sync (punya API list konten terbit).
+ *  Pinterest dikecualikan — Developer Guidelines melarang penyimpanan metadata.
+ */
 export const POSTS_SYNC_PLATFORMS = new Set<string>([
   "instagram",
   "instagram_standalone",
   "facebook",
   "tiktok",
   "youtube",
-  "pinterest",
 ]);
 
 /** Deteksi error token permanen — akun harus dihubungkan ulang user. */
@@ -215,10 +215,6 @@ async function fetchExternalPosts(
     }
     case "youtube": {
       const result = await getYouTubeVideos(accessToken, account.platformAccountId, since);
-      return result.ok ? result.data : { error: result.error };
-    }
-    case "pinterest": {
-      const result = await getPinterestPins(accessToken, since);
       return result.ok ? result.data : { error: result.error };
     }
     default:

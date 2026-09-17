@@ -4,13 +4,7 @@
 // Dipakai oleh posts-sync.ts (orchestration). Semua request lewat httpRequest
 // (timeout + retry 429/5xx + backoff).
 
-import {
-  GRAPH_FB_URL,
-  GRAPH_IG_URL,
-  PINTEREST_API_BASE_URL,
-  TIKTOK_OPEN_API_URL,
-  YOUTUBE_API_URL,
-} from "./config";
+import { GRAPH_FB_URL, GRAPH_IG_URL, TIKTOK_OPEN_API_URL, YOUTUBE_API_URL } from "./config";
 import { httpRequest } from "./http";
 
 const GRAPH_FB = GRAPH_FB_URL;
@@ -373,49 +367,5 @@ export async function getYouTubeVideos(
 }
 
 // ---------------------------------------------------------------------------
-// Pinterest — pins user
+// End of file
 // ---------------------------------------------------------------------------
-
-export async function getPinterestPins(
-  accessToken: string,
-  since?: Date,
-  limit = 50,
-): Promise<FetchResult> {
-  try {
-    const res = await httpRequest<{
-      items?: Array<{
-        id: string;
-        title?: string;
-        description?: string;
-        created_at?: string;
-        media?: { images?: Record<string, { url?: string }> };
-      }>;
-      message?: string;
-    }>(`${PINTEREST_API_BASE_URL}/pins`, {
-      query: { page_size: limit },
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      return { ok: false, error: `Pinterest pins: HTTP ${res.status} ${text.slice(0, 150)}` };
-    }
-    const items = (await res.json()).items ?? [];
-    const posts: ExternalPost[] = [];
-    for (const item of items) {
-      if (!item.id || !item.created_at) continue;
-      const publishedAt = new Date(item.created_at);
-      if (since && publishedAt < since) continue;
-      posts.push({
-        externalId: item.id,
-        caption: item.title ?? item.description ?? "",
-        mediaType: "IMAGE",
-        thumbnailUrl: item.media?.images?.["600x"]?.url,
-        permalink: `https://pinterest.com/pin/${item.id}`,
-        publishedAt,
-      });
-    }
-    return { ok: true, data: posts };
-  } catch (error) {
-    return fail(error);
-  }
-}
