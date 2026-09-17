@@ -1166,3 +1166,179 @@ apiTestsRoute.post("/trigger/human-agent", requirePlatformAdmin, async (c) => {
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
   }
 });
+
+/**
+ * POST /admin/api-tests/trigger/dm-permissions
+ * Generate test API calls untuk Instagram (instagram_business_manage_messages)
+ * dan Facebook (pages_messaging) DM permissions.
+ *
+ * Instagram butuh 10 test calls, Facebook butuh test calls ke conversations endpoint.
+ */
+apiTestsRoute.post("/trigger/dm-permissions", requirePlatformAdmin, async (c) => {
+  try {
+    const GRAPH_FB = GRAPH_FB_URL;
+    const results: Array<{
+      platform: string;
+      account: string;
+      calls: number;
+      success: number;
+      failed: number;
+      errors: string[];
+    }> = [];
+
+    // --- Instagram DM test calls ---
+    const igAccounts = await db
+      .select({
+        platformAccountId: socialAccount.platformAccountId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        metadata: socialAccount.metadata,
+        username: socialAccount.username,
+      })
+      .from(socialAccount)
+      .where(eq(socialAccount.platform, "instagram" as never))
+      .limit(5);
+
+    for (const account of igAccounts) {
+      if (!account.accessTokenEnc) continue;
+
+      let token: string;
+      try {
+        token = decrypt(account.accessTokenEnc);
+      } catch {
+        continue;
+      }
+
+      // Instagram via FB Login uses Page token for DM
+      const pageToken =
+        typeof account.metadata === "object" &&
+        account.metadata !== null &&
+        typeof (account.metadata as Record<string, unknown>).pageAccessToken === "string"
+          ? ((account.metadata as Record<string, unknown>).pageAccessToken as string)
+          : token;
+
+      let success = 0;
+      let failed = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < 10; i++) {
+        try {
+          const res = await fetchJson<{
+            data?: Array<{ id: string }>;
+            error?: { message?: string };
+          }>(
+            `${GRAPH_FB}/${account.platformAccountId}/conversations?platform=instagram&fields=id,updated_time&limit=5&access_token=${encodeURIComponent(pageToken)}`,
+          );
+          if (res.ok) {
+            success++;
+          } else {
+            failed++;
+            if (res.data?.error?.message) {
+              errors.push(res.data.error.message.slice(0, 100));
+            }
+          }
+        } catch {
+          failed++;
+        }
+      }
+
+      results.push({
+        platform: "instagram",
+        account: account.username ?? account.platformAccountId,
+        calls: 10,
+        success,
+        failed,
+        errors: [...new Set(errors)].slice(0, 3),
+      });
+    }
+
+    // --- Facebook DM test calls ---
+    const fbAccounts = await db
+      .select({
+        platformAccountId: socialAccount.platformAccountId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        metadata: socialAccount.metadata,
+        username: socialAccount.username,
+      })
+      .from(socialAccount)
+      .where(eq(socialAccount.platform, "facebook" as never))
+      .limit(5);
+
+    for (const account of fbAccounts) {
+      if (!account.accessTokenEnc) continue;
+
+      let token: string;
+      try {
+        token = decrypt(account.accessTokenEnc);
+      } catch {
+        continue;
+      }
+
+      // Facebook uses Page token for DM
+      const pageToken =
+        typeof account.metadata === "object" &&
+        account.metadata !== null &&
+        typeof (account.metadata as Record<string, unknown>).pageAccessToken === "string"
+          ? ((account.metadata as Record<string, unknown>).pageAccessToken as string)
+          : token;
+
+      let success = 0;
+      let failed = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < 10; i++) {
+        try {
+          const res = await fetchJson<{
+            data?: Array<{ id: string }>;
+            error?: { message?: string };
+          }>(
+            `${GRAPH_FB}/${account.platformAccountId}/conversations?fields=id,updated_time&limit=5&access_token=${encodeURIComponent(pageToken)}`,
+          );
+          if (res.ok) {
+            success++;
+          } else {
+            failed++;
+            if (res.data?.error?.message) {
+              errors.push(res.data.error.message.slice(0, 100));
+            }
+          }
+        } catch {
+          failed++;
+        }
+      }
+
+      results.push({
+        platform: "facebook",
+        account: account.username ?? account.platformAccountId,
+        calls: 10,
+        success,
+        failed,
+        errors: [...new Set(errors)].slice(0, 3),
+      });
+    }
+
+    await logAdminAction(c, null, {
+      action: "dm_permissions.trigger",
+      entityType: "social_account",
+      metadata: {
+        results: results.map((r) => ({
+          platform: r.platform,
+          success: r.success,
+          failed: r.failed,
+        })),
+      },
+    });
+
+    return c.json({
+      success: true,
+      message: "DM permission test calls completed",
+      results,
+      nextSteps: [
+        "Buka Meta Developer Console → App Review → Permissions and Features",
+        "Cek 'panggilan API uji' sudah bertambah untuk instagram_business_manage_messages dan pages_messaging",
+        "Jika semua test calls berhasil (success=10), submit untuk review",
+      ],
+    });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+});
