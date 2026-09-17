@@ -52,7 +52,7 @@ type MetaConversation = {
   messages?: { data?: MetaMessage[] };
 };
 
-/** Error Meta: permission belum granted / app belum live — bukan error sesungguhnya */
+/** Error Meta: permission belum granted / app belum live — perlu logging untuk debugging */
 function isPermissionError(body: string): boolean {
   // code 10 = permission tidak diberikan; code 3 = app mode / scope;
   // subcode 2202 (IG messaging dev mode), 2018108 (account tidak eligibel)
@@ -204,16 +204,25 @@ export async function syncAccountDMs(ctx: {
   if (platform === "linkedin" || platform === "linkedin_org") {
     return syncLinkedInDMs(ctx);
   }
+  // Threads tidak punya DM API — scope threads_read_replies hanya utk reply thread publik
+  if (platform === "threads") {
+    return { platform, newItems: 0 };
+  }
   if (platform !== "instagram" && platform !== "instagram_standalone" && platform !== "facebook") {
     return { platform, newItems: 0 };
   }
 
   const base = platform === "instagram_standalone" ? GRAPH_IG : GRAPH_FB;
   // Jalur instagram (FB Login) butuh Page token; facebook juga (metadata.pageAccessToken)
+  const hasPageToken = typeof ctx.account.metadata?.pageAccessToken === "string";
   const token =
     (typeof ctx.account.metadata?.pageAccessToken === "string"
       ? (ctx.account.metadata.pageAccessToken as string)
       : null) ?? ctx.accessToken;
+
+  console.log(
+    `[dm-sync] ${platform} syncing: platformAccountId=${ctx.account.platformAccountId} hasPageToken=${hasPageToken} tokenLen=${token.length}`,
+  );
 
   const convRes = await httpRequest<{ data?: MetaConversation[] }>(
     `${base}/${ctx.account.platformAccountId}/conversations`,
@@ -233,8 +242,11 @@ export async function syncAccountDMs(ctx: {
     const body = await convRes.text().catch(() => "");
     if (isPermissionError(body)) {
       // Permission instagram_manage_messages / pages_messaging belum di-grant —
-      // wajar saat app masih dev mode; skip tanpa error
-      return { platform, newItems: 0 };
+      // log untuk debugging, tapi skip agar sync lain tetap jalan
+      console.warn(
+        `[dm-sync] ${platform} permission/mode error (${convRes.status}): ${body.slice(0, 200)}`,
+      );
+      return { platform, newItems: 0, error: `permission/mode: ${body.slice(0, 100)}` };
     }
     console.warn(
       `[dm-sync] ${platform} conversations API error (${convRes.status}): ${body.slice(0, 200)}`,
@@ -243,6 +255,9 @@ export async function syncAccountDMs(ctx: {
   }
 
   const conversations = (await convRes.json()).data ?? [];
+  console.log(
+    `[dm-sync] ${platform} conversations API OK: ${conversations.length} conversations found`,
+  );
   let newItems = 0;
 
   for (const conv of conversations) {
@@ -523,6 +538,7 @@ export async function syncDueDMAccounts(
           "instagram",
           "instagram_standalone",
           "facebook",
+          "threads",
           "linkedin",
         ]),
       ),
