@@ -208,7 +208,12 @@ dmRoute.post("/:id/reply", async (c) => {
             : null) ?? accessToken;
 
         const result = await sendDMReply({
-          platform: row.platform as "instagram" | "instagram_standalone" | "facebook" | "linkedin" | "linkedin_org",
+          platform: row.platform as
+            | "instagram"
+            | "instagram_standalone"
+            | "facebook"
+            | "linkedin"
+            | "linkedin_org",
           accessToken: token,
           platformAccountId: row.platformAccountId,
           partnerId: row.conversation.partnerId,

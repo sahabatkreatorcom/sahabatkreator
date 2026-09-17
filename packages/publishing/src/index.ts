@@ -1,6 +1,5 @@
 // @sahabatkreator/publishing — adapter platform + pipeline publish post
 
-export * from "./config";
 export { getAdapter, supportedPlatforms } from "./adapters";
 export {
   type AccountMetrics,
@@ -20,6 +19,7 @@ export {
   personalize,
   processAutomation,
 } from "./automation";
+export * from "./config";
 export {
   sendDMReply,
   syncAccountDMs,
