@@ -1,14 +1,16 @@
 // Inbox DM — percakapan direct message Instagram/Facebook (master-detail)
 // List kiri: percakapan dengan badge unread. Thread kanan: bubble + composer.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
+import { ChevronLeft, ChevronRight, Inbox, Loader2, RefreshCw } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   ConversationList,
   ConversationListHeader,
   type DmConversation,
 } from "@/components/inbox/conversation-list";
 import { MessageThread } from "@/components/inbox/message-thread";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 
 export default function InboxPage() {
@@ -17,6 +19,25 @@ export default function InboxPage() {
   const [q, setQ] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [page, setPage] = useState(1);
+
+  const syncNow = useMutation({
+    mutationFn: () =>
+      api.post<{ accounts: number; newMessages: number; errors: string[] }>("/dm/sync-now"),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["dm-conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["dm-unread-count"] });
+      if (res.errors.length > 0) {
+        toast.error(`Sync DM gagal pada ${res.errors.length} akun`, { description: res.errors[0] });
+      } else {
+        toast.success(
+          res.newMessages > 0
+            ? `Sync selesai — ${res.newMessages} pesan baru`
+            : "Sync selesai — tidak ada pesan baru",
+        );
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["dm-conversations", unreadOnly, q, page],
@@ -54,11 +75,17 @@ export default function InboxPage() {
             Percakapan direct message Instagram &amp; Facebook — sync otomatis tiap 15 menit.
           </p>
         </div>
-        {unreadMessages > 0 && (
-          <span className="rounded-full bg-[var(--accent-gold-light)] px-3 py-1 font-semibold text-[var(--accent-gold)] text-sm">
-            {unreadMessages} pesan belum dibaca
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {unreadMessages > 0 && (
+            <span className="rounded-full bg-[var(--accent-gold-light)] px-3 py-1 font-semibold text-[var(--accent-gold)] text-sm">
+              {unreadMessages} pesan belum dibaca
+            </span>
+          )}
+          <Button size="sm" variant="outline" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
+            {syncNow.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            {syncNow.isPending ? "Menyinkronkan..." : "Sinkronkan"}
+          </Button>
+        </div>
       </div>
 
       <div className="grid h-[calc(100vh-13rem)] min-h-[30rem] grid-cols-1 gap-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-light)] bg-[var(--bg-secondary)] md:grid-cols-5">

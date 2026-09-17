@@ -55,7 +55,6 @@ const TABS = [
   { value: undefined, label: "Semua", icon: MessagesSquare },
   { value: "comment", label: "Komentar", icon: MessageCircle },
   { value: "mention", label: "Mention", icon: AtSign },
-  { value: "dm", label: "DM", icon: MessagesSquare },
   { value: "review", label: "Review", icon: Star },
   { value: "collab", label: "Collab IG", icon: Users },
 ] as const;

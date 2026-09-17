@@ -7,7 +7,7 @@ import {
   member,
   socialAccount,
 } from "@sahabatkreator/db/schema";
-import { PublishError, sendDMReply } from "@sahabatkreator/publishing";
+import { PublishError, sendDMReply, syncAccountDMs } from "@sahabatkreator/publishing";
 import { and, asc, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -16,6 +16,69 @@ import { decrypt } from "../lib/crypto";
 import { generateId } from "../lib/id";
 
 export const dmRoute = new Hono();
+
+/** POST /dm/sync-now — pull conversations for connected DM accounts in this org. */
+dmRoute.post("/sync-now", async (c) => {
+  try {
+    const ctx = await requirePermission(c, "engagement.view");
+    const accounts = await db
+      .select({
+        id: socialAccount.id,
+        organizationId: socialAccount.organizationId,
+        platform: socialAccount.platform,
+        platformAccountId: socialAccount.platformAccountId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        metadata: socialAccount.metadata,
+      })
+      .from(socialAccount)
+      .where(
+        and(
+          eq(socialAccount.organizationId, ctx.organization.id),
+          eq(socialAccount.isConnected, true),
+          sql`${socialAccount.platform} IN ('instagram', 'instagram_standalone', 'facebook')`,
+        ),
+      )
+      .limit(20);
+
+    const results = await Promise.allSettled(
+      accounts.map(async (account) => {
+        if (!account.accessTokenEnc) {
+          return { platform: account.platform, newMessages: 0, error: "Token tidak tersedia" };
+        }
+        const accessToken = decrypt(account.accessTokenEnc);
+        const result = await syncAccountDMs({
+          account: {
+            id: account.id,
+            organizationId: account.organizationId,
+            platform: account.platform,
+            platformAccountId: account.platformAccountId,
+            metadata: account.metadata,
+          },
+          accessToken,
+        });
+        await db
+          .update(socialAccount)
+          .set({ lastDmSyncedAt: new Date() })
+          .where(eq(socialAccount.id, account.id));
+        return { platform: account.platform, newMessages: result.newItems, error: result.error };
+      }),
+    );
+
+    const summary = results.map((result) =>
+      result.status === "fulfilled"
+        ? result.value
+        : { platform: "unknown", newMessages: 0, error: String(result.reason) },
+    );
+    return c.json({
+      ok: true,
+      accounts: summary.length,
+      newMessages: summary.reduce((sum, result) => sum + result.newMessages, 0),
+      errors: summary.filter((result) => result.error).map((result) => `${result.platform}: ${result.error}`),
+    });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
 
 /**
  * GET /dm — list percakapan (satu SELECT berkat materialized fields).
