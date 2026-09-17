@@ -80,6 +80,7 @@ export function MessageThread({
         toast.success("Balasan terkirim");
       }
       setReply("");
+      textareaRef.current?.focus();
       queryClient.invalidateQueries({ queryKey: ["dm-thread", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["dm-conversations"] });
       queryClient.invalidateQueries({ queryKey: ["dm-unread-count"] });
@@ -105,6 +106,14 @@ export function MessageThread({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, conversationId]);
+
+  // Auto-grow textarea mengikuti isi (maks setara max-h-32 = 128px)
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }, [reply]);
 
   // Enter kirim / Shift+Enter newline (pattern chat standard)
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {

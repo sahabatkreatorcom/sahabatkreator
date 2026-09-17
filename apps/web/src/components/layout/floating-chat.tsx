@@ -1,9 +1,10 @@
-// Floating AI chat — tombol sticky kanan bawah, tampil di semua halaman.
+// Floating AI chat — tombol sticky kanan bawah, tampil di hampir semua halaman.
+// Disembunyikan di /inbox (composer balasan menempati area yang sama).
 // Guest → kartu CTA masuk; user login → panel chat SEB ringkas.
 import { useQuery } from "@tanstack/react-query";
 import { Bot, MessageCircle, Sparkles, X } from "lucide-react";
 import { useState } from "react";
-import { Link, Outlet } from "react-router";
+import { Link, Outlet, useLocation } from "react-router";
 import { SebChatPanel } from "@/components/seb/chat-panel";
 import { meQueryOptions } from "@/layouts/require-auth";
 
@@ -19,10 +20,15 @@ export function AppShell() {
 
 export function FloatingChat() {
   const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
   const { data, isLoading } = useQuery(meQueryOptions);
 
+  // Inbox punya composer balasan di kanan bawah — FAB di sini menutupi tombol
+  // kirim. Sembunyikan saja; AI tetap bisa diakses dari halaman /assistant.
+  const hiddenOnRoute = pathname.startsWith("/inbox");
+
   // Jangan tampilkan apapun sebelum status auth diketahui (hindari kedipan)
-  if (isLoading) return null;
+  if (isLoading || hiddenOnRoute) return null;
 
   return (
     <>
