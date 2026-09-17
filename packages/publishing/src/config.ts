@@ -8,8 +8,6 @@ import { env } from "@sahabatkreator/env/server";
 
 /** Versi Graph API Meta (pin di env; riset docs/social-platforms/meta-facebook.md) */
 export const META_GRAPH_VERSION = env.META_GRAPH_VERSION || "v26.0";
-/** Facebook Login for Business config ID; needed for Page messaging permissions. */
-export const FACEBOOK_LOGIN_CONFIG_ID = env.FACEBOOK_LOGIN_CONFIG_ID;
 
 /** Versi API LinkedIn — sunset bulanan, update rutin via env */
 export const LINKEDIN_API_VERSION = env.LINKEDIN_API_VERSION || "202608";

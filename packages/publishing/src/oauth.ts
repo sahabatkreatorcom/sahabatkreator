@@ -8,7 +8,6 @@
 
 import {
   GBP_ACCOUNT_API_URL,
-  FACEBOOK_LOGIN_CONFIG_ID,
   GOOGLE_OAUTH_AUTH_URL,
   GOOGLE_OAUTH_TOKEN_URL,
   GRAPH_FB_URL,
@@ -273,13 +272,7 @@ function parseExtraScopes(cred: AppCredential): string[] {
 
 /** Daftar scope lengkap yang diminta (config + extra, tanpa duplikat, urut stabil) */
 function requestedScopes(platform: OAuthPlatform, cred: AppCredential): string[] {
-  const scopes = [...OAUTH_CONFIGS[platform].scopes, ...parseExtraScopes(cred)];
-  // Meta only accepts pages_messaging through a Facebook Login for Business
-  // configuration. Do not send it through the legacy dialog without config_id.
-  if (platform === "facebook" && !FACEBOOK_LOGIN_CONFIG_ID) {
-    return [...new Set(scopes.filter((scope) => scope !== "pages_messaging"))];
-  }
-  return [...new Set(scopes)];
+  return [...new Set([...OAUTH_CONFIGS[platform].scopes, ...parseExtraScopes(cred)])];
 }
 
 /** Scope yang benar-benar di-grant platform (response token field "scope") — fallback ke requested */
@@ -311,9 +304,6 @@ export function buildAuthorizeUrl(
     response_type: "code",
     scope: requestedScopes(platform, cred).join(sep),
     state,
-    ...(platform === "facebook" && FACEBOOK_LOGIN_CONFIG_ID
-      ? { config_id: FACEBOOK_LOGIN_CONFIG_ID }
-      : {}),
     ...(config.extraAuthorizeParams ?? {}),
   });
   return `${config.authorizeUrl}?${params.toString()}`;

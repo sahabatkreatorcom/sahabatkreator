@@ -43,8 +43,6 @@ export const env = createEnv({
     // (playbook docs/social-platforms/app-review-playbook.md)
     META_APP_ID: z.string().optional(),
     META_APP_SECRET: z.string().optional(),
-    // Facebook Login for Business configuration ID (required for pages_messaging)
-    FACEBOOK_LOGIN_CONFIG_ID: z.string().optional(),
     // Instagram Login standalone — app terpisah dari Meta app utama
     INSTAGRAM_APP_ID: z.string().optional(),
     INSTAGRAM_APP_SECRET: z.string().optional(),
