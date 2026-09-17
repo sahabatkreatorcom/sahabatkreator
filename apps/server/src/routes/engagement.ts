@@ -156,6 +156,7 @@ engagementRoute.delete("/comments/:id", async (c) => {
 engagementRoute.post("/sync-now", async (c) => {
   try {
     const ctx = await requireOrg(c);
+    console.log(`[engagement] sync-now triggered for org ${ctx.organization.id}`);
 
     // Semua akun terhubung org (manual tidak punya API utk sync)
     const accounts = await db
@@ -176,6 +177,8 @@ engagementRoute.post("/sync-now", async (c) => {
       )
       .limit(50);
 
+    console.log(`[engagement] sync-now: ${accounts.length} connected accounts`);
+
     // TODO(performance): sync dijalankan sinkron karena frontend membaca hasil
     // (newItems/errors) di response. Jika jadi lambat, ubah jadi fire-and-forget
     // (job queue + response 202) dan tampilkan progres via polling/websocket.
@@ -193,6 +196,7 @@ engagementRoute.post("/sync-now", async (c) => {
       try {
         accessToken = decrypt(account.accessTokenEnc);
       } catch {
+        console.warn(`[engagement] sync-now: decrypt failed for ${account.platform} (${account.id})`);
         results.push({
           platform: account.platform,
           newItems: 0,
@@ -215,6 +219,10 @@ engagementRoute.post("/sync-now", async (c) => {
       });
       results.push(result);
       newItems += result.newItems;
+      console.log(
+        `[engagement] sync-now: ${account.platform} (${account.id}): newItems=${result.newItems}` +
+          (result.error ? ` error=${result.error}` : ""),
+      );
 
       // Update lastSyncedAt agar worker polling tidak double-sync segera
       await db
@@ -224,6 +232,9 @@ engagementRoute.post("/sync-now", async (c) => {
     }
 
     const errors = results.filter((r) => r.error);
+    console.log(
+      `[engagement] sync-now done: accounts=${results.length} newItems=${newItems} errors=${errors.length}`,
+    );
     return c.json({
       ok: true,
       accounts: results.length,
@@ -231,6 +242,7 @@ engagementRoute.post("/sync-now", async (c) => {
       errors: errors.map((e) => `${e.platform}: ${e.error}`),
     });
   } catch (error) {
+    console.error("[engagement] sync-now error:", error);
     return errorResponse(error);
   }
 });

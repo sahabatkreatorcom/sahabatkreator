@@ -485,6 +485,9 @@ analyticsRoute.get("/demographics", async (c) => {
     );
     if (!res.ok) {
       const text = await res.text().catch(() => "");
+      console.warn(
+        `[analytics] demographics upstream error (${res.status}) for ${account.username}: ${text.slice(0, 300)}`,
+      );
       throw new HTTPError(
         502,
         `Gagal mengambil data demografi dari Instagram: ${text.slice(0, 150)}`,
