@@ -119,6 +119,7 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
       "instagram_manage_comments",
       "instagram_manage_messages",
       "instagram_manage_insights", // media insights utk analytics
+      "pages_messaging", // Messenger API for Instagram via linked Facebook Page
     ],
   },
   // Instagram standalone — Business Login for Instagram (IG Login)
@@ -144,6 +145,7 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
       "pages_manage_posts",
       "pages_read_engagement",
       "pages_manage_engagement", // reply komentar Page
+      "pages_messaging", // read/reply Facebook Page conversations
     ],
   },
   threads: {
