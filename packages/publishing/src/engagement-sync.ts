@@ -413,7 +413,7 @@ async function syncTikTok(ctx: SyncContext): Promise<SyncResult> {
   }>(`${TIKTOK_OPEN_API_URL}/video/list/`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ max_count: 10 }),
+    body: JSON.stringify({ max_count: 10, fields: ["id", "create_time", "title"] }),
     retries: 1,
   });
   if (!videosRes.ok) {
@@ -438,7 +438,7 @@ async function syncTikTok(ctx: SyncContext): Promise<SyncResult> {
     }>(`${TIKTOK_OPEN_API_URL}/comment/list/`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ video_id: video.id, max_count: 50 }),
+      body: JSON.stringify({ video_id: video.id, max_count: 50, fields: ["id", "text", "create_time", "user"] }),
       retries: 1,
     });
     if (!commentsRes.ok) continue;
