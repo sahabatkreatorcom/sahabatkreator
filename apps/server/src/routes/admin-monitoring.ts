@@ -17,7 +17,7 @@ import {
   subscription,
   user,
 } from "@sahabatkreator/db/schema";
-import { count, desc, eq, gte, sql } from "drizzle-orm";
+import { count, desc, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { errorResponse, requirePlatformAdmin } from "../lib/auth-guard";
 
@@ -48,16 +48,6 @@ type MonitoringResponse = {
     platform: string;
     count: number;
   }>;
-  topOrganizations: Array<{
-    id: string;
-    name: string;
-    postCount: number;
-    memberCount: number;
-  }>;
-  storage: {
-    mediaCount: number;
-    totalMediaSizeEstimate: string;
-  };
   auth: {
     activeSessions: number;
     totalUsers: number;
@@ -73,23 +63,31 @@ type MonitoringResponse = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function rowCount(table: { _: unknown }): Promise<number> {
-  const [result] = await db.select({ value: count() }).from(table);
-  return result?.value ?? 0;
+async function safeCount(table: { _: unknown }): Promise<number> {
+  try {
+    const [result] = await db.select({ value: count() }).from(table);
+    return result?.value ?? 0;
+  } catch {
+    return -1;
+  }
 }
 
-async function countSince(
+async function safeCountSince(
   table: { _: unknown },
   dateColumn: { _: unknown },
   daysAgo: number,
 ): Promise<number> {
-  const since = new Date();
-  since.setDate(since.getDate() - daysAgo);
-  const [result] = await db
-    .select({ value: count() })
-    .from(table)
-    .where(gte(dateColumn as never, since as never));
-  return result?.value ?? 0;
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - daysAgo);
+    const [result] = await db
+      .select({ value: count() })
+      .from(table)
+      .where(sql`${dateColumn as string} >= ${since}`);
+    return result?.value ?? 0;
+  } catch {
+    return -1;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -118,22 +116,20 @@ monitoringRoute.get("/", async (c) => {
       engagementCount,
       analyticsCount,
       postAnalyticsCount,
-      automationLogCount,
       notificationCount,
     ] = await Promise.all([
-      rowCount(user),
-      rowCount(session),
-      rowCount(postGroup),
-      rowCount(post),
-      rowCount(media),
-      rowCount(socialAccount),
-      rowCount(subscription),
-      rowCount(payment),
-      rowCount(engagementItem),
-      rowCount(accountAnalytics),
-      rowCount(postAnalytics),
-      rowCount(automationLog),
-      rowCount(notification),
+      safeCount(user),
+      safeCount(session),
+      safeCount(postGroup),
+      safeCount(post),
+      safeCount(media),
+      safeCount(socialAccount),
+      safeCount(subscription),
+      safeCount(payment),
+      safeCount(engagementItem),
+      safeCount(accountAnalytics),
+      safeCount(postAnalytics),
+      safeCount(notification),
     ]);
 
     // 3. Recent activity metrics
@@ -142,62 +138,75 @@ monitoringRoute.get("/", async (c) => {
       postsLast7d,
       newUsersLast7d,
       newSubscriptionsLast7d,
-      failedPaymentsLast24h,
       engagementItemsLast24h,
     ] = await Promise.all([
-      countSince(post, post.createdAt, 1),
-      countSince(post, post.createdAt, 7),
-      countSince(user, user.createdAt, 7),
-      countSince(subscription, subscription.createdAt, 7),
-      // failed payments — approximate by looking for status != 'succeeded' in last 24h
-      db
-        .select({ value: count() })
-        .from(payment)
-        .where(
-          sql`${payment.status} != 'succeeded' AND ${payment.createdAt} >= NOW() - INTERVAL '24 hours'`,
-        )
-        .then((r) => r[0]?.value ?? 0),
-      countSince(engagementItem, engagementItem.createdAt, 1),
+      safeCountSince(post, post.createdAt, 1),
+      safeCountSince(post, post.createdAt, 7),
+      safeCountSince(user, user.createdAt, 7),
+      safeCountSince(subscription, subscription.createdAt, 7),
+      safeCountSince(engagementItem, engagementItem.createdAt, 1),
     ]);
 
+    // Failed payments in last 24h
+    let failedPaymentsLast24h = 0;
+    try {
+      const [result] = await db
+        .select({ value: count() })
+        .from(payment)
+        .where(sql`${payment.status} != 'succeeded' AND ${payment.createdAt} >= NOW() - INTERVAL '24 hours'`);
+      failedPaymentsLast24h = result?.value ?? 0;
+    } catch {
+      failedPaymentsLast24h = -1;
+    }
+
     // 4. Platform accounts distribution
-    const platformAccounts = await db
-      .select({
-        platform: socialAccount.platform,
-        value: count(),
-      })
-      .from(socialAccount)
-      .groupBy(socialAccount.platform);
+    let platformAccounts: Array<{ platform: string; count: number }> = [];
+    try {
+      const rows = await db
+        .select({
+          platform: socialAccount.platform,
+          value: count(),
+        })
+        .from(socialAccount)
+        .groupBy(socialAccount.platform);
+      platformAccounts = rows.map((r) => ({ platform: r.platform ?? "unknown", count: r.value }));
+    } catch {
+      platformAccounts = [];
+    }
 
-    // 5. Top organizations by post count
-    const topOrgs = await db
-      .select({
-        id: postGroup.organizationId,
-        value: count(),
-      })
-      .from(postGroup)
-      .groupBy(postGroup.organizationId)
-      .orderBy(desc(count()))
-      .limit(5);
+    // 5. Auth stats
+    let activeSessions = 0;
+    try {
+      const [result] = await db
+        .select({ value: count() })
+        .from(session)
+        .where(sql`${session.expiresAt} > NOW()`);
+      activeSessions = result?.value ?? 0;
+    } catch {
+      activeSessions = -1;
+    }
 
-    // 6. Auth stats
-    const activeSessions = await db
-      .select({ value: count() })
-      .from(session)
-      .where(sql`${session.expiresAt} > NOW()`)
-      .then((r) => r[0]?.value ?? 0);
-
-    // 7. Recent errors (from automation_log where status = 'failed')
-    const recentErrors = await db
-      .select({
-        timestamp: automationLog.createdAt,
-        type: automationLog.platform,
-        message: automationLog.error,
-      })
-      .from(automationLog)
-      .where(sql`${automationLog.status} = 'failed'`)
-      .orderBy(desc(automationLog.createdAt))
-      .limit(10);
+    // 6. Recent errors (from automation_log where status = 'failed')
+    let recentErrors: Array<{ timestamp: string; type: string; message: string }> = [];
+    try {
+      const rows = await db
+        .select({
+          timestamp: automationLog.occurredAt,
+          type: automationLog.source,
+          message: automationLog.error,
+        })
+        .from(automationLog)
+        .where(sql`${automationLog.status} = 'failed'`)
+        .orderBy(desc(automationLog.occurredAt))
+        .limit(10);
+      recentErrors = rows.map((r) => ({
+        timestamp: r.timestamp?.toISOString() ?? "",
+        type: r.type ?? "unknown",
+        message: r.message ?? "",
+      }));
+    } catch {
+      recentErrors = [];
+    }
 
     const response: MonitoringResponse = {
       generatedAt: new Date().toISOString(),
@@ -217,7 +226,6 @@ monitoringRoute.get("/", async (c) => {
         { label: "Engagement Items", value: engagementCount },
         { label: "Account Analytics", value: analyticsCount },
         { label: "Post Analytics", value: postAnalyticsCount },
-        { label: "Automation Logs", value: automationLogCount },
         { label: "Notifications", value: notificationCount },
       ],
       recentActivity: {
@@ -228,29 +236,12 @@ monitoringRoute.get("/", async (c) => {
         failedPaymentsLast24h,
         engagementItemsLast24h,
       },
-      platformAccounts: platformAccounts.map((r) => ({
-        platform: r.platform,
-        count: r.value,
-      })),
-      topOrganizations: topOrgs.map((r) => ({
-        id: r.id,
-        name: r.id, // org name not in postGroup, use ID
-        postCount: r.value,
-        memberCount: 0,
-      })),
-      storage: {
-        mediaCount,
-        totalMediaSizeEstimate: "N/A", // R2 size not easily queryable
-      },
+      platformAccounts,
       auth: {
         activeSessions,
         totalUsers: userCount,
       },
-      recentErrors: recentErrors.map((r) => ({
-        timestamp: r.timestamp?.toISOString() ?? "",
-        type: r.type ?? "unknown",
-        message: r.message ?? "",
-      })),
+      recentErrors,
     };
 
     return c.json(response);
