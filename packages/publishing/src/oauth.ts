@@ -401,7 +401,7 @@ export async function exchangeCodeForToken(
   };
 }
 
-/** Refresh token (AT habis — TikTok 24j, Pinterest 30hr, Google, LinkedIn 60hr) */
+/** Refresh token (AT habis — Instagram/Threads, TikTok, Pinterest, Google, LinkedIn) */
 export async function refreshAccessToken(
   platform: OAuthPlatform,
   cred: AppCredential,
@@ -446,6 +446,48 @@ export async function refreshAccessToken(
       accessToken: data.access_token,
       // Token hasil refresh = AT sekaligus "refresh token" berikutnya
       refreshToken: data.access_token,
+      expiresAt:
+        Number.isFinite(expiresIn) && expiresIn > 0
+          ? new Date(Date.now() + expiresIn * 1000)
+          : null,
+      scopes: requestedScopes(platform, cred),
+    };
+  }
+
+  // Instagram Login: refresh long-lived user token via graph.instagram.com.
+  // The token endpoint used for authorization-code exchange does not accept
+  // the generic OAuth refresh_token POST flow.
+  if (platform === "instagram_standalone") {
+    const res = await httpRequest<{ access_token?: string; expires_in?: number }>(
+      `${GRAPH_IG_URL}/refresh_access_token`,
+      {
+        query: {
+          grant_type: "ig_refresh_token",
+          access_token: refreshToken,
+        },
+      },
+    );
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new PublishError(
+        "oauth_refresh_failed",
+        `Refresh token ${platform} gagal (${res.status}): ${text.slice(0, 200)} — hubungkan ulang akun.`,
+        false,
+      );
+    }
+    const data = await res.json();
+    if (!data.access_token) {
+      throw new PublishError(
+        "oauth_no_token",
+        `Refresh ${platform} tidak berisi access_token`,
+        false,
+      );
+    }
+    const expiresIn = Number(data.expires_in);
+    return {
+      accessToken: data.access_token,
+      // Instagram refresh keeps the same long-lived token family.
+      refreshToken,
       expiresAt:
         Number.isFinite(expiresIn) && expiresIn > 0
           ? new Date(Date.now() + expiresIn * 1000)

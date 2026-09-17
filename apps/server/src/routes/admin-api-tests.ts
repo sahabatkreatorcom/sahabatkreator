@@ -16,6 +16,7 @@ import {
   LINKEDIN_REST_URL,
   LINKEDIN_USERINFO_URL,
   PINTEREST_API_BASE_URL,
+  refreshDueTokens,
   TIKTOK_OPEN_API_URL,
   YOUTUBE_API_URL,
 } from "@sahabatkreator/publishing";
@@ -524,6 +525,11 @@ async function runMetaSuite(
   graphUrl = GRAPH_FB_URL,
 ): Promise<TestResult[]> {
   const cred = await getCredential(platform);
+  if (platform === "instagram_standalone") {
+    // Refresh the long-lived token before validating /me. The worker normally
+    // does this hourly, but an admin test should not race that schedule.
+    await refreshDueTokens(20);
+  }
   const userToken = await getStoredUserToken(socialAccountPlatform);
 
   return [
