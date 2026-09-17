@@ -11,6 +11,8 @@ import {
   GOOGLE_OAUTH_AUTH_URL,
   GOOGLE_OAUTH_TOKEN_URL,
   GRAPH_FB_URL,
+  GRAPH_IG_EXCHANGE_LONG_LIVED_URL,
+  GRAPH_IG_REFRESH_URL,
   GRAPH_IG_URL,
   GRAPH_THREADS_EXCHANGE_LONG_LIVED_URL,
   GRAPH_THREADS_OAUTH_URL,
@@ -389,12 +391,36 @@ export async function exchangeCodeForToken(
     // refresh scheduler akan coba lagi dan menandai needsReconnect bila gagal.
   }
 
+  // Instagram standalone (IG Login): token exchange awal hanya short-lived (~1 jam) —
+  // langsung upgrade ke long-lived 60 hari via grant_type=ig_exchange_token.
+  // Tanpa ini token expired dalam 1 jam setelah connect.
+  if (platform === "instagram_standalone") {
+    const longLived = await httpRequest<{ access_token?: string; expires_in?: number }>(
+      GRAPH_IG_EXCHANGE_LONG_LIVED_URL,
+      {
+        query: {
+          grant_type: "ig_exchange_token",
+          client_secret: cred.clientSecret,
+          access_token: accessToken,
+        },
+      },
+    );
+    if (longLived.ok) {
+      const ld = await longLived.json();
+      if (ld.access_token) {
+        accessToken = ld.access_token;
+        if (ld.expires_in) expiresIn = ld.expires_in; // ~5184000 (60 hari)
+      }
+    }
+    // Gagal upgrade → lanjut dengan short-lived; refresh scheduler menandai needsReconnect.
+  }
+
   return {
     accessToken,
-    // Threads: token long-lived juga dipakai untuk refresh berikutnya
-    // (th_refresh_token) — simpan sebagai refreshToken supaya scheduler jalan.
+    // Threads & instagram_standalone: token long-lived juga dipakai untuk refresh berikutnya —
+    // simpan sebagai refreshToken supaya scheduler jalan.
     refreshToken:
-      platform === "threads"
+      platform === "threads" || platform === "instagram_standalone"
         ? accessToken
         : (data.refresh_token ?? data.data?.refresh_token ?? undefined),
     expiresAt:
@@ -458,12 +484,12 @@ export async function refreshAccessToken(
     };
   }
 
-  // Instagram Login: refresh long-lived user token via graph.instagram.com.
+  // Instagram Login: refresh long-lived user token via GRAPH_IG_REFRESH_URL.
   // The token endpoint used for authorization-code exchange does not accept
   // the generic OAuth refresh_token POST flow.
   if (platform === "instagram_standalone") {
     const res = await httpRequest<{ access_token?: string; expires_in?: number }>(
-      `${GRAPH_IG_URL}/refresh_access_token`,
+      GRAPH_IG_REFRESH_URL,
       {
         query: {
           grant_type: "ig_refresh_token",
@@ -491,7 +517,7 @@ export async function refreshAccessToken(
     return {
       accessToken: data.access_token,
       // Instagram refresh keeps the same long-lived token family.
-      refreshToken,
+      refreshToken: data.access_token,
       expiresAt:
         Number.isFinite(expiresIn) && expiresIn > 0
           ? new Date(Date.now() + expiresIn * 1000)

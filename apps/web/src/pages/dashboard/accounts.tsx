@@ -42,8 +42,22 @@ type Account = {
   needsReconnect: boolean;
   lastSyncedAt: string | null;
   lastError: string | null;
+  tokenExpiresAt: string | null;
   createdAt: string;
 };
+
+/** Hitung status expiry token — null bila token tidak ada batasnya (manual/bluesky) */
+function tokenExpiryStatus(
+  tokenExpiresAt: string | null,
+): { label: string; variant: "warning" | "danger" } | null {
+  if (!tokenExpiresAt) return null;
+  const msLeft = new Date(tokenExpiresAt).getTime() - Date.now();
+  const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+  if (daysLeft <= 0) return { label: "Token sudah expired", variant: "danger" };
+  if (daysLeft <= 2) return { label: `Token habis ${daysLeft} hari lagi`, variant: "danger" };
+  if (daysLeft <= 7) return { label: `Token habis ${daysLeft} hari lagi`, variant: "warning" };
+  return null;
+}
 
 export function AccountsPage() {
   const queryClient = useQueryClient();
@@ -189,15 +203,19 @@ export function AccountsPage() {
             const Icon = cfg?.icon;
             const needsReconnection =
               !account.isConnected || !!account.lastError || account.needsReconnect;
+            const expiry = !needsReconnection ? tokenExpiryStatus(account.tokenExpiresAt) : null;
+            const cardHighlight = needsReconnection
+              ? "border-orange-300 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-950/20"
+              : expiry?.variant === "danger"
+                ? "border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20"
+                : expiry?.variant === "warning"
+                  ? "border-yellow-300 bg-yellow-50/40 dark:border-yellow-700 dark:bg-yellow-950/20"
+                  : "";
 
             return (
               <div
                 key={account.id}
-                className={`card flex flex-col p-5 ${
-                  needsReconnection
-                    ? "border-orange-300 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-950/20"
-                    : ""
-                }`}
+                className={`card flex flex-col p-5 ${cardHighlight}`}
               >
                 {/* Top: Avatar user (fallback icon platform) + name + status badge, info button */}
                 <div className="flex items-center justify-between">
@@ -250,22 +268,34 @@ export function AccountsPage() {
                 {needsReconnection && (
                   <div className="mt-3 flex items-center gap-1.5 text-orange-600 text-sm dark:text-orange-400">
                     <AlertTriangle className="h-4 w-4" />
-                    <span>Needs reconnection</span>
+                    <span>Perlu dihubungkan ulang</span>
+                  </div>
+                )}
+
+                {/* Token expiry warning */}
+                {!needsReconnection && expiry && (
+                  <div
+                    className={`mt-3 flex items-center gap-1.5 text-sm ${
+                      expiry.variant === "danger"
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-yellow-600 dark:text-yellow-400"
+                    }`}
+                  >
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>{expiry.label} — segera reconnect</span>
                   </div>
                 )}
 
                 {/* Username + copy */}
                 <div className="mt-4">
-                  <p className="font-medium text-[var(--text-primary)] text-sm">
-                    @{account.username}
-                  </p>
-                  <div className="mt-1 flex items-center gap-2 text-[var(--text-muted)] text-xs">
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    <span>Terhubung {formatDate(account.createdAt, "medium")}</span>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium text-[var(--text-primary)] text-sm">
+                      @{account.username}
+                    </p>
                     <button
                       type="button"
                       onClick={() => copyUsername(account.username, account.id)}
-                      className="rounded p-0.5 hover:bg-[var(--bg-tertiary)]"
+                      className="rounded p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
                       title="Salin username"
                     >
                       {copiedId === account.id ? (
@@ -275,7 +305,12 @@ export function AccountsPage() {
                       )}
                     </button>
                   </div>
+                  <div className="mt-1 flex items-center gap-1.5 text-[var(--text-muted)] text-xs">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    <span>Terhubung {formatDate(account.createdAt, "medium")}</span>
+                  </div>
                 </div>
+
 
                 {/* Last sync */}
                 {account.lastSyncedAt && (
@@ -564,12 +599,27 @@ function AccountInfoModal({
   const Icon = cfg?.icon;
   const needsReconnection = !account.isConnected || !!account.lastError || account.needsReconnect;
 
+  const expiryInfo = account.tokenExpiresAt
+    ? (() => {
+        const d = new Date(account.tokenExpiresAt);
+        const daysLeft = Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        const suffix =
+          daysLeft <= 0
+            ? " (sudah expired)"
+            : daysLeft <= 7
+              ? ` (${daysLeft} hari lagi)`
+              : "";
+        return `${formatDate(account.tokenExpiresAt, "medium")}${suffix}`;
+      })()
+    : null;
+
   const rows: Array<{ label: string; value: string }> = [
     { label: "Platform", value: cfg?.label ?? account.platform },
     { label: "Username", value: `@${account.username}` },
     ...(account.displayName ? [{ label: "Nama tampilan", value: account.displayName }] : []),
     { label: "Status", value: needsReconnection ? "Perlu dihubungkan ulang" : "Terhubung" },
     { label: "Terhubung sejak", value: formatDate(account.createdAt, "medium") },
+    ...(expiryInfo ? [{ label: "Token berakhir", value: expiryInfo }] : []),
     ...(account.lastSyncedAt
       ? [
           {

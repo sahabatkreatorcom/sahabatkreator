@@ -34,6 +34,7 @@ accountsRoute.get("/", async (c) => {
         needsReconnect: socialAccount.needsReconnect,
         lastSyncedAt: socialAccount.lastSyncedAt,
         lastError: socialAccount.lastError,
+        tokenExpiresAt: socialAccount.tokenExpiresAt,
         createdAt: socialAccount.createdAt,
       })
       .from(socialAccount)

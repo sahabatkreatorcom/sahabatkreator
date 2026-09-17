@@ -47,6 +47,10 @@ export const META_DIALOG_URL = `https://www.facebook.com/${META_GRAPH_VERSION}/d
 /** OAuth Instagram standalone — Business Login for Instagram (IG Login) */
 export const INSTAGRAM_OAUTH_AUTH_URL = "https://www.instagram.com/oauth/authorize";
 export const INSTAGRAM_OAUTH_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
+/** Upgrade short-lived → long-lived 60 hari (GET, grant_type=ig_exchange_token) */
+export const GRAPH_IG_EXCHANGE_LONG_LIVED_URL = `https://graph.instagram.com/${META_GRAPH_VERSION}/access_token`;
+/** Refresh long-lived token IG Login (GET, grant_type=ig_refresh_token) */
+export const GRAPH_IG_REFRESH_URL = `https://graph.instagram.com/${META_GRAPH_VERSION}/refresh_access_token`;
 /** Open API TikTok (Login Kit + Content Posting API) */
 export const TIKTOK_OPEN_API_URL = "https://open.tiktokapis.com/v2";
 /** Authorize TikTok (login screen) — token exchange & revoke pakai TIKTOK_OPEN_API_URL */
