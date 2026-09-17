@@ -330,13 +330,19 @@ export function AccountsPage() {
 
                 {/* Actions */}
                 <div className="mt-auto pt-4">
-                  {needsReconnection ? (
+                  {needsReconnection || expiry ? (
                     <div className="space-y-2">
                       <div className="flex gap-2">
                         <Button
                           variant="primary"
                           size="sm"
-                          className="flex-1 bg-orange-500 hover:bg-orange-600"
+                          className={`flex-1 ${
+                            expiry?.variant === "danger"
+                              ? "bg-red-500 hover:bg-red-600 text-white"
+                              : expiry?.variant === "warning"
+                                ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                                : "bg-orange-500 hover:bg-orange-600"
+                          }`}
                           onClick={() => reconnect.mutate(account.platform)}
                           disabled={reconnect.isPending}
                         >
