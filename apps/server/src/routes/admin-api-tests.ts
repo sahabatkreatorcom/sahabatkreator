@@ -351,10 +351,11 @@ function checkMetaCredentialFormat(
   };
 }
 
-/** Check (b): app token valid — mint via client_credentials lalu GET /oauth/access_token_info */
+/** Check (b): app token valid — mint via client_credentials lalu, bila didukung, inspect token. */
 async function checkMetaAppToken(
   cred: { clientId: string; clientSecret: string; source: "db" | "env" } | null,
   graphUrl = GRAPH_FB_URL,
+  inspectToken = true,
 ): Promise<Omit<TestResult, "name" | "durationMs">> {
   if (!cred) {
     return { status: "fail", message: "Dilewati — kredensial app belum tersimpan." };
@@ -379,6 +380,15 @@ async function checkMetaAppToken(
     return {
       status: "fail",
       message: `Graph API merespons HTTP ${mintRes.status} saat mint app token — periksa koneksi jaringan.`,
+    };
+  }
+
+  // Threads Graph can mint a valid app token but returns HTTP 400 for the
+  // Facebook Graph-only /oauth/access_token_info inspection endpoint.
+  if (!inspectToken) {
+    return {
+      status: "pass",
+      message: "App token valid — Threads Graph menerima client_id + client_secret.",
     };
   }
 
@@ -495,8 +505,11 @@ async function runMetaSuite(
     await runCheck("Kredensial app tersimpan & format valid", () =>
       Promise.resolve(checkMetaCredentialFormat(cred)),
     ),
-    await runCheck("App token valid (Graph /oauth/access_token_info)", () =>
-      checkMetaAppToken(cred, graphUrl),
+    await runCheck(
+      platform === "threads"
+        ? "App token valid (Threads Graph /oauth/access_token)"
+        : "App token valid (Graph /oauth/access_token_info)",
+      () => checkMetaAppToken(cred, graphUrl, platform !== "threads"),
     ),
     await runCheck("Webhook verify token tersedia", () => checkVerifyToken(platform)),
     await runCheck("User token tersimpan — scopes & expiry (/debug_token)", () =>
