@@ -174,19 +174,33 @@ type DmTestResult = {
 function InsightsPermissionTest() {
   const instagramTest = useMutation({
     mutationFn: () =>
-      api.post<{ success: boolean; message: string }>(
+      api.post<{ success: boolean; message?: string } | undefined>(
         "/admin/api-tests/trigger/instagram-insights",
       ),
-    onSuccess: (res) => (res.success ? toast.success(res.message) : toast.error(res.message)),
+    onSuccess: (res) => {
+      if (!res) {
+        toast.error("Server tidak mengembalikan hasil test Instagram");
+        return;
+      }
+      const message = res.message ?? "Test Instagram selesai";
+      res.success ? toast.success(message) : toast.error(message);
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const facebookTest = useMutation({
     mutationFn: () =>
-      api.post<{
-        success: boolean;
-        results: Array<{ account: string; success: boolean; message: string }>;
-      }>("/admin/api-tests/trigger/facebook-insights"),
+      api.post<
+        | {
+            success: boolean;
+            results: Array<{ account: string; success: boolean; message: string }>;
+          }
+        | undefined
+      >("/admin/api-tests/trigger/facebook-insights"),
     onSuccess: (res) => {
+      if (!res?.results) {
+        toast.error("Server tidak mengembalikan hasil test Facebook");
+        return;
+      }
       const failed = res.results.filter((result) => !result.success).length;
       if (failed > 0) toast.error(`${failed} Facebook Page Insights call gagal`);
       else toast.success(`${res.results.length} Facebook Page Insights call berhasil`);
@@ -226,10 +240,14 @@ function InsightsPermissionTest() {
 function DmPermissionTest() {
   const dmTest = useMutation({
     mutationFn: () =>
-      api.post<{ success: boolean; results: DmTestResult[]; nextSteps: string[] }>(
+      api.post<{ success: boolean; results: DmTestResult[]; nextSteps: string[] } | undefined>(
         "/admin/api-tests/trigger/dm-permissions",
       ),
     onSuccess: (res) => {
+      if (!res?.results) {
+        toast.error("Server tidak mengembalikan hasil test DM");
+        return;
+      }
       if (res.results.length === 0) {
         toast.warning("Tidak ada akun IG/FB terhubung untuk diuji");
         return;

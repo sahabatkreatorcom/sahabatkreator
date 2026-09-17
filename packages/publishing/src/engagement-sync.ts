@@ -81,14 +81,14 @@ export async function upsertEngagementItems(items: EngagementUpsert[]): Promise<
     })
     .from(engagementItem)
     .where(
-        or(
-          ...unique.map((item) =>
-            and(
-              eq(engagementItem.socialAccountId, item.socialAccountId),
-              eq(engagementItem.platformItemId, item.platformItemId),
-            ),
+      or(
+        ...unique.map((item) =>
+          and(
+            eq(engagementItem.socialAccountId, item.socialAccountId),
+            eq(engagementItem.platformItemId, item.platformItemId),
           ),
         ),
+      ),
     );
   const existingKeys = new Set(existing.map((r) => `${r.socialAccountId}:${r.platformItemId}`));
 
@@ -414,7 +414,8 @@ async function syncTikTok(ctx: SyncContext): Promise<SyncResult> {
   }>(`${TIKTOK_OPEN_API_URL}/video/list/`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ max_count: 10, fields: ["id", "create_time", "title"] }),
+    query: { fields: "id,create_time,title" },
+    body: JSON.stringify({ max_count: 10 }),
     retries: 1,
   });
   if (!videosRes.ok) {
@@ -439,7 +440,8 @@ async function syncTikTok(ctx: SyncContext): Promise<SyncResult> {
     }>(`${TIKTOK_OPEN_API_URL}/comment/list/`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ video_id: video.id, max_count: 50, fields: ["id", "text", "create_time", "user"] }),
+      query: { fields: "id,text,create_time,user" },
+      body: JSON.stringify({ video_id: video.id, max_count: 50 }),
       retries: 1,
     });
     if (!commentsRes.ok) continue;
