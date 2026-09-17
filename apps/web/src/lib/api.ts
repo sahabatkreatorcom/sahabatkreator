@@ -59,7 +59,9 @@ async function request<T>(path: string, init?: RequestInit & { json?: unknown })
 
   if (res.status === 204) return undefined as T;
   const body = await res.text();
-  if (!body.trim()) return undefined as T;
+  if (!body.trim()) {
+    throw new ApiError(res.status, "Server mengembalikan response kosong");
+  }
   return JSON.parse(body) as T;
 }
 

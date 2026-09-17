@@ -173,10 +173,13 @@ type DmTestResult = {
 
 function InsightsPermissionTest() {
   const instagramTest = useMutation({
-    mutationFn: () =>
-      api.post<{ success: boolean; message?: string } | undefined>(
+    mutationFn: async () => {
+      const response = await api.post<{ success: boolean; message?: string } | undefined>(
         "/admin/api-tests/trigger/instagram-insights",
-      ),
+      );
+      if (!response) throw new Error("Server tidak mengembalikan hasil test Instagram");
+      return response;
+    },
     onSuccess: (res) => {
       if (!res) {
         toast.error("Server tidak mengembalikan hasil test Instagram");
@@ -188,14 +191,17 @@ function InsightsPermissionTest() {
     onError: (e: Error) => toast.error(e.message),
   });
   const facebookTest = useMutation({
-    mutationFn: () =>
-      api.post<
+    mutationFn: async () => {
+      const response = await api.post<
         | {
             success: boolean;
             results: Array<{ account: string; success: boolean; message: string }>;
           }
         | undefined
-      >("/admin/api-tests/trigger/facebook-insights"),
+      >("/admin/api-tests/trigger/facebook-insights");
+      if (!response) throw new Error("Server tidak mengembalikan hasil test Facebook");
+      return response;
+    },
     onSuccess: (res) => {
       if (!res?.results) {
         toast.error("Server tidak mengembalikan hasil test Facebook");
@@ -239,10 +245,13 @@ function InsightsPermissionTest() {
 
 function DmPermissionTest() {
   const dmTest = useMutation({
-    mutationFn: () =>
-      api.post<{ success: boolean; results: DmTestResult[]; nextSteps: string[] } | undefined>(
-        "/admin/api-tests/trigger/dm-permissions",
-      ),
+    mutationFn: async () => {
+      const response = await api.post<
+        { success: boolean; results: DmTestResult[]; nextSteps: string[] } | undefined
+      >("/admin/api-tests/trigger/dm-permissions");
+      if (!response) throw new Error("Server tidak mengembalikan hasil test DM");
+      return response;
+    },
     onSuccess: (res) => {
       if (!res?.results) {
         toast.error("Server tidak mengembalikan hasil test DM");

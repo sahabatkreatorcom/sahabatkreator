@@ -10,6 +10,8 @@ import {
   BSKY_APPVIEW_URL,
   GBP_ACCOUNT_API_URL,
   GRAPH_FB_URL,
+  GRAPH_IG_URL,
+  GRAPH_THREADS_URL,
   LINKEDIN_API_VERSION,
   LINKEDIN_REST_URL,
   LINKEDIN_USERINFO_URL,
@@ -352,6 +354,7 @@ function checkMetaCredentialFormat(
 /** Check (b): app token valid — mint via client_credentials lalu GET /oauth/access_token_info */
 async function checkMetaAppToken(
   cred: { clientId: string; clientSecret: string; source: "db" | "env" } | null,
+  graphUrl = GRAPH_FB_URL,
 ): Promise<Omit<TestResult, "name" | "durationMs">> {
   if (!cred) {
     return { status: "fail", message: "Dilewati — kredensial app belum tersimpan." };
@@ -359,7 +362,7 @@ async function checkMetaAppToken(
   // Mint app access token dulu — /oauth/access_token_info hanya menerima
   // param access_token (client_id+client_secret langsung akan ditolak 400).
   const mintUrl =
-    `${GRAPH_FB_URL}/oauth/access_token` +
+    `${graphUrl}/oauth/access_token` +
     `?client_id=${encodeURIComponent(cred.clientId)}&client_secret=${encodeURIComponent(cred.clientSecret)}` +
     "&grant_type=client_credentials";
   const mintRes = await fetchJson<{ access_token?: string }>(mintUrl);
@@ -379,7 +382,7 @@ async function checkMetaAppToken(
     };
   }
 
-  const infoUrl = `${GRAPH_FB_URL}/oauth/access_token_info?access_token=${encodeURIComponent(appToken)}`;
+  const infoUrl = `${graphUrl}/oauth/access_token_info?access_token=${encodeURIComponent(appToken)}`;
   const res = await fetchJson<{ error?: { message?: string } }>(infoUrl);
   if (res.ok) {
     return {
@@ -423,6 +426,7 @@ async function checkVerifyToken(
 async function checkUserToken(
   userToken: string | null,
   cred: { clientId: string; clientSecret: string; source: "db" | "env" } | null,
+  graphUrl = GRAPH_FB_URL,
 ): Promise<Omit<TestResult, "name" | "durationMs">> {
   if (!userToken) {
     return {
@@ -439,7 +443,7 @@ async function checkUserToken(
   // debug_token ada di Graph API umum (graph.facebook.com) — user token IG/FB/Threads
   // semuanya diterbitkan app Meta dan bisa diinspeksi di sana.
   const tokenUrl =
-    `${GRAPH_FB_URL}/oauth/access_token` +
+    `${graphUrl}/oauth/access_token` +
     `?client_id=${encodeURIComponent(cred.clientId)}&client_secret=${encodeURIComponent(cred.clientSecret)}` +
     "&grant_type=client_credentials";
   const tokenRes = await fetchJson<{ access_token?: string }>(tokenUrl);
@@ -452,7 +456,7 @@ async function checkUserToken(
   }
 
   const debugUrl =
-    `${GRAPH_FB_URL}/debug_token` +
+    `${graphUrl}/debug_token` +
     `?input_token=${encodeURIComponent(userToken)}&access_token=${encodeURIComponent(appToken)}`;
   const res = await fetchJson<MetaDebugTokenResponse>(debugUrl);
   const d = res.data?.data;
@@ -482,6 +486,7 @@ async function checkUserToken(
 async function runMetaSuite(
   platform: VerifyTokenPlatform,
   socialAccountPlatform: string,
+  graphUrl = GRAPH_FB_URL,
 ): Promise<TestResult[]> {
   const cred = await getCredential(platform);
   const userToken = await getStoredUserToken(socialAccountPlatform);
@@ -491,11 +496,11 @@ async function runMetaSuite(
       Promise.resolve(checkMetaCredentialFormat(cred)),
     ),
     await runCheck("App token valid (Graph /oauth/access_token_info)", () =>
-      checkMetaAppToken(cred),
+      checkMetaAppToken(cred, graphUrl),
     ),
     await runCheck("Webhook verify token tersedia", () => checkVerifyToken(platform)),
     await runCheck("User token tersimpan — scopes & expiry (/debug_token)", () =>
-      checkUserToken(userToken, cred),
+      checkUserToken(userToken, cred, graphUrl),
     ),
   ];
 }
@@ -1112,11 +1117,11 @@ apiTestsRoute.post("/run/:platform", async (c) => {
         break;
       case "threads":
         // Threads — app terpisah (verify token DB kartu Threads / env sendiri)
-        results = await runMetaSuite("threads", "threads");
+        results = await runMetaSuite("threads", "threads", GRAPH_THREADS_URL);
         break;
       case "instagram_standalone":
         // Instagram Login — aplikasi terpisah, verify token & secret app sendiri
-        results = await runMetaSuite("instagram_standalone", "instagram_standalone");
+        results = await runMetaSuite("instagram_standalone", "instagram_standalone", GRAPH_IG_URL);
         break;
       default:
         // Instagram & Facebook — satu aplikasi Meta
