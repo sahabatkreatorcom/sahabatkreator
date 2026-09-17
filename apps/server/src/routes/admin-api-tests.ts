@@ -492,6 +492,32 @@ async function checkUserToken(
   };
 }
 
+/** Validate an Instagram Login token directly; this flow has no Meta app token. */
+async function checkInstagramStandaloneUserToken(
+  userToken: string | null,
+): Promise<Omit<TestResult, "name" | "durationMs">> {
+  if (!userToken) {
+    return {
+      status: "warn",
+      message:
+        "Belum ada user token tersimpan (belum ada akun Instagram standalone terhubung).",
+    };
+  }
+
+  const url = `${GRAPH_IG_URL}/me?fields=id,username&access_token=${encodeURIComponent(userToken)}`;
+  const res = await fetchJson<{ id?: string; username?: string; error?: { message?: string } }>(url);
+  if (!res.ok || !res.data?.id) {
+    return {
+      status: "fail",
+      message: `Token Instagram tidak valid / tidak bisa diperiksa: ${res.data?.error?.message ?? `HTTP ${res.status}`}`,
+    };
+  }
+  return {
+    status: "pass",
+    message: `Token Instagram valid — akun @${res.data.username ?? res.data.id}.`,
+  };
+}
+
 /** Suite lengkap Meta (IG bisnis/IG Login/FB/Threads) — verify token dari DB kredensial masing-masing aplikasi, fallback env */
 async function runMetaSuite(
   platform: VerifyTokenPlatform,
@@ -508,12 +534,26 @@ async function runMetaSuite(
     await runCheck(
       platform === "threads"
         ? "App token valid (Threads Graph /oauth/access_token)"
+        : platform === "instagram_standalone"
+          ? "App token tidak diperlukan (Instagram Login)"
         : "App token valid (Graph /oauth/access_token_info)",
-      () => checkMetaAppToken(cred, graphUrl, platform !== "threads"),
+      () =>
+        platform === "instagram_standalone"
+          ? Promise.resolve({
+              status: "pass" as const,
+              message: "Instagram Login tidak memakai App Token Graph client_credentials.",
+            })
+          : checkMetaAppToken(cred, graphUrl, platform !== "threads"),
     ),
     await runCheck("Webhook verify token tersedia", () => checkVerifyToken(platform)),
-    await runCheck("User token tersimpan — scopes & expiry (/debug_token)", () =>
-      checkUserToken(userToken, cred, graphUrl),
+    await runCheck(
+      platform === "instagram_standalone"
+        ? "User token valid — panggil Graph Instagram /me"
+        : "User token tersimpan — scopes & expiry (/debug_token)",
+      () =>
+        platform === "instagram_standalone"
+          ? checkInstagramStandaloneUserToken(userToken)
+          : checkUserToken(userToken, cred, graphUrl),
     ),
   ];
 }
