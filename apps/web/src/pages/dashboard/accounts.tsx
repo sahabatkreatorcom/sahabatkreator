@@ -43,6 +43,7 @@ type Account = {
   lastSyncedAt: string | null;
   lastError: string | null;
   tokenExpiresAt: string | null;
+  hasRefreshToken: boolean;
   createdAt: string;
 };
 
@@ -70,6 +71,7 @@ export function AccountsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [platformDialogOpen, setPlatformDialogOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [reconnectingId, setReconnectingId] = useState<string | null>(null);
   const [infoAccount, setInfoAccount] = useState<Account | null>(null);
 
   // Nama organisasi aktif (untuk label sinkronisasi)
@@ -165,7 +167,10 @@ export function AccountsPage() {
     onSuccess: (data) => {
       window.location.href = data.authorizeUrl;
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e.message);
+      setReconnectingId(null);
+    },
   });
 
   function copyUsername(username: string, id: string) {
@@ -203,7 +208,8 @@ export function AccountsPage() {
             const Icon = cfg?.icon;
             const needsReconnection =
               !account.isConnected || !!account.lastError || account.needsReconnect;
-            const expiry = !needsReconnection ? tokenExpiryStatus(account.tokenExpiresAt) : null;
+            // Hanya tampilkan warning jika TIDAK punya refresh token (karena jika punya, system auto-refresh)
+            const expiry = !needsReconnection && !account.hasRefreshToken ? tokenExpiryStatus(account.tokenExpiresAt) : null;
             const cardHighlight = needsReconnection
               ? "border-orange-300 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-950/20"
               : expiry?.variant === "danger"
@@ -343,10 +349,13 @@ export function AccountsPage() {
                                 ? "bg-yellow-500 hover:bg-yellow-600 text-white"
                                 : "bg-orange-500 hover:bg-orange-600"
                           }`}
-                          onClick={() => reconnect.mutate(account.platform)}
+                          onClick={() => {
+                            setReconnectingId(account.id);
+                            reconnect.mutate(account.platform);
+                          }}
                           disabled={reconnect.isPending}
                         >
-                          {reconnect.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                          {reconnect.isPending && reconnectingId === account.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                           Reconnect
                         </Button>
                         <Button
@@ -361,11 +370,15 @@ export function AccountsPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => reconnect.mutate(account.platform)}
+                        onClick={() => {
+                          setReconnectingId(account.id);
+                          reconnect.mutate(account.platform);
+                        }}
                         className="flex w-full items-center justify-center gap-1.5 text-[var(--text-secondary)] text-xs hover:text-[var(--text-primary)]"
+                        disabled={reconnect.isPending}
                       >
                         <ExternalLink className="h-3 w-3" />
-                        Reconnect link
+                        {reconnect.isPending && reconnectingId === account.id ? "Loading..." : "Reconnect link"}
                       </button>
                     </div>
                   ) : (

@@ -6,7 +6,7 @@ import {
   type PendingPageData,
   socialAccount,
 } from "@sahabatkreator/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { fireActivity } from "../lib/activity-log";
@@ -35,6 +35,7 @@ accountsRoute.get("/", async (c) => {
         lastSyncedAt: socialAccount.lastSyncedAt,
         lastError: socialAccount.lastError,
         tokenExpiresAt: socialAccount.tokenExpiresAt,
+        hasRefreshToken: isNotNull(socialAccount.refreshTokenEnc),
         createdAt: socialAccount.createdAt,
       })
       .from(socialAccount)
