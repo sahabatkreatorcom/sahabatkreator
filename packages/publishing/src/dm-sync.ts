@@ -236,6 +236,9 @@ export async function syncAccountDMs(ctx: {
       // wajar saat app masih dev mode; skip tanpa error
       return { platform, newItems: 0 };
     }
+    console.warn(
+      `[dm-sync] ${platform} conversations API error (${convRes.status}): ${body.slice(0, 200)}`,
+    );
     return { platform, newItems: 0, error: `DM conversations: ${body.slice(0, 150)}` };
   }
 
@@ -423,7 +426,11 @@ async function syncLinkedInDMs(ctx: {
     if (convRes.status === 403 || convRes.status === 401) {
       return { platform: account.platform, newItems: 0 };
     }
-    return { platform: account.platform, newItems: 0, error: `LI conversations: ${body.slice(0, 150)}` };
+    return {
+      platform: account.platform,
+      newItems: 0,
+      error: `LI conversations: ${body.slice(0, 150)}`,
+    };
   }
 
   const conversations = (await convRes.json()).elements ?? [];
@@ -451,8 +458,7 @@ async function syncLinkedInDMs(ctx: {
     // Extract partner info from participants
     const participantUrns = conv.participants ?? [];
     const myUrn = account.platformAccountId;
-    const partnerUrn =
-      participantUrns.find((p) => p["~"] !== myUrn) ?? participantUrns[0];
+    const partnerUrn = participantUrns.find((p) => p["~"] !== myUrn) ?? participantUrns[0];
     const partnerId = partnerUrn?.["~"] ?? "unknown";
 
     // Map messages
@@ -460,8 +466,7 @@ async function syncLinkedInDMs(ctx: {
       .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
       .map((msg) => ({
         platformMessageId: msg.id,
-        direction:
-          (msg.sender?.["~"] === myUrn ? "outbound" : "inbound") as "inbound" | "outbound",
+        direction: (msg.sender?.["~"] === myUrn ? "outbound" : "inbound") as "inbound" | "outbound",
         senderId: msg.sender?.["~"] ?? null,
         text: msg.body ?? null,
         occurredAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
@@ -514,7 +519,12 @@ export async function syncDueDMAccounts(
     .where(
       and(
         eq(socialAccount.isConnected, true),
-        inArray(socialAccount.platform, ["instagram", "instagram_standalone", "facebook", "linkedin", "linkedin_org"]),
+        inArray(socialAccount.platform, [
+          "instagram",
+          "instagram_standalone",
+          "facebook",
+          "linkedin",
+        ]),
       ),
     )
     .limit(maxAccounts * 2);
@@ -522,6 +532,10 @@ export async function syncDueDMAccounts(
   const due = accounts
     .filter((a) => !a.lastDmSyncedAt || a.lastDmSyncedAt < since)
     .slice(0, maxAccounts);
+
+  console.log(
+    `[dm-sync] ${accounts.length} connected IG/FB/LI accounts, ${due.length} due (interval ${intervalMinutes}m)`,
+  );
 
   let newMessages = 0;
   const errors: string[] = [];
@@ -555,19 +569,32 @@ export async function syncDueDMAccounts(
     for (const outcome of settled) {
       if (outcome.status === "rejected") {
         // decrypt gagal / exception tak terduga — catat, lanjut akun lain
-        errors.push(
+        const errMsg =
           outcome.reason instanceof Error
             ? outcome.reason.message.slice(0, 200)
-            : String(outcome.reason),
-        );
+            : String(outcome.reason);
+        console.warn(`[dm-sync] account rejected: ${errMsg}`);
+        errors.push(errMsg);
         continue;
       }
       const value = outcome.value;
       if (!value) continue; // akun tanpa token terenkripsi
       synced++;
       newMessages += value.result.newItems;
+      console.log(
+        `[dm-sync] ${value.account.username ?? value.account.id} (${value.account.platform}): ` +
+          `newMessages=${value.result.newItems}` +
+          (value.result.error ? ` error=${value.result.error}` : ""),
+      );
       if (value.result.error) errors.push(`${value.result.platform}: ${value.result.error}`);
     }
+  }
+
+  if (synced > 0 || errors.length > 0) {
+    console.log(
+      `[dm-sync] cycle: ${synced} accounts synced, ${newMessages} new messages` +
+        (errors.length > 0 ? `, ${errors.length} errors` : ""),
+    );
   }
 
   return { synced, newMessages, errors };

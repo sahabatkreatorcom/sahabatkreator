@@ -118,14 +118,12 @@ async function runAnalyticsSync(): Promise<void> {
 /** Satu siklus DM sync (pesan IG/FB → inbox percakapan) */
 async function runDMSync(): Promise<void> {
   const result = await syncDueDMAccounts(15, 10);
-  if (result.synced > 0 || result.errors.length > 0) {
-    console.log(
-      `[dm-sync] accounts=${result.synced} newMessages=${result.newMessages}` +
-        (result.errors.length > 0 ? ` errors=${result.errors.length}` : ""),
-    );
-    for (const err of result.errors) {
-      console.warn(`[dm-sync] ${err}`);
-    }
+  console.log(
+    `[dm-sync] cycle done: accounts=${result.synced} newMessages=${result.newMessages}` +
+      (result.errors.length > 0 ? ` errors=${result.errors.length}` : ""),
+  );
+  for (const err of result.errors) {
+    console.warn(`[dm-sync] ${err}`);
   }
 }
 
@@ -162,6 +160,14 @@ app.post("/sync-engagement", async (c) => {
   const rejected = requireCronSecret(c);
   if (rejected) return rejected;
   const result = await syncDueAccounts(15, 10);
+  return c.json({ ok: true, mode, ...result, errors: result.errors.length });
+});
+
+// Trigger manual DM sync (cron eksternal / debugging)
+app.post("/sync-dm", async (c) => {
+  const rejected = requireCronSecret(c);
+  if (rejected) return rejected;
+  const result = await syncDueDMAccounts(15, 10);
   return c.json({ ok: true, mode, ...result, errors: result.errors.length });
 });
 
@@ -272,6 +278,7 @@ setInterval(() => {
 }, DM_SYNC_TICK_MS);
 // DM sync pertama 90 detik setelah start (stagger dengan engagement sync startup)
 setTimeout(() => runDMSync().catch(() => {}), 90_000);
+console.log(`[dm-sync] loop aktif — interval ${DM_SYNC_TICK_MS / 1000}s, due threshold 15m`);
 
 // ---- Analytics sync loop (kedua mode) ----
 // Tiap jam cek akun yang belum punya snapshot hari ini (syncDueAnalyticsAccounts
