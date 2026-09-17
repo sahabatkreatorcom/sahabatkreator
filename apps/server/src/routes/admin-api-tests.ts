@@ -60,6 +60,7 @@ const AVAILABLE_PLATFORMS: PlatformKey[] = [
   "google_business",
   "pinterest",
   "linkedin",
+  "linkedin_org",
   "bluesky",
 ];
 

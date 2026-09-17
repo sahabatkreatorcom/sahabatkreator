@@ -280,6 +280,11 @@ export function AdminApiTestsPage() {
         `/admin/api-tests/run/${platform}`,
       ),
     onSuccess: (res) => {
+      if (!res?.results || !res.platform || !res.ranAt) {
+        queryClient.invalidateQueries({ queryKey: ["admin-api-tests"] });
+        toast.error("Server mengembalikan hasil test yang kosong atau tidak valid");
+        return;
+      }
       // Update cache langsung agar hasil tampil tanpa refetch penuh
       queryClient.setQueryData<{ platforms: PlatformSummary[] }>(["admin-api-tests"], (old) =>
         old
