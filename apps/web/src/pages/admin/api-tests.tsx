@@ -42,6 +42,7 @@ const TESTABLE_PLATFORMS = [
   "google_business",
   "pinterest",
   "linkedin",
+  "linkedin_org",
   "bluesky",
 ] as const;
 

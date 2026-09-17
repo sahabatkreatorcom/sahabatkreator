@@ -10,6 +10,8 @@ import {
   BSKY_APPVIEW_URL,
   GBP_ACCOUNT_API_URL,
   GRAPH_FB_URL,
+  LINKEDIN_API_VERSION,
+  LINKEDIN_REST_URL,
   LINKEDIN_USERINFO_URL,
   PINTEREST_API_BASE_URL,
   PINTEREST_SANDBOX,
@@ -44,6 +46,7 @@ type PlatformKey =
   | "google_business"
   | "pinterest"
   | "linkedin"
+  | "linkedin_org"
   | "bluesky";
 
 /** Suite yang tersedia — key dipakai di URL POST /run/:platform */
@@ -125,6 +128,7 @@ const ENV_CREDENTIAL_KEYS: Partial<Record<PlatformKey, { id: string; secret: str
   google_business: { id: "GOOGLE_CLIENT_ID", secret: "GOOGLE_CLIENT_SECRET" },
   pinterest: { id: "PINTEREST_APP_ID", secret: "PINTEREST_APP_SECRET" },
   linkedin: { id: "LINKEDIN_CLIENT_ID", secret: "LINKEDIN_CLIENT_SECRET" },
+  linkedin_org: { id: "LINKEDIN_ORG_CLIENT_ID", secret: "LINKEDIN_ORG_CLIENT_SECRET" },
   // Bluesky tanpa app credential — auth via app password per akun (connect manual)
 };
 
@@ -844,6 +848,103 @@ async function runLinkedInSuite(): Promise<TestResult[]> {
   ];
 }
 
+// Suite diagnostik LinkedIn company/page
+async function runLinkedInOrganizationSuite(): Promise<TestResult[]> {
+  const cred = await getCredential("linkedin_org");
+  const account = await getStoredAccount("linkedin_org");
+  const headers = account?.accessToken
+    ? {
+        Authorization: `Bearer ${account.accessToken}`,
+        "LinkedIn-Version": LINKEDIN_API_VERSION,
+        "X-Restli-Protocol-Version": "2.0.0",
+      }
+    : undefined;
+
+  return [
+    await runCheck("Kredensial app company tersimpan & format valid", async () => {
+      if (!cred) {
+        return {
+          status: "fail",
+          message:
+            "Kredensial LinkedIn company belum tersimpan. Isi LINKEDIN_ORG_CLIENT_ID/LINKEDIN_ORG_CLIENT_SECRET di Admin Panel atau env.",
+        };
+      }
+      if (cred.clientId.length < 20) {
+        return {
+          status: "warn",
+          message:
+            "Client ID company terlihat terlalu pendek — pastikan sesuai LinkedIn Developer Apps.",
+        };
+      }
+      const sourceLabel = cred.source === "db" ? "Admin Panel (DB)" : "env";
+      return {
+        status: "pass",
+        message: `Kredensial valid (sumber: ${sourceLabel}, Client ID ${cred.clientId.length} karakter).`,
+      };
+    }),
+    await runCheck("Endpoint LinkedIn REST API hidup (api.linkedin.com)", async () => {
+      const res = await fetchJson(`${LINKEDIN_REST_URL}/rest/organizationAcls`);
+      if (res.status === 401 || res.status === 403) {
+        return {
+          status: "pass",
+          message: `Endpoint merespons HTTP ${res.status} (auth diperlukan) — API LinkedIn company hidup & terjangkau.`,
+        };
+      }
+      return {
+        status: "fail",
+        message: `Endpoint tidak terjangkau (HTTP ${res.status}) — cek koneksi jaringan.`,
+      };
+    }),
+    await runCheck("User token valid — daftar company admin (organizationAcls)", async () => {
+      if (!account?.accessToken || !headers) {
+        return {
+          status: "warn",
+          message:
+            "Belum ada halaman company LinkedIn terhubung. Hubungkan minimal satu company untuk memvalidasi token.",
+        };
+      }
+      const res = await fetchJson<{
+        elements?: Array<{
+          organizationTarget?: string;
+          organization?: string | { id?: number | string };
+        }>;
+      }>(
+        `${LINKEDIN_REST_URL}/rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED`,
+        {
+          headers,
+        },
+      );
+      if (res.status === 401) {
+        return {
+          status: "fail",
+          message: "Token LinkedIn company ditolak (401) — hubungkan ulang akun company.",
+        };
+      }
+      if (res.status === 403) {
+        return {
+          status: "fail",
+          message:
+            "LinkedIn menolak akses company (403) — scope Community Management API belum approved atau user bukan ADMIN.",
+        };
+      }
+      if (!res.ok) {
+        return { status: "fail", message: `Gagal mengambil daftar company (HTTP ${res.status}).` };
+      }
+      const count = res.data?.elements?.length ?? 0;
+      if (count === 0) {
+        return {
+          status: "warn",
+          message: "Token valid, tetapi tidak ada company LinkedIn dengan peran ADMIN.",
+        };
+      }
+      return {
+        status: "pass",
+        message: `Token valid — ${count} company dengan peran ADMIN ditemukan.`,
+      };
+    }),
+  ];
+}
+
 // ---------------------------------------------------------------------------
 // Suite diagnostik Bluesky
 // ---------------------------------------------------------------------------
@@ -1001,6 +1102,9 @@ apiTestsRoute.post("/run/:platform", async (c) => {
         break;
       case "linkedin":
         results = await runLinkedInSuite();
+        break;
+      case "linkedin_org":
+        results = await runLinkedInOrganizationSuite();
         break;
       case "bluesky":
         results = await runBlueskySuite();
