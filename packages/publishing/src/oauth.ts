@@ -8,6 +8,7 @@
 
 import {
   GBP_ACCOUNT_API_URL,
+  FACEBOOK_LOGIN_CONFIG_ID,
   GOOGLE_OAUTH_AUTH_URL,
   GOOGLE_OAUTH_TOKEN_URL,
   GRAPH_FB_URL,
@@ -119,7 +120,6 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
       "instagram_manage_comments",
       "instagram_manage_messages",
       "instagram_manage_insights", // media insights utk analytics
-      "pages_messaging", // Messenger API for Instagram via linked Facebook Page
     ],
   },
   // Instagram standalone — Business Login for Instagram (IG Login)
@@ -142,6 +142,7 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
       // Sama dengan instagram: Page Business Manager butuh scope ini agar
       // terlihat di /me/accounts (picker Page saat connect)
       "business_management",
+      "pages_manage_metadata", // webhook + Messenger Platform Page setup
       "pages_manage_posts",
       "pages_read_engagement",
       "pages_manage_engagement", // reply komentar Page
@@ -272,7 +273,13 @@ function parseExtraScopes(cred: AppCredential): string[] {
 
 /** Daftar scope lengkap yang diminta (config + extra, tanpa duplikat, urut stabil) */
 function requestedScopes(platform: OAuthPlatform, cred: AppCredential): string[] {
-  return [...new Set([...OAUTH_CONFIGS[platform].scopes, ...parseExtraScopes(cred)])];
+  const scopes = [...OAUTH_CONFIGS[platform].scopes, ...parseExtraScopes(cred)];
+  // Meta only accepts pages_messaging through a Facebook Login for Business
+  // configuration. Do not send it through the legacy dialog without config_id.
+  if (platform === "facebook" && !FACEBOOK_LOGIN_CONFIG_ID) {
+    return [...new Set(scopes.filter((scope) => scope !== "pages_messaging"))];
+  }
+  return [...new Set(scopes)];
 }
 
 /** Scope yang benar-benar di-grant platform (response token field "scope") — fallback ke requested */
@@ -304,6 +311,9 @@ export function buildAuthorizeUrl(
     response_type: "code",
     scope: requestedScopes(platform, cred).join(sep),
     state,
+    ...(platform === "facebook" && FACEBOOK_LOGIN_CONFIG_ID
+      ? { config_id: FACEBOOK_LOGIN_CONFIG_ID }
+      : {}),
     ...(config.extraAuthorizeParams ?? {}),
   });
   return `${config.authorizeUrl}?${params.toString()}`;
