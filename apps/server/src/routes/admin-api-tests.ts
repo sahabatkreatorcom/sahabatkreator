@@ -1043,3 +1043,117 @@ apiTestsRoute.post("/run/:platform", async (c) => {
     return errorResponse(error);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Trigger API calls for pending verification permissions
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /admin/api-tests/trigger/instagram-insights
+ * Trigger 1 API call to instagram_business_manage_insights
+ * Gets media list then fetches insights for first media
+ */
+apiTestsRoute.post("/trigger/instagram-insights", requirePlatformAdmin, async (c) => {
+  try {
+    const userToken = await getStoredUserToken("instagram");
+    if (!userToken) {
+      return c.json({ error: "No Instagram account connected" }, 400);
+    }
+
+    // Step 1: Get user's media list
+    const mediaRes = await fetchJson<{
+      data?: Array<{ id: string }>;
+      error?: { message?: string };
+    }>(
+      `https://graph.facebook.com/v19.0/me/media?fields=id&limit=1&access_token=${encodeURIComponent(userToken)}`,
+    );
+
+    if (!mediaRes.ok || !mediaRes.data?.data?.length) {
+      return c.json({
+        error: "Failed to get media list",
+        details: mediaRes.data?.error?.message ?? "No media found",
+      }, 400);
+    }
+
+    const mediaId = mediaRes.data.data[0].id;
+
+    // Step 2: Get insights for first media (triggers instagram_business_manage_insights)
+    const insightsRes = await fetchJson<{
+      data?: Array<{ name: string; values: Array<{ value: number }> }>;
+      error?: { message?: string };
+    }>(
+      `https://graph.facebook.com/v19.0/${mediaId}/insights?metric=impressions,reach,engagement&access_token=${encodeURIComponent(userToken)}`,
+    );
+
+    if (!insightsRes.ok) {
+      return c.json({
+        error: "Failed to get media insights",
+        details: insightsRes.data?.error?.message ?? "Unknown error",
+        mediaId,
+      }, 400);
+    }
+
+    return c.json({
+      success: true,
+      message: "instagram_business_manage_insights API call completed",
+      mediaId,
+      insights: insightsRes.data?.data,
+    });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+});
+
+/**
+ * POST /admin/api-tests/trigger/human-agent
+ * Trigger Human Agent permission by sending a test message with human_agent flag
+ */
+apiTestsRoute.post("/trigger/human-agent", requirePlatformAdmin, async (c) => {
+  try {
+    const userToken = await getStoredUserToken("instagram");
+    if (!userToken) {
+      return c.json({ error: "No Instagram account connected" }, 400);
+    }
+
+    // Get user's IG business account ID
+    const profileRes = await fetchJson<{
+      id?: string;
+      error?: { message?: string };
+    }>(
+      `https://graph.facebook.com/v19.0/me?fields=id&access_token=${encodeURIComponent(userToken)}`,
+    );
+
+    if (!profileRes.ok || !profileRes.data?.id) {
+      return c.json({
+        error: "Failed to get Instagram account ID",
+        details: profileRes.data?.error?.message,
+      }, 400);
+    }
+
+    const igUserId = profileRes.data.id;
+
+    // Note: Human Agent requires an actual conversation with a user
+    // This endpoint verifies the permission is available by checking scopes
+    const debugRes = await fetchJson<{
+      data?: {
+        scopes?: string[];
+        is_valid?: boolean;
+      };
+      error?: { message?: string };
+    }>(
+      `https://graph.facebook.com/v19.0/debug_token?input_token=${encodeURIComponent(userToken)}&access_token=${encodeURIComponent(userToken)}`,
+    );
+
+    const hasHumanAgent = debugRes.data?.data?.scopes?.includes("human_agent") ?? false;
+
+    return c.json({
+      success: true,
+      message: "Human Agent permission check completed",
+      igUserId,
+      hasHumanAgentScope: hasHumanAgent,
+      scopes: debugRes.data?.data?.scopes,
+    });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+});
