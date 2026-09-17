@@ -112,6 +112,8 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
       // Page di Business Manager hanya muncul di /me/accounts bila token punya
       // scope ini (terbukti via Graph API Explorer; tanpa ini → data kosong)
       "business_management",
+      "pages_manage_metadata", // Instagram Messaging + webhook Page setup
+      "pages_messaging", // Instagram Messaging via linked Facebook Page
       "pages_manage_posts",
       "pages_read_engagement",
       "instagram_basic",

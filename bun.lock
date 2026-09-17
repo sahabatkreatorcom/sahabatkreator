@@ -182,6 +182,7 @@
       },
       "devDependencies": {
         "@sahabatkreator/config": "workspace:*",
+        "@types/bun": "catalog:",
         "@types/pg": "^8.23.1",
         "@types/web-push": "^3.6.4",
         "drizzle-kit": "^0.31.10",
