@@ -179,6 +179,14 @@ export function ThreadsResearchPage() {
         </select>
       </div>
 
+      {/* Catatan approval — beberapa endpoint mengembalikan hasil kosong selama
+          izin advanced access belum disetujui App Review */}
+      <p className="mb-4 rounded-[var(--radius-md)] border border-[var(--border-light)] bg-[var(--bg-secondary)] p-2 text-[11px] text-[var(--text-muted)]">
+        Sebagian fitur ini butuh izin Threads advanced access yang disetujui App Review. Selama
+        belum disetujui: keyword search hanya mengembalikan post milik sendiri, mention dan profil
+        publik bisa kosong/gagal.
+      </p>
+
       {/* Tab */}
       <div className="mb-4 inline-flex flex-wrap gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] p-1">
         {TABS.map((t) => (
@@ -282,7 +290,7 @@ export function ThreadsResearchPage() {
         ) : (
           <EmptyState
             title="Belum ada hasil"
-            description="Masukkan kata kunci dan tekan Cari untuk melihat post publik Threads."
+            description="Masukkan kata kunci dan tekan Cari. Bila app belum di-approve untuk threads_keyword_search, hasil hanya mencakup post milik sendiri — post akun baru biasanya kosong."
           />
         ))}
 
@@ -432,7 +440,7 @@ export function ThreadsResearchPage() {
         ) : (
           <EmptyState
             title="Belum ada mention"
-            description="Sebutan akun Threads Anda akan muncul di sini dan juga tersinkron ke halaman Engagement."
+            description="Sebutan akun Threads Anda akan muncul di sini dan juga tersinkron ke halaman Engagement. Akun baru yang belum pernah di-mention memang kosong; izin threads_manage_mentions juga harus disetujui App Review."
           />
         ))}
     </div>

@@ -133,9 +133,11 @@ export async function searchThreadsLocations(input: {
       retries: 1,
     });
 
-  // Meta docs memakai `query`; sebagian contoh memakai `q` — fallback bila 400.
-  let res = await send("query");
-  if (!res.ok && res.status === 400) res = await send("q");
+  // Postman/reference Meta memakai `q`; sebagian halaman docs memakai `query`.
+  // `q` didahulukan — dengan `query` yang diabaikan, Graph bisa mengembalikan
+  // hasil global (tidak relevan) alih-alih lokasi yang dicari.
+  let res = await send("q");
+  if (!res.ok && res.status === 400) res = await send("query");
   if (!res.ok) await throwThreadsError(res, "Threads location search");
   return (await res.json()).data ?? [];
 }

@@ -28,8 +28,19 @@ export const threadsRoute = new Hono();
  */
 function fail(error: unknown): Response {
   if (error instanceof PublishError) {
-    console.warn("[threads] upstream error:", error.message);
-    return errorResponse(new HTTPError(502, error.message));
+    const message = error.message;
+    console.warn("[threads] upstream error:", message);
+    // Permission denied (code 10) → pesan yang actionable, bukan 502 generik.
+    const permissionDenied = /\(#?10\b|"code":10\b|permission|not authorized/i.test(message);
+    if (permissionDenied) {
+      return errorResponse(
+        new HTTPError(
+          403,
+          `Izin Threads belum di-grant/disetujui untuk aksi ini. Pastikan App Review menyetujui scope terkait lalu hubungkan ulang akun. Detail: ${message.slice(0, 180)}`,
+        ),
+      );
+    }
+    return errorResponse(new HTTPError(502, message));
   }
   return errorResponse(error);
 }
