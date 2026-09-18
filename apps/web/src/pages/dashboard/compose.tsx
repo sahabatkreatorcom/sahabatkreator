@@ -232,9 +232,20 @@ export function ComposePage() {
                   onChange={(e) => setContent(e.target.value)}
                   onPaste={handleClipboardPaste}
                 />
-                {/* Aksi cepat caption: emoji + simpan draft */}
+                {/* Aksi cepat caption: emoji + asisten AI + simpan draft */}
                 <div className="mt-2 flex items-center justify-between">
-                  <EmojiPicker onPick={(emoji) => setContent((prev) => `${prev}${emoji}`)} />
+                  <div className="flex items-center gap-2">
+                    <EmojiPicker onPick={(emoji) => setContent((prev) => `${prev}${emoji}`)} />
+                    <AiComposerPanel
+                      variant="inline"
+                      title="Asisten AI — Caption Utama"
+                      platform={aiPlatform}
+                      content={content}
+                      hashtags={hashtags}
+                      onApplyContent={setContent}
+                      onApplyHashtags={setHashtags}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
@@ -264,19 +275,6 @@ export function ComposePage() {
                         {content.length}/{limit}
                       </Badge>
                     ))}
-                </div>
-
-                {/* Asisten AI — menempel di caption utama */}
-                <div className="mt-4">
-                  <AiComposerPanel
-                    variant="inline"
-                    title="Asisten AI — Caption Utama"
-                    platform={aiPlatform}
-                    content={content}
-                    hashtags={hashtags}
-                    onApplyContent={setContent}
-                    onApplyHashtags={setHashtags}
-                  />
                 </div>
               </>
             ) : (

@@ -1,7 +1,6 @@
 // Asisten AI untuk variasi caption per platform — pilih akun target lalu hasil
 // generate/rewrite langsung ditulis ke variasi akun tersebut (bukan caption utama).
 import { useState } from "react";
-import { Label } from "@/components/ui/label";
 import { AiComposerPanel } from "./ai-panel";
 
 type AccountLite = { id: string; platform: string; username: string };
@@ -36,13 +35,13 @@ export function VariationsAiPanel({
 
   return (
     <div className="mt-4 space-y-3 border-[var(--border-light)] border-t pt-4">
-      <div className="space-y-2">
-        <Label htmlFor="variations-ai-account">Akun target variasi</Label>
+      <div className="flex items-center gap-2">
         <select
           id="variations-ai-account"
           value={account.id}
           onChange={(e) => setAccountId(e.target.value)}
-          className="h-9 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-3 text-sm"
+          className="h-8 w-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-2 text-xs"
+          title="Akun target variasi"
         >
           {accounts.map((a) => (
             <option key={a.id} value={a.id}>
@@ -50,19 +49,19 @@ export function VariationsAiPanel({
             </option>
           ))}
         </select>
-      </div>
 
-      <AiComposerPanel
-        variant="inline"
-        title={`Asisten AI — variasi @${account.username}`}
-        platform={account.platform}
-        content={variations[account.id]?.trim() ? variations[account.id] : baseContent}
-        hashtags={
-          hashtagVariations[account.id]?.trim() ? hashtagVariations[account.id] : baseHashtags
-        }
-        onApplyContent={(text) => onApplyVariation(account.id, text)}
-        onApplyHashtags={(tags) => onApplyHashtags(account.id, tags)}
-      />
+        <AiComposerPanel
+          variant="inline"
+          title={`Asisten AI — variasi @${account.username}`}
+          platform={account.platform}
+          content={variations[account.id]?.trim() ? variations[account.id] : baseContent}
+          hashtags={
+            hashtagVariations[account.id]?.trim() ? hashtagVariations[account.id] : baseHashtags
+          }
+          onApplyContent={(text) => onApplyVariation(account.id, text)}
+          onApplyHashtags={(tags) => onApplyHashtags(account.id, tags)}
+        />
+      </div>
     </div>
   );
 }
