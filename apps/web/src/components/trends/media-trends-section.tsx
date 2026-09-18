@@ -151,7 +151,13 @@ function YoutubeCard({ video }: { video: YoutubeTrendItem }) {
   );
 }
 
-export function MediaTrendsSection() {
+export function MediaTrendsSection({
+  showMusic = true,
+  showVideo = true,
+}: {
+  showMusic?: boolean;
+  showVideo?: boolean;
+}) {
   const musicQuery = useQuery({
     queryKey: ["trends-music"],
     queryFn: () =>
@@ -177,61 +183,65 @@ export function MediaTrendsSection() {
   return (
     <div className="space-y-8">
       {/* Tren musik (Apple Music ID) */}
-      <section className="space-y-3">
-        <div>
-          <h2 className="flex items-center gap-2 font-bold text-xl">
-            <Music2 className="h-5 w-5 text-[var(--accent-gold)]" />
-            Lagu Populer Indonesia
-          </h2>
-          <p className="mt-1 text-[var(--text-secondary)] text-sm">
-            Chart Apple Music Indonesia (data nyata) — manfaatkan untuk Reels/TikTok.
-          </p>
-        </div>
-        {musicQuery.isLoading ? (
-          <div className="flex items-center gap-2 text-[var(--text-muted)] text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" /> Memuat chart…
+      {showMusic && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="flex items-center gap-2 font-bold text-xl">
+              <Music2 className="h-5 w-5 text-[var(--accent-gold)]" />
+              Lagu Populer Indonesia
+            </h2>
+            <p className="mt-1 text-[var(--text-secondary)] text-sm">
+              Chart Apple Music Indonesia (data nyata) — manfaatkan untuk Reels/TikTok.
+            </p>
           </div>
-        ) : songs.length === 0 ? (
-          <p className="card p-4 text-[var(--text-secondary)] text-sm">
-            Chart lagu belum bisa diambil saat ini.
-          </p>
-        ) : (
-          <div className="grid gap-2 lg:grid-cols-2">
-            {songs.map((song) => (
-              <MusicCard key={`${song.rank}-${song.title}`} song={song} />
-            ))}
-          </div>
-        )}
-      </section>
+          {musicQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-[var(--text-muted)] text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Memuat chart…
+            </div>
+          ) : songs.length === 0 ? (
+            <p className="card p-4 text-[var(--text-secondary)] text-sm">
+              Chart lagu belum bisa diambil saat ini.
+            </p>
+          ) : (
+            <div className="grid gap-2 lg:grid-cols-2">
+              {songs.map((song) => (
+                <MusicCard key={`${song.rank}-${song.title}`} song={song} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Video populer YouTube ID */}
-      <section className="space-y-3">
-        <div>
-          <h2 className="flex items-center gap-2 font-bold text-xl">
-            <Video className="h-5 w-5 text-red-500" />
-            Video Populer YouTube Indonesia
-          </h2>
-          <p className="mt-1 text-[var(--text-secondary)] text-sm">
-            Paling banyak ditonton hari ini (region Indonesia) — sumber ide konten.
-          </p>
-        </div>
-        {youtubeQuery.isLoading ? (
-          <div className="flex items-center gap-2 text-[var(--text-muted)] text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" /> Memuat video…
+      {showVideo && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="flex items-center gap-2 font-bold text-xl">
+              <Video className="h-5 w-5 text-red-500" />
+              Video Populer YouTube Indonesia
+            </h2>
+            <p className="mt-1 text-[var(--text-secondary)] text-sm">
+              Paling banyak ditonton hari ini (region Indonesia) — sumber ide konten.
+            </p>
           </div>
-        ) : !youtubeQuery.data?.available ? (
-          <p className="card p-4 text-[var(--text-secondary)] text-sm">
-            {youtubeQuery.data?.message ??
-              "Video populer belum tersedia. Hubungkan akun YouTube untuk mengaktifkan."}
-          </p>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {videos.map((video) => (
-              <YoutubeCard key={video.id} video={video} />
-            ))}
-          </div>
-        )}
-      </section>
+          {youtubeQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-[var(--text-muted)] text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Memuat video…
+            </div>
+          ) : !youtubeQuery.data?.available ? (
+            <p className="card p-4 text-[var(--text-secondary)] text-sm">
+              {youtubeQuery.data?.message ??
+                "Video populer belum tersedia. Hubungkan akun YouTube untuk mengaktifkan."}
+            </p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {videos.map((video) => (
+                <YoutubeCard key={video.id} video={video} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }
