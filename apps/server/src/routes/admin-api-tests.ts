@@ -15,6 +15,7 @@ import {
   LINKEDIN_API_VERSION,
   LINKEDIN_REST_URL,
   LINKEDIN_USERINFO_URL,
+  listGbpAccounts,
   PINTEREST_API_BASE_URL,
   refreshDueTokens,
   TIKTOK_OPEN_API_URL,
@@ -688,28 +689,34 @@ async function runGoogleBusinessSuite(): Promise<TestResult[]> {
       if (!account?.accessToken) {
         return { status: "warn", message: "Dilewati — belum ada akun terhubung." };
       }
-      const res = await fetchJson<{ accounts?: Array<{ name?: string }> }>(
-        `${GBP_ACCOUNT_API_URL}/accounts`,
-        { headers: { Authorization: `Bearer ${account.accessToken}` } },
-      );
-      if (res.ok) {
-        const n = res.data?.accounts?.length ?? 0;
+      // listGbpAccounts: cached 5 menit → hindari burst call yang memicu 429
+      try {
+        const accounts = await listGbpAccounts(account.accessToken);
         return {
-          status: n > 0 ? "pass" : "warn",
+          status: accounts.length > 0 ? "pass" : "warn",
           message:
-            n > 0
-              ? `Token valid — ${n} akun GBP terjangkau.`
+            accounts.length > 0
+              ? `Token valid — ${accounts.length} akun GBP terjangkau.`
               : "Token valid tapi tidak ada akun GBP terdaftar (user belum jadi manager bisnis).",
         };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes("(429)")) {
+          return {
+            status: "warn",
+            message:
+              "Kuota per-menit Business Profile API habis (429). Ajukan peningkatan kuota di Google Cloud → APIs & Services → Quotas, lalu coba lagi beberapa menit.",
+          };
+        }
+        if (message.includes("(403)")) {
+          return {
+            status: "fail",
+            message:
+              "Akses ditolak (403). Cek 3 hal: (1) scope business.manage belum di-approve, (2) akses Business Profile API project belum di-allowlist (pengajuan terpisah dari verifikasi OAuth), (3) API belum diaktifkan di Google Cloud. Setelah beres, connect ulang akun.",
+          };
+        }
+        return { status: "fail", message };
       }
-      if (res.status === 403) {
-        return {
-          status: "fail",
-          message:
-            "Token ditolak (403). Cek 3 hal: (1) scope business.manage belum di-approve, (2) akses Business Profile API project belum di-allowlist (pengajuan terpisah dari verifikasi OAuth), (3) API belum diaktifkan di Google Cloud. Setelah beres, connect ulang akun.",
-        };
-      }
-      return { status: "fail", message: `Gagal (HTTP ${res.status}) — periksa token akun.` };
     }),
   ];
 }

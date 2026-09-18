@@ -20,7 +20,8 @@ export {
   LINKEDIN_ORG_ACCESS_SCOPES,
   OAUTH_CONFIGS,
 } from "./platform-configs";
-export { fetchPlatformProfile } from "./profile";
+export type { GbpAccount } from "./profile";
+export { fetchPlatformProfile, listGbpAccounts } from "./profile";
 export type {
   AppCredential,
   LinkedInOrganization,

@@ -17,6 +17,44 @@ import { fetchLinkedInAdminOrganizations } from "./linkedin";
 import { LINKEDIN_ORG_ACCESS_SCOPES } from "./platform-configs";
 import type { OAuthPlatform, PlatformProfile, TokenResult } from "./types";
 
+export type GbpAccount = { name: string; accountName?: string };
+
+// Cache daftar akun GBP 5 menit. Kuota Business Profile API per menit kecil
+// (sering 429), dan account list dipanggil berulang saat connect + admin test.
+const GBP_ACCOUNTS_TTL_MS = 5 * 60 * 1000;
+let gbpAccountsCache: { key: string; data: GbpAccount[]; fetchedAt: number } | null = null;
+
+/**
+ * Daftar akun Google Business Profile (accounts.list) dengan cache in-memory.
+ * Melempar PublishError berisi status + body agar 429/403 terlihat jelas.
+ */
+export async function listGbpAccounts(accessToken: string): Promise<GbpAccount[]> {
+  const key = `${accessToken.slice(0, 16)}:${accessToken.length}`;
+  if (
+    gbpAccountsCache &&
+    gbpAccountsCache.key === key &&
+    Date.now() - gbpAccountsCache.fetchedAt < GBP_ACCOUNTS_TTL_MS
+  ) {
+    return gbpAccountsCache.data;
+  }
+
+  const res = await httpRequest<{ accounts?: GbpAccount[] }>(`${GBP_ACCOUNT_API_URL}/accounts`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new PublishError(
+      "oauth_profile_failed",
+      `Gagal mengambil akun Google Business (${res.status}): ${body.slice(0, 200)}`,
+      res.status === 429 || res.status >= 500,
+    );
+  }
+
+  const accounts = (await res.json()).accounts ?? [];
+  gbpAccountsCache = { key, data: accounts, fetchedAt: Date.now() };
+  return accounts;
+}
+
 /**
  * Identitas user access token Meta — untuk pesan error saat /me/accounts kosong.
  * Best-effort: gagal fetch → string kosong (jangan gagalkan error utama).
@@ -246,22 +284,9 @@ export async function fetchPlatformProfile(
     }
 
     case "google_business": {
-      const res = await httpRequest<{
-        accounts?: Array<{ name: string; accountName?: string }>;
-      }>(`${GBP_ACCOUNT_API_URL}/accounts`, {
-        headers: { Authorization: `Bearer ${at}` },
-      });
-      if (!res.ok) {
-        // Surface status + body: 403 SERVICE_DISABLED (API belum di-enable),
-        // 429/403 quota (Basic Access belum approve), dst — jangan telan detailnya
-        const body = await res.text().catch(() => "");
-        throw new PublishError(
-          "oauth_profile_failed",
-          `Gagal mengambil akun Google Business (${res.status}): ${body.slice(0, 200)}`,
-          false,
-        );
-      }
-      const account = (await res.json()).accounts?.[0];
+      // listGbpAccounts: cached 5 menit + surface status/body (403/429) apa adanya
+      const accounts = await listGbpAccounts(at);
+      const account = accounts[0];
       if (!account)
         throw new PublishError("oauth_no_gbp", "Tidak ada akun Google Business Profile", false);
       return {
