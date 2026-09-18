@@ -610,65 +610,6 @@ apiTestTriggersRoute.post("/trigger/page-demographics", requirePlatformAdmin, as
 });
 
 /**
- * POST /admin/api-tests/trigger/human-agent
- * Trigger Human Agent permission by sending a test message with human_agent flag.
- * Catatan: human_agent adalah permission/fitur Messenger untuk label pesan CS —
- * aplikasi ini saat ini TIDAK meminta scope ini (tidak ada fitur yang
- * membutuhkannya), sehingga hasHumanAgentScope akan false. Endpoint dipertahankan
- * sebagai pemeriksaan diagnostik bila fitur Human Agent dibuka nanti.
- */
-apiTestTriggersRoute.post("/trigger/human-agent", requirePlatformAdmin, async (c) => {
-  try {
-    const userToken = await getStoredUserToken("instagram");
-    if (!userToken) {
-      return c.json({ error: "No Instagram account connected" }, 400);
-    }
-
-    // Get user's IG business account ID
-    const profileRes = await fetchJson<{
-      id?: string;
-      error?: { message?: string };
-    }>(`${GRAPH_FB_URL}/me?fields=id,email&access_token=${encodeURIComponent(userToken)}`);
-
-    if (!profileRes.ok || !profileRes.data?.id) {
-      return c.json(
-        {
-          error: "Failed to get Instagram account ID",
-          details: profileRes.data?.error?.message,
-        },
-        400,
-      );
-    }
-
-    const igUserId = profileRes.data.id;
-
-    // Note: Human Agent requires an actual conversation with a user
-    // This endpoint verifies the permission is available by checking scopes
-    const debugRes = await fetchJson<{
-      data?: {
-        scopes?: string[];
-        is_valid?: boolean;
-      };
-      error?: { message?: string };
-    }>(
-      `https://graph.facebook.com/v19.0/debug_token?input_token=${encodeURIComponent(userToken)}&access_token=${encodeURIComponent(userToken)}`,
-    );
-
-    const hasHumanAgent = debugRes.data?.data?.scopes?.includes("human_agent") ?? false;
-
-    return c.json({
-      success: true,
-      message: "Human Agent permission check completed",
-      igUserId,
-      hasHumanAgentScope: hasHumanAgent,
-      scopes: debugRes.data?.data?.scopes,
-    });
-  } catch (error) {
-    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
-  }
-});
-
-/**
  * POST /admin/api-tests/trigger/dm-permissions
  * Generate test API calls untuk Instagram (instagram_business_manage_messages)
  * dan Facebook (pages_messaging) DM permissions.
