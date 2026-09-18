@@ -28,6 +28,7 @@ import { SoundPicker } from "@/components/compose/sound-picker";
 import { StrategyAssetsPanel } from "@/components/compose/strategy-assets-panel";
 import { UtmPanel } from "@/components/compose/utm-panel";
 import { ValidationPanel } from "@/components/compose/validation-panel";
+import { VariationsAiPanel } from "@/components/compose/variations-ai-panel";
 import { VariationsPanel } from "@/components/compose/variations-panel";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -264,22 +265,54 @@ export function ComposePage() {
                       </Badge>
                     ))}
                 </div>
+
+                {/* Asisten AI — menempel di caption utama */}
+                <div className="mt-4">
+                  <AiComposerPanel
+                    variant="inline"
+                    title="Asisten AI — Caption Utama"
+                    platform={aiPlatform}
+                    content={content}
+                    hashtags={hashtags}
+                    onApplyContent={setContent}
+                    onApplyHashtags={setHashtags}
+                  />
+                </div>
               </>
             ) : (
-              <VariationsPanel
-                selectedAccounts={selectedAccounts}
-                accounts={accounts.map((a) => ({
-                  id: a.id,
-                  platform: a.platform,
-                  username: a.username,
-                }))}
-                variations={variations}
-                hashtagVariations={hashtagVariations}
-                baseHashtags={hashtags}
-                onChange={setVariations}
-                onHashtagsChange={setHashtagVariations}
-                baseContent={content}
-              />
+              <>
+                <VariationsPanel
+                  selectedAccounts={selectedAccounts}
+                  accounts={accounts.map((a) => ({
+                    id: a.id,
+                    platform: a.platform,
+                    username: a.username,
+                  }))}
+                  variations={variations}
+                  hashtagVariations={hashtagVariations}
+                  baseHashtags={hashtags}
+                  onChange={setVariations}
+                  onHashtagsChange={setHashtagVariations}
+                  baseContent={content}
+                />
+
+                {/* Asisten AI — menempel di variasi per platform (akun target dipilih) */}
+                <VariationsAiPanel
+                  accounts={accounts
+                    .filter((a) => selectedAccounts.includes(a.id))
+                    .map((a) => ({ id: a.id, platform: a.platform, username: a.username }))}
+                  baseContent={content}
+                  baseHashtags={hashtags}
+                  variations={variations}
+                  hashtagVariations={hashtagVariations}
+                  onApplyVariation={(id, text) =>
+                    setVariations((prev) => ({ ...prev, [id]: text }))
+                  }
+                  onApplyHashtags={(id, tags) =>
+                    setHashtagVariations((prev) => ({ ...prev, [id]: tags }))
+                  }
+                />
+              </>
             )}
 
             <div className="mt-4 space-y-2">
@@ -292,21 +325,12 @@ export function ComposePage() {
               />
             </div>
 
-            {/* Toolbar alat (AI, strategi, UTM, sound, produk, waktu, CSV) */}
+            {/* Toolbar alat (strategi, UTM, sound, produk, waktu, CSV).
+                Asisten AI menempel di tab Caption Utama & Variasi per Platform. */}
             <div className="mt-5 border-[var(--border-light)] border-t pt-4">
               <ComposeTools>
                 {(tool: ComposeTool) => {
                   switch (tool) {
-                    case "ai":
-                      return (
-                        <AiComposerPanel
-                          platform={aiPlatform}
-                          content={content}
-                          hashtags={hashtags}
-                          onApplyContent={setContent}
-                          onApplyHashtags={setHashtags}
-                        />
-                      );
                     case "strategy":
                       return (
                         <StrategyAssetsPanel

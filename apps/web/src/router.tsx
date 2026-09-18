@@ -84,6 +84,14 @@ const ReportsPage = lazy(() =>
 const ComposePage = lazy(() =>
   import("./pages/dashboard/compose").then((m) => ({ default: m.ComposePage })),
 );
+const RepurposePage = lazy(() =>
+  import("./pages/dashboard/repurpose").then((m) => ({ default: m.RepurposePage })),
+);
+const CarouselGeneratorPage = lazy(() =>
+  import("./pages/dashboard/carousel-generator").then((m) => ({
+    default: m.CarouselGeneratorPage,
+  })),
+);
 const MediaPage = lazy(() =>
   import("./pages/dashboard/media").then((m) => ({ default: m.MediaPage })),
 );
@@ -293,6 +301,9 @@ export const router = createBrowserRouter([
           { path: "/calendar", element: withFallback(<CalendarPage />) },
           { path: "/queue", element: withFallback(<QueuePage />) },
           { path: "/compose", element: withFallback(<ComposePage />) },
+          // ---------- Generator AI (mandiri) ----------
+          { path: "/generator/repurpose", element: withFallback(<RepurposePage />) },
+          { path: "/generator/carousel", element: withFallback(<CarouselGeneratorPage />) },
           { path: "/media", element: withFallback(<MediaPage />) },
           { path: "/engagement", element: withFallback(<EngagementPage />) },
           { path: "/inbox", element: withFallback(<InboxPage />) },

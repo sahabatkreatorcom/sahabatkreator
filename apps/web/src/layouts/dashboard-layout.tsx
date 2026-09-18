@@ -5,6 +5,7 @@ import {
   BarChart3,
   CalendarDays,
   CreditCard,
+  GalleryHorizontalEnd,
   Image as ImageIcon,
   Inbox,
   LayoutDashboard,
@@ -18,6 +19,7 @@ import {
   PenSquare,
   Plus,
   Radar,
+  RefreshCcw,
   Search,
   Settings,
   ShieldCheck,
@@ -75,6 +77,13 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: "/performance", label: "Performa", icon: BarChart3 },
       { to: "/research", label: "Riset", icon: Radar },
       { to: "/assistant", label: "AI Asisten", icon: Sparkles },
+    ],
+  },
+  {
+    label: "Generator AI",
+    items: [
+      { to: "/generator/repurpose", label: "Repurpose", icon: RefreshCcw },
+      { to: "/generator/carousel", label: "Carousel", icon: GalleryHorizontalEnd },
     ],
   },
   {

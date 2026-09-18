@@ -1,15 +1,15 @@
-// Toolbar alat Compose — tombol kompak (AI, strategi, UTM, sound, produk, CSV,
+// Toolbar alat Compose — tombol kompak (strategi, UTM, sound, produk, CSV,
 // waktu optimal) yang membuka panel terkait sebagai section accordion di bawah
 // toolbar. Hanya satu alat yang terbuka pada satu waktu (perilaku Buffer).
+// Asisten AI tidak lagi di sini — ia menempel di tab Caption Utama & Variasi.
 import { CalendarClock, Lightbulb, Link2, Music, Package, Sparkles, Table } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /** Kunci alat — null = semua tertutup */
-export type ComposeTool = "ai" | "strategy" | "utm" | "sound" | "product" | "csv" | "times";
+export type ComposeTool = "strategy" | "utm" | "sound" | "product" | "csv" | "times";
 
 const TOOLS: { key: ComposeTool; label: string; icon: typeof Sparkles }[] = [
-  { key: "ai", label: "AI", icon: Sparkles },
   { key: "strategy", label: "Strategi", icon: Lightbulb },
   { key: "utm", label: "UTM", icon: Link2 },
   { key: "sound", label: "Sound", icon: Music },
