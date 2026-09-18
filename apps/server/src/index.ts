@@ -33,6 +33,7 @@ import { accountsRoute } from "./routes/accounts";
 import { activityRoute } from "./routes/activity";
 import { adminRoute } from "./routes/admin";
 import { apiAccessRoute } from "./routes/admin-api-access";
+import { apiTestTriggersRoute } from "./routes/admin-api-test-triggers";
 import { apiTestsRoute } from "./routes/admin-api-tests";
 import { monitoringRoute } from "./routes/admin-monitoring";
 import { aiRoute } from "./routes/ai";
@@ -138,6 +139,8 @@ api.route("/blog", blogRoute);
 api.route("/admin", adminRoute);
 api.route("/admin/api-access", apiAccessRoute);
 api.route("/admin/api-tests", apiTestsRoute);
+// Trigger izin/fitur App Review — prefix sama, modul terpisah (file tests terlalu panjang)
+api.route("/admin/api-tests", apiTestTriggersRoute);
 api.route("/admin/monitoring", monitoringRoute);
 api.route("/ai", aiRoute);
 api.route("/contact", contactRoute);
