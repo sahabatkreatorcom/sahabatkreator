@@ -11,6 +11,7 @@ import {
   deleteThreadsPost,
   GRAPH_FB_URL,
   GRAPH_IG_URL,
+  GRAPH_THREADS_URL,
   getThreadsMentions,
   getThreadsProfilePosts,
   lookupThreadsProfile,
@@ -388,6 +389,106 @@ apiTestTriggersRoute.post("/trigger/threads-advanced", requirePlatformAdmin, asy
         "Pastikan counter API calls bertambah: threads_manage_mentions, threads_keyword_search, threads_location_tagging, threads_profile_discovery, threads_delete",
         "profile_discovery memakai path profile_search — bila error 404, cek reference 'Threads Profile Discovery' dan sesuaikan PROFILE_SEARCH_PATH di threads-advanced.ts",
         "Kirim mediaId (post Threads milik akun) untuk menguji threads_delete — aksi ini menghapus post",
+      ],
+    });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+});
+
+/**
+ * POST /admin/api-tests/trigger/threads-delete
+ * Hasilkan 1 panggilan API `threads_delete` tanpa posting manual: buat post
+ * text (auto-publish) lalu hapus segera. Body opsional: { accountId?, text? }.
+ * HATI-HATI: mempublikasikan post nyata sesaat di akun Threads target.
+ */
+apiTestTriggersRoute.post("/trigger/threads-delete", requirePlatformAdmin, async (c) => {
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as { accountId?: string; text?: string };
+
+    const accounts = await db
+      .select({
+        id: socialAccount.id,
+        platformAccountId: socialAccount.platformAccountId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        username: socialAccount.username,
+      })
+      .from(socialAccount)
+      .where(eq(socialAccount.platform, "threads" as never))
+      .limit(5);
+
+    const account = body.accountId ? accounts.find((a) => a.id === body.accountId) : accounts[0];
+    if (!account?.accessTokenEnc) {
+      return c.json({ error: "No Threads account connected" }, 400);
+    }
+
+    let token: string;
+    try {
+      token = decrypt(account.accessTokenEnc);
+    } catch {
+      return c.json({ error: "Token Threads tidak bisa dibaca" }, 400);
+    }
+
+    // 1. Publikasikan post text singkat (menghasilkan panggilan content_publish)
+    const text = body.text ?? "Uji hapus otomatis Sahabat Kreator — post ini dihapus segera.";
+    const createRes = await fetchJson<{ id?: string; error?: { message?: string } }>(
+      `${GRAPH_THREADS_URL}/${account.platformAccountId}/threads`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          media_type: "TEXT",
+          text,
+          auto_publish_text: "true",
+          access_token: token,
+        }).toString(),
+      },
+    );
+
+    if (!createRes.ok || !createRes.data?.id) {
+      return c.json(
+        {
+          success: false,
+          error: createRes.data?.error?.message ?? `create HTTP ${createRes.status}`,
+          account: account.username,
+        },
+        502,
+      );
+    }
+    const mediaId = createRes.data.id;
+
+    // 2. Hapus post tersebut (menghasilkan panggilan threads_delete).
+    // Beri jeda singkat; retry sekali bila belum ter-propagate.
+    let deleted = false;
+    let lastError: string | null = null;
+    for (let attempt = 0; attempt < 2 && !deleted; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 4000));
+      try {
+        await deleteThreadsPost({ accessToken: token, mediaId });
+        deleted = true;
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+      }
+    }
+
+    await logAdminAction(c, null, {
+      action: "threads_delete.trigger",
+      entityType: "social_account",
+      metadata: { account: account.username, mediaId, deleted },
+    });
+
+    return c.json({
+      success: deleted,
+      message: deleted
+        ? "Post uji dibuat lalu dihapus — 1 panggilan threads_delete tercatat"
+        : "Post dibuat tetapi gagal dihapus — hapus manual bila perlu",
+      account: account.username,
+      mediaId,
+      deleted,
+      error: lastError,
+      nextSteps: [
+        "Buka Meta Developer Console → App Review → Permissions and Features",
+        "Pastikan threads_delete menunjukkan 1/1 panggilan API",
       ],
     });
   } catch (error) {
