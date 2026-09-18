@@ -24,7 +24,6 @@ import { PlatformPreviews } from "@/components/compose/platform-previews";
 import { PlatformSettingsPanel } from "@/components/compose/platform-settings-panel";
 import { PredictScoreBadge } from "@/components/compose/predict-score-badge";
 import { ProductPicker } from "@/components/compose/product-picker";
-import { SoundPicker } from "@/components/compose/sound-picker";
 import { StrategyAssetsPanel } from "@/components/compose/strategy-assets-panel";
 import { UtmPanel } from "@/components/compose/utm-panel";
 import { ValidationPanel } from "@/components/compose/validation-panel";
@@ -50,8 +49,6 @@ export function ComposePage() {
     selectedAccounts,
     toggleAccount,
     selectedMedia,
-    soundTrack,
-    setSoundTrack,
     productIds,
     setProductIds,
     variations,
@@ -323,8 +320,9 @@ export function ComposePage() {
               />
             </div>
 
-            {/* Toolbar alat (strategi, UTM, sound, produk).
-                Waktu Optimal & Import CSV kini terpisah — lihat sidebar kanan & bawah editor. */}
+            {/* Toolbar alat (strategi, UTM, produk).
+                Waktu Optimal & Import CSV kini terpisah — lihat sidebar kanan & bawah editor.
+                Sound dihapus: tidak ada adapter yang memakai audioTrackId saat publish. */}
             <div className="mt-5 border-[var(--border-light)] border-t pt-4">
               <ComposeTools>
                 {(tool: ComposeTool) => {
@@ -354,13 +352,6 @@ export function ComposePage() {
                       );
                     case "utm":
                       return <UtmPanel content={content} onApplyContent={setContent} />;
-                    case "sound":
-                      return (
-                        <SoundPicker
-                          selectedTrackId={soundTrack?.id ?? null}
-                          onSelect={setSoundTrack}
-                        />
-                      );
                     case "product":
                       return <ProductPicker selectedIds={productIds} onChange={setProductIds} />;
                   }

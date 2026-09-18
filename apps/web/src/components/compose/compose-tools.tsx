@@ -1,19 +1,19 @@
-// Toolbar alat Compose — tombol kompak (strategi, UTM, sound, produk)
+// Toolbar alat Compose — tombol kompak (strategi, UTM, produk)
 // yang membuka panel terkait sebagai section accordion di bawah
 // toolbar. Hanya satu alat yang terbuka pada satu waktu (perilaku Buffer).
 // Waktu Optimal & Import CSV kini masing-masing menempel di sidebar kanan
 // dan bagian bawah editor — bukan lagi di toolbar ini.
-import { Lightbulb, Link2, Music, Package, type Sparkles } from "lucide-react";
+// Sound dihapus: tidak ada publishing adapter yang memakai audioTrackId.
+import { Lightbulb, Link2, Package, type Sparkles } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /** Kunci alat — null = semua tertutup */
-export type ComposeTool = "strategy" | "utm" | "sound" | "product";
+export type ComposeTool = "strategy" | "utm" | "product";
 
 const TOOLS: { key: ComposeTool; label: string; icon: typeof Sparkles }[] = [
   { key: "strategy", label: "Strategi", icon: Lightbulb },
   { key: "utm", label: "UTM", icon: Link2 },
-  { key: "sound", label: "Sound", icon: Music },
   { key: "product", label: "Produk", icon: Package },
 ];
 
