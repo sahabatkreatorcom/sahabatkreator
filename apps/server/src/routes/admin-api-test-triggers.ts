@@ -209,7 +209,9 @@ apiTestTriggersRoute.post(
 
 /**
  * POST /admin/api-tests/trigger/facebook-insights
- * Trigger a Page Insights call for pages_manage/read_insights verification.
+ * Trigger a Page Insights call for read_insights verification.
+ * `read_insights` adalah satu-satunya permission sah untuk metrik Page Insights
+ * (page_impressions, page_fans_gender_age, dll).
  */
 apiTestTriggersRoute.post("/trigger/facebook-insights", requirePlatformAdmin, async (c) => {
   try {
@@ -500,8 +502,14 @@ apiTestTriggersRoute.post("/trigger/page-mentions", requirePlatformAdmin, async 
 
 /**
  * POST /admin/api-tests/trigger/page-demographics
- * Trigger API call untuk `pages_user_gender` — Page Insights demografi audiens
- * (`page_fans_gender_age`, period lifetime) untuk tiap Halaman Facebook terhubung.
+ * Trigger API call untuk demografi audiens Page — `page_fans_gender_age`
+ * (period lifetime) untuk tiap Halaman Facebook terhubung.
+ *
+ * Permission yang dipakai: `read_insights` (Page Insights). CATATAN PENTING:
+ * `pages_user_gender` BUKAN permission untuk metrik ini — permission itu
+ * membaca gender *orang* yang berkirim pesan dengan Page (messaging context),
+ * dan meminta nya saat authorize membatalkan seluruh login Facebook dengan
+ * error "Invalid Scope: pages_user_gender". Jadi scope OAuth hanya read_insights.
  */
 apiTestTriggersRoute.post("/trigger/page-demographics", requirePlatformAdmin, async (c) => {
   try {
@@ -592,7 +600,7 @@ apiTestTriggersRoute.post("/trigger/page-demographics", requirePlatformAdmin, as
       results,
       nextSteps: [
         "Buka Meta Developer Console → App Review → Permissions and Features",
-        "Pastikan counter API calls pages_user_gender bertambah > 0",
+        "Pastikan counter API calls read_insights bertambah > 0",
         "Bila error 'metric not supported', Page Insights demografi mungkin sudah dibatasi Meta untuk Page tsb",
       ],
     });
@@ -603,7 +611,11 @@ apiTestTriggersRoute.post("/trigger/page-demographics", requirePlatformAdmin, as
 
 /**
  * POST /admin/api-tests/trigger/human-agent
- * Trigger Human Agent permission by sending a test message with human_agent flag
+ * Trigger Human Agent permission by sending a test message with human_agent flag.
+ * Catatan: human_agent adalah permission/fitur Messenger untuk label pesan CS —
+ * aplikasi ini saat ini TIDAK meminta scope ini (tidak ada fitur yang
+ * membutuhkannya), sehingga hasHumanAgentScope akan false. Endpoint dipertahankan
+ * sebagai pemeriksaan diagnostik bila fitur Human Agent dibuka nanti.
  */
 apiTestTriggersRoute.post("/trigger/human-agent", requirePlatformAdmin, async (c) => {
   try {

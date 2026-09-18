@@ -196,14 +196,29 @@ aiRoute.post("/caption", async (c) => {
 
     const style = PLATFORM_STYLE[input.platform] ?? "";
     const voice = await brandVoicePrompt(ctx.organization.id);
-    const system = `Kamu adalah copywriter social media profesional Indonesia. Tulis caption ${input.tone} dalam Bahasa Indonesia untuk konten kreator UMKM.\n${style}${voice}\n${input.includeHashtags ? "Sertakan 3-8 hashtag relevan di akhir caption." : "JANGAN sertakan hashtag."}\nKembalikan HANYA teks caption, tanpa penjelasan tambahan.`;
+    // Hashtag JANGAN ditempel di caption — platform punya field hashtag
+    // terpisah, dan adapter menggabungkannya via composeCaption saat publish.
+    // Caption bertype hashtag + field hashtag = dobel saat tayang.
+    const system = `Kamu adalah copywriter social media profesional Indonesia. Tulis caption ${input.tone} dalam Bahasa Indonesia untuk konten kreator UMKM.\n${style}${voice}\n${input.includeHashtags ? "Selesai menulis caption, tambahkan satu baris baru berisi persis 'HASHTAG:' lalu 3-8 hashtag relevan dipisah spasi. Caption di ATAS baris HASHTAG: wajib bebas tanda pagar (#)." : "JANGAN sertakan hashtag sama sekali (tidak perlu baris HASHTAG:)."}\nKembalikan HANYA teks caption, tanpa penjelasan tambahan.`;
 
-    const caption = await chatCompletion(config, system, input.prompt, {
+    const raw = await chatCompletion(config, system, input.prompt, {
       temperature: 0.85,
       maxTokens: 800,
     });
 
-    const hashtags = caption.match(/#\w+/g) ?? [];
+    // Pisahkan baris HASHTAG: dari body caption (jangan ditempel di caption).
+    const marker = raw.match(/^HASHTAG:\s*(.+)$/im);
+    let caption = raw;
+    let hashtags: string[] = [];
+    if (marker && marker[1] && typeof marker.index === "number") {
+      hashtags = (marker[1].match(/#[A-Za-z0-9_]+/g) ?? []).map((t) => t.replace(/^#/, ""));
+      caption = raw.slice(0, marker.index).trim();
+    } else if (input.includeHashtags) {
+      // Model tidak ikuti format — jatuhkan hashtag apa pun yang nyasar di
+      // body agar tidak dobel dengan field hashtag.
+      hashtags = (raw.match(/#[A-Za-z0-9_]+/g) ?? []).map((t) => t.replace(/^#/, ""));
+      caption = raw.replace(/#[A-Za-z0-9_]+/g, "").replace(/[ \t]{2,}/g, " ").trim();
+    }
 
     return c.json({
       caption,

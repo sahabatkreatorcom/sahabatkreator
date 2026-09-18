@@ -72,7 +72,11 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
       "pages_read_engagement",
       "pages_manage_engagement", // reply komentar Page
       "pages_messaging", // read/reply Facebook Page conversations
-      "pages_user_gender", // demografi audiens Page (page_fans_gender_age)
+      // Page Insights (page_impressions, page_fans_gender_age, dll). Ini satu-
+      // satunya permission yang sah untuk metrik Insights — BUKAN pages_user_gender
+      // (permission itu untuk gender *orang* yang chat, dan membatalkan seluruh
+      // authorize request dengan "Invalid Scope" bila app tidak punya aksesnya).
+      "read_insights",
     ],
   },
   threads: {

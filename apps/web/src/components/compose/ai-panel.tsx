@@ -105,6 +105,17 @@ export function AiComposerPanel({
       }),
     onSuccess: (data) => {
       onApplyContent(data.caption);
+      // Hashtag masuk ke field hashtag (bukan ditempel di caption) — adapter
+      // menggabungkan keduanya via composeCaption saat publish. Merge dengan
+      // tag manual yang sudah ada (dedupe, maks 10) agar tidak menimpa.
+      if (data.hashtags.length > 0) {
+        const existing = hashtags
+          .split(/[,\s]+/)
+          .map((t) => t.replace(/^#+/, "").trim())
+          .filter(Boolean);
+        const merged = [...new Set([...existing, ...data.hashtags.map((t) => t.replace(/^#+/, "").trim())])];
+        onApplyHashtags(merged.slice(0, 10).map((t) => `#${t}`).join(", "));
+      }
       setSuggestedHashtags(data.hashtags);
       refetchUsage();
       toast.success("Caption dihasilkan");
