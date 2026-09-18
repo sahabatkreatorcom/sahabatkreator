@@ -273,31 +273,37 @@ export function AiComposerPanel({
             </div>
             {suggestedHashtags.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
-                {suggestedHashtags.map((tag) => (
+                {suggestedHashtags.map((tag) => {
+                  const clean = tag.replace(/^#+/, "").trim();
+                  const withHash = `#${clean}`;
+                  // Normalisasi hashtag di form untuk perbandingan: pastikan ada #
+                  const current = hashtags
+                    .split(/[,\s]+/)
+                    .map((t) => t.replace(/^#+/, "").trim())
+                    .filter(Boolean);
+                  const exists = current.includes(clean);
+                  return (
                   <button
                     key={tag}
                     type="button"
                     onClick={() => {
-                      // Toggle: tambah jika belum ada, hapus jika sudah
-                      const current = hashtags
-                        .split(/[,\s]+/)
-                        .map((t) => t.replace(/^#/, "").trim())
-                        .filter(Boolean);
-                      const exists = current.includes(tag.replace(/^#/, ""));
+                      // Toggle: tambah jika belum ada, hapus jika sudah.
+                      // Tag masuk ke form DENGAN tanda #.
                       const next = exists
-                        ? current.filter((t) => t !== tag.replace(/^#/, ""))
-                        : [...current, tag.replace(/^#/, "")];
-                      onApplyHashtags(next.join(", "));
+                        ? current.filter((t) => t !== clean)
+                        : [...current, clean];
+                      onApplyHashtags(next.map((t) => `#${t}`).join(", "));
                     }}
                     className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                      hashtags.includes(tag.replace(/^#/, ""))
+                      exists
                         ? "border-[var(--accent-gold)] bg-[var(--accent-gold-light)] font-medium"
                         : "border-[var(--border)] hover:border-[var(--accent-gold)]"
                     }`}
                   >
-                    {tag}
+                    {withHash}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-[var(--text-muted)] text-xs">Belum ada saran — klik Generate</p>
@@ -480,31 +486,36 @@ export function AiComposerPanel({
             </div>
             {suggestedHashtags.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
-                {suggestedHashtags.map((tag) => (
+                {suggestedHashtags.map((tag) => {
+                  const clean = tag.replace(/^#+/, "").trim();
+                  const withHash = `#${clean}`;
+                  const current = hashtags
+                    .split(/[,\s]+/)
+                    .map((t) => t.replace(/^#+/, "").trim())
+                    .filter(Boolean);
+                  const exists = current.includes(clean);
+                  return (
                   <button
                     key={tag}
                     type="button"
                     onClick={() => {
-                      // Toggle: tambah jika belum ada, hapus jika sudah
-                      const current = hashtags
-                        .split(/[,\s]+/)
-                        .map((t) => t.replace(/^#/, "").trim())
-                        .filter(Boolean);
-                      const exists = current.includes(tag.replace(/^#/, ""));
+                      // Toggle: tambah jika belum ada, hapus jika sudah.
+                      // Tag masuk ke form DENGAN tanda #.
                       const next = exists
-                        ? current.filter((t) => t !== tag.replace(/^#/, ""))
-                        : [...current, tag.replace(/^#/, "")];
-                      onApplyHashtags(next.join(", "));
+                        ? current.filter((t) => t !== clean)
+                        : [...current, clean];
+                      onApplyHashtags(next.map((t) => `#${t}`).join(", "));
                     }}
                     className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                      hashtags.includes(tag.replace(/^#/, ""))
+                      exists
                         ? "border-[var(--accent-gold)] bg-[var(--accent-gold-light)] font-medium"
                         : "border-[var(--border)] hover:border-[var(--accent-gold)]"
                     }`}
                   >
-                    {tag}
+                    {withHash}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-[var(--text-muted)] text-xs">Belum ada saran — klik Generate</p>
