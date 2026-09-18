@@ -706,7 +706,7 @@ async function runGoogleBusinessSuite(): Promise<TestResult[]> {
         return {
           status: "fail",
           message:
-            "Token ditolak (403) — scope business.manage hilang atau API belum diaktifkan; connect ulang akun.",
+            "Token ditolak (403). Cek 3 hal: (1) scope business.manage belum di-approve, (2) akses Business Profile API project belum di-allowlist (pengajuan terpisah dari verifikasi OAuth), (3) API belum diaktifkan di Google Cloud. Setelah beres, connect ulang akun.",
         };
       }
       return { status: "fail", message: `Gagal (HTTP ${res.status}) — periksa token akun.` };
