@@ -22,6 +22,10 @@ const GRAPH_THREADS = GRAPH_THREADS_URL;
 const POST_FIELDS =
   "id,text,username,permalink,timestamp,media_type,has_replies,is_reply,is_quote_post";
 
+// profile_posts tidak mendukung field milik reply (`has_replies`/`is_reply`)
+const PROFILE_POST_FIELDS =
+  "id,text,username,permalink,timestamp,media_type,is_quote_post,topic_tag";
+
 const LOCATION_FIELDS = "id,name,address,city,country,latitude,longitude,postal_code";
 
 // Timeout pendek + tanpa retry network: bila Graph menggantung, kita kembalikan
@@ -51,12 +55,14 @@ export type ThreadsLocation = {
   postal_code?: string | null;
 };
 
+// Catatan: field profile_lookup BEDA dari profil /me — di sini `profile_picture_url`
+// dan `biography` (bukan `threads_*`), plus follower_count.
 export type ThreadsProfile = {
-  id: string;
   username?: string;
   name?: string;
-  threads_biography?: string;
-  threads_profile_picture_url?: string;
+  profile_picture_url?: string;
+  biography?: string;
+  follower_count?: number;
   is_verified?: boolean;
 };
 
@@ -187,7 +193,7 @@ export async function lookupThreadsProfile(input: {
     {
       query: {
         username: input.username.replace(/^@/, ""),
-        fields: "id,username,name,threads_biography,threads_profile_picture_url,is_verified",
+        fields: "username,name,profile_picture_url,biography,follower_count,is_verified",
         access_token: input.accessToken,
       },
       retries: 0,
@@ -213,7 +219,7 @@ export async function getThreadsProfilePosts(input: {
   const res = await httpRequest<{ data?: ThreadsPost[] }>(`${GRAPH_THREADS}/profile_posts`, {
     query: {
       username: input.username.replace(/^@/, ""),
-      fields: POST_FIELDS,
+      fields: PROFILE_POST_FIELDS,
       limit: input.limit ?? 25,
       access_token: input.accessToken,
     },

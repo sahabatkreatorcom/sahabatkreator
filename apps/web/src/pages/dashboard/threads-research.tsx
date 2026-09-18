@@ -33,14 +33,16 @@ type ThreadsLocation = {
   id: string;
   name?: string;
   address?: string;
+  city?: string | null;
+  country?: string | null;
 };
 
 type ThreadsProfile = {
-  id: string;
   username?: string;
   name?: string;
-  threads_biography?: string;
-  threads_profile_picture_url?: string;
+  profile_picture_url?: string;
+  biography?: string;
+  follower_count?: number;
   is_verified?: boolean;
 };
 
@@ -306,8 +308,10 @@ export function ThreadsResearchPage() {
                   <MapPin className="h-3.5 w-3.5 text-[var(--accent-gold)]" />
                   {l.name ?? l.id}
                 </p>
-                {l.address && (
-                  <p className="mt-0.5 text-[var(--text-muted)] text-xs">{l.address}</p>
+                {(l.address || l.city || l.country) && (
+                  <p className="mt-0.5 text-[var(--text-muted)] text-xs">
+                    {[l.address, l.city, l.country].filter(Boolean).join(", ")}
+                  </p>
                 )}
                 <p className="mt-1 font-mono text-[10px] text-[var(--text-muted)]">ID: {l.id}</p>
               </li>
@@ -329,17 +333,22 @@ export function ThreadsResearchPage() {
                 <div className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--border-light)] p-3">
                   <Avatar
                     name={p.name ?? p.username ?? "?"}
-                    src={p.threads_profile_picture_url}
+                    src={p.profile_picture_url}
                     className="h-12 w-12 text-sm"
                   />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm">
-                      {p.name ?? p.username ?? p.id}
+                      {p.name ?? p.username ?? "—"}
                       {p.is_verified && <span className="ml-1 text-[var(--accent-gold)]">✓</span>}
                     </p>
-                    <p className="text-[var(--text-muted)] text-xs">@{p.username ?? "—"}</p>
-                    {p.threads_biography && (
-                      <p className="mt-1 whitespace-pre-wrap text-sm">{p.threads_biography}</p>
+                    <p className="text-[var(--text-muted)] text-xs">
+                      @{p.username ?? "—"}
+                      {typeof p.follower_count === "number" && (
+                        <> · {new Intl.NumberFormat("id-ID").format(p.follower_count)} pengikut</>
+                      )}
+                    </p>
+                    {p.biography && (
+                      <p className="mt-1 whitespace-pre-wrap text-sm">{p.biography}</p>
                     )}
                     {p.username && (
                       <a

@@ -113,8 +113,8 @@ threadsRoute.get("/_debug", async (c) => {
     const paths: Record<string, string> = {
       location: `/location_search?query=${encodeURIComponent(q)}&fields=id,name,address,city,country,latitude,longitude,postal_code`,
       "location-q": `/location_search?q=${encodeURIComponent(q)}&fields=id,name,address,city,country,latitude,longitude,postal_code`,
-      profile: `/profile_lookup?username=${encodeURIComponent(q.replace(/^@/, ""))}&fields=id,username,name,threads_biography,threads_profile_picture_url,is_verified`,
-      "profile-posts": `/profile_posts?username=${encodeURIComponent(q.replace(/^@/, ""))}&fields=id,text,username,permalink,timestamp,media_type`,
+      profile: `/profile_lookup?username=${encodeURIComponent(q.replace(/^@/, ""))}&fields=username,name,profile_picture_url,biography,follower_count,is_verified`,
+      "profile-posts": `/profile_posts?username=${encodeURIComponent(q.replace(/^@/, ""))}&fields=id,text,username,permalink,timestamp,media_type,is_quote_post,topic_tag`,
       keyword: `/keyword_search?q=${encodeURIComponent(q)}&search_type=TOP&fields=id,text,username,permalink,timestamp`,
       mentions: `/${account.platformAccountId}/mentions?fields=id,text,username,timestamp,permalink`,
     };
