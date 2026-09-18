@@ -10,16 +10,31 @@ import { generateId } from "../lib/id";
 
 export const automationRoute = new Hono();
 
+// Aksi rule: template statis (reply) atau AI-generated dengan delay (ai_reply).
+// ai_reply delay direkomendasikan: DM 0.5-2 menit (responsif), komentar 2-5 menit
+// (hindari kesan bot + beri window untuk cancel / cek sudah-dibalas-manual).
+const actionSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("reply"),
+    message: z.string().min(1).max(1000),
+  }),
+  z.object({
+    type: z.literal("ai_reply"),
+    tone: z.enum(["ramah", "profesional", "lucu"]).default("ramah"),
+    // 0.1-30 menit; dibulatkan ke atas oleh engine (min 0)
+    delayMinutes: z.number().min(0).max(30).default(2),
+    // true = generate draft tanpa kirim — review manual dulu (rekomendasi 1-2 minggu pertama)
+    dryRun: z.boolean().default(false),
+  }),
+]);
+
 const ruleSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   source: z.enum(["dm", "comment"]),
   socialAccountId: z.string().nullable().optional(),
   triggers: z.array(z.string().min(1).max(50)).min(1).max(20),
-  action: z.object({
-    type: z.literal("reply"),
-    message: z.string().min(1).max(1000),
-  }),
+  action: actionSchema,
   isActive: z.boolean().optional(),
 });
 
@@ -86,7 +101,7 @@ automationRoute.post("/", async (c) => {
         source: body.source,
         socialAccountId: body.socialAccountId ?? null,
         triggers,
-        action: { type: "reply", message: body.action.message },
+        action: body.action,
         isActive: body.isActive ?? true,
       })
       .returning();
@@ -112,8 +127,7 @@ automationRoute.patch("/:id", async (c) => {
         ...new Set(patch.triggers.map((t) => t.trim().toLowerCase()).filter(Boolean)),
       ];
     }
-    if (patch.action !== undefined)
-      values.action = { type: "reply", message: patch.action.message };
+    if (patch.action !== undefined) values.action = patch.action;
     if (patch.isActive !== undefined) values.isActive = patch.isActive;
 
     if (Object.keys(values).length === 0) {

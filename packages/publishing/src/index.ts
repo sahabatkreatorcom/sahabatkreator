@@ -19,6 +19,15 @@ export {
   personalize,
   processAutomation,
 } from "./automation";
+export {
+  type AutoReplyResult,
+  processAutoReplyJob,
+} from "./auto-reply";
+export {
+  clearAutoReplyEnqueue,
+  enqueueAutoReply,
+  registerAutoReplyEnqueue,
+} from "./queue-hook";
 export * from "./config";
 export {
   sendDMReply,

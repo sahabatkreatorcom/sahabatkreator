@@ -62,6 +62,8 @@ engagementRoute.get("/", async (c) => {
         content: engagementItem.content,
         rating: engagementItem.rating,
         replyContent: engagementItem.replyContent,
+        // Draft dari auto-reply AI dry-run — tampil di inbox untuk review manual
+        draftReply: engagementItem.draftReply,
         repliedAt: engagementItem.repliedAt,
         labels: engagementItem.labels,
         sentiment: engagementItem.sentiment,
@@ -370,6 +372,8 @@ engagementRoute.patch("/:id", async (c) => {
         status: z.enum(["unread", "read", "replied", "archived"]).optional(),
         labels: z.array(z.string()).optional(),
         replyContent: z.string().optional(),
+        // Buang draft auto-reply AI (dismiss) saat ditolak / sudah dikirim manual
+        clearDraft: z.boolean().optional(),
       })
       .parse(await c.req.json());
 
@@ -395,8 +399,11 @@ engagementRoute.patch("/:id", async (c) => {
               replyContent: input.replyContent,
               repliedAt: new Date(),
               status: "replied",
+              // Reply terkirim → draft tidak lagi relevan
+              draftReply: null,
             }
           : {}),
+        ...(input.clearDraft ? { draftReply: null } : {}),
       })
       .where(eq(engagementItem.id, row.id));
 
@@ -485,6 +492,8 @@ engagementRoute.post("/:id/reply", async (c) => {
         repliedAt: new Date(),
         status: "replied",
         platformReplyId,
+        // Reply terkirim → draft auto-reply AI (jika ada) tidak lagi relevan
+        draftReply: null,
       })
       .where(eq(engagementItem.id, row.item.id));
 

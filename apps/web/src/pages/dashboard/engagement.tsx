@@ -44,6 +44,8 @@ type Item = {
   content: string;
   rating: number | null;
   replyContent: string | null;
+  // Draft dari auto-reply AI (mode review) — belum terkirim
+  draftReply: string | null;
   repliedAt: string | null;
   sentiment: string | null;
   occurredAt: string;
@@ -153,7 +155,9 @@ const SENTIMENT_BADGE: Record<
 function EngagementCard({ item }: { item: Item }) {
   const queryClient = useQueryClient();
   const [replyOpen, setReplyOpen] = useState(false);
-  const [reply, setReply] = useState(item.replyContent ?? "");
+  // Prefill dengan draft AI (mode review) bila ada — user edit lalu kirim/tolak.
+  const [reply, setReply] = useState(item.draftReply ?? item.replyContent ?? "");
+  const hasDraft = Boolean(item.draftReply) && !item.replyContent;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["engagement-inbox"] });
@@ -281,8 +285,39 @@ function EngagementCard({ item }: { item: Item }) {
             </div>
           )}
 
+          {hasDraft && !replyOpen && (
+            <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--accent-gold)]/40 bg-[var(--accent-gold-light)] p-3 text-sm">
+              <p className="mb-1 flex items-center gap-1.5 font-medium text-[var(--accent-gold)] text-xs">
+                <Sparkles className="h-3.5 w-3.5" />
+                Draft auto-reply AI — periksa sebelum dikirim
+              </p>
+              <p className="text-[var(--text-secondary)]">{item.draftReply}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => setReplyOpen(true)}>
+                  <Reply className="h-3.5 w-3.5" />
+                  Edit &amp; Kirim
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-red-500 hover:text-red-600"
+                  disabled={patch.isPending}
+                  onClick={() => patch.mutate({ clearDraft: true })}
+                >
+                  Tolak Draft
+                </Button>
+              </div>
+            </div>
+          )}
+
           {replyOpen ? (
             <div className="mt-3 space-y-2">
+              {hasDraft && (
+                <p className="flex items-center gap-1.5 text-[var(--accent-gold)] text-xs">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Draft AI dimuat — edit sesuai kebutuhan sebelum kirim.
+                </p>
+              )}
               <Textarea
                 rows={3}
                 placeholder="Tulis balasan..."

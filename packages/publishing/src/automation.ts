@@ -10,8 +10,9 @@
 // - Aksi reply memakai sendDMReply (DM) / sendReply (komentar) yang sudah ada
 
 import { db } from "@sahabatkreator/db";
-import { automationLog, automationRule } from "@sahabatkreator/db/schema";
+import { automationLog, automationRule, type AutomationAction } from "@sahabatkreator/db/schema";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
+import { enqueueAutoReply } from "./queue-hook";
 import { decrypt } from "./crypto";
 import { sendDMReply } from "./dm-sync";
 import { sendReply } from "./reply";
@@ -85,6 +86,23 @@ async function findMatchingRule(
 }
 
 /**
+ * Rencana eksekusi per jenis aksi (type-safe narrowing).
+ * ai_reply → status "pending" + dueAt (delay); reply → "sent" + langsung kirim.
+ */
+function planExecution(action: AutomationAction): {
+  status: "pending" | "sent";
+  dueAt: Date | null;
+} {
+  if (action.type === "ai_reply") {
+    return {
+      status: "pending",
+      dueAt: new Date(Date.now() + Math.max(action.delayMinutes, 0) * 60_000),
+    };
+  }
+  return { status: "sent", dueAt: null };
+}
+
+/**
  * Proses satu item inbound terhadap aturan automation.
  * Dipanggil dari dm-sync (pesan baru) & engagement-sync (komentar baru) —
  * best-effort: error TIDAK menggagalkan sync, hanya dicatat ke log.
@@ -95,10 +113,13 @@ export async function processAutomation(input: AutomationInput): Promise<Automat
     if (!match) return { matched: false };
 
     const { rule, keyword } = match;
-    if (rule.action.type !== "reply") return { matched: false };
+    if (rule.action.type !== "reply" && rule.action.type !== "ai_reply") {
+      return { matched: false };
+    }
 
     // Guard dedup: insert log dulu — conflict berarti item ini sudah diproses rule ini
     const logId = generateId("autolog");
+    const plan = planExecution(rule.action);
     const inserted = await db
       .insert(automationLog)
       .values({
@@ -110,7 +131,8 @@ export async function processAutomation(input: AutomationInput): Promise<Automat
         partnerName: input.partnerName ?? null,
         partnerUsername: input.partnerUsername ?? null,
         messageSent: null,
-        status: "sent",
+        status: plan.status,
+        dueAt: plan.dueAt,
       })
       .onConflictDoNothing({ target: [automationLog.ruleId, automationLog.platformItemId] })
       .returning({ id: automationLog.id });
@@ -128,6 +150,30 @@ export async function processAutomation(input: AutomationInput): Promise<Automat
         lastTriggeredAt: new Date(),
       })
       .where(eq(automationRule.id, rule.id));
+
+    // ---- AI reply: jangan kirim sekarang — enqueue delayed job (delay memberi
+    // buffer: cek sentimen segar, cek sudah-dibalas-manual, hindari pola bot).
+    // Eksekusi & semua guard ada di processAutoReplyJob (queue worker / fallback).
+    if (rule.action.type === "ai_reply") {
+      const queued = await enqueueAutoReply(logId, plan.dueAt as Date).catch((err) => {
+        console.warn(`[automation] enqueue ai_reply gagal: ${err}`);
+        return false;
+      });
+      if (!queued) {
+        // Hook belum terdaftar (tanpa host app) atau Redis tidak ada → fallback
+        // polling automation_log.due_at akan memproses. dueAt sudah di DB.
+        console.log(`[automation] ai_reply log=${logId} menunggu fallback polling`);
+      }
+      return {
+        matched: true,
+        ruleId: rule.id,
+        ruleName: rule.name,
+        // status final (sent/drafted/skipped/failed) ditentukan worker saat due;
+        // di sini baru konfirmasi trigger — balasan belum terkirim.
+      };
+    }
+
+    // ---- Template reply: kirim langsung (perilaku lama)
 
     // Ambil konteks akun untuk kirim reply
     const { socialAccount } = await import("@sahabatkreator/db/schema");

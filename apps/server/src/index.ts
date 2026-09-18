@@ -73,6 +73,13 @@ import { userRoute } from "./routes/user";
 import { webhookRoute } from "./routes/webhook";
 import { platformWebhookRoute } from "./routes/webhook-platform";
 
+// Auto-reply AI: webhook server juga memanggil processAutomation (via dm-sync /
+// engagement-sync), jadi perlu daftarkan enqueue hook agar delayed job masuk queue.
+// Tanpa ini, job tetap jalan via worker fallback polling automation_log.due_at.
+import { enqueueAutoReply } from "@sahabatkreator/queue";
+import { registerAutoReplyEnqueue } from "@sahabatkreator/publishing";
+registerAutoReplyEnqueue(enqueueAutoReply);
+
 const app = new Hono();
 
 app.use(logger());

@@ -1,5 +1,13 @@
 // @sahabatkreator/queue — BullMQ publish queue (Redis) dengan fallback DB polling
 export {
+  AUTO_REPLY_QUEUE_NAME,
+  cancelAutoReply,
+  createAutoReplyWorker,
+  enqueueAutoReply,
+  type AutoReplyJobData,
+  runAutoReplyCycle,
+} from "./auto-reply";
+export {
   closeQueues,
   getPublishQueue,
   getRedisConnection,

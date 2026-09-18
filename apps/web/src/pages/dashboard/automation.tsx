@@ -9,6 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { api } from "@/lib/api";
 
+type AutomationAction =
+  | { type: "reply"; message: string }
+  | {
+      type: "ai_reply";
+      tone: "ramah" | "profesional" | "lucu";
+      delayMinutes: number;
+      dryRun: boolean;
+    };
+
 type AutomationRule = {
   id: string;
   name: string;
@@ -16,7 +25,7 @@ type AutomationRule = {
   source: "dm" | "comment";
   socialAccountId: string | null;
   triggers: string[];
-  action: { type: "reply"; message: string };
+  action: AutomationAction;
   isActive: boolean;
   triggeredCount: number;
   deliveredCount: number;
@@ -60,7 +69,22 @@ function RuleForm({
   const [source, setSource] = useState<"dm" | "comment">(initial?.source ?? "dm");
   const [socialAccountId, setSocialAccountId] = useState(initial?.socialAccountId ?? "");
   const [triggersText, setTriggersText] = useState((initial?.triggers ?? []).join(", "));
-  const [message, setMessage] = useState(initial?.action.message ?? "");
+  // Mode balasan: template statis atau AI-generated dengan delay
+  const [actionType, setActionType] = useState<"reply" | "ai_reply">(
+    initial?.action.type ?? "reply",
+  );
+  const [message, setMessage] = useState(
+    initial?.action.type === "reply" ? initial.action.message : "",
+  );
+  const [tone, setTone] = useState<"ramah" | "profesional" | "lucu">(
+    initial?.action.type === "ai_reply" ? initial.action.tone : "ramah",
+  );
+  const [delayMinutes, setDelayMinutes] = useState(
+    initial?.action.type === "ai_reply" ? initial.action.delayMinutes : source === "dm" ? 1 : 3,
+  );
+  const [dryRun, setDryRun] = useState(
+    initial?.action.type === "ai_reply" ? initial.action.dryRun : false,
+  );
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
 
   const save = useMutation({
@@ -70,12 +94,21 @@ function RuleForm({
         .map((t) => t.trim())
         .filter(Boolean);
       if (triggers.length === 0) throw new Error("Minimal 1 keyword trigger");
+      if (actionType === "reply" && !message.trim()) throw new Error("Pesan balasan wajib diisi");
       const body = {
         name,
         source,
         socialAccountId: socialAccountId || null,
         triggers,
-        action: { type: "reply" as const, message },
+        action:
+          actionType === "reply"
+            ? { type: "reply" as const, message }
+            : {
+                type: "ai_reply" as const,
+                tone,
+                delayMinutes,
+                dryRun,
+              },
         isActive,
       };
       if (initial) {
@@ -161,20 +194,89 @@ function RuleForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="rule-message">Pesan Balasan Otomatis</Label>
-        <Textarea
-          id="rule-message"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Hai {{name}}! Terima kasih sudah bertanya. Untuk info harga lengkap, cek link di bio ya 😊"
-          required
-          maxLength={1000}
-        />
+        <Label htmlFor="rule-action-type">Jenis Balasan</Label>
+        <Select
+          id="rule-action-type"
+          value={actionType}
+          onChange={(e) => setActionType(e.target.value as "reply" | "ai_reply")}
+        >
+          <option value="reply">Template pesan tetap</option>
+          <option value="ai_reply">Balasan AI (generate otomatis)</option>
+        </Select>
         <p className="text-[var(--text-muted)] text-xs">
-          Placeholder: <code>{"{{username}}"}</code> <code>{"{{name}}"}</code>{" "}
-          <code>{"{{keyword}}"}</code> (keyword yang cocok).
+          {actionType === "reply"
+            ? "Pesan yang sama dikirim untuk setiap keyword yang cocok (cepat, gratis)."
+            : "AI membuat balasan unik per pesan. Ada delay untuk pengecekan sentimen & mencegah double-reply (pakai 1 kredit AI)."}
         </p>
       </div>
+
+      {actionType === "reply" ? (
+        <div className="space-y-2">
+          <Label htmlFor="rule-message">Pesan Balasan Otomatis</Label>
+          <Textarea
+            id="rule-message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Hai {{name}}! Terima kasih sudah bertanya. Untuk info harga lengkap, cek link di bio ya 😊"
+            required
+            maxLength={1000}
+          />
+          <p className="text-[var(--text-muted)] text-xs">
+            Placeholder: <code>{"{{username}}"}</code> <code>{"{{name}}"}</code>{" "}
+            <code>{"{{keyword}}"}</code> (keyword yang cocok).
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4 rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] p-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="rule-tone">Nada Bahasa AI</Label>
+              <Select
+                id="rule-tone"
+                value={tone}
+                onChange={(e) => setTone(e.target.value as "ramah" | "profesional" | "lucu")}
+              >
+                <option value="ramah">Ramah</option>
+                <option value="profesional">Profesional</option>
+                <option value="lucu">Lucu</option>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rule-delay">Delay sebelum kirim (menit)</Label>
+              <Input
+                id="rule-delay"
+                type="number"
+                min={0}
+                max={30}
+                step={0.5}
+                value={delayMinutes}
+                onChange={(e) => setDelayMinutes(Number(e.target.value))}
+              />
+              <p className="text-[var(--text-muted)] text-xs">
+                {source === "dm"
+                  ? "Rekomendasi DM: 0.5–2 menit (terasa responsif)."
+                  : "Rekomendasi komentar: 2–5 menit (hindari kesan bot + beri waktu cek sudah-dibalas manual)."}
+              </p>
+            </div>
+          </div>
+          <label className="flex cursor-pointer items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={dryRun}
+              onChange={(e) => setDryRun(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-[var(--accent-gold)]"
+            />
+            <span>
+              <strong>Mode review</strong> — jadikan draft dulu, tidak langsung dikirim.
+              <span className="mt-0.5 block text-[var(--text-muted)] text-xs">
+                Rekomendasi 1–2 minggu pertama: kamu review draft AI di inbox, baru aktifkan
+                kirim otomatis setelah kualitasnya oke. Komentar negatif selalu diskip &
+                ditandai untuk review manual.
+              </span>
+            </span>
+          </label>
+        </div>
+      )}
 
       <label className="flex cursor-pointer items-center gap-2 text-sm">
         <input
@@ -281,13 +383,17 @@ export default function AutomationPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="font-semibold">{rule.name}</h2>
                     <Badge variant={rule.source === "dm" ? "secondary" : "outline"}>
-                      {rule.source === "dm" ? (
-                        <MessageCircle className="h-3 w-3" />
-                      ) : (
-                        <MessageCircle className="h-3 w-3" />
-                      )}
+                      <MessageCircle className="h-3 w-3" />
                       {SOURCE_LABELS[rule.source]}
                     </Badge>
+                    {rule.action.type === "ai_reply" && (
+                      <Badge
+                        variant="outline"
+                        className="border-[var(--accent-gold)] text-[var(--accent-gold)]"
+                      >
+                        AI
+                      </Badge>
+                    )}
                     {rule.isActive ? (
                       <Badge variant="success">aktif</Badge>
                     ) : (
@@ -335,7 +441,22 @@ export default function AutomationPage() {
               </div>
 
               <div className="rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] p-3 text-[var(--text-secondary)] text-sm">
-                &ldquo;{rule.action.message}&rdquo;
+                {rule.action.type === "reply" ? (
+                  <>&ldquo;{rule.action.message}&rdquo;</>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="border-[var(--accent-gold)] text-[var(--accent-gold)]">
+                      Balasan AI
+                    </Badge>
+                    <span>
+                      Nada <strong>{rule.action.tone}</strong> · delay{" "}
+                      <strong>{rule.action.delayMinutes} mnt</strong>
+                    </span>
+                    {rule.action.dryRun && (
+                      <Badge variant="secondary">mode review (draft)</Badge>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-4 text-[var(--text-muted)] text-xs">

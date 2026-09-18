@@ -37,6 +37,9 @@ export const engagementItem = pgTable(
     repliedAt: timestamp("replied_at"),
     // ID reply di platform (tracking, idempotensi reply)
     platformReplyId: text("platform_reply_id"),
+    // Draft balasan AI (auto-reply dry-run) — belum terkirim, menunggu review manual.
+    // Berbeda dari replyContent (sudah terkirim); kosongkan saat draft dikirim/dibuang.
+    draftReply: text("draft_reply"),
     // Assignment ke member tim
     assignedMemberId: text("assigned_member_id"),
     // Label custom

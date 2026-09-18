@@ -31,17 +31,26 @@ import {
 } from "@sahabatkreator/publishing";
 import {
   closeQueues,
+  createAutoReplyWorker,
   createPublishWorker,
   createReminderWorker,
+  enqueueAutoReply,
   getRedisConnection,
+  runAutoReplyCycle,
   runReminderCycle,
 } from "@sahabatkreator/queue";
+import { registerAutoReplyEnqueue } from "@sahabatkreator/publishing";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 
 const app = new Hono();
 app.use(logger());
+
+// Daftarkan enqueue hook — processAutomation (publishing) bisa enqueue delayed
+// ai_reply job tanpa import cycle. Implementasi dari queue package.
+// Bila Redis kosong: enqueue return false → fallback polling due_at yang proses.
+registerAutoReplyEnqueue(enqueueAutoReply);
 
 app.get("/health", (c) => c.json({ status: "ok", service: "sahabatkreator-worker" }));
 
@@ -171,6 +180,15 @@ app.post("/sync-dm", async (c) => {
   return c.json({ ok: true, mode, ...result, errors: result.errors.length });
 });
 
+// Trigger manual auto-reply cycle (cron eksternal / debugging) — proses job
+// pending yang sudah due (jalur fallback; BullMQ memprosesnya otomatis saat Redis).
+app.post("/sync-auto-reply", async (c) => {
+  const rejected = requireCronSecret(c);
+  if (rejected) return rejected;
+  const result = await runAutoReplyCycle();
+  return c.json({ ok: true, mode, ...result });
+});
+
 // Trigger manual analytics sync (cron eksternal / debugging)
 app.post("/sync-analytics", async (c) => {
   const rejected = requireCronSecret(c);
@@ -218,6 +236,10 @@ if (mode === "bullmq") {
   }
   // Processor job "post-reminder" — pengingat push post manual terjadwal
   createReminderWorker();
+  // Processor job "auto-reply" — balasan AI komentar/DM dengan delay.
+  // Worker ini yang menjalankan processAutoReplyJob saat due (claim atomik di
+  // dalamnya melindungi race vs fallback loop di bawah).
+  createAutoReplyWorker();
   // Recovery sweep tetap jalan (job hilang saat Redis flush / worker crash sebelum enqueue poll)
   setInterval(() => {
     recoverStalePosts()
@@ -346,6 +368,31 @@ setInterval(() => {
 }, REMINDER_TICK_MS);
 // Cek pertama 10 detik setelah start
 setTimeout(() => runReminderCycle().catch(() => {}), 10_000);
+
+// ---- Auto-Reply AI loop (kedua mode) ----
+// Mode BullMQ: job diproses createAutoReplyWorker — loop ini hanya safety net
+// (job hilang saat Redis flush / enqueue gagal). Mode fallback: satu-satunya
+// jalan eksekusi — polling automation_log.status='pending' AND due_at <= now.
+// Presisi delay ±tick; guard (sentiment, sudah-dibalas, rule aktif) re-cek saat due.
+const AUTO_REPLY_TICK_MS = 30_000;
+let autoReplying = false;
+async function runAutoReply(): Promise<void> {
+  const r = await runAutoReplyCycle();
+  if (r.processed > 0) {
+    console.log(`[auto-reply] processed=${r.processed} sent=${r.sent} (fallback)`);
+  }
+}
+setInterval(() => {
+  if (autoReplying) return;
+  autoReplying = true;
+  runAutoReply()
+    .catch((error) => console.error("[auto-reply] cycle error:", error))
+    .finally(() => {
+      autoReplying = false;
+    });
+}, AUTO_REPLY_TICK_MS);
+// Cek pertama 15 detik setelah start
+setTimeout(() => runAutoReply().catch(() => {}), 15_000);
 
 // ---- Scheduled Reports loop (kedua mode) ----
 // Tiap jam cek jadwal laporan email due (weekly/monthly, dedupe 20 jam)
