@@ -343,53 +343,60 @@ analyticsRoute.get("/optimal-times", async (c) => {
 // (FB butuh scope pages_user_gender)
 // ---------------------------------------------------------------------------
 
-/** Baris breakdown demografi dari Graph API: { key: "F.18-24", value: 123 } */
+/** Baris breakdown demografi dari Graph API: { key: "18-24", value: 123 } */
 type GenderAgeRow = { key: string; value: number };
+
+type IgBreakdown = {
+  dimension_keys?: string[];
+  /** API lama memakai `rows`; `follower_demographics` memakai `results` */
+  rows?: Array<{ dimension_values?: string[]; value?: number }>;
+  results?: Array<{ dimension_values?: string[]; value?: number }>;
+};
 
 type IgInsightsResponse = {
   data?: Array<{
     name?: string;
-    total_value?: {
-      breakdowns?: Array<{
-        dimension_keys?: string[];
-        rows?: Array<{
-          dimension_values?: string[];
-          value?: number;
-        }>;
-      }>;
-    };
+    total_value?: { breakdowns?: IgBreakdown[] };
     values?: Array<{ value?: { [key: string]: number } | number }>;
   }>;
 };
 
+/** Ambil baris breakdown (dukung `results` baru & `rows` lama) → { key, value } */
+function parseBreakdown(breakdown: IgBreakdown | undefined): GenderAgeRow[] {
+  const rows = breakdown?.results ?? breakdown?.rows ?? [];
+  return rows.map((r) => ({
+    key: (r.dimension_values ?? []).join("."),
+    value: Number(r.value ?? 0),
+  }));
+}
+
 /**
- * Parse response insights audience_gender_age → daftar { key: "F.18-24", value }.
- * Format modern: data[0].total_value.breakdowns[0].rows dengan dimension_values
- * ["F", "18-24"] digabung jadi key "F.18-24". Format legacy pakai values map.
+ * Demografi pengikut IG — pengganti `audience_gender_age` yang sudah dihapus Meta.
+ * `metric=follower_demographics&breakdown=gender|age&metric_type=total_value`.
+ * Satu breakdown per request (gender & usia tidak bisa di-cross-tab lagi).
  */
-function parseGenderAge(data: IgInsightsResponse): GenderAgeRow[] {
-  const breakdown = data.data?.[0]?.total_value?.breakdowns?.[0];
-  if (breakdown?.rows) {
-    const rows = breakdown.rows
-      .map((r) => {
-        const dims = r.dimension_values ?? [];
-        return {
-          key: dims.join("."),
-          value: Number(r.value ?? 0),
-        };
-      })
-      .filter((r) => r.key.includes("."));
-    if (rows.length > 0) return rows;
+async function fetchFollowerDemographics(
+  base: string,
+  igUserId: string,
+  token: string,
+  breakdown: "gender" | "age",
+): Promise<{ rows: GenderAgeRow[]; error?: { status: number; text: string } }> {
+  const res = await httpRequest<IgInsightsResponse>(`${base}/${igUserId}/insights`, {
+    query: {
+      metric: "follower_demographics",
+      period: "lifetime",
+      breakdown,
+      metric_type: "total_value",
+      access_token: token,
+    },
+    retries: 1,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { rows: [], error: { status: res.status, text } };
   }
-  // Legacy format: values[0].value = { "F.18-24": 123, ... }
-  const legacy = data.data?.[0]?.values?.[0]?.value;
-  if (legacy && typeof legacy === "object") {
-    return Object.entries(legacy).map(([key, value]) => ({
-      key,
-      value: Number(value ?? 0),
-    }));
-  }
-  return [];
+  const data = await res.json();
+  return { rows: parseBreakdown(data.data?.[0]?.total_value?.breakdowns?.[0]) };
 }
 
 // Cache in-memory response demografi per (orgId, accountId) — TTL 1 jam.
@@ -402,7 +409,11 @@ const demographicsCache = new Map<
     at: number;
     username: string | null;
     source: string;
-    payload: { genderAge: GenderAgeRow[]; byGender: { gender: "F" | "M"; value: number }[] };
+    payload: {
+      genderAge: GenderAgeRow[];
+      byGender: { gender: "F" | "M"; value: number }[];
+      byAge: GenderAgeRow[];
+    };
   }
 >();
 
@@ -454,8 +465,8 @@ analyticsRoute.get("/demographics", async (c) => {
       .limit(1);
     if (!account) throw new HTTPError(404, "Akun tidak ditemukan");
 
-    // Instagram (kedua jalur) + Facebook Page didukung. Facebook pakai metric
-    // `page_fans_gender_age` (butuh scope pages_user_gender); platform lain 501.
+    // Instagram (kedua jalur) didukung. Facebook: Meta sudah menghapus metrik
+    // demografi Page (`page_fans_gender_age` → "not a valid insights metric").
     const isInstagram =
       account.platform === "instagram" || account.platform === "instagram_standalone";
     const isFacebook = account.platform === "facebook";
@@ -475,63 +486,66 @@ analyticsRoute.get("/demographics", async (c) => {
       throw new HTTPError(400, "Token akun tidak bisa dibaca — hubungkan ulang akun");
     }
 
-    // IG Standalone pakai user token di graph.instagram.com; IG (FB Login) & FB Page
-    // memakai page token (metadata.pageAccessToken) di graph.facebook.com.
+    // Facebook: metrik demografi gender/usia tidak lagi tersedia di Graph API.
+    if (isFacebook) {
+      return c.json({
+        genderAge: [],
+        byGender: [],
+        byAge: [],
+        source: account.platform,
+        username: account.username,
+        notice:
+          "Meta tidak lagi menyediakan metrik demografi gender/usia untuk Halaman Facebook (page_fans_gender_age sudah tidak valid).",
+      });
+    }
+
+    // Instagram — pakai `follower_demographics` (pengganti audience_gender_age).
+    // IG Standalone: user token di graph.instagram.com; IG (FB Login): page token di
+    // graph.facebook.com. Breakdown gender & age dipanggil terpisah.
     const base = account.platform === "instagram_standalone" ? GRAPH_IG : GRAPH_FB;
     const token = pageTokenOf(account.metadata) ?? accessToken;
-    const metric = isFacebook ? "page_fans_gender_age" : "audience_gender_age";
 
-    const res = await httpRequest<IgInsightsResponse>(
-      `${base}/${account.platformAccountId}/insights`,
-      {
-        query: {
-          metric,
-          period: "lifetime",
-          access_token: token,
-        },
-        retries: 1,
-      },
+    const [genderRes, ageRes] = await Promise.all([
+      fetchFollowerDemographics(base, account.platformAccountId, token, "gender"),
+      fetchFollowerDemographics(base, account.platformAccountId, token, "age"),
+    ]);
+
+    const errors = [genderRes.error, ageRes.error].filter(
+      (e): e is { status: number; text: string } => Boolean(e),
     );
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
+    const firstError = errors[0];
+    if (genderRes.rows.length === 0 && ageRes.rows.length === 0 && firstError) {
       console.warn(
-        `[analytics] demographics upstream error (${res.status}) for ${account.username}: ${text.slice(0, 300)}`,
+        `[analytics] demographics upstream error (${firstError.status}) for ${account.username}: ${firstError.text.slice(0, 300)}`,
       );
-      // 4xx = data tak tersedia (metric deprecated/tidak didukung izin/audiens kurang)
-      // → kembalikan kosong + catatan, bukan 502. Kegagalan server/network tetap 502.
-      if (res.status < 500) {
+      // 4xx = data tak tersedia (izin/audiens kurang) → kosong + catatan; 5xx tetap 502.
+      if (firstError.status < 500) {
         return c.json({
           genderAge: [],
           byGender: [],
+          byAge: [],
           source: account.platform,
           username: account.username,
-          notice: `Platform menolak permintaan demografi (${res.status}): ${text.slice(0, 200)}`,
+          notice: `Platform menolak permintaan demografi (${firstError.status}): ${firstError.text.slice(0, 200)}`,
         });
       }
       throw new HTTPError(
         502,
-        `Gagal mengambil data demografi dari ${account.platform}: ${text.slice(0, 150)}`,
+        `Gagal mengambil data demografi dari ${account.platform}: ${firstError.text.slice(0, 150)}`,
       );
     }
 
-    const genderAge = parseGenderAge(await res.json());
-
-    // Agregasi per gender (F/M) — abaikan kunci lain (mis. U unknown)
+    // Agregasi gender (F/M) + usia terpisah — tidak ada cross-tab lagi.
     const byGender: { gender: "F" | "M"; value: number }[] = [];
-    const fTotal = genderAge
-      .filter((r) => r.key.startsWith("F."))
-      .reduce((sum, r) => sum + r.value, 0);
-    const mTotal = genderAge
-      .filter((r) => r.key.startsWith("M."))
-      .reduce((sum, r) => sum + r.value, 0);
-    if (fTotal > 0) byGender.push({ gender: "F", value: fTotal });
-    if (mTotal > 0) byGender.push({ gender: "M", value: mTotal });
+    for (const row of genderRes.rows) {
+      const g = row.key.charAt(0).toUpperCase();
+      if (g === "F") byGender.push({ gender: "F", value: row.value });
+      else if (g === "M") byGender.push({ gender: "M", value: row.value });
+    }
+    const byAge = ageRes.rows.filter((r) => r.key !== "").sort((a, b) => b.value - a.value);
+    const payload = { genderAge: [] as GenderAgeRow[], byGender, byAge };
 
-    const genderAgeSorted = genderAge.sort((a, b) => b.value - a.value);
-    const payload = { genderAge: genderAgeSorted, byGender };
-
-    // Simpan ke cache hanya untuk response sukses (di atas sudah lolos semua
-    // validasi + Graph API ok)
+    // Cache hanya untuk response sukses (ada data)
     demographicsCache.set(cacheKey, {
       at: Date.now(),
       username: account.username,

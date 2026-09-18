@@ -10,8 +10,11 @@ import { formatCompact } from "@/lib/format";
 import { PLATFORMS } from "@/lib/platforms";
 
 type Demographics = {
+  /** Format lama (gender × usia). Kosong bila platform hanya kirim breakdown terpisah. */
   genderAge: { key: string; value: number }[];
   byGender: { gender: "F" | "M"; value: number }[];
+  /** Breakdown usia terpisah (follower_demographics; tanpa cross-tab gender) */
+  byAge?: { key: string; value: number }[];
   source: string;
   username: string;
   /** Catatan saat platform menolak permintaan (metric deprecated/audiens kurang) */
@@ -68,7 +71,13 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
     if (gender === "F" || gender === "M") group[gender] += row.value;
     ageGroups.set(age, group);
   }
-  const maxAgeTotal = Math.max(1, ...[...ageGroups.values()].map((g) => g.F + g.M));
+  const hasCrossAge = ageGroups.size > 0;
+  // Breakdown usia terpisah (follower_demographics) — dipakai bila cross-tab kosong
+  const byAge = data?.byAge ?? [];
+  const maxAgeTotal = hasCrossAge
+    ? Math.max(1, ...[...ageGroups.values()].map((g) => g.F + g.M))
+    : Math.max(1, ...byAge.map((a) => a.value));
+  const hasData = hasCrossAge || byAge.length > 0;
   const grandTotal = (data?.byGender ?? []).reduce((s, g) => s + g.value, 0);
 
   return (
@@ -112,7 +121,7 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
         <p className="text-[var(--error)] text-sm">
           {(error as Error).message || "Gagal memuat demografi audiens"}
         </p>
-      ) : !data || data.genderAge.length === 0 ? (
+      ) : !data || !hasData ? (
         <div className="space-y-2">
           <EmptyState
             title="Data belum tersedia"
@@ -150,47 +159,72 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
             })}
           </div>
 
-          {/* Bar horizontal per kelompok usia × gender — murni CSS/Tailwind */}
+          {/* Bar horizontal — format lama: per usia × gender (stacked).
+              Format baru (follower_demographics): per kelompok usia (satu warna). */}
           <div className="space-y-2.5">
-            {[...ageGroups.entries()]
-              .sort((a, b) => b[1].F + b[1].M - (a[1].F + a[1].M))
-              .map(([age, counts]) => {
-                const total = counts.F + counts.M;
-                const pct = (total / maxAgeTotal) * 100;
-                const fShare = total > 0 ? (counts.F / total) * 100 : 0;
-                const mShare = 100 - fShare;
-                return (
-                  <div key={age} className="flex items-center gap-3">
-                    <span className="w-14 shrink-0 text-right text-[var(--text-secondary)] text-xs">
-                      {age}
-                    </span>
-                    <div
-                      className="h-6 flex-1 overflow-hidden rounded-[var(--radius-md)] bg-[var(--bg-tertiary)]"
-                      style={{ maxWidth: `${Math.max(pct, 2)}%` }}
-                    >
-                      <div className="flex h-full w-full">
-                        {counts.F > 0 && (
-                          <div
-                            className="h-full"
-                            style={{ width: `${fShare}%`, backgroundColor: GENDER_COLOR.F }}
-                            title={`${GENDER_LABEL.F}: ${formatCompact(counts.F)}`}
-                          />
-                        )}
-                        {counts.M > 0 && (
-                          <div
-                            className="h-full"
-                            style={{ width: `${mShare}%`, backgroundColor: GENDER_COLOR.M }}
-                            title={`${GENDER_LABEL.M}: ${formatCompact(counts.M)}`}
-                          />
-                        )}
+            {hasCrossAge
+              ? [...ageGroups.entries()]
+                  .sort((a, b) => b[1].F + b[1].M - (a[1].F + a[1].M))
+                  .map(([age, counts]) => {
+                    const total = counts.F + counts.M;
+                    const pct = (total / maxAgeTotal) * 100;
+                    const fShare = total > 0 ? (counts.F / total) * 100 : 0;
+                    const mShare = 100 - fShare;
+                    return (
+                      <div key={age} className="flex items-center gap-3">
+                        <span className="w-14 shrink-0 text-right text-[var(--text-secondary)] text-xs">
+                          {age}
+                        </span>
+                        <div
+                          className="h-6 flex-1 overflow-hidden rounded-[var(--radius-md)] bg-[var(--bg-tertiary)]"
+                          style={{ maxWidth: `${Math.max(pct, 2)}%` }}
+                        >
+                          <div className="flex h-full w-full">
+                            {counts.F > 0 && (
+                              <div
+                                className="h-full"
+                                style={{ width: `${fShare}%`, backgroundColor: GENDER_COLOR.F }}
+                                title={`${GENDER_LABEL.F}: ${formatCompact(counts.F)}`}
+                              />
+                            )}
+                            {counts.M > 0 && (
+                              <div
+                                className="h-full"
+                                style={{ width: `${mShare}%`, backgroundColor: GENDER_COLOR.M }}
+                                title={`${GENDER_LABEL.M}: ${formatCompact(counts.M)}`}
+                              />
+                            )}
+                          </div>
+                        </div>
+                        <span className="w-16 shrink-0 font-medium text-xs">
+                          {formatCompact(total)}
+                        </span>
                       </div>
+                    );
+                  })
+              : byAge.map((row) => {
+                  const pct = (row.value / maxAgeTotal) * 100;
+                  return (
+                    <div key={row.key} className="flex items-center gap-3">
+                      <span className="w-14 shrink-0 text-right text-[var(--text-secondary)] text-xs">
+                        {row.key}
+                      </span>
+                      <div
+                        className="h-6 flex-1 overflow-hidden rounded-[var(--radius-md)] bg-[var(--bg-tertiary)]"
+                        style={{ maxWidth: `${Math.max(pct, 2)}%` }}
+                      >
+                        <div
+                          className="h-full w-full"
+                          style={{ backgroundColor: GENDER_COLOR.F }}
+                          title={`${row.key}: ${formatCompact(row.value)}`}
+                        />
+                      </div>
+                      <span className="w-16 shrink-0 font-medium text-xs">
+                        {formatCompact(row.value)}
+                      </span>
                     </div>
-                    <span className="w-16 shrink-0 font-medium text-xs">
-                      {formatCompact(total)}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
           </div>
 
           {/* Legend */}
