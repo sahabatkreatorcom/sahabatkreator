@@ -117,6 +117,8 @@ threadsRoute.get("/_debug", async (c) => {
       "profile-posts": `/profile_posts?username=${encodeURIComponent(q.replace(/^@/, ""))}&fields=id,text,username,permalink,timestamp,media_type,is_quote_post,topic_tag`,
       keyword: `/keyword_search?q=${encodeURIComponent(q)}&search_type=TOP&fields=id,text,username,permalink,timestamp`,
       mentions: `/${account.platformAccountId}/mentions?fields=id,text,username,timestamp,permalink`,
+      // Cek scope yang benar-benar dimiliki token akun ini
+      scopes: `/debug_token?input_token=${encodeURIComponent(token)}`,
     };
     const path = paths[op];
     if (!path) throw new HTTPError(400, `op tidak dikenal: ${op}`);
