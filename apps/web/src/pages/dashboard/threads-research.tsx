@@ -137,6 +137,16 @@ export function ThreadsResearchPage() {
     );
   }
 
+  if (accountsQuery.isError) {
+    return (
+      <div className="card p-6">
+        <p className="text-[var(--error)] text-sm">
+          {(accountsQuery.error as Error).message || "Gagal memuat akun Threads"}
+        </p>
+      </div>
+    );
+  }
+
   if (accounts.length === 0) {
     return (
       <div className="card p-6">
@@ -232,6 +242,13 @@ export function ThreadsResearchPage() {
             Cari
           </Button>
         </div>
+      )}
+
+      {/* Error pencarian (pesan asli dari Threads API) */}
+      {tab !== "mention" && activeMutation.isError && (
+        <p className="mb-3 break-words text-[var(--error)] text-sm">
+          {(activeMutation.error as Error).message}
+        </p>
       )}
 
       {/* Hasil */}

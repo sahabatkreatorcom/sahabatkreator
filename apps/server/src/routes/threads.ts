@@ -8,6 +8,7 @@ import {
   deleteThreadsPost,
   discoverThreadsProfiles,
   getThreadsMentions,
+  PublishError,
   searchThreadsKeywords,
   searchThreadsLocations,
 } from "@sahabatkreator/publishing";
@@ -18,6 +19,19 @@ import { errorResponse, HTTPError, requireOrg } from "../lib/auth-guard";
 import { decrypt } from "../lib/crypto";
 
 export const threadsRoute = new Hono();
+
+/**
+ * Bungkus error: `PublishError` dari Threads API dipetakan ke 502 dengan pesan
+ * asli Graph (mengandung status + body) agar bisa ditampilkan di UI, bukan 500
+ * generik "Terjadi kesalahan internal".
+ */
+function fail(error: unknown): Response {
+  if (error instanceof PublishError) {
+    console.warn("[threads] upstream error:", error.message);
+    return errorResponse(new HTTPError(502, error.message));
+  }
+  return errorResponse(error);
+}
 
 /** Ambil akun Threads milik org + token siap pakai (atau lempar 400/404) */
 async function getThreadsAccount(accountId: string, organizationId: string) {
@@ -72,7 +86,7 @@ threadsRoute.get("/accounts", async (c) => {
       );
     return c.json({ accounts });
   } catch (error) {
-    return errorResponse(error);
+    return fail(error);
   }
 });
 
@@ -96,7 +110,7 @@ threadsRoute.get("/search", async (c) => {
     });
     return c.json({ posts });
   } catch (error) {
-    return errorResponse(error);
+    return fail(error);
   }
 });
 
@@ -118,7 +132,7 @@ threadsRoute.get("/locations", async (c) => {
     });
     return c.json({ locations });
   } catch (error) {
-    return errorResponse(error);
+    return fail(error);
   }
 });
 
@@ -140,7 +154,7 @@ threadsRoute.get("/discover", async (c) => {
     });
     return c.json({ profiles });
   } catch (error) {
-    return errorResponse(error);
+    return fail(error);
   }
 });
 
@@ -160,7 +174,7 @@ threadsRoute.get("/mentions", async (c) => {
     });
     return c.json({ mentions });
   } catch (error) {
-    return errorResponse(error);
+    return fail(error);
   }
 });
 
@@ -202,6 +216,6 @@ threadsRoute.delete("/posts/:postId", async (c) => {
     await db.delete(post).where(eq(post.id, row.id));
     return c.json({ ok: true });
   } catch (error) {
-    return errorResponse(error);
+    return fail(error);
   }
 });
