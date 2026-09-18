@@ -72,6 +72,7 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
       "pages_read_engagement",
       "pages_manage_engagement", // reply komentar Page
       "pages_messaging", // read/reply Facebook Page conversations
+      "pages_user_gender", // demografi audiens Page (page_fans_gender_age)
     ],
   },
   threads: {
@@ -84,6 +85,12 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
       "threads_read_replies", // baca conversations utk sync inbox
       "threads_manage_insights",
       "threads_share_to_instagram", // cross-post Threads → IG Stories (crossreshare_to_ig)
+      // Advanced access (App Review per izin) — lihat threads-advanced.ts + docs threads.md
+      "threads_delete", // hapus post dari dashboard (limit 100/24 jam)
+      "threads_manage_mentions", // sync mention ke inbox (engagement-sync)
+      "threads_keyword_search", // riset keyword (limit 500/7 hari)
+      "threads_location_tagging", // search & tag lokasi saat publish (limit 500/24 jam)
+      "threads_profile_discovery", // profil & post publik akun lain (riset/competitor)
     ],
   },
   tiktok: {

@@ -6,7 +6,7 @@
 // Cakupan polling per platform:
 // - instagram / instagram_standalone: media terbaru → comments per media
 // - facebook: published_posts → comments per post
-// - threads: conversations (threads_read_replies)
+// - threads: conversations (threads_read_replies) + mentions (threads_manage_mentions)
 // - tiktok: video/list → comment/list (comment.list + video.list)
 // - youtube: commentThreads allThreadsRelatedToChannel (youtube.force-ssl)
 // - google_business: locations → reviews (business.manage)
@@ -393,6 +393,29 @@ async function syncThreads(ctx: SyncContext): Promise<SyncResult> {
       });
     }
   }
+
+  // Step 3: Mentions akun kita di post/reply orang lain (threads_manage_mentions).
+  // Bila scope belum di-grant, Graph balas error — cukup di-skip, jangan gagalkan sync.
+  const mentionsRes = await httpRequest<{
+    data?: Array<{ id: string; text?: string; username?: string; timestamp?: string }>;
+  }>(`${GRAPH_THREADS}/${userId}/mentions`, {
+    query: { fields: "id,text,username,timestamp", limit: 25, access_token: ctx.accessToken },
+    retries: 1,
+  });
+  if (mentionsRes.ok) {
+    for (const mention of (await mentionsRes.json()).data ?? []) {
+      items.push({
+        socialAccountId: ctx.account.id,
+        organizationId: ctx.account.organizationId,
+        type: "mention",
+        platformItemId: mention.id,
+        authorUsername: mention.username ? `@${mention.username}` : null,
+        content: mention.text ?? null,
+        occurredAt: mention.timestamp ? new Date(mention.timestamp) : null,
+      });
+    }
+  }
+
   const newItems = await upsertEngagementItems(items);
   return { platform: "threads", newItems };
 }

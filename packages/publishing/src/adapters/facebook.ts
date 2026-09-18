@@ -11,9 +11,27 @@ import {
 } from "../types";
 import { firstImage, firstVideo, GRAPH_FB, quotaHook } from "./meta-shared";
 
+/**
+ * Page Mentions (fitur Meta, bukan scope OAuth) — sebut Halaman Facebook lain di
+ * dalam teks post memakai format Graph `@[page-id]`. ID Halaman diambil dari
+ * `platformSettings.mentions` (dipilih di Compose) dan di-append bila belum ada.
+ */
+function withPageMentions(message: string, mentions: unknown): string {
+  if (!Array.isArray(mentions)) return message;
+  const ids = mentions.filter((m): m is string => typeof m === "string" && m.length > 0);
+  const tokens = [...new Set(ids)]
+    .filter((id) => !message.includes(`@[${id}]`))
+    .map((id) => `@[${id}]`);
+  if (tokens.length === 0) return message;
+  return message.trim() ? `${message.trimEnd()}\n\n${tokens.join(" ")}` : tokens.join(" ");
+}
+
 async function publishFacebook(input: PublishInput, scheduledAt?: Date): Promise<PublishResult> {
   const pageId = input.platformAccountId;
-  const message = composeCaption(input.content, input.hashtags);
+  const message = withPageMentions(
+    composeCaption(input.content, input.hashtags),
+    input.platformSettings.mentions,
+  );
   const image = firstImage(input);
   const video = firstVideo(input);
 

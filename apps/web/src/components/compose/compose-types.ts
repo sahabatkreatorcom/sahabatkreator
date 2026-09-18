@@ -3,6 +3,8 @@
 export type Account = {
   id: string;
   platform: string;
+  /** ID akun di platform (mis. Page ID Facebook) — dipakai untuk mention/tag */
+  platformAccountId: string;
   username: string;
   displayName: string | null;
   avatarUrl: string | null;

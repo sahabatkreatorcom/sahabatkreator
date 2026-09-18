@@ -7,9 +7,11 @@
 //
 // Endpoint insights per platform (riset docs/social-platforms, Sep 2026):
 // - instagram (FB Login): graph.facebook.com — /{ig-id}?fields=followers_count,media_count
-//   + /{media-id}/insights?metric=impressions,reach,saved
+//   + /{ig-id}/insights (reach,profile_views,website_clicks)
+//   + /{media-id}/insights (reach,likes,comments,shares,saved,views)
 // - instagram_standalone: graph.instagram.com — /me?fields=followers_count,media_count
-//   + /{media-id}/insights (metric likes,comments,shares,saves,views)
+//   + /{ig-id}/insights (reach,profile_views,website_clicks)
+//   + /{media-id}/insights (reach,likes,comments,shares,saves,views)
 // - facebook: /{page-id}?fields=fan_count + /{post-id}?fields=reactions.summary,comments.summary,shares
 // - threads: /{user-id}/threads_insights?metric=views,likes,replies,reposts,quotes,followers_count
 // - tiktok: /v2/user/info/?fields=follower_count,likes_count,video_count + video/list (like/comment/share/view_count)
@@ -213,10 +215,13 @@ async function igAccountMetrics(
     throw new Error(`IG akun: ${text.slice(0, 150)}`);
   }
   const data = await res.json();
+  // Account insights opsional — bila izin/metric belum tersedia tetap simpan followers dkk.
+  const insights = await igAccountInsights(base, igUserId, token);
   return {
     followers: data.followers_count,
     following: data.follows_count,
     posts: data.media_count,
+    ...insights,
   };
 }
 
@@ -377,9 +382,14 @@ export async function fetchPostMetrics(
 ): Promise<PostMetrics> {
   switch (platform) {
     case "instagram":
-      return igPostMetrics(GRAPH_FB, platformPostId, pageTokenOf(metadata) ?? accessToken);
+      return igPostMetrics(
+        GRAPH_FB,
+        platformPostId,
+        pageTokenOf(metadata) ?? accessToken,
+        IG_MEDIA_METRICS_FB,
+      );
     case "instagram_standalone":
-      return igPostMetrics(GRAPH_IG, platformPostId, accessToken);
+      return igPostMetrics(GRAPH_IG, platformPostId, accessToken, IG_MEDIA_METRICS_IG);
     case "facebook":
       return facebookPostMetrics(platformPostId, pageTokenOf(metadata) ?? accessToken);
     case "threads":
@@ -398,37 +408,97 @@ export async function fetchPostMetrics(
   }
 }
 
+type MetaInsight = {
+  name?: string;
+  values?: Array<{ value?: number }>;
+  total_value?: { value?: number };
+};
+
 /** Ambil nilai metric dari response insights Meta: [{name, values:[{value}]}] */
 function metricValue(
-  data: Array<{ name?: string; values?: Array<{ value?: number }> } | undefined> | undefined,
+  data: Array<MetaInsight | undefined> | undefined,
   name: string,
 ): number | null {
   const m = data?.find((d) => d?.name === name);
-  const v = m?.values?.[0]?.value;
+  const v = m?.values?.[0]?.value ?? m?.total_value?.value;
   return typeof v === "number" ? v : null;
 }
 
-/** Instagram media insights — beda metric valid per jalur, request dua-duanya */
-async function igPostMetrics(base: string, mediaId: string, token: string): Promise<PostMetrics> {
-  const res = await httpRequest<{
-    data?: Array<{ name?: string; values?: Array<{ value?: number }> }>;
-  }>(`${base}/${mediaId}/insights`, {
-    query: { metric: "impressions,reach,saved,likes,comments,shares,plays", access_token: token },
+// Metric media insights Instagram berbeda antar host:
+// - graph.facebook.com (FB Login): `saved` (singular); `impressions`/`plays` sudah
+//   deprecated → digantikan `views`
+// - graph.instagram.com (IG Login): `saves` (plural); tidak mengenal `impressions`/`plays`
+// `reach` valid untuk semua tipe media → dipakai sebagai fallback bila metric lengkap ditolak.
+const IG_MEDIA_METRICS_FB = "reach,likes,comments,shares,saved,views";
+const IG_MEDIA_METRICS_IG = "reach,likes,comments,shares,saves,views";
+const IG_MEDIA_METRICS_FALLBACK = "reach";
+
+/** Satu request media insights — kembalikan data atau pesan error (tanpa throw) */
+async function requestIgMediaInsights(
+  base: string,
+  mediaId: string,
+  token: string,
+  metric: string,
+): Promise<{ data?: MetaInsight[]; error?: string }> {
+  const res = await httpRequest<{ data?: MetaInsight[] }>(`${base}/${mediaId}/insights`, {
+    query: { metric, access_token: token },
   });
-  if (!res.ok) {
-    // Beberapa media (mis. video pendek) menolak sebagian metric — retry minimal
-    const text = await res.text().catch(() => "");
-    throw new Error(`IG insights: ${text.slice(0, 150)}`);
+  if (res.ok) return { data: (await res.json()).data ?? [] };
+  const text = await res.text().catch(() => "");
+  return { error: text.slice(0, 150) };
+}
+
+/**
+ * Instagram media insights — metric spesifik host. Bila sebagian metric ditolak untuk
+ * tipe media tertentu (mis. `views` untuk image), coba tanpa `views`, lalu `reach` saja.
+ */
+async function igPostMetrics(
+  base: string,
+  mediaId: string,
+  token: string,
+  metrics: string,
+): Promise<PostMetrics> {
+  const attempts = [metrics, metrics.replace(",views", ""), IG_MEDIA_METRICS_FALLBACK];
+  let result: { data?: MetaInsight[]; error?: string } = { error: "tidak ada percobaan" };
+  for (const metric of attempts) {
+    result = await requestIgMediaInsights(base, mediaId, token, metric);
+    if (!result.error) break;
   }
-  const data = (await res.json()).data ?? [];
+  if (result.error) throw new Error(`IG insights: ${result.error}`);
+
+  const data = result.data ?? [];
   return {
-    impressions: metricValue(data, "impressions"),
+    // `impressions` deprecated di kedua host → fallback ke `views` agar dashboard tetap terisi
+    impressions: metricValue(data, "impressions") ?? metricValue(data, "views"),
     reach: metricValue(data, "reach"),
-    saves: metricValue(data, "saved"),
+    saves: metricValue(data, "saved") ?? metricValue(data, "saves"),
     likes: metricValue(data, "likes"),
     comments: metricValue(data, "comments"),
     shares: metricValue(data, "shares"),
-    views: metricValue(data, "plays"),
+    views: metricValue(data, "views") ?? metricValue(data, "plays"),
+  };
+}
+
+/**
+ * Account-level insights Instagram (reach, profile_views, website_clicks).
+ * Butuh `instagram_manage_insights` (FB Login) / `instagram_business_manage_insights`
+ * (IG Login). Sebagian metric ditolak bila akun belum memenuhi syarat (mis. <100 follower)
+ * → jangan gagalkan sync, cukup kembalikan apa adanya.
+ */
+async function igAccountInsights(
+  base: string,
+  igUserId: string,
+  token: string,
+): Promise<AccountMetrics> {
+  const res = await httpRequest<{ data?: MetaInsight[] }>(`${base}/${igUserId}/insights`, {
+    query: { metric: "reach,profile_views,website_clicks", period: "day", access_token: token },
+  });
+  if (!res.ok) return {};
+  const data = (await res.json()).data ?? [];
+  return {
+    reach: metricValue(data, "reach"),
+    profileViews: metricValue(data, "profile_views"),
+    websiteClicks: metricValue(data, "website_clicks"),
   };
 }
 

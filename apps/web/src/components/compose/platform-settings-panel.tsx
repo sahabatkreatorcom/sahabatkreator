@@ -31,11 +31,19 @@ type SettingsState = {
   pinterestLink?: string;
   // Facebook
   facebookLink?: string;
+  /** Page Mentions — id Halaman Facebook yang disebut di post (`@[page-id]`) */
+  facebookMentions?: string[];
   // Threads: cross-post post ini ke Instagram Story
   threadsShareToIg?: boolean;
 };
 
-type AccountLite = { id: string; platform: string; username: string };
+type AccountLite = {
+  id: string;
+  platform: string;
+  username: string;
+  /** ID Halaman di Facebook — dipakai untuk token mention `@[page-id]` */
+  platformAccountId: string;
+};
 
 export function PlatformSettingsPanel({
   accounts,
@@ -336,20 +344,65 @@ export function PlatformSettingsPanel({
                     </div>
                   )}
 
-                  {/* Facebook link */}
+                  {/* Facebook link + Page Mentions */}
                   {isFacebook && (
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Link pada post (opsional)</Label>
-                      <Input
-                        value={s.facebookLink ?? ""}
-                        onChange={(e) =>
-                          onChange(account.id, { ...s, facebookLink: e.target.value })
-                        }
-                        placeholder="https://tokokamu.com"
-                        className="h-8 text-xs"
-                        type="url"
-                      />
-                    </div>
+                    <>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Link pada post (opsional)</Label>
+                        <Input
+                          value={s.facebookLink ?? ""}
+                          onChange={(e) =>
+                            onChange(account.id, { ...s, facebookLink: e.target.value })
+                          }
+                          placeholder="https://tokokamu.com"
+                          className="h-8 text-xs"
+                          type="url"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Sebut Halaman (Page Mentions)</Label>
+                        {accounts.filter((a) => a.platform === "facebook" && a.id !== account.id)
+                          .length === 0 ? (
+                          <p className="text-[11px] text-[var(--text-muted)]">
+                            Hubungkan Halaman Facebook lain dulu untuk bisa menyebutnya di post ini.
+                          </p>
+                        ) : (
+                          <div className="space-y-1">
+                            {accounts
+                              .filter((a) => a.platform === "facebook" && a.id !== account.id)
+                              .map((page) => {
+                                const pageId = page.platformAccountId;
+                                const checked = (s.facebookMentions ?? []).includes(pageId);
+                                return (
+                                  <label
+                                    key={page.id}
+                                    className="flex items-center gap-2 text-[var(--text-secondary)] text-xs"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={(e) => {
+                                        const current = s.facebookMentions ?? [];
+                                        onChange(account.id, {
+                                          ...s,
+                                          facebookMentions: e.target.checked
+                                            ? [...new Set([...current, pageId])]
+                                            : current.filter((id) => id !== pageId),
+                                        });
+                                      }}
+                                      className="accent-[var(--accent-gold)]"
+                                    />
+                                    @{page.username}
+                                  </label>
+                                );
+                              })}
+                          </div>
+                        )}
+                        <p className="text-[11px] text-[var(--text-muted)]">
+                          Halaman terpilih ditambahkan sebagai mention (@[id]) di akhir caption.
+                        </p>
+                      </div>
+                    </>
                   )}
 
                   {/* Threads: share to IG Story */}
@@ -432,6 +485,10 @@ export function buildPlatformSettings(
   }
   if (platform === "facebook" && s.facebookLink?.trim()) {
     settings.link = s.facebookLink.trim();
+  }
+  // Page Mentions — dibaca adapter facebook.ts sebagai token `@[page-id]`
+  if (platform === "facebook" && s.facebookMentions?.length) {
+    settings.mentions = s.facebookMentions;
   }
   // Threads: cross-post ke IG Story (dibaca adapter sebagai crossreshareToIg)
   if (platform === "threads" && s.threadsShareToIg) {

@@ -1,4 +1,5 @@
-// Panel Demografi Audiens — data gender × usia dari IG Insights (murni CSS bar)
+// Panel Demografi Audiens — data gender × usia dari IG Insights / FB Page Insights
+// (murni CSS bar)
 import { useQuery } from "@tanstack/react-query";
 import { Users } from "lucide-react";
 import { useState } from "react";
@@ -33,11 +34,14 @@ const GENDER_LABEL: Record<string, string> = {
 };
 
 export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] }) {
-  const igAccounts = accounts.filter(
-    (a) => a.platform === "instagram" || a.platform === "instagram_standalone",
+  const supportedAccounts = accounts.filter(
+    (a) =>
+      a.platform === "instagram" ||
+      a.platform === "instagram_standalone" ||
+      a.platform === "facebook",
   );
-  const [accountId, setAccountId] = useState<string>(igAccounts[0]?.id ?? "");
-  const selected = igAccounts.find((a) => a.id === accountId);
+  const [accountId, setAccountId] = useState<string>(supportedAccounts[0]?.id ?? "");
+  const selected = supportedAccounts.find((a) => a.id === accountId);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["analytics-demographics", accountId],
@@ -66,14 +70,14 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
           <Users className="h-4 w-4 text-[var(--accent-gold)]" />
           <h2 className="font-semibold">Demografi Audiens</h2>
         </div>
-        {igAccounts.length > 0 && (
+        {supportedAccounts.length > 0 && (
           <select
             value={accountId}
             onChange={(e) => setAccountId(e.target.value)}
             className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-2 text-xs"
-            aria-label="Pilih akun Instagram"
+            aria-label="Pilih akun"
           >
-            {igAccounts.map((a) => {
+            {supportedAccounts.map((a) => {
               const cfg = PLATFORMS[a.platform as keyof typeof PLATFORMS];
               return (
                 <option key={a.id} value={a.id}>
@@ -85,10 +89,10 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
         )}
       </div>
 
-      {igAccounts.length === 0 ? (
+      {supportedAccounts.length === 0 ? (
         <EmptyState
-          title="Belum ada akun Instagram"
-          description="Demografi audiens tersedia untuk akun Instagram Bisnis yang terhubung."
+          title="Belum ada akun Instagram/Facebook"
+          description="Demografi audiens tersedia untuk akun Instagram Bisnis atau Halaman Facebook yang terhubung."
         />
       ) : isLoading ? (
         <div className="space-y-3">
@@ -103,7 +107,7 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
       ) : !data || data.genderAge.length === 0 ? (
         <EmptyState
           title="Data belum tersedia"
-          description="Instagram belum mengirim data demografi untuk akun ini. Coba lagi nanti."
+          description="Platform belum mengirim data demografi untuk akun ini (butuh audiens minimum). Coba lagi nanti."
         />
       ) : (
         <div className="space-y-5">
@@ -187,7 +191,10 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
                 {GENDER_LABEL[g]}
               </span>
             ))}
-            <span>Sumber: Instagram Insights (@{data.username || selected?.username})</span>
+            <span>
+              Sumber: {PLATFORMS[data.source as keyof typeof PLATFORMS]?.label ?? data.source}{" "}
+              Insights (@{data.username || selected?.username})
+            </span>
           </div>
         </div>
       )}

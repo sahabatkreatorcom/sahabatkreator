@@ -8,7 +8,10 @@ import { db } from "@sahabatkreator/db";
 import { platformCredential, socialAccount } from "@sahabatkreator/db/schema";
 import {
   BSKY_APPVIEW_URL,
+  deleteThreadsPost,
+  discoverThreadsProfiles,
   GBP_ACCOUNT_API_URL,
+  getThreadsMentions,
   GRAPH_FB_URL,
   GRAPH_IG_URL,
   GRAPH_THREADS_URL,
@@ -17,6 +20,8 @@ import {
   LINKEDIN_USERINFO_URL,
   PINTEREST_API_BASE_URL,
   refreshDueTokens,
+  searchThreadsKeywords,
+  searchThreadsLocations,
   TIKTOK_OPEN_API_URL,
   YOUTUBE_API_URL,
 } from "@sahabatkreator/publishing";
@@ -1210,6 +1215,117 @@ apiTestsRoute.post("/trigger/instagram-insights", requirePlatformAdmin, async (c
 });
 
 /**
+ * POST /admin/api-tests/trigger/instagram-standalone-insights
+ * Trigger API calls untuk `instagram_business_manage_insights` (jalur Instagram Login):
+ * - media insights: GET graph.instagram.com/{media-id}/insights
+ * - account insights: GET graph.instagram.com/{ig-id}/insights?period=day
+ *
+ * Beda dengan /trigger/instagram-insights yang memakai graph.facebook.com (jalur FB Login).
+ */
+apiTestsRoute.post("/trigger/instagram-standalone-insights", requirePlatformAdmin, async (c) => {
+  try {
+    const accounts = await db
+      .select({
+        platformAccountId: socialAccount.platformAccountId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        username: socialAccount.username,
+      })
+      .from(socialAccount)
+      .where(eq(socialAccount.platform, "instagram_standalone" as never))
+      .limit(5);
+
+    if (accounts.length === 0) {
+      return c.json({ error: "No Instagram standalone account connected" }, 400);
+    }
+
+    type InsightData = Array<{ name: string; values?: Array<{ value: number }> }>;
+    const results: Array<{
+      account: string;
+      mediaId: string | null;
+      mediaInsights: boolean;
+      accountInsights: boolean;
+      errors: string[];
+    }> = [];
+
+    for (const account of accounts) {
+      if (!account.accessTokenEnc) continue;
+      let token: string;
+      try {
+        token = decrypt(account.accessTokenEnc);
+      } catch {
+        continue;
+      }
+
+      const errors: string[] = [];
+
+      // 1. Media terbaru → media insights (memicu instagram_business_manage_insights)
+      const mediaRes = await fetchJson<{
+        data?: Array<{ id: string }>;
+        error?: { message?: string };
+      }>(`${GRAPH_IG_URL}/me/media?fields=id&limit=1&access_token=${encodeURIComponent(token)}`);
+      const mediaId = mediaRes.data?.data?.[0]?.id ?? null;
+
+      let mediaInsights = false;
+      if (mediaId) {
+        const insightsRes = await fetchJson<{ data?: InsightData; error?: { message?: string } }>(
+          `${GRAPH_IG_URL}/${mediaId}/insights?metric=reach,likes,comments,saves,shares,views&access_token=${encodeURIComponent(token)}`,
+        );
+        mediaInsights = insightsRes.ok;
+        if (!insightsRes.ok) {
+          errors.push(
+            insightsRes.data?.error?.message ?? `media insights HTTP ${insightsRes.status}`,
+          );
+        }
+      } else {
+        errors.push(mediaRes.data?.error?.message ?? "No media found");
+      }
+
+      // 2. Account insights (reach, profile_views, website_clicks)
+      const accountRes = await fetchJson<{ data?: InsightData; error?: { message?: string } }>(
+        `${GRAPH_IG_URL}/${account.platformAccountId}/insights?metric=reach,profile_views,website_clicks&period=day&access_token=${encodeURIComponent(token)}`,
+      );
+      const accountInsights = accountRes.ok;
+      if (!accountRes.ok) {
+        errors.push(
+          accountRes.data?.error?.message ?? `account insights HTTP ${accountRes.status}`,
+        );
+      }
+
+      results.push({
+        account: account.username ?? account.platformAccountId,
+        mediaId,
+        mediaInsights,
+        accountInsights,
+        errors: [...new Set(errors)].slice(0, 3),
+      });
+    }
+
+    if (results.length === 0) {
+      return c.json({ error: "No Instagram standalone account with readable token" }, 400);
+    }
+
+    await logAdminAction(c, null, {
+      action: "instagram_standalone_insights.trigger",
+      entityType: "social_account",
+      metadata: { results: results.map((r) => ({ account: r.account, ok: r.mediaInsights })) },
+    });
+
+    return c.json({
+      success: results.some((r) => r.mediaInsights || r.accountInsights),
+      message: "Instagram standalone insights test calls completed",
+      results,
+      nextSteps: [
+        "Buka Meta Developer Console → App Review → Permissions and Features",
+        "Pastikan 'API calls' untuk instagram_business_manage_insights bertambah > 0",
+        "Jika mediaInsights/accountInsights gagal, cek pesan error (metric/scope) di field errors",
+      ],
+    });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+});
+
+/**
  * POST /admin/api-tests/trigger/facebook-insights
  * Trigger a Page Insights call for pages_manage/read_insights verification.
  */
@@ -1263,6 +1379,331 @@ apiTestsRoute.post("/trigger/facebook-insights", requirePlatformAdmin, async (c)
       return c.json({ error: "No Facebook Page account connected" }, 400);
     }
     return c.json({ success: results.every((result) => result.success), results });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+});
+
+/**
+ * POST /admin/api-tests/trigger/threads-advanced
+ * Trigger API calls untuk 5 izin Threads advanced access (butuh Threads Tester
+ * atau App Review): threads_manage_mentions, threads_keyword_search,
+ * threads_location_tagging, threads_profile_discovery, dan threads_delete.
+ *
+ * Body opsional (JSON): { mediaId?, keyword?, locationQuery?, profileQuery?, accountId? }
+ * - mediaId: baru menjalankan DELETE (destruktif) pada post tersebut; tanpa ini tidak ada hapus.
+ *
+ * Response hanya berisi jumlah hasil + pesan error Graph — tidak pernah token.
+ */
+apiTestsRoute.post("/trigger/threads-advanced", requirePlatformAdmin, async (c) => {
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      mediaId?: string;
+      keyword?: string;
+      locationQuery?: string;
+      profileQuery?: string;
+      accountId?: string;
+    };
+
+    const accounts = await db
+      .select({
+        id: socialAccount.id,
+        platformAccountId: socialAccount.platformAccountId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        username: socialAccount.username,
+      })
+      .from(socialAccount)
+      .where(eq(socialAccount.platform, "threads" as never))
+      .limit(5);
+
+    const targets = body.accountId ? accounts.filter((a) => a.id === body.accountId) : accounts;
+    if (targets.length === 0) {
+      return c.json({ error: "No Threads account connected" }, 400);
+    }
+
+    type OpResult = { op: string; ok: boolean; count?: number; error?: string };
+    const results: Array<{ account: string; ops: OpResult[] }> = [];
+
+    for (const account of targets) {
+      if (!account.accessTokenEnc) continue;
+      let token: string;
+      try {
+        token = decrypt(account.accessTokenEnc);
+      } catch {
+        continue;
+      }
+
+      const ops: OpResult[] = [];
+      const run = async (op: string, fn: () => Promise<number>) => {
+        try {
+          ops.push({ op, ok: true, count: await fn() });
+        } catch (error) {
+          ops.push({
+            op,
+            ok: false,
+            error: error instanceof Error ? error.message.slice(0, 200) : String(error),
+          });
+        }
+      };
+
+      const base = { accessToken: token, userId: account.platformAccountId };
+      await run("mentions", async () => (await getThreadsMentions(base)).length);
+      await run(
+        "keyword_search",
+        async () =>
+          (await searchThreadsKeywords({ ...base, query: body.keyword ?? "kopi" })).length,
+      );
+      await run(
+        "location_search",
+        async () =>
+          (await searchThreadsLocations({ ...base, query: body.locationQuery ?? "Jakarta" }))
+            .length,
+      );
+      await run(
+        "profile_discovery",
+        async () =>
+          (await discoverThreadsProfiles({ ...base, query: body.profileQuery ?? "coffee" })).length,
+      );
+      if (body.mediaId) {
+        const mediaId = body.mediaId;
+        await run("delete", async () => {
+          await deleteThreadsPost({ accessToken: token, mediaId });
+          return 1;
+        });
+      }
+
+      results.push({ account: account.username ?? account.platformAccountId, ops });
+    }
+
+    if (results.length === 0) {
+      return c.json({ error: "No Threads account with readable token" }, 400);
+    }
+
+    await logAdminAction(c, null, {
+      action: "threads_advanced.trigger",
+      entityType: "social_account",
+      metadata: {
+        results: results.map((r) => ({ account: r.account, ok: r.ops.filter((o) => o.ok).length })),
+      },
+    });
+
+    return c.json({
+      success: results.some((r) => r.ops.some((o) => o.ok)),
+      message: "Threads advanced permission test calls completed",
+      results,
+      nextSteps: [
+        "Buka Meta Developer Console → App Review → Permissions and Features",
+        "Pastikan counter API calls bertambah: threads_manage_mentions, threads_keyword_search, threads_location_tagging, threads_profile_discovery, threads_delete",
+        "profile_discovery memakai path profile_search — bila error 404, cek reference 'Threads Profile Discovery' dan sesuaikan PROFILE_SEARCH_PATH di threads-advanced.ts",
+        "Kirim mediaId (post Threads milik akun) untuk menguji threads_delete — aksi ini menghapus post",
+      ],
+    });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+});
+
+/**
+ * POST /admin/api-tests/trigger/page-mentions
+ * Uji fitur "Page Mentions" (sebut Halaman Facebook lain saat publish).
+ * Body: { mentionedPageId, pageId?, text? }
+ *
+ * Membuat post TERJADWAL (published=false, tayang +1 jam) berisi `@[mentionedPageId]`,
+ * lalu menghapusnya lagi — agar tidak meninggalkan konten. Fitur ini tidak punya
+ * scope OAuth sendiri (pakai `pages_manage_posts` + `pages_read_engagement`).
+ */
+apiTestsRoute.post("/trigger/page-mentions", requirePlatformAdmin, async (c) => {
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      pageId?: string;
+      mentionedPageId?: string;
+      text?: string;
+    };
+    if (!body.mentionedPageId) {
+      return c.json({ error: "mentionedPageId wajib diisi (id Halaman yang disebut)" }, 400);
+    }
+
+    const accounts = await db
+      .select({
+        platformAccountId: socialAccount.platformAccountId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        metadata: socialAccount.metadata,
+        username: socialAccount.username,
+      })
+      .from(socialAccount)
+      .where(eq(socialAccount.platform, "facebook" as never))
+      .limit(5);
+
+    const page = accounts.find((a) => a.platformAccountId === body.pageId) ?? accounts[0] ?? null;
+    if (!page || !page.accessTokenEnc) {
+      return c.json({ error: "No Facebook Page account connected" }, 400);
+    }
+
+    const token =
+      typeof page.metadata === "object" &&
+      page.metadata !== null &&
+      typeof (page.metadata as Record<string, unknown>).pageAccessToken === "string"
+        ? ((page.metadata as Record<string, unknown>).pageAccessToken as string)
+        : decrypt(page.accessTokenEnc);
+
+    const message = `${body.text?.trim() || "Uji Page Mentions dari Sahabat Kreator"} @[${body.mentionedPageId}]`;
+    const scheduledAt = Math.floor(Date.now() / 1000) + 3600;
+
+    // 1. Buat post terjadwal dengan mention (belum tayang → tidak ada notifikasi)
+    const createRes = await fetchJson<{ id?: string; error?: { message?: string } }>(
+      `${GRAPH_FB_URL}/${page.platformAccountId}/feed`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          published: false,
+          scheduled_publish_time: scheduledAt,
+          access_token: token,
+        }),
+      },
+    );
+    if (!createRes.ok || !createRes.data?.id) {
+      return c.json(
+        {
+          success: false,
+          error: createRes.data?.error?.message ?? `HTTP ${createRes.status}`,
+          pageId: page.platformAccountId,
+          mentionedPageId: body.mentionedPageId,
+        },
+        502,
+      );
+    }
+
+    const postId = createRes.data.id;
+
+    // 2. Hapus post uji (best-effort — jangan gagalkan hasil bila gagal hapus)
+    const deleteRes = await fetchJson<{ success?: boolean }>(
+      `${GRAPH_FB_URL}/${postId}?access_token=${encodeURIComponent(token)}`,
+      { method: "DELETE" },
+    );
+
+    await logAdminAction(c, null, {
+      action: "page_mentions.trigger",
+      entityType: "social_account",
+      metadata: { pageId: page.platformAccountId, mentionedPageId: body.mentionedPageId },
+    });
+
+    return c.json({
+      success: true,
+      message: "Page Mentions test post created and cleaned up",
+      pageId: page.platformAccountId,
+      mentionedPageId: body.mentionedPageId,
+      postId,
+      deleted: deleteRes.ok,
+      nextSteps: [
+        "Buka Meta Developer Console → App Review → Permissions and Features → Page Mentions",
+        "Untuk screencast: publish nyata dari Compose dengan Halaman disebut, lalu tunjukkan post berisi mention",
+      ],
+    });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+});
+
+/**
+ * POST /admin/api-tests/trigger/page-demographics
+ * Trigger API call untuk `pages_user_gender` — Page Insights demografi audiens
+ * (`page_fans_gender_age`, period lifetime) untuk tiap Halaman Facebook terhubung.
+ */
+apiTestsRoute.post("/trigger/page-demographics", requirePlatformAdmin, async (c) => {
+  try {
+    const accounts = await db
+      .select({
+        platformAccountId: socialAccount.platformAccountId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        metadata: socialAccount.metadata,
+        username: socialAccount.username,
+      })
+      .from(socialAccount)
+      .where(eq(socialAccount.platform, "facebook" as never))
+      .limit(5);
+
+    if (accounts.length === 0) {
+      return c.json({ error: "No Facebook Page account connected" }, 400);
+    }
+
+    type InsightData = Array<{
+      name?: string;
+      values?: Array<{ value?: Record<string, number> | number }>;
+      total_value?: {
+        breakdowns?: Array<{ rows?: Array<{ dimension_values?: string[]; value?: number }> }>;
+      };
+    }>;
+
+    const results: Array<{
+      account: string;
+      success: boolean;
+      rows: number;
+      message: string;
+    }> = [];
+
+    for (const account of accounts) {
+      if (!account.accessTokenEnc) continue;
+      let token: string;
+      try {
+        token = decrypt(account.accessTokenEnc);
+      } catch {
+        continue;
+      }
+      const pageToken =
+        typeof account.metadata === "object" &&
+        account.metadata !== null &&
+        typeof (account.metadata as Record<string, unknown>).pageAccessToken === "string"
+          ? ((account.metadata as Record<string, unknown>).pageAccessToken as string)
+          : token;
+
+      const res = await fetchJson<{ data?: InsightData; error?: { message?: string } }>(
+        `${GRAPH_FB_URL}/${account.platformAccountId}/insights?metric=page_fans_gender_age&period=lifetime&access_token=${encodeURIComponent(pageToken)}`,
+      );
+
+      let rows = 0;
+      const first = res.data?.data?.[0];
+      const breakdown = first?.total_value?.breakdowns?.[0]?.rows;
+      if (breakdown?.length) {
+        rows = breakdown.length;
+      } else {
+        const legacy = first?.values?.[0]?.value;
+        if (legacy && typeof legacy === "object") rows = Object.keys(legacy).length;
+      }
+
+      results.push({
+        account: account.username ?? account.platformAccountId,
+        success: res.ok,
+        rows,
+        message: res.ok
+          ? `page_fans_gender_age OK (${rows} baris)`
+          : (res.data?.error?.message ?? `HTTP ${res.status}`),
+      });
+    }
+
+    if (results.length === 0) {
+      return c.json({ error: "No Facebook Page account with readable token" }, 400);
+    }
+
+    await logAdminAction(c, null, {
+      action: "page_demographics.trigger",
+      entityType: "social_account",
+      metadata: {
+        results: results.map((r) => ({ account: r.account, ok: r.success, rows: r.rows })),
+      },
+    });
+
+    return c.json({
+      success: results.some((r) => r.success),
+      message: "Page demographics test calls completed",
+      results,
+      nextSteps: [
+        "Buka Meta Developer Console → App Review → Permissions and Features",
+        "Pastikan counter API calls pages_user_gender bertambah > 0",
+        "Bila error 'metric not supported', Page Insights demografi mungkin sudah dibatasi Meta untuk Page tsb",
+      ],
+    });
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
   }

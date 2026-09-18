@@ -339,7 +339,8 @@ analyticsRoute.get("/optimal-times", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// Demografi audiens (M7) — IG Graph API audience_gender_age
+// Demografi audiens (M7) — IG `audience_gender_age` + FB Page `page_fans_gender_age`
+// (FB butuh scope pages_user_gender)
 // ---------------------------------------------------------------------------
 
 /** Baris breakdown demografi dari Graph API: { key: "F.18-24", value: 123 } */
@@ -400,6 +401,7 @@ const demographicsCache = new Map<
   {
     at: number;
     username: string | null;
+    source: string;
     payload: { genderAge: GenderAgeRow[]; byGender: { gender: "F" | "M"; value: number }[] };
   }
 >();
@@ -427,7 +429,7 @@ analyticsRoute.get("/demographics", async (c) => {
     if (cached && Date.now() - cached.at < DEMOGRAPHICS_CACHE_MS) {
       return c.json({
         ...cached.payload,
-        source: "instagram",
+        source: cached.source,
         username: cached.username,
         cached: true,
       });
@@ -452,13 +454,17 @@ analyticsRoute.get("/demographics", async (c) => {
       .limit(1);
     if (!account) throw new HTTPError(404, "Akun tidak ditemukan");
 
-    // Hanya Instagram (kedua jalur) yang didukung — platform lain belum
-    if (account.platform !== "instagram" && account.platform !== "instagram_standalone") {
+    // Instagram (kedua jalur) + Facebook Page didukung. Facebook pakai metric
+    // `page_fans_gender_age` (butuh scope pages_user_gender); platform lain 501.
+    const isInstagram =
+      account.platform === "instagram" || account.platform === "instagram_standalone";
+    const isFacebook = account.platform === "facebook";
+    if (!isInstagram && !isFacebook) {
       return c.json({ message: "Demografi audiens belum didukung untuk platform ini" }, 501);
     }
 
     if (!account.isConnected || !account.accessTokenEnc) {
-      throw new HTTPError(400, "Akun belum terhubung — hubungkan ulang akun Instagram");
+      throw new HTTPError(400, "Akun belum terhubung — hubungkan ulang akun");
     }
 
     // Decrypt token (gagal → minta hubungkan ulang, bukan 500)
@@ -469,15 +475,17 @@ analyticsRoute.get("/demographics", async (c) => {
       throw new HTTPError(400, "Token akun tidak bisa dibaca — hubungkan ulang akun");
     }
 
-    // IG jalur FB Login pakai page token; standalone pakai user token langsung
-    const base = account.platform === "instagram" ? GRAPH_FB : GRAPH_IG;
+    // IG Standalone pakai user token di graph.instagram.com; IG (FB Login) & FB Page
+    // memakai page token (metadata.pageAccessToken) di graph.facebook.com.
+    const base = account.platform === "instagram_standalone" ? GRAPH_IG : GRAPH_FB;
     const token = pageTokenOf(account.metadata) ?? accessToken;
+    const metric = isFacebook ? "page_fans_gender_age" : "audience_gender_age";
 
     const res = await httpRequest<IgInsightsResponse>(
       `${base}/${account.platformAccountId}/insights`,
       {
         query: {
-          metric: "audience_gender_age",
+          metric,
           period: "lifetime",
           access_token: token,
         },
@@ -491,7 +499,7 @@ analyticsRoute.get("/demographics", async (c) => {
       );
       throw new HTTPError(
         502,
-        `Gagal mengambil data demografi dari Instagram: ${text.slice(0, 150)}`,
+        `Gagal mengambil data demografi dari ${account.platform}: ${text.slice(0, 150)}`,
       );
     }
 
@@ -516,12 +524,13 @@ analyticsRoute.get("/demographics", async (c) => {
     demographicsCache.set(cacheKey, {
       at: Date.now(),
       username: account.username,
+      source: account.platform,
       payload,
     });
 
     return c.json({
       ...payload,
-      source: "instagram",
+      source: account.platform,
       username: account.username,
     });
   } catch (error) {

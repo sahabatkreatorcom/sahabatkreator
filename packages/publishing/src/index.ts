@@ -103,5 +103,15 @@ export {
   replizRemoveSchedule,
 } from "./repliz";
 export * from "./reply";
+export {
+  deleteThreadsPost,
+  discoverThreadsProfiles,
+  getThreadsMentions,
+  searchThreadsKeywords,
+  searchThreadsLocations,
+  type ThreadsLocation,
+  type ThreadsPost,
+  type ThreadsProfile,
+} from "./threads-advanced";
 export { countNeedsReconnect, refreshDueTokens, type TokenRefreshResult } from "./token-refresh";
 export * from "./types";
