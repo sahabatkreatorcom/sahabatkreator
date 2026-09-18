@@ -3,10 +3,14 @@
 // - keyword search    → threads_keyword_search (limit 500/7 hari)
 // - location search   → threads_location_tagging (limit 500/24 jam)
 // - mentions          → threads_manage_mentions
-// - profile discovery → threads_profile_discovery
+// - profile discovery → threads_profile_discovery (lookup username persis)
 //
-// Riset: docs/social-platforms/threads.md. Semua endpoint di host graph.threads.net.
-// Dipakai oleh admin API-test trigger + (menyusul) UI. Scope di platform-configs.ts.
+// Referensi (endpoint root-level, bukan di bawah /{user-id}):
+// - GET /keyword_search?q=&search_type=TOP|RECENT
+// - GET /location_search?query=&fields=
+// - GET /{threads-user-id}/mentions
+// - GET /profile_lookup?username=  &  GET /profile_posts?username=
+// Riset: docs/social-platforms/threads.md + Meta Threads API reference.
 
 import { GRAPH_THREADS_URL } from "./config";
 import { httpRequest } from "./http";
@@ -18,11 +22,7 @@ const GRAPH_THREADS = GRAPH_THREADS_URL;
 const POST_FIELDS =
   "id,text,username,permalink,timestamp,media_type,has_replies,is_reply,is_quote_post";
 
-/**
- * Path endpoint Profile Discovery — mengikuti reference "Threads Profile Discovery".
- * Bila Graph menolak (404/path berubah), ubah konstanta ini tanpa menyentuh pemanggil.
- */
-const PROFILE_SEARCH_PATH = "profile_search";
+const LOCATION_FIELDS = "id,name,address,city,country,latitude,longitude,postal_code";
 
 export type ThreadsPost = {
   id: string;
@@ -38,19 +38,22 @@ export type ThreadsPost = {
 
 export type ThreadsLocation = {
   id: string;
-  name?: string;
-  address?: string;
-  latitude?: number;
-  longitude?: number;
+  name?: string | null;
+  address?: string | null;
+  city?: string | null;
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  postal_code?: string | null;
 };
 
 export type ThreadsProfile = {
   id: string;
   username?: string;
   name?: string;
-  biography?: string;
-  profile_picture_url?: string;
-  followers_count?: number;
+  threads_biography?: string;
+  threads_profile_picture_url?: string;
+  is_verified?: boolean;
 };
 
 /** Lempar PublishError dari response non-2xx Threads (retryable untuk 429/5xx) */
@@ -80,60 +83,59 @@ export async function deleteThreadsPost(input: {
 }
 
 /**
- * Cari post publik berdasarkan keyword.
- * `GET /{threads-user-id}/keyword_search?q=&search_type=TOP|RECENT` — scope `threads_keyword_search`.
+ * Cari post publik berdasarkan keyword/topic tag.
+ * `GET /keyword_search` (root-level) — scope `threads_keyword_search`.
  */
 export async function searchThreadsKeywords(input: {
   accessToken: string;
-  userId: string;
   query: string;
   searchType?: "TOP" | "RECENT";
+  searchMode?: "KEYWORD" | "TAG";
   limit?: number;
 }): Promise<ThreadsPost[]> {
-  const res = await httpRequest<{ data?: ThreadsPost[] }>(
-    `${GRAPH_THREADS}/${input.userId}/keyword_search`,
-    {
-      query: {
-        q: input.query,
-        search_type: input.searchType ?? "TOP",
-        fields: POST_FIELDS,
-        limit: input.limit ?? 25,
-        access_token: input.accessToken,
-      },
-      retries: 1,
+  const res = await httpRequest<{ data?: ThreadsPost[] }>(`${GRAPH_THREADS}/keyword_search`, {
+    query: {
+      q: input.query,
+      search_type: input.searchType ?? "TOP",
+      search_mode: input.searchMode,
+      fields: POST_FIELDS,
+      limit: input.limit ?? 25,
+      access_token: input.accessToken,
     },
-  );
+    retries: 1,
+  });
   if (!res.ok) await throwThreadsError(res, "Threads keyword search");
   return (await res.json()).data ?? [];
 }
 
 /**
  * Cari lokasi untuk di-tag saat publish.
- * `GET /{threads-user-id}/location_search` dengan `q` ATAU `latitude`+`longitude`.
+ * `GET /location_search` (root-level) dengan `query` atau `latitude`+`longitude`.
  * Scope `threads_location_tagging`.
  */
 export async function searchThreadsLocations(input: {
   accessToken: string;
-  userId: string;
   query?: string;
   latitude?: number;
   longitude?: number;
   limit?: number;
 }): Promise<ThreadsLocation[]> {
-  const res = await httpRequest<{ data?: ThreadsLocation[] }>(
-    `${GRAPH_THREADS}/${input.userId}/location_search`,
-    {
+  const send = (param: "query" | "q") =>
+    httpRequest<{ data?: ThreadsLocation[] }>(`${GRAPH_THREADS}/location_search`, {
       query: {
-        q: input.query,
+        [param]: input.query,
         latitude: input.latitude,
         longitude: input.longitude,
-        fields: "id,name,address,latitude,longitude",
+        fields: LOCATION_FIELDS,
         limit: input.limit ?? 25,
         access_token: input.accessToken,
       },
       retries: 1,
-    },
-  );
+    });
+
+  // Meta docs memakai `query`; sebagian contoh memakai `q` — fallback bila 400.
+  let res = await send("query");
+  if (!res.ok && res.status === 400) res = await send("q");
   if (!res.ok) await throwThreadsError(res, "Threads location search");
   return (await res.json()).data ?? [];
 }
@@ -163,27 +165,50 @@ export async function getThreadsMentions(input: {
 }
 
 /**
- * Cari profil publik + post publik akun lain (riset kompetitor/discovery).
- * Scope `threads_profile_discovery`.
+ * Lookup profil publik berdasarkan **username persis** (Threads API tidak
+ * menyediakan pencarian profil per keyword).
+ * `GET /profile_lookup?username=` — scope `threads_profile_discovery`.
  */
-export async function discoverThreadsProfiles(input: {
+export async function lookupThreadsProfile(input: {
   accessToken: string;
-  userId: string;
-  query: string;
-  limit?: number;
-}): Promise<ThreadsProfile[]> {
-  const res = await httpRequest<{ data?: ThreadsProfile[] }>(
-    `${GRAPH_THREADS}/${input.userId}/${PROFILE_SEARCH_PATH}`,
+  username: string;
+}): Promise<ThreadsProfile | null> {
+  const res = await httpRequest<ThreadsProfile | { data?: ThreadsProfile[] }>(
+    `${GRAPH_THREADS}/profile_lookup`,
     {
       query: {
-        q: input.query,
-        fields: "id,username,name,biography,profile_picture_url,followers_count",
-        limit: input.limit ?? 25,
+        username: input.username.replace(/^@/, ""),
+        fields: "id,username,name,threads_biography,threads_profile_picture_url,is_verified",
         access_token: input.accessToken,
       },
       retries: 1,
     },
   );
-  if (!res.ok) await throwThreadsError(res, "Threads profile discovery");
+  if (!res.ok) await throwThreadsError(res, "Threads profile lookup");
+  const body = await res.json();
+  const data = (body as { data?: ThreadsProfile[] }).data;
+  if (Array.isArray(data)) return data[0] ?? null;
+  return (body as ThreadsProfile) ?? null;
+}
+
+/**
+ * Ambil post publik sebuah profil.
+ * `GET /profile_posts?username=` — scope `threads_profile_discovery`.
+ */
+export async function getThreadsProfilePosts(input: {
+  accessToken: string;
+  username: string;
+  limit?: number;
+}): Promise<ThreadsPost[]> {
+  const res = await httpRequest<{ data?: ThreadsPost[] }>(`${GRAPH_THREADS}/profile_posts`, {
+    query: {
+      username: input.username.replace(/^@/, ""),
+      fields: POST_FIELDS,
+      limit: input.limit ?? 25,
+      access_token: input.accessToken,
+    },
+    retries: 1,
+  });
+  if (!res.ok) await throwThreadsError(res, "Threads profile posts");
   return (await res.json()).data ?? [];
 }

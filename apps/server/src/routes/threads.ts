@@ -6,8 +6,9 @@ import { db } from "@sahabatkreator/db";
 import { post, socialAccount } from "@sahabatkreator/db/schema";
 import {
   deleteThreadsPost,
-  discoverThreadsProfiles,
   getThreadsMentions,
+  getThreadsProfilePosts,
+  lookupThreadsProfile,
   PublishError,
   searchThreadsKeywords,
   searchThreadsLocations,
@@ -103,7 +104,6 @@ threadsRoute.get("/search", async (c) => {
     const account = await getThreadsAccount(accountId, ctx.organization.id);
     const posts = await searchThreadsKeywords({
       accessToken: account.accessToken,
-      userId: account.platformAccountId,
       query: q,
       searchType,
       limit: 25,
@@ -126,7 +126,6 @@ threadsRoute.get("/locations", async (c) => {
     const account = await getThreadsAccount(accountId, ctx.organization.id);
     const locations = await searchThreadsLocations({
       accessToken: account.accessToken,
-      userId: account.platformAccountId,
       query: q,
       limit: 25,
     });
@@ -136,23 +135,38 @@ threadsRoute.get("/locations", async (c) => {
   }
 });
 
-/** GET /threads/discover?accountId=&q= — profil publik (profile discovery) */
+/**
+ * GET /threads/discover?accountId=&username= — profil publik + post-nya.
+ * Threads hanya mendukung lookup **username persis** (bukan keyword).
+ * `GET /profile_lookup` + `GET /profile_posts` — scope threads_profile_discovery.
+ */
 threadsRoute.get("/discover", async (c) => {
   try {
     const ctx = await requireOrg(c);
     const accountId = c.req.query("accountId");
-    const q = c.req.query("q")?.trim();
-    if (!accountId || !q) {
-      throw new HTTPError(400, "Parameter accountId & q wajib diisi");
+    const username = (c.req.query("username") ?? c.req.query("q"))?.trim();
+    if (!accountId || !username) {
+      throw new HTTPError(400, "Parameter accountId & username wajib diisi");
     }
     const account = await getThreadsAccount(accountId, ctx.organization.id);
-    const profiles = await discoverThreadsProfiles({
+    const profile = await lookupThreadsProfile({
       accessToken: account.accessToken,
-      userId: account.platformAccountId,
-      query: q,
-      limit: 25,
+      username,
     });
-    return c.json({ profiles });
+    // Post profil best-effort — profil tetap tampil walau daftar post gagal.
+    let posts: Awaited<ReturnType<typeof getThreadsProfilePosts>> = [];
+    if (profile) {
+      try {
+        posts = await getThreadsProfilePosts({
+          accessToken: account.accessToken,
+          username,
+          limit: 25,
+        });
+      } catch (error) {
+        console.warn("[threads] profile posts error:", (error as Error).message);
+      }
+    }
+    return c.json({ profile, posts });
   } catch (error) {
     return fail(error);
   }

@@ -39,10 +39,12 @@ type ThreadsProfile = {
   id: string;
   username?: string;
   name?: string;
-  biography?: string;
-  profile_picture_url?: string;
-  followers_count?: number;
+  threads_biography?: string;
+  threads_profile_picture_url?: string;
+  is_verified?: boolean;
 };
+
+type ProfileResult = { profile: ThreadsProfile | null; posts: ThreadsPost[] };
 
 type Tab = "keyword" | "location" | "profile" | "mention";
 
@@ -58,10 +60,6 @@ function formatDate(value?: string): string {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
-}
-
-function formatNumber(n?: number): string {
-  return n == null ? "—" : new Intl.NumberFormat("id-ID").format(n);
 }
 
 export function ThreadsResearchPage() {
@@ -99,7 +97,7 @@ export function ThreadsResearchPage() {
 
   const searchProfiles = useMutation({
     mutationFn: () =>
-      api.get<{ profiles: ThreadsProfile[] }>(`/threads/discover?${params({ q: query.trim() })}`),
+      api.get<ProfileResult>(`/threads/discover?${params({ username: query.trim() })}`),
     onError: (error) => toast.error((error as Error).message),
   });
 
@@ -218,7 +216,7 @@ export function ThreadsResearchPage() {
                 ? "kata kunci, mis. kopi susu"
                 : tab === "location"
                   ? "nama lokasi, mis. Jakarta"
-                  : "username / brand, mis. kopi"
+                  : "username persis, mis. threads"
             }
             className="h-9 max-w-md flex-1"
           />
@@ -315,42 +313,82 @@ export function ThreadsResearchPage() {
         ))}
 
       {tab === "profile" &&
-        (searchProfiles.data?.profiles.length ? (
-          <ul className="space-y-2">
-            {searchProfiles.data.profiles.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--border-light)] p-3"
-              >
-                <Avatar
-                  name={p.name ?? p.username ?? "?"}
-                  src={p.profile_picture_url}
-                  className="h-9 w-9 text-xs"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm">{p.name ?? p.username ?? p.id}</p>
-                  <p className="text-[var(--text-muted)] text-xs">
-                    @{p.username ?? "—"} · {formatNumber(p.followers_count)} pengikut
-                  </p>
-                  {p.biography && <p className="mt-1 line-clamp-2 text-sm">{p.biography}</p>}
-                  {p.username && (
-                    <a
-                      href={`https://www.threads.net/@${p.username}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-1 inline-flex items-center gap-1 text-[var(--accent-gold)] text-xs hover:underline"
-                    >
-                      <ExternalLink className="h-3 w-3" /> Buka profil
-                    </a>
-                  )}
+        (searchProfiles.data?.profile ? (
+          <div className="space-y-3">
+            {(() => {
+              const p = searchProfiles.data.profile;
+              return (
+                <div className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--border-light)] p-3">
+                  <Avatar
+                    name={p.name ?? p.username ?? "?"}
+                    src={p.threads_profile_picture_url}
+                    className="h-12 w-12 text-sm"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm">
+                      {p.name ?? p.username ?? p.id}
+                      {p.is_verified && <span className="ml-1 text-[var(--accent-gold)]">✓</span>}
+                    </p>
+                    <p className="text-[var(--text-muted)] text-xs">@{p.username ?? "—"}</p>
+                    {p.threads_biography && (
+                      <p className="mt-1 whitespace-pre-wrap text-sm">{p.threads_biography}</p>
+                    )}
+                    {p.username && (
+                      <a
+                        href={`https://www.threads.net/@${p.username}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 text-[var(--accent-gold)] text-xs hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Buka profil
+                      </a>
+                    )}
+                  </div>
                 </div>
-              </li>
-            ))}
-          </ul>
+              );
+            })()}
+            {searchProfiles.data.posts.length > 0 ? (
+              <ul className="space-y-2">
+                {searchProfiles.data.posts.map((post) => (
+                  <li
+                    key={post.id}
+                    className="rounded-[var(--radius-md)] border border-[var(--border-light)] p-3"
+                  >
+                    <div className="flex items-center gap-2 text-[var(--text-muted)] text-xs">
+                      {post.timestamp && <span>{formatDate(post.timestamp)}</span>}
+                      {post.is_reply && <span>· reply</span>}
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-sm">
+                      {post.text ?? "(tanpa teks)"}
+                    </p>
+                    {post.permalink && (
+                      <a
+                        href={post.permalink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 text-[var(--accent-gold)] text-xs hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Buka di Threads
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[var(--text-muted)] text-xs">
+                Tidak ada post publik terbaru yang bisa ditampilkan.
+              </p>
+            )}
+          </div>
+        ) : searchProfiles.isSuccess ? (
+          <EmptyState
+            title="Profil tidak ditemukan"
+            description="Threads hanya mendukung pencarian username persis (bukan kata kunci). Coba tulis username lengkap tanpa @."
+          />
         ) : (
           <EmptyState
-            title="Belum ada hasil"
-            description="Cari profil publik Threads untuk riset kompetitor atau kolaborator."
+            title="Cari profil publik"
+            description="Masukkan username persis (tanpa @) untuk melihat profil publik Threads dan post terbarunya."
           />
         ))}
 

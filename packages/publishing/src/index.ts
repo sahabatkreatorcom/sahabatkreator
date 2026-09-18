@@ -35,8 +35,8 @@ export {
   upsertEngagementItems,
 } from "./engagement-sync";
 export * from "./http";
+export { type CommentModerationInput, moderateComment } from "./moderation";
 export * from "./oauth";
-export { moderateComment, type CommentModerationInput } from "./moderation";
 export {
   computeOptimalTimes,
   nextOccurrence,
@@ -105,8 +105,9 @@ export {
 export * from "./reply";
 export {
   deleteThreadsPost,
-  discoverThreadsProfiles,
   getThreadsMentions,
+  getThreadsProfilePosts,
+  lookupThreadsProfile,
   searchThreadsKeywords,
   searchThreadsLocations,
   type ThreadsLocation,

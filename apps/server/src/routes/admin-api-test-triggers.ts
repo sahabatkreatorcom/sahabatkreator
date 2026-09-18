@@ -9,10 +9,11 @@ import { db } from "@sahabatkreator/db";
 import { socialAccount } from "@sahabatkreator/db/schema";
 import {
   deleteThreadsPost,
-  discoverThreadsProfiles,
   GRAPH_FB_URL,
   GRAPH_IG_URL,
   getThreadsMentions,
+  getThreadsProfilePosts,
+  lookupThreadsProfile,
   searchThreadsKeywords,
   searchThreadsLocations,
 } from "@sahabatkreator/publishing";
@@ -327,24 +328,34 @@ apiTestTriggersRoute.post("/trigger/threads-advanced", requirePlatformAdmin, asy
         }
       };
 
-      const base = { accessToken: token, userId: account.platformAccountId };
-      await run("mentions", async () => (await getThreadsMentions(base)).length);
+      await run(
+        "mentions",
+        async () =>
+          (await getThreadsMentions({ accessToken: token, userId: account.platformAccountId }))
+            .length,
+      );
       await run(
         "keyword_search",
         async () =>
-          (await searchThreadsKeywords({ ...base, query: body.keyword ?? "kopi" })).length,
+          (await searchThreadsKeywords({ accessToken: token, query: body.keyword ?? "kopi" }))
+            .length,
       );
       await run(
         "location_search",
         async () =>
-          (await searchThreadsLocations({ ...base, query: body.locationQuery ?? "Jakarta" }))
-            .length,
+          (
+            await searchThreadsLocations({
+              accessToken: token,
+              query: body.locationQuery ?? "Jakarta",
+            })
+          ).length,
       );
-      await run(
-        "profile_discovery",
-        async () =>
-          (await discoverThreadsProfiles({ ...base, query: body.profileQuery ?? "coffee" })).length,
-      );
+      await run("profile_discovery", async () => {
+        const username = body.profileQuery ?? "threads";
+        const profile = await lookupThreadsProfile({ accessToken: token, username });
+        if (!profile) return 0;
+        return (await getThreadsProfilePosts({ accessToken: token, username })).length;
+      });
       if (body.mediaId) {
         const mediaId = body.mediaId;
         await run("delete", async () => {
