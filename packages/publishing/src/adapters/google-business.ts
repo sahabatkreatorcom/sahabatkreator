@@ -1,5 +1,6 @@
-// Adapter Google Business Profile — LocalPosts API
-// POST localPosts — 1-call + native scheduledTime
+// Adapter Google Business Profile — LocalPosts API (masih legacy v4; Google belum
+// menyediakan pengganti v1 untuk localPosts/reviews).
+// POST /v4/accounts/{accountId}/locations/{locationId}/localPosts
 // platformAccountId = "accounts/{accountId}/locations/{locationId}"
 // Riset: docs/social-platforms/google-business.md (Sep 2026)
 
@@ -14,9 +15,17 @@ import {
 } from "../types";
 
 async function publishGoogleBusiness(input: PublishInput): Promise<PublishResult> {
-  const location = input.platformAccountId.startsWith("locations/")
-    ? input.platformAccountId
-    : `locations/${input.platformAccountId}`;
+  // localPosts v4 butuh name lengkap "accounts/{a}/locations/{l}".
+  // platformAccountId untuk GBP = "accounts/{accountId}" (belum ada pemilihan lokasi),
+  // jadi tolak jelas alih-alih menembak URL yang salah.
+  const location = input.platformAccountId;
+  if (!location.startsWith("accounts/") || !location.includes("/locations/")) {
+    throw new PublishError(
+      "gbp_location_required",
+      "Google Business butuh lokasi lengkap (accounts/{accountId}/locations/{locationId}) untuk publish.",
+      false,
+    );
+  }
   const summary = composeCaption(input.content, input.hashtags);
   if (summary.length > 1500) {
     throw new PublishError(

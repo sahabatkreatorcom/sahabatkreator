@@ -18,6 +18,7 @@ import { and, eq, or } from "drizzle-orm";
 import { processAutomation } from "./automation";
 import {
   GBP_API_URL,
+  GBP_BUSINESS_INFO_API_URL,
   GRAPH_FB_URL,
   GRAPH_IG_URL,
   GRAPH_THREADS_URL,
@@ -547,10 +548,13 @@ async function syncYouTube(ctx: SyncContext): Promise<SyncResult> {
 // ---------------------------------------------------------------------------
 
 async function syncGoogleBusiness(ctx: SyncContext): Promise<SyncResult> {
-  // platformAccountId = "accounts/123" → list locations → reviews per location
+  // platformAccountId = "accounts/{accountId}"
+  const accountName = ctx.account.platformAccountId;
+  // 1. List locations — Business Information API v1 (bukan /v4 lagi; readMask wajib)
   const locRes = await httpRequest<{
-    locations?: Array<{ name: string; locationName?: string }>;
-  }>(`${GBP_API_URL}/v1/${ctx.account.platformAccountId}/locations`, {
+    locations?: Array<{ name: string; title?: string }>;
+  }>(`${GBP_BUSINESS_INFO_API_URL}/${accountName}/locations`, {
+    query: { readMask: "name,title", pageSize: 100 },
     headers: { Authorization: `Bearer ${ctx.accessToken}` },
   });
   if (!locRes.ok) {
@@ -560,16 +564,21 @@ async function syncGoogleBusiness(ctx: SyncContext): Promise<SyncResult> {
   const locations = (await locRes.json()).locations ?? [];
 
   const items: EngagementUpsert[] = [];
-  for (const loc of locations.slice(0, 5)) {
+  for (const loc of locations.slice(0, 10)) {
+    // Reviews belum punya API baru → tetap v4, name wajib "accounts/{a}/locations/{l}"
+    const reviewParent = loc.name.startsWith("accounts/")
+      ? loc.name
+      : `${accountName}/${loc.name}`;
     const revRes = await httpRequest<{
       reviews?: Array<{
-        name: string; // locations/{loc}/reviews/{id}
+        name: string; // accounts/{a}/locations/{l}/reviews/{id}
         reviewer?: { displayName?: string; profilePhotoUrl?: string };
         starRating?: string; // "FIVE" dst
         comment?: string;
         createTime?: string;
       }>;
-    }>(`${GBP_API_URL}/v4/${loc.name}/reviews`, {
+    }>(`${GBP_API_URL}/v4/${reviewParent}/reviews`, {
+      query: { pageSize: 50 },
       headers: { Authorization: `Bearer ${ctx.accessToken}` },
     });
     if (!revRes.ok) continue;

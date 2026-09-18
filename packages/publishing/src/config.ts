@@ -69,10 +69,13 @@ export const LINKEDIN_USERINFO_URL = "https://api.linkedin.com/v2/userinfo";
 export const GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
 export const GOOGLE_OAUTH_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 export const GOOGLE_OAUTH_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
-/** Google Business Profile API (localPosts + review reply) */
+/** Google Business Profile API legacy v4 (localPosts + reviews/reply — belum ada pengganti) */
 export const GBP_API_URL = "https://mybusiness.googleapis.com";
 /** GBP Account Management API (list accounts saat connect) */
 export const GBP_ACCOUNT_API_URL = "https://mybusinessaccountmanagement.googleapis.com/v1";
+/** GBP Business Information API v1 (list locations — pengganti /v4/.../locations) */
+export const GBP_BUSINESS_INFO_API_URL =
+  "https://mybusinessbusinessinformation.googleapis.com/v1";
 /** OAuth Pinterest (authorize tetap pinterest.com walau API diarahkan ke sandbox) */
 export const PINTEREST_OAUTH_URL = "https://www.pinterest.com/oauth/";
 /** Public App View Bluesky (analytics/engagement, tanpa auth) */
