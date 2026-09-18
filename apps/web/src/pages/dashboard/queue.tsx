@@ -162,6 +162,16 @@ export function QueuePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Hapus post Threads yang sudah tayang di platform (scope threads_delete)
+  const removeThreadsPost = useMutation({
+    mutationFn: (id: string) => api.delete(`/threads/posts/${id}`),
+    onSuccess: () => {
+      toast.success("Post Threads dihapus di platform");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const groups = data?.groups ?? [];
   const filtered = groups.filter((g) => {
     if (tab === "all") return true;
@@ -416,6 +426,36 @@ export function QueuePage() {
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>
                                 )}
+                                {/* Hapus di platform (khusus Threads — scope threads_delete) */}
+                                {p.platform === "threads" &&
+                                  p.status === "published" &&
+                                  p.platformPostId && (
+                                    <button
+                                      type="button"
+                                      title="Hapus post di Threads"
+                                      disabled={
+                                        removeThreadsPost.isPending &&
+                                        removeThreadsPost.variables === p.id
+                                      }
+                                      onClick={() => {
+                                        if (
+                                          confirm(
+                                            `Hapus permanen post Threads @${p.username ?? "—"} di platform?`,
+                                          )
+                                        ) {
+                                          removeThreadsPost.mutate(p.id);
+                                        }
+                                      }}
+                                      className="ml-auto shrink-0 rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--error-light)] hover:text-[var(--error)] disabled:opacity-50"
+                                    >
+                                      {removeThreadsPost.isPending &&
+                                      removeThreadsPost.variables === p.id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      )}
+                                    </button>
+                                  )}
                               </div>
                               {p.errorMessage && (
                                 <p className="mt-1 font-mono text-[var(--error)] text-xs">

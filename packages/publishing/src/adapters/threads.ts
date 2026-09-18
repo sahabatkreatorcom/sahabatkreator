@@ -51,6 +51,12 @@ async function publishThreads(input: PublishInput): Promise<PublishResult> {
   // butuh scope threads_share_to_instagram (docs: share-to-ig-stories)
   const shareToIg = input.platformSettings.crossreshareToIg === true;
 
+  // Tag lokasi (threads_location_tagging) — ID dari location_search di Compose
+  const locationId =
+    typeof input.platformSettings.locationId === "string"
+      ? input.platformSettings.locationId
+      : undefined;
+
   if (!image && !video) {
     // Teks murni → auto_publish_text 1 call (media_type tetap wajib per docs)
     const res = await httpRequest<{ id?: string }>(`${GRAPH_THREADS}/${userId}/threads`, {
@@ -59,6 +65,7 @@ async function publishThreads(input: PublishInput): Promise<PublishResult> {
         media_type: "TEXT",
         text,
         auto_publish_text: "true",
+        ...(locationId ? { location_id: locationId } : {}),
         access_token: input.accessToken,
       },
       onResponse: quotaHook("threads", input),
@@ -85,6 +92,7 @@ async function publishThreads(input: PublishInput): Promise<PublishResult> {
       video_url: video?.url,
       // Share to IG: cross-post post Threads ini sebagai IG Story
       ...(shareToIg ? { crossreshare_to_ig: "true" } : {}),
+      ...(locationId ? { location_id: locationId } : {}),
       access_token: input.accessToken,
     },
     onResponse: quotaHook("threads", input),

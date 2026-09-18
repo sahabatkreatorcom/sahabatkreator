@@ -1,0 +1,385 @@
+// Halaman Riset Threads — keyword search, lokasi, profil publik, dan mention.
+// Memakai endpoint /threads (scope advanced access: threads_keyword_search,
+// threads_location_tagging, threads_profile_discovery, threads_manage_mentions).
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { AtSign, ExternalLink, Loader2, MapPin, Search, UserSearch } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+
+type ThreadsAccount = {
+  id: string;
+  username: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+};
+
+type ThreadsPost = {
+  id: string;
+  text?: string;
+  username?: string;
+  permalink?: string;
+  timestamp?: string;
+  media_type?: string;
+  is_reply?: boolean;
+};
+
+type ThreadsLocation = {
+  id: string;
+  name?: string;
+  address?: string;
+};
+
+type ThreadsProfile = {
+  id: string;
+  username?: string;
+  name?: string;
+  biography?: string;
+  profile_picture_url?: string;
+  followers_count?: number;
+};
+
+type Tab = "keyword" | "location" | "profile" | "mention";
+
+const TABS: { key: Tab; label: string; icon: typeof Search }[] = [
+  { key: "keyword", label: "Cari Post", icon: Search },
+  { key: "location", label: "Lokasi", icon: MapPin },
+  { key: "profile", label: "Profil", icon: UserSearch },
+  { key: "mention", label: "Mention", icon: AtSign },
+];
+
+function formatDate(value?: string): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function formatNumber(n?: number): string {
+  return n == null ? "—" : new Intl.NumberFormat("id-ID").format(n);
+}
+
+export function ThreadsResearchPage() {
+  const [tab, setTab] = useState<Tab>("keyword");
+  const [accountId, setAccountId] = useState("");
+  const [query, setQuery] = useState("");
+  const [searchType, setSearchType] = useState<"TOP" | "RECENT">("TOP");
+
+  const accountsQuery = useQuery({
+    queryKey: ["threads-accounts"],
+    queryFn: () => api.get<{ accounts: ThreadsAccount[] }>("/threads/accounts"),
+  });
+  const accounts = accountsQuery.data?.accounts ?? [];
+  const selected = accounts.find((a) => a.id === accountId) ?? accounts[0];
+  const effectiveId = selected?.id ?? "";
+
+  const params = (extra: Record<string, string>) =>
+    new URLSearchParams({ accountId: effectiveId, ...extra }).toString();
+
+  const searchPosts = useMutation({
+    mutationFn: () =>
+      api.get<{ posts: ThreadsPost[] }>(
+        `/threads/search?${params({ q: query.trim(), searchType })}`,
+      ),
+    onError: (error) => toast.error((error as Error).message),
+  });
+
+  const searchLocations = useMutation({
+    mutationFn: () =>
+      api.get<{ locations: ThreadsLocation[] }>(
+        `/threads/locations?${params({ q: query.trim() })}`,
+      ),
+    onError: (error) => toast.error((error as Error).message),
+  });
+
+  const searchProfiles = useMutation({
+    mutationFn: () =>
+      api.get<{ profiles: ThreadsProfile[] }>(`/threads/discover?${params({ q: query.trim() })}`),
+    onError: (error) => toast.error((error as Error).message),
+  });
+
+  const mentionsQuery = useQuery({
+    queryKey: ["threads-mentions", effectiveId],
+    queryFn: () => api.get<{ mentions: ThreadsPost[] }>(`/threads/mentions?${params({})}`),
+    enabled: tab === "mention" && !!effectiveId,
+    retry: false,
+  });
+
+  const activeMutation =
+    tab === "keyword" ? searchPosts : tab === "location" ? searchLocations : searchProfiles;
+
+  function runSearch() {
+    if (!effectiveId) {
+      toast.error("Belum ada akun Threads yang terhubung");
+      return;
+    }
+    if (!query.trim()) {
+      toast.error("Masukkan kata kunci dulu");
+      return;
+    }
+    if (tab === "keyword") searchPosts.mutate();
+    else if (tab === "location") searchLocations.mutate();
+    else if (tab === "profile") searchProfiles.mutate();
+  }
+
+  if (accountsQuery.isLoading) {
+    return (
+      <div className="card p-6">
+        <div className="flex items-center gap-2 text-[var(--text-muted)] text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" /> Memuat akun Threads…
+        </div>
+      </div>
+    );
+  }
+
+  if (accounts.length === 0) {
+    return (
+      <div className="card p-6">
+        <EmptyState
+          title="Belum ada akun Threads"
+          description="Hubungkan akun Threads dulu di halaman Akun Sosmed untuk memakai riset keyword, lokasi, dan profil."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="card p-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">Riset Threads</h2>
+          <p className="text-[var(--text-muted)] text-xs">
+            Cari post publik, lokasi, profil, dan mention — memakai izin Threads advanced access.
+          </p>
+        </div>
+        <select
+          value={effectiveId}
+          onChange={(e) => setAccountId(e.target.value)}
+          className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-2 text-xs"
+          aria-label="Pilih akun Threads"
+        >
+          {accounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              @{a.username ?? a.id}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Tab */}
+      <div className="mb-4 inline-flex flex-wrap gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] p-1">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => {
+              setTab(t.key);
+              setQuery("");
+            }}
+            className={cn(
+              "flex items-center gap-1.5 rounded-[var(--radius-sm)] px-3 py-1.5 font-medium text-xs transition-colors",
+              tab === t.key
+                ? "bg-gradient text-white"
+                : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]",
+            )}
+          >
+            <t.icon className="h-3.5 w-3.5" />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Search bar (kecuali Mention) */}
+      {tab !== "mention" && (
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") runSearch();
+            }}
+            placeholder={
+              tab === "keyword"
+                ? "kata kunci, mis. kopi susu"
+                : tab === "location"
+                  ? "nama lokasi, mis. Jakarta"
+                  : "username / brand, mis. kopi"
+            }
+            className="h-9 max-w-md flex-1"
+          />
+          {tab === "keyword" && (
+            <select
+              value={searchType}
+              onChange={(e) => setSearchType(e.target.value as "TOP" | "RECENT")}
+              className="h-9 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-2 text-xs"
+              aria-label="Tipe pencarian"
+            >
+              <option value="TOP">Top</option>
+              <option value="RECENT">Terbaru</option>
+            </select>
+          )}
+          <Button size="sm" onClick={runSearch} disabled={activeMutation.isPending}>
+            {activeMutation.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Search className="h-3.5 w-3.5" />
+            )}
+            Cari
+          </Button>
+        </div>
+      )}
+
+      {/* Hasil */}
+      {tab === "keyword" &&
+        (searchPosts.data?.posts.length ? (
+          <ul className="space-y-2">
+            {searchPosts.data.posts.map((p) => (
+              <li
+                key={p.id}
+                className="rounded-[var(--radius-md)] border border-[var(--border-light)] p-3"
+              >
+                <div className="flex items-center gap-2 text-[var(--text-muted)] text-xs">
+                  <span className="font-medium text-[var(--text-primary)]">
+                    @{p.username ?? "—"}
+                  </span>
+                  {p.timestamp && <span>{formatDate(p.timestamp)}</span>}
+                  {p.is_reply && <span>· reply</span>}
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-sm">{p.text ?? "(tanpa teks)"}</p>
+                {p.permalink && (
+                  <a
+                    href={p.permalink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-flex items-center gap-1 text-[var(--accent-gold)] text-xs hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3" /> Buka di Threads
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            title="Belum ada hasil"
+            description="Masukkan kata kunci dan tekan Cari untuk melihat post publik Threads."
+          />
+        ))}
+
+      {tab === "location" &&
+        (searchLocations.data?.locations.length ? (
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {searchLocations.data.locations.map((l) => (
+              <li
+                key={l.id}
+                className="rounded-[var(--radius-md)] border border-[var(--border-light)] p-3"
+              >
+                <p className="flex items-center gap-1.5 font-medium text-sm">
+                  <MapPin className="h-3.5 w-3.5 text-[var(--accent-gold)]" />
+                  {l.name ?? l.id}
+                </p>
+                {l.address && (
+                  <p className="mt-0.5 text-[var(--text-muted)] text-xs">{l.address}</p>
+                )}
+                <p className="mt-1 font-mono text-[10px] text-[var(--text-muted)]">ID: {l.id}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            title="Belum ada hasil"
+            description="Cari nama lokasi untuk dipakai saat menandai (tag) lokasi postingan Threads."
+          />
+        ))}
+
+      {tab === "profile" &&
+        (searchProfiles.data?.profiles.length ? (
+          <ul className="space-y-2">
+            {searchProfiles.data.profiles.map((p) => (
+              <li
+                key={p.id}
+                className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--border-light)] p-3"
+              >
+                <Avatar
+                  name={p.name ?? p.username ?? "?"}
+                  src={p.profile_picture_url}
+                  className="h-9 w-9 text-xs"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm">{p.name ?? p.username ?? p.id}</p>
+                  <p className="text-[var(--text-muted)] text-xs">
+                    @{p.username ?? "—"} · {formatNumber(p.followers_count)} pengikut
+                  </p>
+                  {p.biography && <p className="mt-1 line-clamp-2 text-sm">{p.biography}</p>}
+                  {p.username && (
+                    <a
+                      href={`https://www.threads.net/@${p.username}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex items-center gap-1 text-[var(--accent-gold)] text-xs hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" /> Buka profil
+                    </a>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            title="Belum ada hasil"
+            description="Cari profil publik Threads untuk riset kompetitor atau kolaborator."
+          />
+        ))}
+
+      {tab === "mention" &&
+        (mentionsQuery.isLoading ? (
+          <div className="flex items-center gap-2 text-[var(--text-muted)] text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" /> Memuat mention…
+          </div>
+        ) : mentionsQuery.isError ? (
+          <p className="text-[var(--error)] text-sm">
+            {(mentionsQuery.error as Error).message ||
+              "Gagal memuat mention — pastikan scope threads_manage_mentions sudah di-grant."}
+          </p>
+        ) : mentionsQuery.data?.mentions.length ? (
+          <ul className="space-y-2">
+            {mentionsQuery.data.mentions.map((m) => (
+              <li
+                key={m.id}
+                className="rounded-[var(--radius-md)] border border-[var(--border-light)] p-3"
+              >
+                <div className="flex items-center gap-2 text-[var(--text-muted)] text-xs">
+                  <span className="font-medium text-[var(--text-primary)]">
+                    @{m.username ?? "—"}
+                  </span>
+                  {m.timestamp && <span>{formatDate(m.timestamp)}</span>}
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-sm">{m.text ?? "(tanpa teks)"}</p>
+                {m.permalink && (
+                  <a
+                    href={m.permalink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-flex items-center gap-1 text-[var(--accent-gold)] text-xs hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3" /> Buka di Threads
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            title="Belum ada mention"
+            description="Sebutan akun Threads Anda akan muncul di sini dan juga tersinkron ke halaman Engagement."
+          />
+        ))}
+    </div>
+  );
+}

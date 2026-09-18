@@ -118,6 +118,9 @@ const ListeningPage = lazy(() =>
 const CompetitorsPage = lazy(() =>
   import("./pages/dashboard/competitors").then((m) => ({ default: m.CompetitorsPage })),
 );
+const ThreadsResearchPage = lazy(() =>
+  import("./pages/dashboard/threads-research").then((m) => ({ default: m.ThreadsResearchPage })),
+);
 const AccountsPage = lazy(() =>
   import("./pages/dashboard/accounts").then((m) => ({ default: m.AccountsPage })),
 );
@@ -322,6 +325,7 @@ export const router = createBrowserRouter([
               { path: "listening", element: withFallback(<ListeningPage />) },
               { path: "kompetitor", element: withFallback(<CompetitorsPage />) },
               { path: "tren", element: withFallback(<TrendsPage />) },
+              { path: "threads", element: withFallback(<ThreadsResearchPage />) },
             ],
           },
           {

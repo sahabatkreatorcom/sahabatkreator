@@ -2,10 +2,14 @@
 // yang sudah didukung schema & pipeline (kolom jsonb platform_settings + first_comment).
 // Field ditampilkan hanya untuk akun terpilih yang platformnya relevan.
 
-import { ChevronDown, Settings2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { ChevronDown, Loader2, MapPin, Search, Settings2, X } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { api } from "@/lib/api";
 import { PLATFORMS } from "@/lib/platforms";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +39,103 @@ type SettingsState = {
   facebookMentions?: string[];
   // Threads: cross-post post ini ke Instagram Story
   threadsShareToIg?: boolean;
+  /** Threads: tag lokasi (location_id) saat publish */
+  threadsLocationId?: string;
+  threadsLocationName?: string;
 };
+
+/** Picker lokasi Threads — cari via /threads/locations (scope threads_location_tagging) */
+function ThreadsLocationPicker({
+  accountId,
+  value,
+  valueName,
+  onChange,
+}: {
+  accountId: string;
+  value?: string;
+  valueName?: string;
+  onChange: (id?: string, name?: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const search = useMutation({
+    mutationFn: () =>
+      api.get<{ locations: { id: string; name?: string; address?: string }[] }>(
+        `/threads/locations?accountId=${accountId}&q=${encodeURIComponent(q.trim())}`,
+      ),
+    onError: (error) => toast.error((error as Error).message),
+  });
+  const results = search.data?.locations ?? [];
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">Tag lokasi (opsional)</Label>
+      {value ? (
+        <div className="flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1.5 text-xs">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-[var(--accent-gold)]" />
+            <span className="truncate">{valueName || value}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange(undefined, undefined)}
+            className="shrink-0 text-[var(--text-muted)] hover:text-[var(--error)]"
+            aria-label="Hapus lokasi"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex gap-2">
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && q.trim()) search.mutate();
+              }}
+              placeholder="Cari lokasi, mis. Jakarta"
+              className="h-8 text-xs"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={search.isPending || !q.trim()}
+              onClick={() => search.mutate()}
+            >
+              {search.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Search className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
+          {results.length > 0 && (
+            <div className="max-h-32 space-y-1 overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border-light)] p-1">
+              {results.map((l) => (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => onChange(l.id, l.name ?? l.address ?? l.id)}
+                  className="w-full rounded-[var(--radius-sm)] px-2 py-1.5 text-left text-xs hover:bg-[var(--bg-tertiary)]"
+                >
+                  {l.name ?? l.id}
+                  {l.address ? (
+                    <span className="text-[var(--text-muted)]"> — {l.address}</span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      <p className="text-[11px] text-[var(--text-muted)]">
+        Lokasi ditempel ke post Threads via <code>location_id</code> (butuh izin
+        threads_location_tagging).
+      </p>
+    </div>
+  );
+}
 
 type AccountLite = {
   id: string;
@@ -434,6 +534,18 @@ export function PlatformSettingsPanel({
                           akun Threads Anda.
                         </p>
                       )}
+                      <ThreadsLocationPicker
+                        accountId={account.id}
+                        value={s.threadsLocationId}
+                        valueName={s.threadsLocationName}
+                        onChange={(id, name) =>
+                          onChange(account.id, {
+                            ...s,
+                            threadsLocationId: id,
+                            threadsLocationName: name,
+                          })
+                        }
+                      />
                     </>
                   )}
 
@@ -493,6 +605,10 @@ export function buildPlatformSettings(
   // Threads: cross-post ke IG Story (dibaca adapter sebagai crossreshareToIg)
   if (platform === "threads" && s.threadsShareToIg) {
     settings.crossreshareToIg = true;
+  }
+  // Threads: tag lokasi — adapter kirim sebagai location_id
+  if (platform === "threads" && s.threadsLocationId) {
+    settings.locationId = s.threadsLocationId;
   }
 
   return Object.keys(settings).length > 0 ? settings : undefined;

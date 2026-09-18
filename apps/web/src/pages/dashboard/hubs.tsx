@@ -57,6 +57,7 @@ export function ResearchPage() {
           { to: "/research/listening", label: "Listening" },
           { to: "/research/kompetitor", label: "Kompetitor" },
           { to: "/research/tren", label: "Tren" },
+          { to: "/research/threads", label: "Threads" },
         ]}
       />
       <Outlet />
