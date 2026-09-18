@@ -1,6 +1,7 @@
 // Panel aset strategi di compose — template caption + koleksi hashtag siap pakai
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, Hash, Loader2 } from "lucide-react";
+import { ExternalLink, FileText, Hash, Loader2 } from "lucide-react";
+import { Link } from "react-router";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 
@@ -57,7 +58,16 @@ export function StrategyAssetsPanel({
 
   return (
     <div className="card space-y-4 p-6">
-      <h2 className="font-semibold">Aset Strategi</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold">Aset Strategi</h2>
+        <Link
+          to="/assistant/strategi"
+          className="flex items-center gap-1 text-[var(--accent-gold)] text-xs hover:underline"
+        >
+          Kelola di Strategi
+          <ExternalLink className="h-3 w-3" />
+        </Link>
+      </div>
       <p className="text-[var(--text-secondary)] text-xs">
         Template & koleksi hashtag dari halaman Strategi Konten
       </p>
