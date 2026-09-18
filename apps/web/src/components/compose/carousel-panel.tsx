@@ -1,11 +1,12 @@
 // Panel Carousel AI — generate outline carousel IG via /ai/carousel
-import { useMutation } from "@tanstack/react-query";
-import { Copy, GalleryHorizontalEnd, Loader2 } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Check, Clock, Copy, Download, GalleryHorizontalEnd, Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAiHistory } from "@/hooks/use-ai-history";
 import { api } from "@/lib/api";
 
 const CAROUSEL_STYLES = [
@@ -55,6 +56,16 @@ export function CarouselPanel({
   const [style, setStyle] = useState<CarouselStyle>("edukasi");
   const [result, setResult] = useState<CarouselResult | null>(null);
 
+  // Cek apakah brand voice aktif (diinject backend ke prompt)
+  const { data: brandVoiceData } = useQuery({
+    queryKey: ["brand-voice"],
+    queryFn: () => api.get<{ brandVoice: { description: string | null } | null }>("/strategy/brand-voice"),
+    staleTime: 60 * 1000,
+  });
+  const brandVoiceActive = !!brandVoiceData?.brandVoice?.description?.trim();
+
+  const { history, add: addHistory, remove: removeHistory } = useAiHistory();
+
   const generate = useMutation({
     mutationFn: () =>
       api.post<CarouselResult>("/ai/carousel", {
@@ -67,6 +78,14 @@ export function CarouselPanel({
       setResult(data);
       onCreditsUsed();
       toast.success("Outline carousel dihasilkan");
+      // Simpan ke history
+      const slidesText = data.slides.map((s, i) => `${i + 1}. ${s.title}\n${s.body}`).join("\n\n");
+      addHistory({
+        type: "carousel",
+        label: `${topic.slice(0, 40)} — ${data.slides.length} slide`,
+        content: `${slidesText}\n\n---\nCaption: ${data.caption}\n\nTips Desain: ${data.designTips}`,
+        metadata: { topic, style, platform: String(platform), slideCount: String(data.slides.length) },
+      });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -77,8 +96,48 @@ export function CarouselPanel({
     toast.success(`Slide ${index + 1} dicopy`);
   }
 
+  /** Export hasil sebagai Markdown */
+  function exportMarkdown() {
+    if (!result) return;
+    const lines: string[] = [`# Carousel: ${topic}`, ""];
+    result.slides.forEach((slide, i) => {
+      lines.push(`## Slide ${i + 1}: ${slide.title}`);
+      lines.push("");
+      lines.push(slide.body);
+      lines.push("");
+    });
+    if (result.designTips) {
+      lines.push("## Tips Desain");
+      lines.push("");
+      lines.push(result.designTips);
+      lines.push("");
+    }
+    if (result.caption) {
+      lines.push("## Caption");
+      lines.push("");
+      lines.push(result.caption);
+    }
+    const md = lines.join("\n");
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `carousel-${topic.slice(0, 30).replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Carousel diexport sebagai Markdown");
+  }
+
   return (
     <div className="space-y-4">
+      {/* Indikator brand voice */}
+      {brandVoiceActive && (
+        <div className="flex items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent-gold-light)] px-2.5 py-1 text-[var(--accent-gold)] text-xs">
+          <Check className="h-3 w-3" />
+          Brand voice aktif — nada & gaya merek diterapkan ke hasil
+        </div>
+      )}
+
       <p className="text-[var(--text-muted)] text-xs">
         Outline dibuat untuk konteks{" "}
         <span className="font-medium text-[var(--text-secondary)]">
@@ -187,19 +246,97 @@ export function CarouselPanel({
           )}
 
           {result.caption && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => {
-                onApplyContent(result.caption);
-                toast.success("Caption carousel diterapkan");
-              }}
-            >
-              Pakai Caption ke Konten
-            </Button>
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  // Kirim caption + slide titles sebagai context ke Compose
+                  const slideContext = result.slides
+                    .map((s, i) => `${i + 1}. ${s.title}`)
+                    .join("\n");
+                  const fullContent = `${result.caption}\n\n---\n[Carousel Outline]\n${slideContext}`;
+                  onApplyContent(fullContent);
+                  toast.success("Caption + outline carousel dibuka di Compose");
+                }}
+              >
+                Pakai Caption + Outline ke Compose
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={exportMarkdown}
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export sebagai Markdown
+              </Button>
+            </div>
           )}
+        </div>
+      )}
+
+      {/* Riwayat generate — restore tanpa habis credit */}
+      {history.filter((h) => h.type === "carousel").length > 0 && (
+        <div className="space-y-2">
+          <p className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium">
+            <Clock className="h-3 w-3" />
+            Riwayat
+          </p>
+          <div className="max-h-40 space-y-1 overflow-y-auto">
+            {history.filter((h) => h.type === "carousel").map((h) => (
+              <div
+                key={h.id}
+                className="group flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border-light)] px-2 py-1.5"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Parse carousel dari history: slides + caption + tips
+                    const parts = h.content.split("\n\n---\n");
+                    const slidesText = parts[0] ?? "";
+                    const captionMatch = parts[1]?.match(/^Caption:\s*([\s\S]*)/);
+                    const tipsMatch = parts[1]?.match(/Tips Desain:\s*([\s\S]*)/);
+                    const slides = slidesText
+                      .split(/\n\n(?=\d+\.\s)/)
+                      .filter(Boolean)
+                      .map((block) => {
+                        const match = block.match(/^\d+\.\s*(.+?)\n([\s\S]*)/);
+                        return match
+                          ? { title: match[1].trim(), body: match[2].trim() }
+                          : { title: block.trim(), body: "" };
+                      });
+                    const meta = h.metadata;
+                    const slideCount = Number(meta.slideCount) || slides.length;
+                    if (slides.length > 0) {
+                      setResult({
+                        slides,
+                        caption: captionMatch?.[1]?.trim() ?? "",
+                        designTips: tipsMatch?.[1]?.trim() ?? "",
+                      });
+                      setTopic(meta.topic ?? "");
+                      void slideCount;
+                      toast.success("Riwayat carousel dimuat");
+                    }
+                  }}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <span className="block truncate text-xs">{h.label}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeHistory(h.id)}
+                  className="shrink-0 text-[var(--text-muted)] opacity-0 hover:text-red-500 group-hover:opacity-100"
+                  aria-label="Hapus riwayat"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

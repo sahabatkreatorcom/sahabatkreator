@@ -50,7 +50,7 @@ export function CarouselGeneratorPage() {
             platform={platform}
             disabled={disabled}
             onApplyContent={(caption) => {
-              toast.success("Caption dibuka di Compose");
+              toast.success("Caption + slide context dibuka di Compose");
               navigate("/compose", { state: { content: caption } });
             }}
             onCreditsUsed={refetchUsage}
