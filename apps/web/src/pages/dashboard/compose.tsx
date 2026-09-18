@@ -1,10 +1,10 @@
 // Halaman Compose — buat konten multi-platform dengan jadwal.
 // Layout 3 zona ala Buffer:
-//   1. Editor utama (kiri): pilih akun → caption/toolbar alat → media → pengaturan
-//   2. Live preview sticky (kanan atas): tab per platform
+//   1. Editor utama (kiri): pilih akun → caption/toolbar alat → media → pengaturan → CSV import
+//   2. Live preview sticky (kanan atas): tab per platform + validasi + waktu optimal
 //   3. Submit bar (kanan bawah): skor prediksi + tombol aksi
 // Logic form ada di hook useComposeForm — halaman ini fokus presentasi.
-import { CloudCheck, Eraser, Eye, Save, Upload } from "lucide-react";
+import { CalendarClock, CloudCheck, Eraser, Eye, Save, Upload } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AccountSelector } from "@/components/compose/account-selector";
@@ -323,8 +323,8 @@ export function ComposePage() {
               />
             </div>
 
-            {/* Toolbar alat (strategi, UTM, sound, produk, waktu, CSV).
-                Asisten AI menempel di tab Caption Utama & Variasi per Platform. */}
+            {/* Toolbar alat (strategi, UTM, sound, produk).
+                Waktu Optimal & Import CSV kini terpisah — lihat sidebar kanan & bawah editor. */}
             <div className="mt-5 border-[var(--border-light)] border-t pt-4">
               <ComposeTools>
                 {(tool: ComposeTool) => {
@@ -363,18 +363,6 @@ export function ComposePage() {
                       );
                     case "product":
                       return <ProductPicker selectedIds={productIds} onChange={setProductIds} />;
-                    case "times":
-                      return (
-                        <OptimalTimesPanel
-                          platform={aiPlatform}
-                          onSelect={(localDateTime) => {
-                            setScheduledAt(localDateTime);
-                            toast.success("Jadwal diperbarui dari saran waktu terbaik");
-                          }}
-                        />
-                      );
-                    case "csv":
-                      return <CsvImportPanel />;
                   }
                 }}
               </ComposeTools>
@@ -420,12 +408,15 @@ export function ComposePage() {
               onScheduledAtChange={setScheduledAt}
             />
           </div>
+
+          {/* Import CSV massal — di bawah editor, terpisah dari toolbar alat */}
+          <CsvImportPanel />
         </div>
 
-        {/* ============ Zona 2 & 3: Preview sticky + submit bar ============ */}
+        {/* ============ Zona 2 & 3: Preview sticky + validasi + waktu optimal + submit bar ============ */}
         <div className="space-y-4 lg:sticky lg:top-6">
-          {/* Preview + validasi scroll bersama — submit bar tetap terlihat di bawah */}
-          <div className="max-h-[calc(100vh-200px)] space-y-4 overflow-y-auto">
+          {/* Preview — scrollable, terpisah dari validasi agar media panjang tidak menutupi validasi */}
+          <div className="max-h-[calc(100vh-380px)] space-y-4 overflow-y-auto">
             <div className="card p-5">
               <div className="mb-4 flex items-center gap-2">
                 <Eye className="h-4 w-4 text-[var(--text-muted)]" />
@@ -448,10 +439,32 @@ export function ComposePage() {
                 <PreviewEmptyState hasAccounts={accounts.length > 0} />
               )}
             </div>
-
-            {/* Panel validasi — error memblokir publish; di samping preview agar terlihat saat editing */}
-            <ValidationPanel issues={validationIssues} />
           </div>
+
+          {/* Validasi — di luar scroll, selalu terlihat meski preview panjang */}
+          <ValidationPanel issues={validationIssues} />
+
+          {/* Waktu Optimal — floating di bawah validasi */}
+          <details className="card group p-4">
+            <summary className="flex cursor-pointer list-none items-center justify-between">
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                <CalendarClock className="h-4 w-4 text-[var(--accent-gold)]" />
+                Waktu Optimal
+              </span>
+              <span className="text-[var(--text-muted)] text-xs group-open:rotate-180 transition-transform">
+                ▾
+              </span>
+            </summary>
+            <div className="mt-3">
+              <OptimalTimesPanel
+                platform={aiPlatform}
+                onSelect={(localDateTime) => {
+                  setScheduledAt(localDateTime);
+                  toast.success("Jadwal diperbarui dari saran waktu terbaik");
+                }}
+              />
+            </div>
+          </details>
 
           <SubmitBar
             mode={scheduleMode}
