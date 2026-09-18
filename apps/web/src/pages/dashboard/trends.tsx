@@ -1,10 +1,10 @@
 // Halaman Tren — tren pencarian Google Indonesia + AI generate ide konten
-// + trending sounds Instagram/TikTok (kurasi manual)
+// + chart lagu Apple Music ID + video populer YouTube ID (semua data nyata)
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ExternalLink, Flame, Loader2, Sparkles, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { TrendingSoundsSection } from "@/components/trends/trending-sounds-section";
+import { MediaTrendsSection } from "@/components/trends/media-trends-section";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { PLATFORMS } from "@/lib/platforms";
@@ -80,8 +80,8 @@ export function TrendsPage() {
         </select>
       </div>
 
-      {/* Trending sounds IG/TikTok — kurasi manual */}
-      <TrendingSoundsSection />
+      {/* Tren musik (Apple Music chart) + video populer YouTube — data nyata */}
+      <MediaTrendsSection />
 
       {isLoading ? (
         <div className="space-y-3">

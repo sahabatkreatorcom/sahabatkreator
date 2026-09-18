@@ -1,14 +1,15 @@
 // API Tren — Google Trends harian Indonesia + AI generate ide konten dari tren
 
 import { db } from "@sahabatkreator/db";
-import { brandVoice } from "@sahabatkreator/db/schema";
-import { eq } from "drizzle-orm";
+import { brandVoice, socialAccount } from "@sahabatkreator/db/schema";
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { aiCreditCost, chatCompletion, consumeAiCredits, getAiConfig } from "../lib/ai";
 import { errorResponse, requireOrg } from "../lib/auth-guard";
 import { getOrgLimits } from "../lib/billing";
-import { fetchDailyTrendsID } from "../lib/trends";
+import { decrypt } from "../lib/crypto";
+import { fetchDailyTrendsID, fetchPopularYouTubeID, fetchTopSongsID } from "../lib/trends";
 
 export const trendsRoute = new Hono();
 
@@ -23,6 +24,62 @@ trendsRoute.get("/", async (c) => {
       fetchedAt: new Date().toISOString(),
       available: trends.length > 0,
     });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** GET /trends/music?limit=25 — chart lagu Indonesia (Apple Music, data nyata) */
+trendsRoute.get("/music", async (c) => {
+  try {
+    await requireOrg(c);
+    const limit = Math.min(Number(c.req.query("limit") ?? 25), 100);
+    const songs = await fetchTopSongsID(limit);
+    return c.json({ songs, available: songs.length > 0, source: "Apple Music Top 100 ID" });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/**
+ * GET /trends/youtube?limit=12 — video populer YouTube Indonesia (real).
+ * Butuh akun YouTube org terhubung (OAuth). Bila belum ada → available=false.
+ */
+trendsRoute.get("/youtube", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+    const limit = Math.min(Number(c.req.query("limit") ?? 12), 50);
+
+    const [account] = await db
+      .select({ accessTokenEnc: socialAccount.accessTokenEnc })
+      .from(socialAccount)
+      .where(
+        and(
+          eq(socialAccount.organizationId, ctx.organization.id),
+          eq(socialAccount.platform, "youtube" as never),
+          eq(socialAccount.isConnected, true),
+        ),
+      )
+      .limit(1);
+
+    if (!account?.accessTokenEnc) {
+      return c.json({
+        videos: [],
+        available: false,
+        reason: "no_youtube_account",
+        message: "Hubungkan akun YouTube untuk melihat video populer Indonesia.",
+      });
+    }
+
+    let token: string;
+    try {
+      token = decrypt(account.accessTokenEnc);
+    } catch {
+      return c.json({ videos: [], available: false, reason: "token_unreadable" });
+    }
+
+    const videos = await fetchPopularYouTubeID(token, limit);
+    return c.json({ videos, available: videos.length > 0, source: "YouTube mostPopular ID" });
   } catch (error) {
     return errorResponse(error);
   }

@@ -1,4 +1,16 @@
-// Tren pencarian Google Indonesia — data riil publik (tanpa OAuth/API key).
+import { YOUTUBE_API_URL } from "@sahabatkreator/publishing";
+
+// Tren pencarian Google Indonesia + tren musik (Apple Music chart) + video
+// populer YouTube — semua data riil publik (tanpa data karangan).
+//
+// Catatan sumber:
+// - Google Trends: RSS publik trends.google.com/trending/rss?geo=ID (real).
+// - Apple Music: rss.applemarketingtools.com/api/v2/id/music/most-played (real,
+//   tanpa API key) — menggantikan daftar "trending sounds" kurasi manual.
+// - YouTube: Data API v3 chart=mostPopular regionCode=ID (butuh OAuth akun
+//   YouTube org yang terhubung).
+//
+// Bagian Google Trends:
 //
 // Endpoint dailytrends lama sudah 404 (Google memindahkan ke surface "Trending Now",
 // per riset Sep 2026). Route yang masih hidup:
@@ -137,5 +149,151 @@ export async function fetchDailyTrendsID(limit = 20): Promise<TrendItem[]> {
   } catch (error) {
     console.error("[trends] fetch gagal:", error);
     return cache?.data.slice(0, limit) ?? [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tren musik Indonesia — Apple Music "Most Played" chart (real, tanpa API key)
+// ---------------------------------------------------------------------------
+
+export type MusicTrendItem = {
+  rank: number;
+  title: string;
+  artist: string;
+  genre: string | null;
+  artworkUrl: string | null;
+  url: string | null;
+};
+
+const MUSIC_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 jam
+let musicCache: { data: MusicTrendItem[]; fetchedAt: number } | null = null;
+
+type AppleFeed = {
+  feed?: {
+    results?: Array<{
+      name?: string;
+      artistName?: string;
+      artworkUrl100?: string;
+      url?: string;
+      genres?: Array<{ name?: string }>;
+    }>;
+  };
+};
+
+/** Top songs Indonesia dari RSS Apple Music (data chart nyata, bukan karangan). */
+export async function fetchTopSongsID(limit = 25): Promise<MusicTrendItem[]> {
+  if (musicCache && Date.now() - musicCache.fetchedAt < MUSIC_CACHE_TTL_MS) {
+    return musicCache.data.slice(0, limit);
+  }
+  try {
+    const res = await fetch(
+      `https://rss.applemarketingtools.com/api/v2/id/music/most-played/${Math.min(limit, 100)}/songs.json`,
+      { signal: AbortSignal.timeout(10_000) },
+    );
+    if (!res.ok) {
+      console.error(`[trends] Apple Music RSS merespons ${res.status}`);
+      return musicCache?.data.slice(0, limit) ?? [];
+    }
+    const body = (await res.json()) as AppleFeed;
+    const items = (body.feed?.results ?? [])
+      .map((r, i) => {
+        if (!r.name || !r.artistName) return null;
+        return {
+          rank: i + 1,
+          title: r.name,
+          artist: r.artistName,
+          genre: r.genres?.[0]?.name ?? null,
+          artworkUrl: r.artworkUrl100?.replace("100x100bb", "300x300bb") ?? null,
+          url: r.url ?? null,
+        } satisfies MusicTrendItem;
+      })
+      .filter((x): x is MusicTrendItem => x !== null);
+    if (items.length === 0) return musicCache?.data.slice(0, limit) ?? [];
+    musicCache = { data: items, fetchedAt: Date.now() };
+    return items.slice(0, limit);
+  } catch (error) {
+    console.error("[trends] Apple Music fetch gagal:", error);
+    return musicCache?.data.slice(0, limit) ?? [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Video populer YouTube Indonesia — Data API v3 chart=mostPopular
+// ---------------------------------------------------------------------------
+
+export type YoutubeTrendItem = {
+  id: string;
+  title: string;
+  channelTitle: string;
+  thumbnailUrl: string | null;
+  publishedAt: string | null;
+  viewCount: number | null;
+  url: string;
+};
+
+const YT_CACHE_TTL_MS = 60 * 60 * 1000; // 1 jam
+let ytCache: { data: YoutubeTrendItem[]; fetchedAt: number } | null = null;
+
+type YoutubeListResponse = {
+  items?: Array<{
+    id?: string;
+    snippet?: {
+      title?: string;
+      channelTitle?: string;
+      publishedAt?: string;
+      thumbnails?: { medium?: { url?: string }; high?: { url?: string } };
+    };
+    statistics?: { viewCount?: string };
+  }>;
+};
+
+/**
+ * Video paling populer di YouTube Indonesia (regionCode=ID).
+ * Butuh access token OAuth akun YouTube org (scope read/force-ssl).
+ */
+export async function fetchPopularYouTubeID(
+  accessToken: string,
+  limit = 12,
+): Promise<YoutubeTrendItem[]> {
+  const cacheKey = Math.min(limit, 50);
+  if (ytCache && Date.now() - ytCache.fetchedAt < YT_CACHE_TTL_MS) {
+    return ytCache.data.slice(0, cacheKey);
+  }
+  try {
+    const url = new URL(`${YOUTUBE_API_URL}/videos`);
+    url.searchParams.set("part", "snippet,statistics");
+    url.searchParams.set("chart", "mostPopular");
+    url.searchParams.set("regionCode", "ID");
+    url.searchParams.set("maxResults", String(cacheKey));
+    url.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) {
+      console.error(`[trends] YouTube mostPopular merespons ${res.status}`);
+      return ytCache?.data.slice(0, cacheKey) ?? [];
+    }
+    const body = (await res.json()) as YoutubeListResponse;
+    const items = (body.items ?? [])
+      .map((v) => {
+        if (!v.id || !v.snippet?.title) return null;
+        const views = v.statistics?.viewCount ? Number(v.statistics.viewCount) : null;
+        return {
+          id: v.id,
+          title: v.snippet.title,
+          channelTitle: v.snippet.channelTitle ?? "",
+          thumbnailUrl:
+            v.snippet.thumbnails?.medium?.url ?? v.snippet.thumbnails?.high?.url ?? null,
+          publishedAt: v.snippet.publishedAt ?? null,
+          viewCount: Number.isFinite(views) ? views : null,
+          url: `https://www.youtube.com/watch?v=${v.id}`,
+        } satisfies YoutubeTrendItem;
+      })
+      .filter((x): x is YoutubeTrendItem => x !== null);
+    if (items.length === 0) return ytCache?.data.slice(0, cacheKey) ?? [];
+    ytCache = { data: items, fetchedAt: Date.now() };
+    return items.slice(0, cacheKey);
+  } catch (error) {
+    console.error("[trends] YouTube fetch gagal:", error);
+    return ytCache?.data.slice(0, cacheKey) ?? [];
   }
 }
