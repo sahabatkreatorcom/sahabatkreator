@@ -77,6 +77,58 @@ async function getThreadsAccount(accountId: string, organizationId: string) {
   return { ...account, accessToken };
 }
 
+/**
+ * GET /threads/_debug?op=location|profile|keyword|mentions&q=&accountId=
+ * Diagnostik: panggil Graph mentah dan kembalikan status + body asli (token
+ * tidak pernah dikembalikan). Berguna saat UI hanya menampilkan 502/kosong.
+ */
+threadsRoute.get("/_debug", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+    const accountId = c.req.query("accountId");
+    const op = c.req.query("op") ?? "location";
+    const q = c.req.query("q") ?? "";
+
+    // Tanpa accountId → pakai akun Threads pertama milik org
+    let resolvedId = accountId;
+    if (!resolvedId) {
+      const [first] = await db
+        .select({ id: socialAccount.id })
+        .from(socialAccount)
+        .where(
+          and(
+            eq(socialAccount.organizationId, ctx.organization.id),
+            eq(socialAccount.platform, "threads" as never),
+          ),
+        )
+        .limit(1);
+      resolvedId = first?.id;
+    }
+    if (!resolvedId) throw new HTTPError(400, "Tidak ada akun Threads");
+
+    const account = await getThreadsAccount(resolvedId, ctx.organization.id);
+    const base = "https://graph.threads.net/v1.0";
+    const token = account.accessToken;
+
+    const paths: Record<string, string> = {
+      location: `/location_search?query=${encodeURIComponent(q)}&fields=id,name,address,city,country,latitude,longitude,postal_code`,
+      "location-q": `/location_search?q=${encodeURIComponent(q)}&fields=id,name,address,city,country,latitude,longitude,postal_code`,
+      profile: `/profile_lookup?username=${encodeURIComponent(q.replace(/^@/, ""))}&fields=id,username,name,threads_biography,threads_profile_picture_url,is_verified`,
+      "profile-posts": `/profile_posts?username=${encodeURIComponent(q.replace(/^@/, ""))}&fields=id,text,username,permalink,timestamp,media_type`,
+      keyword: `/keyword_search?q=${encodeURIComponent(q)}&search_type=TOP&fields=id,text,username,permalink,timestamp`,
+      mentions: `/${account.platformAccountId}/mentions?fields=id,text,username,timestamp,permalink`,
+    };
+    const path = paths[op];
+    if (!path) throw new HTTPError(400, `op tidak dikenal: ${op}`);
+
+    const upstream = await fetch(`${base}${path}&access_token=${encodeURIComponent(token)}`);
+    const body = await upstream.text();
+    return c.json({ op, status: upstream.status, ok: upstream.ok, body: body.slice(0, 2000) });
+  } catch (error) {
+    return fail(error);
+  }
+});
+
 /** GET /threads/accounts — daftar akun Threads org (untuk picker) */
 threadsRoute.get("/accounts", async (c) => {
   try {

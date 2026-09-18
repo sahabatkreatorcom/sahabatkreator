@@ -24,6 +24,10 @@ const POST_FIELDS =
 
 const LOCATION_FIELDS = "id,name,address,city,country,latitude,longitude,postal_code";
 
+// Timeout pendek + tanpa retry network: bila Graph menggantung, kita kembalikan
+// pesan error sendiri dengan cepat (< timeout proxy) alih-alih 502 mentah.
+const THREADS_TIMEOUT_MS = 15_000;
+
 export type ThreadsPost = {
   id: string;
   text?: string;
@@ -77,7 +81,8 @@ export async function deleteThreadsPost(input: {
   const res = await httpRequest<{ success?: boolean }>(`${GRAPH_THREADS}/${input.mediaId}`, {
     method: "DELETE",
     query: { access_token: input.accessToken },
-    retries: 1,
+    retries: 0,
+    timeoutMs: THREADS_TIMEOUT_MS,
   });
   if (!res.ok) await throwThreadsError(res, "Hapus post Threads");
 }
@@ -102,7 +107,8 @@ export async function searchThreadsKeywords(input: {
       limit: input.limit ?? 25,
       access_token: input.accessToken,
     },
-    retries: 1,
+    retries: 0,
+    timeoutMs: THREADS_TIMEOUT_MS,
   });
   if (!res.ok) await throwThreadsError(res, "Threads keyword search");
   return (await res.json()).data ?? [];
@@ -130,14 +136,14 @@ export async function searchThreadsLocations(input: {
         limit: input.limit ?? 25,
         access_token: input.accessToken,
       },
-      retries: 1,
+      retries: 0,
+      timeoutMs: THREADS_TIMEOUT_MS,
     });
 
-  // Postman/reference Meta memakai `q`; sebagian halaman docs memakai `query`.
-  // `q` didahulukan — dengan `query` yang diabaikan, Graph bisa mengembalikan
-  // hasil global (tidak relevan) alih-alih lokasi yang dicari.
-  let res = await send("q");
-  if (!res.ok && res.status === 400) res = await send("query");
+  // Referensi resmi Meta: parameter `query` (Optional) + latitude/longitude.
+  // `q` hanya fallback bila Graph menolak dengan 400.
+  let res = await send("query");
+  if (!res.ok && res.status === 400) res = await send("q");
   if (!res.ok) await throwThreadsError(res, "Threads location search");
   return (await res.json()).data ?? [];
 }
@@ -159,7 +165,8 @@ export async function getThreadsMentions(input: {
         limit: input.limit ?? 25,
         access_token: input.accessToken,
       },
-      retries: 1,
+      retries: 0,
+      timeoutMs: THREADS_TIMEOUT_MS,
     },
   );
   if (!res.ok) await throwThreadsError(res, "Threads mentions");
@@ -183,7 +190,8 @@ export async function lookupThreadsProfile(input: {
         fields: "id,username,name,threads_biography,threads_profile_picture_url,is_verified",
         access_token: input.accessToken,
       },
-      retries: 1,
+      retries: 0,
+      timeoutMs: THREADS_TIMEOUT_MS,
     },
   );
   if (!res.ok) await throwThreadsError(res, "Threads profile lookup");
@@ -209,7 +217,8 @@ export async function getThreadsProfilePosts(input: {
       limit: input.limit ?? 25,
       access_token: input.accessToken,
     },
-    retries: 1,
+    retries: 0,
+    timeoutMs: THREADS_TIMEOUT_MS,
   });
   if (!res.ok) await throwThreadsError(res, "Threads profile posts");
   return (await res.json()).data ?? [];
