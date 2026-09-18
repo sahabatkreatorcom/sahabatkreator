@@ -497,6 +497,17 @@ analyticsRoute.get("/demographics", async (c) => {
       console.warn(
         `[analytics] demographics upstream error (${res.status}) for ${account.username}: ${text.slice(0, 300)}`,
       );
+      // 4xx = data tak tersedia (metric deprecated/tidak didukung izin/audiens kurang)
+      // → kembalikan kosong + catatan, bukan 502. Kegagalan server/network tetap 502.
+      if (res.status < 500) {
+        return c.json({
+          genderAge: [],
+          byGender: [],
+          source: account.platform,
+          username: account.username,
+          notice: `Platform menolak permintaan demografi (${res.status}): ${text.slice(0, 200)}`,
+        });
+      }
       throw new HTTPError(
         502,
         `Gagal mengambil data demografi dari ${account.platform}: ${text.slice(0, 150)}`,

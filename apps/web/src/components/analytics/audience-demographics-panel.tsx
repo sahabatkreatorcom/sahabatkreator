@@ -14,6 +14,8 @@ type Demographics = {
   byGender: { gender: "F" | "M"; value: number }[];
   source: string;
   username: string;
+  /** Catatan saat platform menolak permintaan (metric deprecated/audiens kurang) */
+  notice?: string;
 };
 
 type Account = {
@@ -40,13 +42,19 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
       a.platform === "instagram_standalone" ||
       a.platform === "facebook",
   );
-  const [accountId, setAccountId] = useState<string>(supportedAccounts[0]?.id ?? "");
-  const selected = supportedAccounts.find((a) => a.id === accountId);
+  const [accountId, setAccountId] = useState<string>("");
+  // Default: utamakan Instagram (data lebih lengkap); Facebook hanya bila tak ada IG.
+  // Dihitung efektif agar tetap benar saat daftar akun baru selesai dimuat async.
+  const selected =
+    supportedAccounts.find((a) => a.id === accountId) ??
+    supportedAccounts.find((a) => a.platform !== "facebook") ??
+    supportedAccounts[0];
+  const effectiveId = selected?.id ?? "";
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["analytics-demographics", accountId],
-    queryFn: () => api.get<Demographics>(`/analytics/demographics?accountId=${accountId}`),
-    enabled: !!accountId,
+    queryKey: ["analytics-demographics", effectiveId],
+    queryFn: () => api.get<Demographics>(`/analytics/demographics?accountId=${effectiveId}`),
+    enabled: !!effectiveId,
     retry: false,
   });
 
@@ -72,7 +80,7 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
         </div>
         {supportedAccounts.length > 0 && (
           <select
-            value={accountId}
+            value={effectiveId}
             onChange={(e) => setAccountId(e.target.value)}
             className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-2 text-xs"
             aria-label="Pilih akun"
@@ -105,10 +113,15 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
           {(error as Error).message || "Gagal memuat demografi audiens"}
         </p>
       ) : !data || data.genderAge.length === 0 ? (
-        <EmptyState
-          title="Data belum tersedia"
-          description="Platform belum mengirim data demografi untuk akun ini (butuh audiens minimum). Coba lagi nanti."
-        />
+        <div className="space-y-2">
+          <EmptyState
+            title="Data belum tersedia"
+            description="Platform belum mengirim data demografi untuk akun ini (butuh audiens minimum). Coba lagi nanti."
+          />
+          {data?.notice && (
+            <p className="break-words text-[11px] text-[var(--text-muted)]">{data.notice}</p>
+          )}
+        </div>
       ) : (
         <div className="space-y-5">
           {/* Ringkasan per gender */}
