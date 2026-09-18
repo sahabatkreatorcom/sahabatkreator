@@ -6,7 +6,6 @@ import { db } from "@sahabatkreator/db";
 import { post, socialAccount } from "@sahabatkreator/db/schema";
 import {
   deleteThreadsPost,
-  getThreadsMentions,
   getThreadsProfilePosts,
   lookupThreadsProfile,
   PublishError,
@@ -232,26 +231,6 @@ threadsRoute.get("/discover", async (c) => {
       }
     }
     return c.json({ profile, posts });
-  } catch (error) {
-    return fail(error);
-  }
-});
-
-/** GET /threads/mentions?accountId= — sebutan akun kita di post orang lain */
-threadsRoute.get("/mentions", async (c) => {
-  try {
-    const ctx = await requireOrg(c);
-    const accountId = c.req.query("accountId");
-    if (!accountId) {
-      throw new HTTPError(400, "Parameter accountId wajib diisi");
-    }
-    const account = await getThreadsAccount(accountId, ctx.organization.id);
-    const mentions = await getThreadsMentions({
-      accessToken: account.accessToken,
-      userId: account.platformAccountId,
-      limit: 25,
-    });
-    return c.json({ mentions });
   } catch (error) {
     return fail(error);
   }

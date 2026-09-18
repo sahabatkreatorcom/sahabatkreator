@@ -1,8 +1,8 @@
-// Halaman Riset Threads — keyword search, lokasi, profil publik, dan mention.
-// Memakai endpoint /threads (scope advanced access: threads_keyword_search,
-// threads_location_tagging, threads_profile_discovery, threads_manage_mentions).
+// Halaman Riset Threads — keyword search & profil publik.
+// Lokasi sudah ada di Compose (picker tag lokasi) dan mention sudah masuk inbox
+// di halaman Engagement, jadi keduanya tidak diduplikasi di sini.
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AtSign, ExternalLink, Loader2, MapPin, Search, UserSearch } from "lucide-react";
+import { ExternalLink, Loader2, Search, UserSearch } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/ui/avatar";
@@ -29,14 +29,6 @@ type ThreadsPost = {
   is_reply?: boolean;
 };
 
-type ThreadsLocation = {
-  id: string;
-  name?: string;
-  address?: string;
-  city?: string | null;
-  country?: string | null;
-};
-
 type ThreadsProfile = {
   username?: string;
   name?: string;
@@ -48,13 +40,11 @@ type ThreadsProfile = {
 
 type ProfileResult = { profile: ThreadsProfile | null; posts: ThreadsPost[] };
 
-type Tab = "keyword" | "location" | "profile" | "mention";
+type Tab = "keyword" | "profile";
 
 const TABS: { key: Tab; label: string; icon: typeof Search }[] = [
   { key: "keyword", label: "Cari Post", icon: Search },
-  { key: "location", label: "Lokasi", icon: MapPin },
   { key: "profile", label: "Profil", icon: UserSearch },
-  { key: "mention", label: "Mention", icon: AtSign },
 ];
 
 function formatDate(value?: string): string {
@@ -89,29 +79,13 @@ export function ThreadsResearchPage() {
     onError: (error) => toast.error((error as Error).message),
   });
 
-  const searchLocations = useMutation({
-    mutationFn: () =>
-      api.get<{ locations: ThreadsLocation[] }>(
-        `/threads/locations?${params({ q: query.trim() })}`,
-      ),
-    onError: (error) => toast.error((error as Error).message),
-  });
-
   const searchProfiles = useMutation({
     mutationFn: () =>
       api.get<ProfileResult>(`/threads/discover?${params({ username: query.trim() })}`),
     onError: (error) => toast.error((error as Error).message),
   });
 
-  const mentionsQuery = useQuery({
-    queryKey: ["threads-mentions", effectiveId],
-    queryFn: () => api.get<{ mentions: ThreadsPost[] }>(`/threads/mentions?${params({})}`),
-    enabled: tab === "mention" && !!effectiveId,
-    retry: false,
-  });
-
-  const activeMutation =
-    tab === "keyword" ? searchPosts : tab === "location" ? searchLocations : searchProfiles;
+  const activeMutation = tab === "keyword" ? searchPosts : searchProfiles;
 
   function runSearch() {
     if (!effectiveId) {
@@ -123,8 +97,7 @@ export function ThreadsResearchPage() {
       return;
     }
     if (tab === "keyword") searchPosts.mutate();
-    else if (tab === "location") searchLocations.mutate();
-    else if (tab === "profile") searchProfiles.mutate();
+    else searchProfiles.mutate();
   }
 
   if (accountsQuery.isLoading) {
@@ -152,7 +125,7 @@ export function ThreadsResearchPage() {
       <div className="card p-6">
         <EmptyState
           title="Belum ada akun Threads"
-          description="Hubungkan akun Threads dulu di halaman Akun Sosmed untuk memakai riset keyword, lokasi, dan profil."
+          description="Hubungkan akun Threads dulu di halaman Akun Sosmed untuk memakai riset keyword dan profil."
         />
       </div>
     );
@@ -164,7 +137,8 @@ export function ThreadsResearchPage() {
         <div>
           <h2 className="font-semibold">Riset Threads</h2>
           <p className="text-[var(--text-muted)] text-xs">
-            Cari post publik, lokasi, profil, dan mention — memakai izin Threads advanced access.
+            Cari post publik dan profil — memakai izin Threads advanced access. Tag lokasi ada di
+            Compose, mention ada di halaman Engagement.
           </p>
         </div>
         <select
@@ -185,8 +159,8 @@ export function ThreadsResearchPage() {
           izin advanced access belum disetujui App Review */}
       <p className="mb-4 rounded-[var(--radius-md)] border border-[var(--border-light)] bg-[var(--bg-secondary)] p-2 text-[11px] text-[var(--text-muted)]">
         Sebagian fitur ini butuh izin Threads advanced access yang disetujui App Review. Selama
-        belum disetujui: keyword search hanya mengembalikan post milik sendiri, mention dan profil
-        publik bisa kosong/gagal.
+        belum disetujui: keyword search hanya mengembalikan post milik sendiri, dan profil publik
+        bisa kosong/gagal.
       </p>
 
       {/* Tab */}
@@ -212,48 +186,42 @@ export function ThreadsResearchPage() {
         ))}
       </div>
 
-      {/* Search bar (kecuali Mention) */}
-      {tab !== "mention" && (
-        <div className="mb-5 flex flex-wrap items-center gap-2">
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") runSearch();
-            }}
-            placeholder={
-              tab === "keyword"
-                ? "kata kunci, mis. kopi susu"
-                : tab === "location"
-                  ? "nama lokasi, mis. Jakarta"
-                  : "username persis, mis. threads"
-            }
-            className="h-9 max-w-md flex-1"
-          />
-          {tab === "keyword" && (
-            <select
-              value={searchType}
-              onChange={(e) => setSearchType(e.target.value as "TOP" | "RECENT")}
-              className="h-9 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-2 text-xs"
-              aria-label="Tipe pencarian"
-            >
-              <option value="TOP">Top</option>
-              <option value="RECENT">Terbaru</option>
-            </select>
+      {/* Search bar */}
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") runSearch();
+          }}
+          placeholder={
+            tab === "keyword" ? "kata kunci, mis. kopi susu" : "username persis, mis. threads"
+          }
+          className="h-9 max-w-md flex-1"
+        />
+        {tab === "keyword" && (
+          <select
+            value={searchType}
+            onChange={(e) => setSearchType(e.target.value as "TOP" | "RECENT")}
+            className="h-9 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-2 text-xs"
+            aria-label="Tipe pencarian"
+          >
+            <option value="TOP">Top</option>
+            <option value="RECENT">Terbaru</option>
+          </select>
+        )}
+        <Button size="sm" onClick={runSearch} disabled={activeMutation.isPending}>
+          {activeMutation.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Search className="h-3.5 w-3.5" />
           )}
-          <Button size="sm" onClick={runSearch} disabled={activeMutation.isPending}>
-            {activeMutation.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Search className="h-3.5 w-3.5" />
-            )}
-            Cari
-          </Button>
-        </div>
-      )}
+          Cari
+        </Button>
+      </div>
 
       {/* Error pencarian (pesan asli dari Threads API) */}
-      {tab !== "mention" && activeMutation.isError && (
+      {activeMutation.isError && (
         <p className="mb-3 break-words text-[var(--error)] text-sm">
           {(activeMutation.error as Error).message}
         </p>
@@ -293,34 +261,6 @@ export function ThreadsResearchPage() {
           <EmptyState
             title="Belum ada hasil"
             description="Masukkan kata kunci dan tekan Cari. Bila app belum di-approve untuk threads_keyword_search, hasil hanya mencakup post milik sendiri — post akun baru biasanya kosong."
-          />
-        ))}
-
-      {tab === "location" &&
-        (searchLocations.data?.locations.length ? (
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {searchLocations.data.locations.map((l) => (
-              <li
-                key={l.id}
-                className="rounded-[var(--radius-md)] border border-[var(--border-light)] p-3"
-              >
-                <p className="flex items-center gap-1.5 font-medium text-sm">
-                  <MapPin className="h-3.5 w-3.5 text-[var(--accent-gold)]" />
-                  {l.name ?? l.id}
-                </p>
-                {(l.address || l.city || l.country) && (
-                  <p className="mt-0.5 text-[var(--text-muted)] text-xs">
-                    {[l.address, l.city, l.country].filter(Boolean).join(", ")}
-                  </p>
-                )}
-                <p className="mt-1 font-mono text-[10px] text-[var(--text-muted)]">ID: {l.id}</p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState
-            title="Belum ada hasil"
-            description="Cari nama lokasi untuk dipakai saat menandai (tag) lokasi postingan Threads."
           />
         ))}
 
@@ -406,50 +346,6 @@ export function ThreadsResearchPage() {
           <EmptyState
             title="Cari profil publik"
             description="Masukkan username persis (tanpa @) untuk melihat profil publik Threads dan post terbarunya."
-          />
-        ))}
-
-      {tab === "mention" &&
-        (mentionsQuery.isLoading ? (
-          <div className="flex items-center gap-2 text-[var(--text-muted)] text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" /> Memuat mention…
-          </div>
-        ) : mentionsQuery.isError ? (
-          <p className="text-[var(--error)] text-sm">
-            {(mentionsQuery.error as Error).message ||
-              "Gagal memuat mention — pastikan scope threads_manage_mentions sudah di-grant."}
-          </p>
-        ) : mentionsQuery.data?.mentions.length ? (
-          <ul className="space-y-2">
-            {mentionsQuery.data.mentions.map((m) => (
-              <li
-                key={m.id}
-                className="rounded-[var(--radius-md)] border border-[var(--border-light)] p-3"
-              >
-                <div className="flex items-center gap-2 text-[var(--text-muted)] text-xs">
-                  <span className="font-medium text-[var(--text-primary)]">
-                    @{m.username ?? "—"}
-                  </span>
-                  {m.timestamp && <span>{formatDate(m.timestamp)}</span>}
-                </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm">{m.text ?? "(tanpa teks)"}</p>
-                {m.permalink && (
-                  <a
-                    href={m.permalink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 inline-flex items-center gap-1 text-[var(--accent-gold)] text-xs hover:underline"
-                  >
-                    <ExternalLink className="h-3 w-3" /> Buka di Threads
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState
-            title="Belum ada mention"
-            description="Sebutan akun Threads Anda akan muncul di sini dan juga tersinkron ke halaman Engagement. Akun baru yang belum pernah di-mention memang kosong; izin threads_manage_mentions juga harus disetujui App Review."
           />
         ))}
     </div>
