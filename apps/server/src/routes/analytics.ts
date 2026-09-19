@@ -13,6 +13,7 @@ import {
   httpRequest,
   nextOccurrence,
   PINTEREST_API_BASE_URL,
+  PINTEREST_SANDBOX,
   slotLabel,
 } from "@sahabatkreator/publishing";
 import { and, eq, gte, sql } from "drizzle-orm";
@@ -765,8 +766,9 @@ analyticsRoute.get("/hashtags", async (c) => {
 // ---------------------------------------------------------------------------
 
 type PinterestCache = {
-  data: unknown;
+  data: Record<string, unknown>;
   expiresAt: number;
+  storedAt: number;
 };
 const pinterestCache = new Map<string, PinterestCache>();
 const PINTEREST_CACHE_TTL_MS = 5 * 60 * 1000; // 5 menit
@@ -800,7 +802,7 @@ analyticsRoute.get("/pinterest", async (c) => {
     const cacheKey = `pinterest_${account.id}`;
     const cached = pinterestCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
-      return c.json(cached.data);
+      return c.json({ ...cached.data, cachedAt: new Date(cached.storedAt).toISOString() });
     }
 
     // Decrypt token
@@ -824,10 +826,20 @@ analyticsRoute.get("/pinterest", async (c) => {
     if (!accountRes.ok) {
       const text = await accountRes.text().catch(() => "");
       console.warn(`[pinterest-analytics] Account fetch failed: ${text.slice(0, 150)}`);
+      const authFailed = accountRes.status === 401 || accountRes.status === 403;
+      if (authFailed) {
+        await db
+          .update(socialAccount)
+          .set({ needsReconnect: true })
+          .where(eq(socialAccount.id, account.id));
+      }
       return c.json({
         account: null,
         pins: [],
-        error: `Pinterest API error: ${accountRes.status}`,
+        error: authFailed
+          ? "Gagal mengautentikasi ke Pinterest. Token kemungkinan sudah kedaluwarsa — hubungkan ulang akun Pinterest Anda."
+          : `Pinterest API error: ${accountRes.status}`,
+        needsReconnect: authFailed,
       });
     }
 
@@ -853,16 +865,68 @@ analyticsRoute.get("/pinterest", async (c) => {
       title: string;
       thumbnail: string | null;
       createdAt: string;
+      impressions: number | null;
+      engagements: number | null;
+      link: string | null;
     }> = [];
 
     if (pinsRes.ok) {
       const pinsData = await pinsRes.json();
-      pins = (pinsData.items ?? []).map((pin) => ({
-        id: pin.id,
-        title: pin.title ?? "",
-        thumbnail: pin.media?.images?.["236x"]?.url ?? null,
-        createdAt: pin.created_at ?? "",
-      }));
+
+      // Ambil metric analytics per-pin (7 hari terakhir). Pinterest Developer
+      // Guidelines melarang penyimpanan — ini hanya diteruskan ke UI on-demand.
+      const pinIds = (pinsData.items ?? []).map((p) => p.id);
+      const metricsByPin = new Map<string, { impressions: number; engagements: number }>();
+
+      if (pinIds.length > 0) {
+        const endDate = new Date();
+        const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const fmt = (d: Date) => d.toISOString().slice(0, 10);
+        const anRes = await httpRequest<Record<string, unknown>>(
+          `${PINTEREST_API_BASE_URL}/user_account/analytics`,
+          {
+            query: {
+              start_date: fmt(startDate),
+              end_date: fmt(endDate),
+              metric_types: "IMPRESSION,ENGAGEMENT",
+              pin_ids: pinIds.join(","),
+              app_types: "fresh",
+              split_field: "NO_SPLIT",
+            },
+            headers: { Authorization: `Bearer ${token}` },
+            retries: 1,
+          },
+        );
+        // Sandbox menolak endpoint analytics: code 3022 "This endpoint does not
+        // support sandbox requests." — pin tetap ditampilkan tanpa metrik.
+        if (anRes.ok) {
+          const anData = (await anRes.json()) as Record<string, { impressions?: number; engagements?: number }>;
+          for (const [pid, m] of Object.entries(anData)) {
+            metricsByPin.set(pid, {
+              impressions: m.impressions ?? 0,
+              engagements: m.engagements ?? 0,
+            });
+          }
+        } else if (anRes.status !== 400) {
+          const errBody = (await anRes.json().catch(() => ({}))) as { code?: number };
+          if (errBody.code !== 3022) {
+            console.warn(`[pinterest-analytics] metrics fetch failed: ${JSON.stringify(errBody).slice(0, 150)}`);
+          }
+        }
+      }
+
+      pins = (pinsData.items ?? []).map((pin) => {
+        const m = metricsByPin.get(pin.id);
+        return {
+          id: pin.id,
+          title: pin.title ?? "",
+          thumbnail: pin.media?.images?.["236x"]?.url ?? null,
+          createdAt: pin.created_at ?? "",
+          impressions: m?.impressions ?? null,
+          engagements: m?.engagements ?? null,
+          link: pin.link ?? null,
+        };
+      });
     }
 
     const result = {
@@ -873,12 +937,17 @@ analyticsRoute.get("/pinterest", async (c) => {
         boardCount: accountData.board_count ?? null,
       },
       pins,
+      sandbox: PINTEREST_SANDBOX,
     };
 
     // Cache result
-    pinterestCache.set(cacheKey, { data: result, expiresAt: Date.now() + PINTEREST_CACHE_TTL_MS });
+    pinterestCache.set(cacheKey, {
+      data: result,
+      expiresAt: Date.now() + PINTEREST_CACHE_TTL_MS,
+      storedAt: Date.now(),
+    });
 
-    return c.json(result);
+    return c.json({ ...result, cachedAt: new Date().toISOString() });
   } catch (error) {
     return errorResponse(error);
   }

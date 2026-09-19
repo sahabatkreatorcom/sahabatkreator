@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import { AudienceDemographicsPanel } from "@/components/analytics/audience-demographics-panel";
 import { HashtagPerformancePanel } from "@/components/analytics/hashtag-performance-panel";
+import { PinterestAnalyticsPanel } from "@/components/analytics/pinterest-analytics-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -618,6 +619,9 @@ export function AnalyticsPage() {
 
       {/* Performa hashtag — top hashtag berdasarkan engagement */}
       <HashtagPerformancePanel days={effectiveDays} />
+
+      {/* Analytics Pinterest — fetch on-demand (compliance: tidak disimpan) */}
+      <PinterestAnalyticsPanel />
     </div>
   );
 }
