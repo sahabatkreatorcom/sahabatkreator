@@ -59,6 +59,7 @@ export type AccountMetrics = {
   reach?: number | null;
   profileViews?: number | null;
   websiteClicks?: number | null;
+  engagementCount?: number | null;
 };
 
 /** Metrik post hasil fetch (kumulatif lifetime dari platform) */
@@ -114,6 +115,7 @@ export async function upsertAccountAnalytics(
     reach: metrics.reach ?? null,
     profileViews: metrics.profileViews ?? null,
     websiteClicks: metrics.websiteClicks ?? null,
+    engagementCount: metrics.engagementCount ?? null,
   };
   await db
     .insert(accountAnalytics)
@@ -238,13 +240,75 @@ async function facebookAccountMetrics(pageId: string, token: string): Promise<Ac
     throw new Error(`FB akun: ${text.slice(0, 150)}`);
   }
   const data = await res.json();
-  return { followers: data.followers_count ?? data.fan_count };
+
+  // Page Insights — satu-satunya permission sah untuk metrik Page Insights
+  // (read_insights). New Pages Experience hanya menerima metric terbatas:
+  // page_views_total, page_post_engagements, page_daily_follows. Metric klasik
+  // (page_impressions, page_fans_gender_age) ditolak "(#100) not a valid insights
+  // metric". Insights bersifat opsional — bila gagal, snapshot followers tetap
+  // tersimpan; error ditelan supaya sync akun tidak terhambat.
+  const insights = await facebookPageInsights(pageId, token);
+
+  return {
+    followers: data.followers_count ?? data.fan_count,
+    impressions: insights.views,
+    profileViews: insights.views,
+    engagementCount: insights.engagements,
+  };
+}
+
+/**
+ * Page Insights Facebook — baca metric yang diterima New Pages Experience.
+ * `page_views_total` = jumlah tampilan Halaman (dipakai untuk impressions &
+ * profileViews), `page_post_engagements` = engagement. Kembalikan null bila
+ * metric tidak tersedia / ditolak, agar tidak menghapus snapshot sebelumnya.
+ */
+async function facebookPageInsights(
+  pageId: string,
+  token: string,
+): Promise<{ views: number | null; engagements: number | null }> {
+  try {
+    const res = await httpRequest<{
+      data?: Array<{
+        name?: string;
+        values?: Array<{ value?: number }>;
+        total_value?: { value?: number };
+      }>;
+    }>(`${GRAPH_FB}/${pageId}/insights`, {
+      query: {
+        metric: "page_views_total,page_post_engagements",
+        period: "day",
+        access_token: token,
+      },
+      retries: 1,
+    });
+    if (!res.ok) return { views: null, engagements: null };
+    const payload = await res.json();
+    const byName = new Map(
+      (payload.data ?? []).map((m) => [
+        m.name ?? "",
+        m.values?.[m.values.length - 1]?.value ?? m.total_value?.value ?? null,
+      ]),
+    );
+    return {
+      views: byName.get("page_views_total") ?? null,
+      engagements: byName.get("page_post_engagements") ?? null,
+    };
+  } catch {
+    // Insights opsional — jangan gagalkan snapshot followers
+    return { views: null, engagements: null };
+  }
 }
 
 /** Threads — threads_insights (butuh ≥1 post; followers_count tersedia) */
 async function threadsAccountMetrics(userId: string, token: string): Promise<AccountMetrics> {
   const res = await httpRequest<{
-    data?: Array<{ name: string; total_value?: number; values?: Array<{ value: number }> }>;
+    data?: Array<{
+      name: string;
+      // total_value bisa object { value } (followers_count) atau number (lama)
+      total_value?: number | { value?: number };
+      values?: Array<{ value: number }>;
+    }>;
   }>(`${GRAPH_THREADS}/${userId}/threads_insights`, {
     query: { metric: "views,likes,replies,reposts,quotes,followers_count", access_token: token },
   });
@@ -253,7 +317,15 @@ async function threadsAccountMetrics(userId: string, token: string): Promise<Acc
     throw new Error(`Threads insights: ${text.slice(0, 150)}`);
   }
   const data = (await res.json()).data ?? [];
-  const byName = new Map(data.map((m) => [m.name, m.total_value ?? m.values?.[0]?.value ?? 0]));
+  const byName = new Map(
+    data.map((m) => {
+      const tv =
+        typeof m.total_value === "object" && m.total_value !== null
+          ? (m.total_value.value ?? null)
+          : (m.total_value ?? null);
+      return [m.name, tv ?? m.values?.[0]?.value ?? null];
+    }),
+  );
   return {
     followers: byName.get("followers_count") ?? null,
     impressions: byName.get("views") ?? null,

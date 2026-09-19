@@ -5,7 +5,7 @@
 // memakai snapshot TERBARU per post (distinct on), bukan sum lintas hari (overcount).
 
 import { db } from "@sahabatkreator/db";
-import { postAnalytics, socialAccount } from "@sahabatkreator/db/schema";
+import { postAnalytics, socialAccount, accountAnalytics } from "@sahabatkreator/db/schema";
 import {
   computeOptimalTimes,
   GRAPH_FB_URL,
@@ -78,9 +78,44 @@ async function sumPostTotals(orgId: string, from: Date, to: Date): Promise<PostT
   };
 }
 
-/** Total followers org pada snapshot terakhir per akun dengan date <= batas */
-async function followersAt(orgId: string, onOrBefore: Date): Promise<number> {
+/**
+ * Page Insights Facebook level-akun (views Halaman + engagement) dalam rentang
+ * [from, to] (tanggal snapshot). Berbeda dengan post totals: FB New Pages
+ * Experience tidak menyediakan insights level post, jadi views/impressions
+ * Halaman diambil dari snapshot harian account_analytics (metric
+ * `page_views_total`/`page_post_engagements` — satu-satunya yang diterima NPE).
+ * Snapshot kumulatif-harian → sum langsung per tanggal dalam rentang.
+ */
+async function sumFacebookPageInsights(
+  orgId: string,
+  from: Date,
+  to: Date,
+): Promise<{ views: number; impressions: number; engagements: number }> {
   const res = await db.execute(
+    sql`select coalesce(sum(aa.impressions), 0)::bigint as views,
+               coalesce(sum(aa.impressions), 0)::bigint as impressions,
+               coalesce(sum(aa.engagement_count), 0)::bigint as engagements
+        from account_analytics aa
+        join social_account sa on sa.id = aa.social_account_id
+        where aa.organization_id = ${orgId}
+          and sa.platform = 'facebook'
+          and aa.date >= ${from.toISOString().slice(0, 10)}
+          and aa.date <= ${to.toISOString().slice(0, 10)}`,
+  );
+  const row = (res.rows[0] ?? {}) as {
+    views?: string | number;
+    impressions?: string | number;
+    engagements?: string | number;
+  };
+  return {
+    views: Number(row.views ?? 0),
+    impressions: Number(row.impressions ?? 0),
+    engagements: Number(row.engagements ?? 0),
+  };
+}
+
+/** Total followers org pada snapshot terakhir per akun dengan date <= batas */
+async function followersAt(orgId: string, onOrBefore: Date): Promise<number> {  const res = await db.execute(
     sql`select coalesce(sum(latest.followers), 0)::int as followers
         from (
           select distinct on (aa.social_account_id) aa.*
@@ -160,10 +195,24 @@ analyticsRoute.get("/overview", async (c) => {
       const prevTo = new Date(from.getTime() - 1);
       const prevFrom = new Date(prevTo.getTime() - spanMs + 1);
 
-      const [current, previous] = await Promise.all([
+      const [current, previous, fbNow, fbPrev] = await Promise.all([
         sumPostTotals(ctx.organization.id, from, to),
         sumPostTotals(ctx.organization.id, prevFrom, prevTo),
+        // Page Insights Facebook (NPE): views/impressions hanya ada level akun
+        sumFacebookPageInsights(ctx.organization.id, from, to),
+        sumFacebookPageInsights(ctx.organization.id, prevFrom, prevTo),
       ]);
+
+      const currentTotals = {
+        ...current,
+        views: current.views + fbNow.views,
+        impressions: current.impressions + fbNow.impressions,
+      };
+      const previousTotals = {
+        ...previous,
+        views: previous.views + fbPrev.views,
+        impressions: previous.impressions + fbPrev.impressions,
+      };
 
       // Followers: snapshot terakhir di dalam/tepat sebelum akhir periode
       const [currentFollowers, previousFollowers] = await Promise.all([
@@ -176,17 +225,17 @@ analyticsRoute.get("/overview", async (c) => {
           from: from.toISOString().slice(0, 10),
           to: to.toISOString().slice(0, 10),
         },
-        totals: { followers: currentFollowers, ...current },
+        totals: { followers: currentFollowers, ...currentTotals },
         accounts: await accountsWithFollowers(ctx.organization.id),
         comparison: {
-          previous: { followers: previousFollowers, ...previous },
+          previous: { followers: previousFollowers, ...previousTotals },
           deltas: {
             followers: percentDelta(currentFollowers, previousFollowers),
-            likes: percentDelta(current.likes, previous.likes),
-            comments: percentDelta(current.comments, previous.comments),
-            shares: percentDelta(current.shares, previous.shares),
-            views: percentDelta(current.views, previous.views),
-            impressions: percentDelta(current.impressions, previous.impressions),
+            likes: percentDelta(currentTotals.likes, previousTotals.likes),
+            comments: percentDelta(currentTotals.comments, previousTotals.comments),
+            shares: percentDelta(currentTotals.shares, previousTotals.shares),
+            views: percentDelta(currentTotals.views, previousTotals.views),
+            impressions: percentDelta(currentTotals.impressions, previousTotals.impressions),
           },
         },
       });
@@ -197,18 +246,28 @@ analyticsRoute.get("/overview", async (c) => {
     const since = new Date();
     since.setDate(since.getDate() - days);
 
-    const totals = await sumPostTotals(
-      ctx.organization.id,
-      since,
-      new Date(), // sampai sekarang
-    );
+    const [totals, fbInsights] = await Promise.all([
+      sumPostTotals(
+        ctx.organization.id,
+        since,
+        new Date(), // sampai sekarang
+      ),
+      // Page Insights Facebook (NPE): views/impressions hanya ada level akun
+      sumFacebookPageInsights(ctx.organization.id, since, new Date()),
+    ]);
+
+    const mergedTotals = {
+      ...totals,
+      views: totals.views + fbInsights.views,
+      impressions: totals.impressions + fbInsights.impressions,
+    };
 
     const followersByAccount = await accountsWithFollowers(ctx.organization.id);
     const totalFollowers = followersByAccount.reduce((sum, a) => sum + (a.followers ?? 0), 0);
 
     return c.json({
       range: { days, since: since.toISOString() },
-      totals: { followers: totalFollowers, ...totals },
+      totals: { followers: totalFollowers, ...mergedTotals },
       accounts: followersByAccount,
     });
   } catch (error) {
@@ -226,43 +285,77 @@ analyticsRoute.get("/timeseries", async (c) => {
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffDate = cutoff.toISOString().slice(0, 10);
 
-    const rows = await db
-      .select({
-        date: postAnalytics.date,
-        likes: sql<number>`coalesce(sum(${postAnalytics.likes}), 0)::int`,
-        comments: sql<number>`coalesce(sum(${postAnalytics.comments}), 0)::int`,
-        shares: sql<number>`coalesce(sum(${postAnalytics.shares}), 0)::int`,
-        views: sql<number>`coalesce(sum(${postAnalytics.views}), 0)::bigint`,
-        impressions: sql<number>`coalesce(sum(${postAnalytics.impressions}), 0)::bigint`,
-      })
-      .from(postAnalytics)
-      .where(
-        and(
-          eq(postAnalytics.organizationId, ctx.organization.id),
-          gte(postAnalytics.date, cutoffDate),
-        ),
-      )
-      .groupBy(postAnalytics.date)
-      .orderBy(postAnalytics.date);
+    const [rows, fbRows] = await Promise.all([
+      db
+        .select({
+          date: postAnalytics.date,
+          likes: sql<number>`coalesce(sum(${postAnalytics.likes}), 0)::int`,
+          comments: sql<number>`coalesce(sum(${postAnalytics.comments}), 0)::int`,
+          shares: sql<number>`coalesce(sum(${postAnalytics.shares}), 0)::int`,
+          views: sql<number>`coalesce(sum(${postAnalytics.views}), 0)::bigint`,
+          impressions: sql<number>`coalesce(sum(${postAnalytics.impressions}), 0)::bigint`,
+        })
+        .from(postAnalytics)
+        .where(
+          and(
+            eq(postAnalytics.organizationId, ctx.organization.id),
+            gte(postAnalytics.date, cutoffDate),
+          ),
+        )
+        .groupBy(postAnalytics.date)
+        .orderBy(postAnalytics.date),
+      // Page Insights Facebook (NPE): views Halaman per hari dari account_analytics
+      db
+        .select({
+          date: accountAnalytics.date,
+          views: sql<number>`coalesce(sum(${accountAnalytics.impressions}), 0)::bigint`,
+          impressions: sql<number>`coalesce(sum(${accountAnalytics.impressions}), 0)::bigint`,
+        })
+        .from(accountAnalytics)
+        .innerJoin(socialAccount, eq(socialAccount.id, accountAnalytics.socialAccountId))
+        .where(
+          and(
+            eq(accountAnalytics.organizationId, ctx.organization.id),
+            eq(socialAccount.platform, "facebook" as never),
+            gte(accountAnalytics.date, cutoffDate),
+          ),
+        )
+        .groupBy(accountAnalytics.date),
+    ]);
+
+    // Gabungkan Page Insights Facebook ke series berdasarkan tanggal
+    const fbByDate = new Map(fbRows.map((r) => [r.date, r]));
 
     return c.json({
       days,
-      series: rows.map((r) => ({
-        ...r,
-        views: Number(r.views),
-        impressions: Number(r.impressions),
-      })),
+      series: rows.map((r) => {
+        const fb = fbByDate.get(r.date);
+        return {
+          ...r,
+          views: Number(r.views) + Number(fb?.views ?? 0),
+          impressions: Number(r.impressions) + Number(fb?.impressions ?? 0),
+        };
+      }),
     });
   } catch (error) {
     return errorResponse(error);
   }
 });
 
-/** GET /analytics/top-posts?limit=10 — post berperforma terbaik (snapshot terbaru) */
+/**
+ * GET /analytics/top-posts?limit=10&platform= — post berperforma terbaik
+ * (snapshot terbaru per post). Filter platform opsional (mis. ?platform=instagram).
+ * Mengembalikan semua metric yang tersimpan: likes, comments, shares, saves,
+ * views, impressions, reach + engagement rate turunan.
+ */
 analyticsRoute.get("/top-posts", async (c) => {
   try {
     const ctx = await requireOrg(c);
     const limit = Math.min(Number(c.req.query("limit") ?? 10), 50);
+    const platform = c.req.query("platform");
+    const platformFilter = platform
+      ? sql` and p.platform = ${platform}`
+      : sql``;
 
     const rows = await db.execute(
       sql`select p.id as post_id,
@@ -274,7 +367,10 @@ analyticsRoute.get("/top-posts", async (c) => {
              latest.likes,
              latest.comments,
              latest.shares,
-             latest.views
+             latest.saves,
+             latest.views,
+             latest.impressions,
+             latest.reach
           from post p
           join social_account sa on sa.id = p.social_account_id
           join lateral (
@@ -284,24 +380,42 @@ analyticsRoute.get("/top-posts", async (c) => {
             limit 1
           ) latest on true
           where p.organization_id = ${ctx.organization.id}
-            and p.status = 'published'
-          order by latest.views desc, latest.likes desc
+            and p.status = 'published'${platformFilter}
+          order by latest.views desc nulls last, latest.likes desc nulls last
           limit ${limit}`,
     );
 
     return c.json({
-      posts: (rows.rows as Record<string, unknown>[]).map((r) => ({
-        postId: r.post_id,
-        platform: r.platform,
-        content: r.content,
-        platformPostUrl: r.platform_post_url,
-        publishedAt: r.published_at,
-        username: r.username,
-        likes: Number(r.likes ?? 0),
-        comments: Number(r.comments ?? 0),
-        shares: Number(r.shares ?? 0),
-        views: Number(r.views ?? 0),
-      })),
+      posts: (rows.rows as Record<string, unknown>[]).map((r) => {
+        const likes = Number(r.likes ?? 0);
+        const comments = Number(r.comments ?? 0);
+        const shares = Number(r.shares ?? 0);
+        const saves = Number(r.saves ?? 0);
+        const views = Number(r.views ?? 0);
+        const impressions = Number(r.impressions ?? 0);
+        const reach = Number(r.reach ?? 0);
+        // Engagement rate = interaksi / impressions (atau reach bila impressions 0).
+        // Untuk platform tanpa impressions (mis. FB NPE), fallback ke views.
+        const denom = impressions || reach || views;
+        const engagement = likes + comments + shares + saves;
+        return {
+          postId: r.post_id,
+          platform: r.platform,
+          content: r.content,
+          platformPostUrl: r.platform_post_url,
+          publishedAt: r.published_at,
+          username: r.username,
+          likes,
+          comments,
+          shares,
+          saves,
+          views,
+          impressions,
+          reach,
+          engagement,
+          engagementRate: denom > 0 ? Number(((engagement / denom) * 100).toFixed(2)) : null,
+        };
+      }),
     });
   } catch (error) {
     return errorResponse(error);

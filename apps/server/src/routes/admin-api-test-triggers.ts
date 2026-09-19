@@ -212,6 +212,14 @@ apiTestTriggersRoute.post(
  * Trigger a Page Insights call for read_insights verification.
  * `read_insights` adalah satu-satunya permission sah untuk metrik Page Insights
  * (page_impressions, page_fans_gender_age, dll).
+ *
+ * CATATAN (Sep 2026): Halaman New Pages Experience MENOLAK metrik klasik
+ * `page_impressions` dengan error "(#100) The value must be a valid insights metric".
+ * Satu-satunya metrik page-level yang diterima NPE adalah `page_views_total`.
+ * Karena API call counter Meta hanya menghitung call yang SUKSES, trigger harus
+ * memakai metrik yang diterima — dua halaman test kita (NPE) selalu gagal dengan
+ * page_impressions, sehingga counter read_insights tidak pernah bertambah.
+ * Strategi: coba page_views_total (NPE) → fallback page_impressions (classic page).
  */
 apiTestTriggersRoute.post("/trigger/facebook-insights", requirePlatformAdmin, async (c) => {
   try {
@@ -237,19 +245,40 @@ apiTestTriggersRoute.post("/trigger/facebook-insights", requirePlatformAdmin, as
           typeof (account.metadata as Record<string, unknown>).pageAccessToken === "string"
             ? ((account.metadata as Record<string, unknown>).pageAccessToken as string)
             : token;
-        const res = await fetchJson<{
-          data?: Array<{ name: string; values?: Array<{ value: number }> }>;
-          error?: { message?: string };
-        }>(
-          `${GRAPH_FB_URL}/${account.platformAccountId}/insights?metric=page_impressions&period=day&access_token=${encodeURIComponent(pageToken)}`,
-        );
-        results.push({
-          account: account.username ?? account.platformAccountId,
-          success: res.ok,
-          message: res.ok
-            ? "Facebook Page Insights API call completed"
-            : (res.data?.error?.message ?? `HTTP ${res.status}`),
-        });
+
+        // New Pages Experience hanya terima page_views_total; classic page terima
+        // page_impressions. Coba NPE dulu, fallback classic.
+        const attempts = [
+          "page_views_total",
+          "page_impressions",
+        ] as const;
+        let lastErr = "no metric accepted";
+        let succeeded = false;
+        for (const metric of attempts) {
+          const res = await fetchJson<{
+            data?: Array<{ name: string; values?: Array<{ value: number }> }>;
+            error?: { message?: string };
+          }>(
+            `${GRAPH_FB_URL}/${account.platformAccountId}/insights?metric=${metric}&period=day&access_token=${encodeURIComponent(pageToken)}`,
+          );
+          if (res.ok) {
+            succeeded = true;
+            results.push({
+              account: account.username ?? account.platformAccountId,
+              success: true,
+              message: `Facebook Page Insights API call completed (metric: ${metric})`,
+            });
+            break;
+          }
+          lastErr = res.data?.error?.message ?? `HTTP ${res.status}`;
+        }
+        if (!succeeded) {
+          results.push({
+            account: account.username ?? account.platformAccountId,
+            success: false,
+            message: lastErr,
+          });
+        }
       } catch (error) {
         results.push({
           account: account.username ?? account.platformAccountId,
@@ -510,6 +539,12 @@ apiTestTriggersRoute.post("/trigger/page-mentions", requirePlatformAdmin, async 
  * membaca gender *orang* yang berkirim pesan dengan Page (messaging context),
  * dan meminta nya saat authorize membatalkan seluruh login Facebook dengan
  * error "Invalid Scope: pages_user_gender". Jadi scope OAuth hanya read_insights.
+ *
+ * CATATAN (Sep 2026): Halaman New Pages Experience MENOLAK `page_fans_gender_age`
+ * ("The value must be a valid insights metric"). Metrik demografi fans tidak
+ * tersedia di NPE; satu-satunya page-level metric yang diterima adalah
+ * `page_views_total`. Counter Meta hanya menghitung call SUKSES, jadi trigger
+ * ini coba page_fans_gender_age (classic) → fallback page_views_total (NPE).
  */
 apiTestTriggersRoute.post("/trigger/page-demographics", requirePlatformAdmin, async (c) => {
   try {
@@ -558,28 +593,48 @@ apiTestTriggersRoute.post("/trigger/page-demographics", requirePlatformAdmin, as
           ? ((account.metadata as Record<string, unknown>).pageAccessToken as string)
           : token;
 
-      const res = await fetchJson<{ data?: InsightData; error?: { message?: string } }>(
-        `${GRAPH_FB_URL}/${account.platformAccountId}/insights?metric=page_fans_gender_age&period=lifetime&access_token=${encodeURIComponent(pageToken)}`,
-      );
-
-      let rows = 0;
-      const first = res.data?.data?.[0];
-      const breakdown = first?.total_value?.breakdowns?.[0]?.rows;
-      if (breakdown?.length) {
-        rows = breakdown.length;
-      } else {
-        const legacy = first?.values?.[0]?.value;
-        if (legacy && typeof legacy === "object") rows = Object.keys(legacy).length;
+      // NPE tidak punya metric demografi fans; fallback ke page_views_total
+      // (page-level, day) agar call tetap sukses dan terhitung di counter.
+      const attempts: Array<{ metric: string; period: string }> = [
+        { metric: "page_fans_gender_age", period: "lifetime" },
+        { metric: "page_views_total", period: "day" },
+      ];
+      let lastErr = "no metric accepted";
+      let succeeded = false;
+      for (const att of attempts) {
+        const res = await fetchJson<{ data?: InsightData; error?: { message?: string } }>(
+          `${GRAPH_FB_URL}/${account.platformAccountId}/insights?metric=${att.metric}&period=${att.period}&access_token=${encodeURIComponent(pageToken)}`,
+        );
+        if (!res.ok) {
+          lastErr = res.data?.error?.message ?? `HTTP ${res.status}`;
+          continue;
+        }
+        succeeded = true;
+        let rows = 0;
+        const first = res.data?.data?.[0];
+        const breakdown = first?.total_value?.breakdowns?.[0]?.rows;
+        if (breakdown?.length) {
+          rows = breakdown.length;
+        } else {
+          const legacy = first?.values?.[0]?.value;
+          if (legacy && typeof legacy === "object") rows = Object.keys(legacy).length;
+        }
+        results.push({
+          account: account.username ?? account.platformAccountId,
+          success: true,
+          rows,
+          message: `${att.metric} OK (${rows} baris)`,
+        });
+        break;
       }
-
-      results.push({
-        account: account.username ?? account.platformAccountId,
-        success: res.ok,
-        rows,
-        message: res.ok
-          ? `page_fans_gender_age OK (${rows} baris)`
-          : (res.data?.error?.message ?? `HTTP ${res.status}`),
-      });
+      if (!succeeded) {
+        results.push({
+          account: account.username ?? account.platformAccountId,
+          success: false,
+          rows: 0,
+          message: lastErr,
+        });
+      }
     }
 
     if (results.length === 0) {

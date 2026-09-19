@@ -6,6 +6,7 @@ import { db } from "@sahabatkreator/db";
 import { post, socialAccount } from "@sahabatkreator/db/schema";
 import {
   deleteThreadsPost,
+  getThreadsMentions,
   getThreadsProfilePosts,
   lookupThreadsProfile,
   PublishError,
@@ -231,6 +232,30 @@ threadsRoute.get("/discover", async (c) => {
       }
     }
     return c.json({ profile, posts });
+  } catch (error) {
+    return fail(error);
+  }
+});
+
+/**
+ * GET /threads/mentions?accountId= — post/reply publik di mana akun ini di-mention.
+ * `GET /{threads-user-id}/mentions` — scope threads_manage_mentions.
+ * userId pakai platformAccountId akun sendiri (bukan input user).
+ */
+threadsRoute.get("/mentions", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+    const accountId = c.req.query("accountId");
+    if (!accountId) {
+      throw new HTTPError(400, "Parameter accountId wajib diisi");
+    }
+    const account = await getThreadsAccount(accountId, ctx.organization.id);
+    const posts = await getThreadsMentions({
+      accessToken: account.accessToken,
+      userId: account.platformAccountId,
+      limit: 25,
+    });
+    return c.json({ posts });
   } catch (error) {
     return fail(error);
   }

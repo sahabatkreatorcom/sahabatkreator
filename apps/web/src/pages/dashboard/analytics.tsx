@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import { AudienceDemographicsPanel } from "@/components/analytics/audience-demographics-panel";
 import { HashtagPerformancePanel } from "@/components/analytics/hashtag-performance-panel";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -84,7 +85,12 @@ type TopPosts = {
     likes: number;
     comments: number;
     shares: number;
+    saves: number;
     views: number;
+    impressions: number;
+    reach: number;
+    engagement: number;
+    engagementRate: number | null;
   }[];
 };
 
@@ -477,6 +483,39 @@ export function AnalyticsPage() {
                         @{p.username} · {formatCompact(p.views)} views · {formatCompact(p.likes)}{" "}
                         likes
                       </p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {p.impressions > 0 && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {formatCompact(p.impressions)} impressions
+                          </Badge>
+                        )}
+                        {p.saves > 0 && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {formatCompact(p.saves)} saves
+                          </Badge>
+                        )}
+                        {p.engagementRate !== null && (
+                          <Badge
+                            className={
+                              p.engagementRate >= 5
+                                ? "bg-emerald-100 text-[10px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                : "text-[10px]"
+                            }
+                          >
+                            {p.engagementRate}% engage
+                          </Badge>
+                        )}
+                        {p.platformPostUrl && (
+                          <a
+                            href={p.platformPostUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[var(--text-muted)] text-[10px] hover:underline"
+                          >
+                            buka
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </li>
                 );
