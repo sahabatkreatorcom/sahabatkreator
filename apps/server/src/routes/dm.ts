@@ -17,30 +17,39 @@ import { generateId } from "../lib/id";
 
 export const dmRoute = new Hono();
 
-/** POST /dm/sync-now — pull conversations for connected DM accounts in this org. */
-dmRoute.post("/sync-now", async (c) => {
-  try {
-    const ctx = await requirePermission(c, "engagement.view");
-    const accounts = await db
-      .select({
-        id: socialAccount.id,
-        organizationId: socialAccount.organizationId,
-        platform: socialAccount.platform,
-        platformAccountId: socialAccount.platformAccountId,
-        accessTokenEnc: socialAccount.accessTokenEnc,
-        metadata: socialAccount.metadata,
-      })
-      .from(socialAccount)
-      .where(
-        and(
-          eq(socialAccount.organizationId, ctx.organization.id),
-          eq(socialAccount.isConnected, true),
-          sql`${socialAccount.platform} IN ('instagram', 'instagram_standalone', 'facebook')`,
-        ),
-      )
-      .limit(20);
+/**
+ * DM sync state per org — disimpan in-memory (server = satu proses long-running).
+ * Sama seperti engagement: POST /sync-now balas 202 segera, sync jalan di
+ * background, frontend polling /dm/sync-status. Mencegah reverse-proxy 502
+ * (sync DM IG/FB = banyak panggilan API per akun).
+ */
+type DmSyncState = {
+  running: boolean;
+  startedAt: number;
+  finishedAt?: number;
+  result: { accounts: number; newMessages: number; errors: string[] } | null;
+};
+const dmSyncStates = new Map<string, DmSyncState>();
 
-    const results = await Promise.allSettled(
+const DM_SYNC_MAX_RUNTIME_MS = 5 * 60 * 1000; // guardian: anggap hang setelah 5 menit
+
+/** Jalankan sync DM semua akun org di background (fire-and-forget). */
+async function runDmSync(
+  organizationId: string,
+  accounts: Array<{
+    id: string;
+    organizationId: string;
+    platform: string;
+    platformAccountId: string;
+    accessTokenEnc: string | null;
+    metadata: Record<string, unknown> | null;
+  }>,
+): Promise<void> {
+  const state: DmSyncState = { running: true, startedAt: Date.now(), result: null };
+  dmSyncStates.set(organizationId, state);
+
+  try {
+    const settled = await Promise.allSettled(
       accounts.map(async (account) => {
         if (!account.accessTokenEnc) {
           return { platform: account.platform, newMessages: 0, error: "Token tidak tersedia" };
@@ -64,16 +73,101 @@ dmRoute.post("/sync-now", async (c) => {
       }),
     );
 
-    const summary = results.map((result) =>
+    const summary = settled.map((result) =>
       result.status === "fulfilled"
         ? result.value
-        : { platform: "unknown", newMessages: 0, error: String(result.reason) },
+        : {
+            platform: "unknown",
+            newMessages: 0,
+            error: result.reason instanceof Error ? result.reason.message.slice(0, 200) : String(result.reason),
+          },
     );
-    return c.json({
-      ok: true,
+
+    state.result = {
       accounts: summary.length,
       newMessages: summary.reduce((sum, result) => sum + result.newMessages, 0),
-      errors: summary.filter((result) => result.error).map((result) => `${result.platform}: ${result.error}`),
+      errors: summary
+        .filter((result) => result.error)
+        .map((result) => `${result.platform}: ${result.error}`),
+    };
+  } catch (error) {
+    console.error("[dm] sync-now background error:", error);
+    state.result = {
+      accounts: 0,
+      newMessages: 0,
+      errors: [error instanceof Error ? error.message.slice(0, 200) : String(error)],
+    };
+  } finally {
+    state.running = false;
+    state.finishedAt = Date.now();
+  }
+}
+
+/**
+ * POST /dm/sync-now — pull conversations for connected DM accounts in this org.
+ *
+ * **Non-blocking**: langsung balas 202 dan jalankan sync di background (pola sama
+ * dengan /engagement/sync-now — sebelumnya memblokir sampai semua akun selesai,
+ * reverse proxy memutus koneksi → 502). Lihat GET /dm/sync-status.
+ */
+dmRoute.post("/sync-now", async (c) => {
+  try {
+    const ctx = await requirePermission(c, "engagement.view");
+
+    const existing = dmSyncStates.get(ctx.organization.id);
+    if (existing?.running && Date.now() - existing.startedAt < DM_SYNC_MAX_RUNTIME_MS) {
+      return c.json({ ok: true, status: "already_running" as const });
+    }
+
+    const accounts = await db
+      .select({
+        id: socialAccount.id,
+        organizationId: socialAccount.organizationId,
+        platform: socialAccount.platform,
+        platformAccountId: socialAccount.platformAccountId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        metadata: socialAccount.metadata,
+      })
+      .from(socialAccount)
+      .where(
+        and(
+          eq(socialAccount.organizationId, ctx.organization.id),
+          eq(socialAccount.isConnected, true),
+          sql`${socialAccount.platform} IN ('instagram', 'instagram_standalone', 'facebook')`,
+        ),
+      )
+      .limit(20);
+
+    // Fire-and-forget — jangan di-await, balas 202 segera
+    void runDmSync(ctx.organization.id, accounts);
+
+    return c.json({ ok: true, status: "started" as const });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/**
+ * GET /dm/sync-status — status sync DM background (dipoll frontend).
+ * Membersihkan state hang (> 5 menit) sekaligus saat dibaca.
+ */
+dmRoute.get("/sync-status", async (c) => {
+  try {
+    const ctx = await requirePermission(c, "engagement.view");
+    const state = dmSyncStates.get(ctx.organization.id);
+    if (!state) {
+      return c.json({ ok: true, running: false, result: null });
+    }
+    if (state.running && Date.now() - state.startedAt > DM_SYNC_MAX_RUNTIME_MS) {
+      console.warn(`[dm] sync-status: stale run detected for org ${ctx.organization.id}, resetting`);
+      state.running = false;
+    }
+    return c.json({
+      ok: true,
+      running: state.running,
+      result: state.result,
+      startedAt: state.startedAt,
+      finishedAt: state.finishedAt,
     });
   } catch (error) {
     return errorResponse(error);

@@ -21,22 +21,54 @@ export default function InboxPage() {
   const [page, setPage] = useState(1);
   const [lastManualSyncAt, setLastManualSyncAt] = useState<Date | null>(null);
 
+  // Non-blocking: backend balas 202 segera, sync DM jalan di background
+  // (sebelumnya memblokir → reverse proxy 502, sama seperti engagement sync).
+  // Frontend polling /dm/sync-status sampai selesai.
   const syncNow = useMutation({
     mutationFn: () =>
-      api.post<{ accounts: number; newMessages: number; errors: string[] }>("/dm/sync-now"),
-    onSuccess: (res) => {
+      api.post<{ ok: boolean; status: "started" | "already_running" }>("/dm/sync-now"),
+    onSuccess: async () => {
+      const deadline = Date.now() + 3 * 60 * 1000; // batas poll 3 menit
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2000));
+        let st: {
+          running: boolean;
+          result: { accounts: number; newMessages: number; errors: string[] } | null;
+        };
+        try {
+          st = await api.get<{
+            running: boolean;
+            result: { accounts: number; newMessages: number; errors: string[] } | null;
+          }>("/dm/sync-status");
+        } catch {
+          continue; // network error saat polling — coba lagi
+        }
+        if (!st.running) {
+          setLastManualSyncAt(new Date());
+          queryClient.invalidateQueries({ queryKey: ["dm-conversations"] });
+          queryClient.invalidateQueries({ queryKey: ["dm-unread-count"] });
+          const r = st.result;
+          if (!r) {
+            toast.info("Sync DM selesai");
+          } else if (r.errors.length > 0) {
+            toast.error(`Sync DM gagal pada ${r.errors.length} akun`, {
+              description: r.errors[0],
+            });
+          } else {
+            toast.success(
+              r.newMessages > 0
+                ? `Sync selesai — ${r.newMessages} pesan baru`
+                : "Sync selesai — tidak ada pesan baru",
+            );
+          }
+          return;
+        }
+      }
+      // Timeout poll — sync mungkin masih jalan di background
+      toast.info("Sync DM masih berjalan di latar belakang");
       setLastManualSyncAt(new Date());
       queryClient.invalidateQueries({ queryKey: ["dm-conversations"] });
       queryClient.invalidateQueries({ queryKey: ["dm-unread-count"] });
-      if (res.errors.length > 0) {
-        toast.error(`Sync DM gagal pada ${res.errors.length} akun`, { description: res.errors[0] });
-      } else {
-        toast.success(
-          res.newMessages > 0
-            ? `Sync selesai — ${res.newMessages} pesan baru`
-            : "Sync selesai — tidak ada pesan baru",
-        );
-      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
