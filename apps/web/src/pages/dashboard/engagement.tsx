@@ -625,25 +625,55 @@ export function EngagementPage() {
     enabled: !isCollabTab,
   });
 
-  // Sinkronkan sekarang (M12) — trigger sync komentar semua akun aktif org
+  // Sinkronkan sekarang (M12) — trigger sync komentar semua akun aktif org.
+  // Non-blocking: backend balas 202 segera dan menjalankan sync di background
+  // (sebelumnya memblokir hingga 22 API call/akun Threads selesai → proxy 502).
+  // Frontend polling /sync-status sampai selesai, lalu invalidate inbox.
   const syncNow = useMutation({
     mutationFn: () =>
-      api.post<{ ok: boolean; accounts: number; newItems: number; errors: string[] }>(
+      api.post<{ ok: boolean; status: "started" | "already_running" }>(
         "/engagement/sync-now",
       ),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ["engagement-inbox"] });
-      if (res.errors.length > 0) {
-        toast.warning(`Sync selesai — ${res.errors.length} akun gagal`, {
-          description: res.errors[0],
-        });
-      } else {
-        toast.success(
-          res.newItems > 0
-            ? `Sync selesai — ${res.newItems} interaksi baru`
-            : "Sync selesai — tidak ada interaksi baru",
-        );
+    onSuccess: async () => {
+      // Jika sync lain sedang berjalan, tunggu juga (poll status yang sama)
+      const deadline = Date.now() + 3 * 60 * 1000; // batas poll 3 menit
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2000));
+        let st: {
+          running: boolean;
+          result: { accounts: number; newItems: number; errors: string[] } | null;
+        };
+        try {
+          st = await api.get<{
+            running: boolean;
+            result: { accounts: number; newItems: number; errors: string[] } | null;
+          }>("/engagement/sync-status");
+        } catch {
+          // Network error saat polling (mis. proxy) — coba lagi
+          continue;
+        }
+        if (!st.running) {
+          await queryClient.invalidateQueries({ queryKey: ["engagement-inbox"] });
+          const r = st.result;
+          if (!r) {
+            toast.info("Sync selesai");
+          } else if (r.errors.length > 0) {
+            toast.warning(`Sync selesai — ${r.errors.length} akun gagal`, {
+              description: r.errors[0],
+            });
+          } else {
+            toast.success(
+              r.newItems > 0
+                ? `Sync selesai — ${r.newItems} interaksi baru`
+                : "Sync selesai — tidak ada interaksi baru",
+            );
+          }
+          return;
+        }
       }
+      // Timeout poll — sync mungkin masih jalan di background
+      toast.info("Sync masih berjalan di latar belakang");
+      queryClient.invalidateQueries({ queryKey: ["engagement-inbox"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

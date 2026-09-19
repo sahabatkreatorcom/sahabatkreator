@@ -257,37 +257,36 @@ engagementRoute.delete("/comments/:id", async (c) => {
 });
 
 /**
- * POST /engagement/sync-now — trigger sync komentar utk semua akun aktif org.
- * Memanggil syncAccountEngagement (fungsi yang sama dipakai worker polling).
+ * Sync state per org — disimpan in-memory (server = satu proses long-running).
+ * Dipakai agar POST /sync-now tidak memblokir: request langsung balas 202,
+ * pekerjaan sync dijalankan di background, frontend polling /sync-status.
  */
-engagementRoute.post("/sync-now", async (c) => {
+type SyncState = {
+  running: boolean;
+  startedAt: number;
+  finishedAt?: number;
+  result: { accounts: number; newItems: number; errors: string[] } | null;
+};
+const syncStates = new Map<string, SyncState>();
+
+const SYNC_MAX_RUNTIME_MS = 5 * 60 * 1000; // guardian: anggap hang setelah 5 menit
+
+/** Jalankan sync engagement semua akun org di background (fire-and-forget). */
+async function runEngagementSync(
+  organizationId: string,
+  accounts: Array<{
+    id: string;
+    organizationId: string;
+    platform: string;
+    platformAccountId: string;
+    accessTokenEnc: string | null;
+    metadata: Record<string, unknown> | null;
+  }>,
+): Promise<void> {
+  const state: SyncState = { running: true, startedAt: Date.now(), result: null };
+  syncStates.set(organizationId, state);
+
   try {
-    const ctx = await requirePermission(c, "engagement.view");
-    console.log(`[engagement] sync-now triggered for org ${ctx.organization.id}`);
-
-    // Semua akun terhubung org (manual tidak punya API utk sync)
-    const accounts = await db
-      .select({
-        id: socialAccount.id,
-        organizationId: socialAccount.organizationId,
-        platform: socialAccount.platform,
-        platformAccountId: socialAccount.platformAccountId,
-        accessTokenEnc: socialAccount.accessTokenEnc,
-        metadata: socialAccount.metadata,
-      })
-      .from(socialAccount)
-      .where(
-        and(
-          eq(socialAccount.organizationId, ctx.organization.id),
-          eq(socialAccount.isConnected, true),
-        ),
-      )
-      .limit(50);
-
-    console.log(`[engagement] sync-now: ${accounts.length} connected accounts`);
-
-    // Proses paralel (Promise.allSettled) — satu akun gagal tidak hentikan lainnya.
-    // Backend worker juga pakai pola ini (packages/publishing engagement-sync.ts).
     const settled = await Promise.allSettled(
       accounts
         .filter((a) => a.platform !== "manual" && a.accessTokenEnc)
@@ -346,19 +345,103 @@ engagementRoute.post("/sync-now", async (c) => {
       }
     }
     const newItems = results.reduce((sum, r) => sum + r.newItems, 0);
-
     const errors = results.filter((r) => r.error);
-    console.log(
-      `[engagement] sync-now done: accounts=${results.length} newItems=${newItems} errors=${errors.length}`,
-    );
-    return c.json({
-      ok: true,
+
+    state.result = {
       accounts: results.length,
       newItems,
       errors: errors.map((e) => `${e.platform}: ${e.error}`),
-    });
+    };
+    console.log(
+      `[engagement] sync-now done: accounts=${results.length} newItems=${newItems} errors=${errors.length}`,
+    );
+  } catch (error) {
+    console.error("[engagement] sync-now background error:", error);
+    state.result = {
+      accounts: 0,
+      newItems: 0,
+      errors: [error instanceof Error ? error.message.slice(0, 200) : String(error)],
+    };
+  } finally {
+    state.running = false;
+    state.finishedAt = Date.now();
+  }
+}
+
+/**
+ * POST /engagement/sync-now — trigger sync komentar utk semua akun aktif org.
+ *
+ * **Non-blocking**: langsung balas 202 dan jalankan sync di background. Sebelumnya
+ * request memblokir sampai semua akun selesai (Threads = hingga 22 panggilan API
+ * per akun) → reverse proxy (nginx/Cloudflare, timeout ~60-100s) memutus koneksi
+ * dengan 502 meski server tetap menyelesaikan sync. Lihat GET /sync-status.
+ */
+engagementRoute.post("/sync-now", async (c) => {
+  try {
+    const ctx = await requirePermission(c, "engagement.view");
+    console.log(`[engagement] sync-now triggered for org ${ctx.organization.id}`);
+
+    const existing = syncStates.get(ctx.organization.id);
+    // Guardian: anggap hang kalau state running lebih dari 5 menit (server restart)
+    if (existing?.running && Date.now() - existing.startedAt < SYNC_MAX_RUNTIME_MS) {
+      return c.json({ ok: true, status: "already_running" as const });
+    }
+
+    // Semua akun terhubung org (manual tidak punya API utk sync)
+    const accounts = await db
+      .select({
+        id: socialAccount.id,
+        organizationId: socialAccount.organizationId,
+        platform: socialAccount.platform,
+        platformAccountId: socialAccount.platformAccountId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        metadata: socialAccount.metadata,
+      })
+      .from(socialAccount)
+      .where(
+        and(
+          eq(socialAccount.organizationId, ctx.organization.id),
+          eq(socialAccount.isConnected, true),
+        ),
+      )
+      .limit(50);
+
+    console.log(`[engagement] sync-now: ${accounts.length} connected accounts`);
+
+    // Fire-and-forget — jangan di-await, balas 202 segera
+    void runEngagementSync(ctx.organization.id, accounts);
+
+    return c.json({ ok: true, status: "started" as const });
   } catch (error) {
     console.error("[engagement] sync-now error:", error);
+    return errorResponse(error);
+  }
+});
+
+/**
+ * GET /engagement/sync-status — status sync background (dipoll frontend).
+ * Membersihkan state hang (> 5 menit) sekaligus saat dibaca.
+ */
+engagementRoute.get("/sync-status", async (c) => {
+  try {
+    const ctx = await requirePermission(c, "engagement.view");
+    const state = syncStates.get(ctx.organization.id);
+    if (!state) {
+      return c.json({ ok: true, running: false, result: null });
+    }
+    // Guardian: bersihkan state hang
+    if (state.running && Date.now() - state.startedAt > SYNC_MAX_RUNTIME_MS) {
+      console.warn(`[engagement] sync-status: stale run detected for org ${ctx.organization.id}, resetting`);
+      state.running = false;
+    }
+    return c.json({
+      ok: true,
+      running: state.running,
+      result: state.result,
+      startedAt: state.startedAt,
+      finishedAt: state.finishedAt,
+    });
+  } catch (error) {
     return errorResponse(error);
   }
 });
