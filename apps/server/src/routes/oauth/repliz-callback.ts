@@ -18,11 +18,6 @@ import { fireActivity } from "../../lib/activity-log";
 import { getReplizCredentials, toReplizPlatformKey } from "../../lib/bridge";
 import { encrypt } from "../../lib/crypto";
 import { generateId } from "../../lib/id";
-import {
-  logRedirectHit,
-  logReplizResponse,
-  maskSecret,
-} from "../../lib/repliz-oauth-debug";
 
 /**
  * GET /oauth/:platform/repliz-callback/:state — callback dari halaman Repliz setelah
@@ -40,16 +35,6 @@ export async function handleReplizCallback(c: Context): Promise<Response> {
     if (!isOAuthPlatformSupported(platform)) {
       return failRedirect("Platform tidak didukung");
     }
-
-    // [DEBUG] Log APA SAJA yang dilihat server saat Repliz melempar redirect
-    // kembali ke callback. Jika token tidak muncul di query/header di sini,
-    // kemungkinan besar Repliz meletakkannya di URL fragment (#token=…)
-    // yang HANYA bisa dibaca browser, bukan server.
-    logRedirectHit(platform, {
-      path: c.req.path,
-      query: c.req.query(),
-      headers: Object.fromEntries(c.req.raw.headers.entries()),
-    });
 
     const code = c.req.query("code");
     const state = c.req.param("state");
@@ -89,10 +74,6 @@ export async function handleReplizCallback(c: Context): Promise<Response> {
       platform === "tiktok"
     ) {
       const { replizConnectAccount, replizGetAccount } = await import("@sahabatkreator/publishing");
-      // [DEBUG] jalur single-entity: kirim { code } ke Repliz connect
-      console.info(
-        `[repliz-oauth] connect [${platform}] kirim body { code: ${maskSecret(code)} }`,
-      );
       const accountId = await replizConnectAccount(cred, platformKey, { code });
       const info = await replizGetAccount(cred, accountId);
       return await upsertReplizAccount(c, { platform, accountId, info, stateRow });
@@ -100,12 +81,6 @@ export async function handleReplizCallback(c: Context): Promise<Response> {
 
     // 1. Exchange code → token Repliz (token user-level platform, short-lived)
     const token = await replizExchangeCode(cred, platformKey, code);
-    // [DEBUG] apakah exchange benar-benar mengembalikan token?
-    logReplizResponse(
-      `exchange [${platform}]`,
-      Boolean(token),
-      `token=${maskSecret(token)}`,
-    );
 
     // 2. Multi-entity (FB Page / channel YouTube / profil LinkedIn): picker dulu.
     //    Simpan pending selection (entity token terenkripsi), user pilih.
@@ -142,16 +117,6 @@ export async function handleReplizCallback(c: Context): Promise<Response> {
                 : "Tidak ada profil LinkedIn yang bisa dihubungkan",
         );
       }
-      // [DEBUG] token per-entity ada/tidak — ini yg dikirim ke connect nanti
-      console.info(
-        `[repliz-oauth] entity [${platform}] ${entities.length} item:\n` +
-          entities
-            .map(
-              (p) =>
-                `  - ${p.name} (${p.id}) token=${p.token ? maskSecret(p.token) : "(TIDAK ADA)"}`,
-            )
-            .join("\n"),
-      );
       const pendingId = generateId("oauthpend");
       const pagesData: {
         pageId: string;
