@@ -28,21 +28,28 @@ export function ReplizFragmentPage() {
 
     (async () => {
       try {
-        // 1. Ekstrak access_token dari URL fragment (#access_token=…).
-        //    Facebook melempar token di sini; ?error=… (jika user tolak) tetap
-        //    di query string seperti platform lain.
+        // 1. Ekstrak kredensial OAuth dari URL.
+        //    Docs Repliz menyebut Facebook mengembalikan token di FRAGMENT
+        //    (#access_token=…), tapi pada praktiknya Repliz juga mengembalikan
+        //    ?code=… di QUERY STRING (tergantung konfigurasi app). Karena halaman
+        //    ini adalah frontend page, kedua bentuk harus dibaca di sini.
+        //    ?error=… (jika user tolak) selalu di query string.
+        const searchParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.slice(1));
-        const accessToken = hashParams.get("access_token");
-        const queryError =
-          new URLSearchParams(window.location.search).get("error_description") ??
-          new URLSearchParams(window.location.search).get("error");
 
+        const queryError = searchParams.get("error_description") ?? searchParams.get("error");
         if (queryError) {
           setStatus("error");
           setMessage(queryError);
           return;
         }
-        if (!accessToken) {
+
+        // Fragment flow (#access_token=…) atau query flow (?code=…).
+        const code = hashParams.get("access_token") ?? searchParams.get("code");
+        // Shopee: shop_id terpisah di query — digabung "{code}_{shop_id}" server-side.
+        const shopId = searchParams.get("shop_id");
+
+        if (!code) {
           setStatus("error");
           setMessage(
             "Token otorisasi tidak ditemukan di URL. Facebook mungkin membatalkan otorisasi — coba hubungkan ulang.",
@@ -50,12 +57,12 @@ export function ReplizFragmentPage() {
           return;
         }
 
-        // 2. POST token ke callback server (body { code }) — server melakukan
-        //    validasi state, exchange, connect, dan upsert akun.
+        // 2. POST code ke callback server (body { code, shopId? }) — server
+        //    melakukan validasi state, exchange, connect, dan upsert akun.
         setStatus("posting");
         const res = await api.post<{ redirect?: string }>(
           `/oauth/${platform}/repliz-callback/${state}`,
-          { code: accessToken },
+          { code, shopId },
         );
 
         // 3. Navigasi ke hasil (picker page bila multi-entity, /accounts sukses).

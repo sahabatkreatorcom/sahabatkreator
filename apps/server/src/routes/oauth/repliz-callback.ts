@@ -47,8 +47,10 @@ export async function handleReplizCallback(c: Context): Promise<Response> {
       return failRedirect("Platform tidak didukung");
     }
 
-    // GET: code di query (?code=…). POST: code di body (dari URL fragment browser).
-    const code = isPost ? (await c.req.json()).code : c.req.query("code");
+    // GET: code di query (?code=…). POST: code di body (dari halaman fragment
+    // browser — baca baik #access_token=… maupun ?code=…).
+    const body = isPost ? await c.req.json().catch(() => ({})) : {};
+    const code = isPost ? body.code : c.req.query("code");
     const state = c.req.param("state");
     const errorParam = c.req.query("error_description") ?? c.req.query("error");
     if (errorParam) return failRedirect(errorParam);
@@ -56,7 +58,7 @@ export async function handleReplizCallback(c: Context): Promise<Response> {
 
     // Shopee mengembalikan code + shop_id terpisah di redirect; Repliz connect
     // butuh keduanya digabung "{code}_{shop_id}" (docs "Connect Shopee").
-    const shopeeShopId = isPost ? null : c.req.query("shop_id");
+    const shopeeShopId = isPost ? (body.shopId ?? null) : c.req.query("shop_id");
 
     const [stateRow] = await db
       .delete(oauthState)
