@@ -334,33 +334,57 @@ export async function replizCreateSchedule(
   return id;
 }
 
-/** Cari satu schedule by id — lewat filter accountIds karena tidak ada endpoint get-by-id */
+/**
+ * Ambil satu schedule by id.
+ *
+ * Pakai endpoint langsung GET /public/schedule/{scheduleId} (docs "Get One
+ * Schedule") — mengembalikan doc lengkap (status, postId, account). Sebelumnya
+ * kode ini memfilter GET /public/schedule berhalaman untuk mencari id, yang
+ * rapuh: schedule di luar halaman pertama (limit 50) tidak pernah ketemu.
+ *
+ * Fallback ke filter list hanya jika endpoint by-id 404 (kompatibilitas tier
+ * lama); pakai accountIds[] (bukan accountIds) supaya filter ditegakkan.
+ */
 export async function replizGetSchedule(
   cred: ReplizCredentials,
   scheduleId: string,
   accountId: string,
 ): Promise<ReplizSchedule | null> {
-  const data = await replizRequest<{ docs: Array<Record<string, unknown>> }>(
-    cred,
-    "/public/schedule",
-    {
-      query: {
-        page: "1",
-        limit: "50",
-        accountIds: accountId,
+  const mapSchedule = (d: Record<string, unknown>): ReplizSchedule => ({
+    id: String(d._id ?? d.id),
+    status: d.status as ReplizScheduleStatus,
+    postId: d.postId ? String(d.postId) : undefined,
+    scheduleAt: String(d.scheduleAt ?? ""),
+    type: String(d.type ?? ""),
+    accountId: String(d.accountId ?? accountId),
+  });
+
+  try {
+    const data = await replizRequest<Record<string, unknown>>(
+      cred,
+      `/public/schedule/${scheduleId}`,
+    );
+    if (data && (data._id || data.id)) return mapSchedule(data);
+    return null;
+  } catch (error) {
+    // 404 "schedule not found" → schedule belum terbentuk di sisi Repliz (race
+    // singkat setelah create). Bukan error — sinyal "belum ada" untuk poller.
+    if (error instanceof PublishError && error.code === "http_404") return null;
+    // Error lain (mis. tier lama tanpa endpoint by-id) → fallback ke filter list.
+    const data = await replizRequest<{ docs: Array<Record<string, unknown>> }>(
+      cred,
+      "/public/schedule",
+      {
+        query: {
+          page: "1",
+          limit: "50",
+          accountIds: accountId,
+        },
       },
-    },
-  );
-  const match = (data?.docs ?? []).find((d) => d._id === scheduleId || d.id === scheduleId);
-  if (!match) return null;
-  return {
-    id: String(match._id ?? match.id),
-    status: match.status as ReplizScheduleStatus,
-    postId: match.postId ? String(match.postId) : undefined,
-    scheduleAt: String(match.scheduleAt ?? ""),
-    type: String(match.type ?? ""),
-    accountId: String(match.accountId ?? accountId),
-  };
+    );
+    const match = (data?.docs ?? []).find((d) => d._id === scheduleId || d.id === scheduleId);
+    return match ? mapSchedule(match) : null;
+  }
 }
 
 /** Hapus/cancel schedule yang belum tayang */

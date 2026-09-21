@@ -32,6 +32,7 @@ import { LegalPage, LegalRedirect } from "./pages/marketing/legal";
 import { PricingPage } from "./pages/marketing/pricing";
 // 404 nyata dengan noindex (bukan soft-404 redirect ke /)
 import { NotFoundPage } from "./pages/not-found";
+import { ReplizFragmentPage } from "./pages/oauth/repliz-fragment";
 // Landing push notification (auth, fullscreen tanpa sidebar)
 import { PostFailedPage } from "./pages/post-failed";
 // Laporan publik via link token (publik, read-only)
@@ -281,6 +282,11 @@ export const router = createBrowserRouter([
 
       // ---------- Laporan publik via share link (publik, read-only) ----------
       { path: "/r/:token", element: <PublicReportPage /> },
+
+      // ---------- Relay fragment OAuth Repliz (Facebook) ----------
+      // Facebook melempar token di URL fragment (#access_token=…) yang tidak
+      // pernah sampai server. Halaman ini membaca hash lalu POST ke callback.
+      { path: "/oauth/repliz-fragment/:platform/:state", element: <ReplizFragmentPage /> },
 
       // ---------- Landing push notification (auth, fullscreen tanpa sidebar) ----------
       {

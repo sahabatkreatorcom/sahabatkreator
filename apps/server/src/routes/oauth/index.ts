@@ -9,7 +9,10 @@
 // - credentials: resolusi kredensial app (DB → env) + refresh token
 // - start: GET /:platform/start
 // - callback: GET /:platform/callback (native flow)
-// - repliz-callback: GET /:platform/repliz-callback/:state (bridge Repliz)
+// - repliz-callback: GET/POST /:platform/repliz-callback/:state (bridge Repliz).
+//   POST dipakai flow fragment (Facebook): token ada di #access_token=… yang
+//   tidak pernah sampai server — frontend /oauth/repliz-fragment/… ekstrak
+//   lalu POST code ke sini.
 // - bluesky: POST /bluesky/connect (app password)
 // - token: POST /:platform/refresh + POST /:platform/revoke
 
@@ -25,6 +28,7 @@ export const oauthRoute = new Hono();
 oauthRoute.get("/:platform/start", handleStart);
 oauthRoute.get("/:platform/callback", handleCallback);
 oauthRoute.get("/:platform/repliz-callback/:state", handleReplizCallback);
+oauthRoute.post("/:platform/repliz-callback/:state", handleReplizCallback);
 oauthRoute.post("/bluesky/connect", handleBlueskyConnect);
 oauthRoute.post("/:platform/refresh", handleRefresh);
 oauthRoute.post("/:platform/revoke", handleRevoke);

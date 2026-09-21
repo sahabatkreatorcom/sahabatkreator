@@ -20,23 +20,35 @@ import { encrypt } from "../../lib/crypto";
 import { generateId } from "../../lib/id";
 
 /**
- * GET /oauth/:platform/repliz-callback/:state — callback dari halaman Repliz setelah
- * user approve OAuth di platform (via app milik Repliz). Terbukti via spike: browser
- * tiba di path redirect utuh dengan ?code=<repliz exchange code> ditambahkan Repliz
- * (state kita di path karena validasi redirect Repliz menolak query string).
+ * GET  /oauth/:platform/repliz-callback/:state — callback dari halaman Repliz setelah
+ * user approve OAuth di platform (via app milik Repliz). Browser tiba di path redirect
+ * utuh dengan ?code=<repliz exchange code> ditambahkan Repliz (state kita di path
+ * karena validasi redirect Repliz menolak query string).
  * Flow: exchange code → token Repliz → (FB: get-page → picker) → connect → accountId.
+ *
+ * POST /oauth/:platform/repliz-callback/:state — varian untuk flow "fragment":
+ * Facebook mengembalikan token di URL FRAGMENT (#access_token=…) yang TIDAK PERNAH
+ * dikirim ke server (docs Repliz: "read it in the browser with window.location.hash
+ * and pass the value to your backend"). Frontend page /oauth/repliz-fragment/…
+ * mengekstrak fragment lalu POST code ke endpoint ini. Response JSON { redirect }
+ * (bukan 302) agar frontend bisa navigasi.
  */
 export async function handleReplizCallback(c: Context): Promise<Response> {
   const platform = c.req.param("platform") as OAuthPlatform;
+  const isPost = c.req.method === "POST";
+  // POST (fragment flow) → response JSON { redirect }; GET → 302 redirect biasa.
   const failRedirect = (msg: string) =>
-    c.redirect(`${env.WEB_URL}/accounts?connect_error=${encodeURIComponent(msg)}`);
+    isPost
+      ? c.json({ redirect: `${env.WEB_URL}/accounts?connect_error=${encodeURIComponent(msg)}` })
+      : c.redirect(`${env.WEB_URL}/accounts?connect_error=${encodeURIComponent(msg)}`);
 
   try {
     if (!isOAuthPlatformSupported(platform)) {
       return failRedirect("Platform tidak didukung");
     }
 
-    const code = c.req.query("code");
+    // GET: code di query (?code=…). POST: code di body (dari URL fragment browser).
+    const code = isPost ? (await c.req.json()).code : c.req.query("code");
     const state = c.req.param("state");
     const errorParam = c.req.query("error_description") ?? c.req.query("error");
     if (errorParam) return failRedirect(errorParam);
@@ -142,7 +154,8 @@ export async function handleReplizCallback(c: Context): Promise<Response> {
         pagesData: JSON.stringify(pagesData),
         expiresAt: new Date(Date.now() + 10 * 60 * 1000),
       });
-      return c.redirect(`${env.WEB_URL}/accounts?pending=${encodeURIComponent(pendingId)}`);
+      const pendingUrl = `${env.WEB_URL}/accounts?pending=${encodeURIComponent(pendingId)}`;
+      return isPost ? c.json({ redirect: pendingUrl }) : c.redirect(pendingUrl);
     }
 
     // 3. Platform lain via bridge (mis. instagram business via FB Login) — connect token
@@ -160,6 +173,7 @@ export async function handleReplizCallback(c: Context): Promise<Response> {
 /**
  * Simpan/refresh social_account hasil connect Repliz + redirect sukses.
  * Dipakai callback (platform single-entity) — FB/YouTube/LinkedIn lewat picker.
+ * Method-aware: POST (fragment flow) → JSON { redirect }; GET → 302.
  */
 async function upsertReplizAccount(
   c: Context,
@@ -172,6 +186,9 @@ async function upsertReplizAccount(
 ): Promise<Response> {
   const { platform, accountId, info, stateRow } = opts;
   const env2 = (await import("@sahabatkreator/env/server")).env;
+  const isPost = c.req.method === "POST";
+  const respond = (url: string): Response =>
+    isPost ? c.json({ redirect: url }) : c.redirect(url);
   // Upsert social account — replizAccountId di metadata (routing publish per-account)
   const [existing] = await db
     .select({ id: socialAccount.id, organizationId: socialAccount.organizationId })
@@ -185,7 +202,7 @@ async function upsertReplizAccount(
     .limit(1);
 
   if (existing && existing.organizationId !== stateRow.organizationId) {
-    return c.redirect(
+    return respond(
       `${env2.WEB_URL}/accounts?connect_error=${encodeURIComponent("Akun ini sudah terhubung di organisasi lain.")}`,
     );
   }
@@ -237,5 +254,5 @@ async function upsertReplizAccount(
     });
   }
 
-  return c.redirect(`${env2.WEB_URL}/accounts?connect_success=${platform}`);
+  return respond(`${env2.WEB_URL}/accounts?connect_success=${platform}`);
 }
