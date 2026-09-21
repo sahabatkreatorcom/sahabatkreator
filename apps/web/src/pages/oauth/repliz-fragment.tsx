@@ -1,15 +1,18 @@
-// Halaman perantara OAuth Repliz untuk flow "fragment".
+// Halaman perantara OAuth Repliz untuk flow "fragment" — FALLBACK.
 //
-// Menurut docs Repliz (OAuth Flow Guide), Facebook mengembalikan token otorisasi
-// di URL FRAGMENT: https://…/callback#access_token=…
+// Docs Repliz (OAuth Flow Guide) menyebut Facebook bisa mengembalikan token di
+// URL FRAGMENT: https://…/callback#access_token=…
 // Fragment (bagian setelah "#") TIDAK PERNAH dikirim ke server HTTP manapun —
 // hanya bisa dibaca di browser via window.location.hash.
 //
-// Karena callback server kita (GET /api/oauth/:platform/repliz-callback/:state)
-// tidak akan pernah menerima fragment tersebut, halaman ini membaca hash di sisi
-// client, lalu men-POST token-nya ke endpoint callback server sebagai JSON body.
-// Server memvalidasi state (sudah tersimpan saat /start) lalu melanjutkan flow
-// exchange → connect → upsert akun, dan mengembalikan { redirect }.
+// Dalam praktiknya Repliz mengembalikan ?code=… di QUERY STRING untuk semua
+// platform (termasuk Facebook), sehingga callback server (GET
+// /api/oauth/:platform/repliz-callback/:state) menangani semuanya langsung dan
+// halaman ini tidak pernah dicapai. Route tetap dipasang sebagai jaring pengaman:
+// bila suatu hari Repliz benar-benar memakai fragment, halaman ini membaca hash
+// (atau query) di sisi client lalu men-POST token-nya ke endpoint callback server
+// sebagai JSON body. Server memvalidasi state (sudah tersimpan saat /start) lalu
+// melanjutkan flow exchange → connect → upsert akun, dan mengembalikan { redirect }.
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
@@ -46,8 +49,6 @@ export function ReplizFragmentPage() {
 
         // Fragment flow (#access_token=…) atau query flow (?code=…).
         const code = hashParams.get("access_token") ?? searchParams.get("code");
-        // Shopee: shop_id terpisah di query — digabung "{code}_{shop_id}" server-side.
-        const shopId = searchParams.get("shop_id");
 
         if (!code) {
           setStatus("error");
@@ -62,7 +63,7 @@ export function ReplizFragmentPage() {
         setStatus("posting");
         const res = await api.post<{ redirect?: string }>(
           `/oauth/${platform}/repliz-callback/${state}`,
-          { code, shopId },
+          { code },
         );
 
         // 3. Navigasi ke hasil (picker page bila multi-entity, /accounts sukses).
@@ -75,9 +76,7 @@ export function ReplizFragmentPage() {
       } catch (error) {
         setStatus("error");
         setMessage(
-          error instanceof Error
-            ? error.message
-            : "Gagal menyelesaikan koneksi akun via Repliz.",
+          error instanceof Error ? error.message : "Gagal menyelesaikan koneksi akun via Repliz.",
         );
       }
     })();
@@ -92,9 +91,7 @@ export function ReplizFragmentPage() {
               <span className="text-2xl">!</span>
             </div>
             <h1 className="font-semibold text-lg">Gagal menghubungkan akun</h1>
-            <p className="max-w-md text-[var(--text-secondary)] text-sm break-words">
-              {message}
-            </p>
+            <p className="max-w-md break-words text-[var(--text-secondary)] text-sm">{message}</p>
             <a
               href="/accounts"
               className="rounded-[var(--radius-md)] bg-[var(--text)] px-4 py-2 font-medium text-[var(--bg-primary)] text-sm hover:opacity-90"
@@ -104,7 +101,7 @@ export function ReplizFragmentPage() {
           </>
         ) : (
           <>
-            <div className="border-[var(--border-light)] border-b-2 border-t-2 h-8 w-8 animate-spin rounded-full" />
+            <div className="h-8 w-8 animate-spin rounded-full border-[var(--border-light)] border-t-2 border-b-2" />
             <h1 className="font-semibold text-lg">Menghubungkan akun…</h1>
             <p className="text-[var(--text-muted)] text-sm">
               {status === "extracting"

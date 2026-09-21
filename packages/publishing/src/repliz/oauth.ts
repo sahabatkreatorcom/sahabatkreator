@@ -8,12 +8,8 @@
 // callback lewat filter URN (urn:li:person: vs urn:li:organization:) —
 // konsisten dgn flow native.
 
-import type {
-  ReplizChannel,
-  ReplizOrganization,
-  ReplizPage,
-} from "./account";
-import { replizEmpty, replizMissingId, replizRequest, type ReplizCredentials } from "./shared";
+import type { ReplizChannel, ReplizOrganization, ReplizPage } from "./account";
+import { type ReplizCredentials, replizEmpty, replizMissingId, replizRequest } from "./shared";
 
 export const REPLIZ_PLATFORMS = {
   facebook: "facebook",
@@ -24,7 +20,6 @@ export const REPLIZ_PLATFORMS = {
   youtube: "youtube",
   linkedin: "linkedin",
   linkedin_org: "linkedin",
-  shopee: "shopee",
 } as const;
 
 export type ReplizPlatformKey = keyof typeof REPLIZ_PLATFORMS;
@@ -44,7 +39,11 @@ export async function replizAuthorizeUrl(
     query: { redirect },
   });
   if (!data?.url) {
-    throw replizMissingId("repliz_no_authorize_url", "Repliz tidak mengembalikan URL authorize.", false);
+    throw replizMissingId(
+      "repliz_no_authorize_url",
+      "Repliz tidak mengembalikan URL authorize.",
+      false,
+    );
   }
   return data.url;
 }
@@ -82,9 +81,13 @@ export async function replizGetYouTubeChannels(
   cred: ReplizCredentials,
   token: string,
 ): Promise<ReplizChannel[]> {
-  const data = await replizRequest<{ docs: ReplizChannel[] }>(cred, "/public/account/youtube/channel", {
-    query: { token },
-  });
+  const data = await replizRequest<{ docs: ReplizChannel[] }>(
+    cred,
+    "/public/account/youtube/channel",
+    {
+      query: { token },
+    },
+  );
   return data?.docs ?? [];
 }
 
@@ -108,7 +111,6 @@ export async function replizGetLinkedInOrganizations(
  * - facebook:    { pageId, token }
  * - youtube:     { channelId, token }
  * - linkedin:    { organizationId, token }
- * - shopee:      { code } — code = `{code}_{shop_id}` dari redirect Shopee
  */
 export type ReplizConnectInput =
   | { code: string }
@@ -135,7 +137,7 @@ export async function replizConnectAccount(
 /**
  * Reconnect akun yang token-nya expired (POST /connect/{accountId}).
  * Catatan: entity id (pageId/channelId/organizationId) HARUS sama dengan connect awal
- * (error 400 "incorrect generatedId"); instagram/threads/tiktok/shopee kirim ulang code.
+ * (error 400 "incorrect generatedId"); instagram/threads/tiktok kirim ulang code.
  */
 export async function replizReconnectAccount(
   cred: ReplizCredentials,
@@ -152,7 +154,7 @@ export async function replizReconnectAccount(
 
 /**
  * Bangun input reconnect dari data akun yang tersimpan.
- * Shopee & instagram/threads/tiktok butuh code baru (OAuth ulang); page/channel/
+ * instagram/threads/tiktok butuh code baru (OAuth ulang); page/channel/
  * organization butuh entity id + token. Dipakai flow reconnect di route accounts.
  */
 export function replizReconnectInput(
@@ -164,7 +166,7 @@ export function replizReconnectInput(
   if (platformKey === "youtube") return { channelId: entityId, token };
   if (platformKey === "linkedin" || platformKey === "linkedin_org")
     return { organizationId: entityId, token };
-  return { code: token }; // shopee / instagram / threads / tiktok
+  return { code: token }; // instagram / threads / tiktok
 }
 
 /** Type guard platform yang butuh exchange sebelum connect */
@@ -181,4 +183,3 @@ export function replizNeedsEntity(platformKey: ReplizPlatformKey): boolean {
     platformKey === "linkedin_org"
   );
 }
-

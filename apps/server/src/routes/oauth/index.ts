@@ -10,9 +10,9 @@
 // - start: GET /:platform/start
 // - callback: GET /:platform/callback (native flow)
 // - repliz-callback: GET/POST /:platform/repliz-callback/:state (bridge Repliz).
-//   POST dipakai flow fragment (Facebook): token ada di #access_token=… yang
-//   tidak pernah sampai server — frontend /oauth/repliz-fragment/… ekstrak
-//   lalu POST code ke sini.
+//   Semua platform (termasuk Facebook) memakai GET langsung. POST adalah fallback
+//   untuk flow fragment (#access_token=…, tidak pernah sampai server): frontend
+//   /oauth/repliz-fragment/… ekstrak lalu POST code ke sini.
 // - bluesky: POST /bluesky/connect (app password)
 // - token: POST /:platform/refresh + POST /:platform/revoke
 

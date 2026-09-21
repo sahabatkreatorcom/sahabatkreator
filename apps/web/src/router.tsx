@@ -283,9 +283,11 @@ export const router = createBrowserRouter([
       // ---------- Laporan publik via share link (publik, read-only) ----------
       { path: "/r/:token", element: <PublicReportPage /> },
 
-      // ---------- Relay fragment OAuth Repliz (Facebook) ----------
-      // Facebook melempar token di URL fragment (#access_token=…) yang tidak
-      // pernah sampai server. Halaman ini membaca hash lalu POST ke callback.
+      // ---------- Relay fragment OAuth Repliz (fallback) ----------
+      // Dalam praktiknya semua platform (termasuk Facebook) mengembalikan ?code=…
+      // di query string langsung ke callback server. Halaman ini tetap dipertahankan
+      // sebagai fallback bila Repliz kembali mengembalikan token di URL fragment
+      // (#access_token=…) — hash tidak pernah sampai server, jadi dibaca di sini.
       { path: "/oauth/repliz-fragment/:platform/:state", element: <ReplizFragmentPage /> },
 
       // ---------- Landing push notification (auth, fullscreen tanpa sidebar) ----------

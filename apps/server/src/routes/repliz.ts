@@ -1,6 +1,6 @@
 // API Repliz bridge — endpoint domain yang dijalankan Repliz (bukan platform native):
-// automation + template, report eksekusi, research Threads, add-on (produk Shopee,
-// musik TikTok, link metadata), serta list schedule bridge.
+// automation + template, report eksekusi, research Threads, add-on (musik TikTok,
+// link metadata), serta list schedule bridge.
 //
 // Semua endpoint di-scope per organisasi: akun bridge milik org aktif saja yang
 // boleh dipakai (cek metadata.replizAccountId di social_account org).
@@ -8,34 +8,33 @@
 import { db } from "@sahabatkreator/db";
 import { socialAccount } from "@sahabatkreator/db/schema";
 import {
-  replizActiveCredentials,
-  replizCountAccounts,
-  replizCreateAutomation,
-  replizCreateTemplate,
-  replizGetOneAutomation,
-  replizGetOneReport,
-  replizGetOneTemplate,
-  replizGetLinkMetadata,
-  replizListAutomations,
-  replizListReports,
-  replizListShopeeProducts,
-  replizListSchedules,
-  replizListTemplates,
-  replizListTiktokMusic,
-  replizRemoveAutomation,
-  replizRemoveTemplate,
-  replizRetryReport,
-  replizSearchThreadsContent,
-  replizSearchThreadsUser,
-  replizListThreadsUserContent,
-  replizUpdateAutomation,
-  replizUpdateTemplate,
   type ReplizAutomationConfig,
   type ReplizReportStatus,
   type ReplizReportType,
   type ReplizScheduleStatus,
   type ReplizTiktokMusicDateRange,
   type ReplizTiktokMusicGenre,
+  replizActiveCredentials,
+  replizCountAccounts,
+  replizCreateAutomation,
+  replizCreateTemplate,
+  replizGetLinkMetadata,
+  replizGetOneAutomation,
+  replizGetOneReport,
+  replizGetOneTemplate,
+  replizListAutomations,
+  replizListReports,
+  replizListSchedules,
+  replizListTemplates,
+  replizListThreadsUserContent,
+  replizListTiktokMusic,
+  replizRemoveAutomation,
+  replizRemoveTemplate,
+  replizRetryReport,
+  replizSearchThreadsContent,
+  replizSearchThreadsUser,
+  replizUpdateAutomation,
+  replizUpdateTemplate,
 } from "@sahabatkreator/publishing";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
@@ -46,19 +45,11 @@ import { checkFeatureGate } from "../lib/billing";
 export const replizRoute = new Hono();
 
 /** Ambil replizAccountId milik org untuk platform account tertentu (org-scoped). */
-async function orgBridgeAccount(
-  orgId: string,
-  socialAccountId: string,
-): Promise<string | null> {
+async function orgBridgeAccount(orgId: string, socialAccountId: string): Promise<string | null> {
   const [row] = await db
     .select({ metadata: socialAccount.metadata })
     .from(socialAccount)
-    .where(
-      and(
-        eq(socialAccount.id, socialAccountId),
-        eq(socialAccount.organizationId, orgId),
-      ),
-    )
+    .where(and(eq(socialAccount.id, socialAccountId), eq(socialAccount.organizationId, orgId)))
     .limit(1);
   const meta = row?.metadata as { replizAccountId?: string } | null;
   return meta?.replizAccountId ?? null;
@@ -71,7 +62,9 @@ async function orgThreadsAccount(orgId: string): Promise<string | null> {
     .from(socialAccount)
     .where(eq(socialAccount.organizationId, orgId));
   const threads = rows.find(
-    (r) => r.platform === "threads" && (r.metadata as { replizAccountId?: string } | null)?.replizAccountId,
+    (r) =>
+      r.platform === "threads" &&
+      (r.metadata as { replizAccountId?: string } | null)?.replizAccountId,
   );
   return threads ? String((threads.metadata as { replizAccountId: string }).replizAccountId) : null;
 }
@@ -96,8 +89,16 @@ const automationConfigSchema: z.ZodType<ReplizAutomationConfig> = z.lazy(() =>
         isExactMatch: z.boolean(),
         values: z.array(z.object({ keyword: z.string(), text: z.string() })),
       }),
-      condition: z.object({ isActive: z.boolean(), isExactMatch: z.boolean(), keywords: z.array(z.string()) }),
-      exception: z.object({ isActive: z.boolean(), isExactMatch: z.boolean(), keywords: z.array(z.string()) }),
+      condition: z.object({
+        isActive: z.boolean(),
+        isExactMatch: z.boolean(),
+        keywords: z.array(z.string()),
+      }),
+      exception: z.object({
+        isActive: z.boolean(),
+        isExactMatch: z.boolean(),
+        keywords: z.array(z.string()),
+      }),
       delay: z.object({ isActive: z.boolean(), value: z.number(), type: z.literal("second") }),
     }),
     like: z.object({ isActive: z.boolean() }),
@@ -111,7 +112,11 @@ const automationConfigSchema: z.ZodType<ReplizAutomationConfig> = z.lazy(() =>
         isExactMatch: z.boolean(),
         values: z.array(z.object({ keyword: z.string(), text: z.string() })),
       }),
-      condition: z.object({ isActive: z.boolean(), isExactMatch: z.boolean(), keywords: z.array(z.string()) }),
+      condition: z.object({
+        isActive: z.boolean(),
+        isExactMatch: z.boolean(),
+        keywords: z.array(z.string()),
+      }),
       delay: z.object({ isActive: z.boolean(), value: z.number(), type: z.literal("second") }),
     }),
     story: z.object({
@@ -124,7 +129,11 @@ const automationConfigSchema: z.ZodType<ReplizAutomationConfig> = z.lazy(() =>
         isExactMatch: z.boolean(),
         values: z.array(z.object({ keyword: z.string(), text: z.string() })),
       }),
-      condition: z.object({ isActive: z.boolean(), isExactMatch: z.boolean(), keywords: z.array(z.string()) }),
+      condition: z.object({
+        isActive: z.boolean(),
+        isExactMatch: z.boolean(),
+        keywords: z.array(z.string()),
+      }),
       delay: z.object({ isActive: z.boolean(), value: z.number(), type: z.literal("second") }),
     }),
     chat: z.object({
@@ -439,25 +448,6 @@ replizRoute.get("/research/threads/content/user", async (c) => {
 });
 
 // ---------- Add-on ----------
-
-/** GET /repliz/shopee/products — produk akun Shopee seller (org-scoped) */
-replizRoute.get("/shopee/products", async (c) => {
-  try {
-    const ctx = await requireOrg(c);
-    const cred = await replizActiveCredentials();
-    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
-    const accountId = await orgBridgeAccount(ctx.organization.id, c.req.query("accountId") as string);
-    if (!accountId) return c.json({ message: "Akun Shopee tidak terhubung via bridge" }, 400);
-    const result = await replizListShopeeProducts(
-      cred,
-      accountId,
-      c.req.query("nextToken") ?? undefined,
-    );
-    return c.json(result);
-  } catch (error) {
-    return errorResponse(error);
-  }
-});
 
 /** GET /repliz/tiktok/music — musik trending TikTok */
 replizRoute.get("/tiktok/music", async (c) => {

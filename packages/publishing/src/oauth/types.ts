@@ -12,10 +12,7 @@ export type OAuthPlatform =
   // App LinkedIn terpisah (Community Management API) — hanya halaman company
   | "linkedin_org"
   | "google_business"
-  | "bluesky"
-  // Marketplace — connect via Repliz (open.shopee.com seller auth); tidak
-  // untuk publish post, tapi untuk add-on riset produk (GET /public/shopee/product).
-  | "shopee";
+  | "bluesky";
 
 /** Kredensial app (dari platform_credential atau env fallback) */
 export type AppCredential = {

@@ -27,11 +27,12 @@ import { generateId } from "../../lib/id";
  * Flow: exchange code → token Repliz → (FB: get-page → picker) → connect → accountId.
  *
  * POST /oauth/:platform/repliz-callback/:state — varian untuk flow "fragment":
- * Facebook mengembalikan token di URL FRAGMENT (#access_token=…) yang TIDAK PERNAH
- * dikirim ke server (docs Repliz: "read it in the browser with window.location.hash
- * and pass the value to your backend"). Frontend page /oauth/repliz-fragment/…
- * mengekstrak fragment lalu POST code ke endpoint ini. Response JSON { redirect }
- * (bukan 302) agar frontend bisa navigasi.
+ * bila suatu saat Repliz mengembalikan token di URL FRAGMENT (#access_token=…)
+ * yang TIDAK PERNAH dikirim ke server (docs Repliz: "read it in the browser with
+ * window.location.hash and pass the value to your backend"), frontend page
+ * /oauth/repliz-fragment/… mengekstrak fragment lalu POST code ke endpoint ini.
+ * Response JSON { redirect } (bukan 302) agar frontend bisa navigasi.
+ * Saat ini semua platform (termasuk FB) memakai GET langsung; POST = fallback.
  */
 export async function handleReplizCallback(c: Context): Promise<Response> {
   const platform = c.req.param("platform") as OAuthPlatform;
@@ -55,10 +56,6 @@ export async function handleReplizCallback(c: Context): Promise<Response> {
     const errorParam = c.req.query("error_description") ?? c.req.query("error");
     if (errorParam) return failRedirect(errorParam);
     if (!code || !state) return failRedirect("Kode otorisasi tidak lengkap");
-
-    // Shopee mengembalikan code + shop_id terpisah di redirect; Repliz connect
-    // butuh keduanya digabung "{code}_{shop_id}" (docs "Connect Shopee").
-    const shopeeShopId = isPost ? (body.shopId ?? null) : c.req.query("shop_id");
 
     const [stateRow] = await db
       .delete(oauthState)
@@ -89,14 +86,10 @@ export async function handleReplizCallback(c: Context): Promise<Response> {
       platform === "instagram" ||
       platform === "instagram_standalone" ||
       platform === "threads" ||
-      platform === "tiktok" ||
-      platform === "shopee"
+      platform === "tiktok"
     ) {
       const { replizConnectAccount, replizGetAccount } = await import("@sahabatkreator/publishing");
-      // Shopee: code_{shop_id}; platform lain: code mentah.
-      const connectCode =
-        platform === "shopee" && shopeeShopId ? `${code}_${shopeeShopId}` : code;
-      const accountId = await replizConnectAccount(cred, platformKey, { code: connectCode });
+      const accountId = await replizConnectAccount(cred, platformKey, { code });
       const info = await replizGetAccount(cred, accountId);
       return await upsertReplizAccount(c, { platform, accountId, info, stateRow });
     }
@@ -197,8 +190,7 @@ async function upsertReplizAccount(
   const { platform, accountId, info, stateRow } = opts;
   const env2 = (await import("@sahabatkreator/env/server")).env;
   const isPost = c.req.method === "POST";
-  const respond = (url: string): Response =>
-    isPost ? c.json({ redirect: url }) : c.redirect(url);
+  const respond = (url: string): Response => (isPost ? c.json({ redirect: url }) : c.redirect(url));
   // Upsert social account — replizAccountId di metadata (routing publish per-account)
   const [existing] = await db
     .select({ id: socialAccount.id, organizationId: socialAccount.organizationId })

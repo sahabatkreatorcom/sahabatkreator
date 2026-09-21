@@ -1,5 +1,5 @@
 // Konfigurasi platform social media — label, ikon SVG kustom (lucide v1 tanpa brand icons), warna
-import { AtSign, Cloud, Globe, type LucideIcon, MapPin, ShoppingBag } from "lucide-react";
+import { AtSign, Cloud, Globe, type LucideIcon, MapPin } from "lucide-react";
 import type { SVGProps } from "react";
 
 // Ikon brand kustom (path SVG resmi masing-masing platform, disederhanakan)
@@ -56,8 +56,6 @@ export type Platform =
   | "linkedin_org"
   | "bluesky"
   | "google_business"
-  // Marketplace — koneksi via bridge Repliz (OAuth Shopee), bukan platform native
-  | "shopee"
   | "manual";
 
 export type PlatformIcon = LucideIcon | BrandIcon;
@@ -146,14 +144,6 @@ export const PLATFORMS: Record<Platform, PlatformConfig> = {
     icon: Globe,
     color: "#6B6B6B",
     status: "manual",
-  },
-  shopee: {
-    // Marketplace (bukan social media) — OAuth di-handle bridge Repliz.
-    // Ikon ShoppingBag lucide: logo Shopee adalah tas belanja oranye.
-    label: "Shopee",
-    icon: ShoppingBag,
-    color: "#EE4D2D",
-    status: "ready",
   },
 };
 

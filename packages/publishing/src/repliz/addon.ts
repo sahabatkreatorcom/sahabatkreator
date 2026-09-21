@@ -1,7 +1,7 @@
-// Add-on API — link metadata (Premium+), produk Shopee, musik TikTok.
+// Add-on API — link metadata (Premium+) dan musik TikTok.
 // Docs: docs/repliz/Addon/
 
-import { replizRequest, type ReplizCredentials } from "./shared";
+import { type ReplizCredentials, replizRequest } from "./shared";
 
 /** Open Graph metadata URL (GET /public/link/metadata). */
 export type ReplizLinkMetadata = {
@@ -25,46 +25,6 @@ export async function replizGetLinkMetadata(
     description: data.description ? String(data.description) : undefined,
     image: data.image ? String(data.image) : undefined,
     url: data.url ? String(data.url) : url,
-  };
-}
-
-/** Produk dari akun Shopee seller yang terkoneksi (GET /public/shopee/product) */
-export type ReplizShopeeProduct = {
-  id: string;
-  name: string;
-  thumbnail?: string;
-  currency?: string;
-  price?: number;
-  accountId?: string;
-};
-
-/**
- * List produk Shopee (GET /public/shopee/product).
- * `accountId` = id akun Shopee terkoneksi di workspace Repliz.
- */
-export async function replizListShopeeProducts(
-  cred: ReplizCredentials,
-  accountId: string,
-  nextToken?: string,
-): Promise<{ docs: ReplizShopeeProduct[]; nextToken?: string }> {
-  const query: Record<string, string> = { accountId };
-  if (nextToken) query.nextToken = nextToken;
-
-  const data = await replizRequest<{
-    docs?: Array<Record<string, unknown>>;
-    nextToken?: string;
-  }>(cred, "/public/shopee/product", { query });
-
-  return {
-    docs: (data?.docs ?? []).map((d) => ({
-      id: String(d.id ?? d._id),
-      name: String(d.name ?? ""),
-      thumbnail: d.thumbnail ? String(d.thumbnail) : undefined,
-      currency: d.currency ? String(d.currency) : undefined,
-      price: typeof d.price === "number" ? d.price : undefined,
-      accountId: d.accountId ? String(d.accountId) : undefined,
-    })),
-    nextToken: data?.nextToken,
   };
 }
 
@@ -97,7 +57,11 @@ export type ReplizTiktokMusicDateRange = "1DAY" | "7DAY" | "30DAY" | "90DAY";
  */
 export async function replizListTiktokMusic(
   cred: ReplizCredentials,
-  opts: { genre: ReplizTiktokMusicGenre; countryCode: string; dateRange: ReplizTiktokMusicDateRange },
+  opts: {
+    genre: ReplizTiktokMusicGenre;
+    countryCode: string;
+    dateRange: ReplizTiktokMusicDateRange;
+  },
 ): Promise<ReplizTiktokMusic[]> {
   const data = await replizRequest<{
     docs?: Array<Record<string, unknown>>;

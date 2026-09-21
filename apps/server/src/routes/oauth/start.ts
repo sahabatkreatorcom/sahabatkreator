@@ -55,15 +55,13 @@ export async function handleStart(c: Context): Promise<Response> {
       // dengan query string, tapi menerima path tambahan. Terbukti via spike:
       // browser tiba di /repliz-callback/{state}?code=... (path utuh + code ditambahkan).
       //
-      // PENTING (docs Repliz "OAuth Flow Guide"): Facebook mengembalikan token di
-      // URL FRAGMENT (#access_token=…), dan fragment TIDAK PERNAH dikirim ke server.
-      // Karena itu redirect FB harus mendarat di halaman FRONTEND (bisa baca hash),
-      // yang lalu mengekstrak access_token dan POST ke callback server. Platform
-      // lain aman langsung ke endpoint server (?code=… di query).
-      const isFragmentFlow = platform === "facebook";
-      const redirect = isFragmentFlow
-        ? `${env.WEB_URL}/oauth/repliz-fragment/${platform}/${state}`
-        : `${env.SERVER_URL || "http://localhost:3000"}/api/oauth/${platform}/repliz-callback/${state}`;
+      // SEMUA platform (termasuk Facebook) redirect langsung ke endpoint server.
+      // Bukti live: FB mengembalikan ?code=… di query string sama seperti
+      // YouTube/LinkedIn/Threads — flow fragment (#access_token=…) TIDAK terjadi.
+      // FB/YouTube/LinkedIn sama-sama 2-langkah (exchange → ambil entity → picker),
+      // jadi semuanya lewat jalur yang sama. Halaman fragment hanya fallback jika
+      // suatu saat Repliz benar-benar mengembalikan token di hash.
+      const redirect = `${env.SERVER_URL || "http://localhost:3000"}/api/oauth/${platform}/repliz-callback/${state}`;
       const authorizeUrl = await replizAuthorizeUrl(cred, platformKey, redirect);
       return c.json({ authorizeUrl });
     }
