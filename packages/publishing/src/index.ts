@@ -111,6 +111,7 @@ export {
   replizDeleteComment,
   replizExchangeCode,
   replizGetAccount,
+  replizGetContent,
   replizGetContentStatistic,
   replizGetFacebookPages,
   replizGetLinkedInOrganizations,

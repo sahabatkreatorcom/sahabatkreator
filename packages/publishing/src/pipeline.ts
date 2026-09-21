@@ -619,18 +619,19 @@ async function pollReplizSchedule(
     await markFailed(postId, "bridge_not_configured", "Bridge Repliz tidak dikonfigurasi.");
     return "failed";
   }
-  const { replizCreateComment, replizGetSchedule, replizListContent } = await import("./repliz");
+  const { replizCreateComment, replizGetContent, replizGetSchedule } = await import("./repliz");
   const sched = await replizGetSchedule(cred, scheduleId, replizAccountId);
   if (!sched) return "processing";
   if (sched.status === "success") {
-    // Ambil permalink dari Content API (schedule response tidak menyertakan URL).
-    // Best-effort: kegagalan tidak menggagalkan publish; URL tetap bisa diisi
-    // oleh posts-sync saat mengimpor post sebagai external.
+    // Ambil permalink dari Content API by-id (schedule response tidak menyertakan
+    // URL, hanya postId). Sebelumnya memindai halaman pertama GET /public/content
+    // — post di luar halaman pertama tidak ketemu. Best-effort: kegagalan tidak
+    // menggagalkan publish; URL tetap bisa diisi posts-sync saat import external.
     let postUrl: string | null = null;
     if (sched.postId) {
       try {
-        const res = await replizListContent(cred, replizAccountId, { type: "media" });
-        postUrl = res.docs.find((c) => c.id === sched.postId)?.url ?? null;
+        const content = await replizGetContent(cred, sched.postId, replizAccountId);
+        postUrl = content?.url ?? null;
       } catch (error) {
         console.warn(
           `[publishing] Ambil URL post bridge gagal (${postId}):`,

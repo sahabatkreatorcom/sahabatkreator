@@ -715,3 +715,35 @@ export async function replizGetContentStatistic(
     query: { accountId },
   });
 }
+
+/**
+ * Detail satu konten by id (GET /public/content/{contentId}?accountId=…).
+ * Sumber otoritatif permalink (field `url`) untuk post yang terbit via Schedule
+ * API — response Schedule hanya berisi postId, tidak ada URL. Sebelumnya
+ * pipeline memindai halaman pertama GET /public/content untuk mencari id,
+ * yang rapuh: post di luar halaman pertama tidak ketemu → URL tetap null.
+ */
+export async function replizGetContent(
+  cred: ReplizCredentials,
+  contentId: string,
+  accountId: string,
+): Promise<ReplizContent | null> {
+  const data = await replizRequest<Record<string, unknown>>(
+    cred,
+    `/public/content/${contentId}`,
+    { query: { accountId } },
+  );
+  if (!data || (!data.id && !data._id)) return null;
+  return {
+    id: String(data.id ?? data._id),
+    title: data.title ? String(data.title) : undefined,
+    description: data.description ? String(data.description) : undefined,
+    topic: data.topic ? String(data.topic) : undefined,
+    type: String(data.type ?? ""),
+    owner: data.owner as ReplizContent["owner"],
+    medias: data.medias as ReplizContent["medias"],
+    url: data.url ? String(data.url) : undefined,
+    createdAt: data.createdAt ? String(data.createdAt) : undefined,
+    statistic: data.statistic as Record<string, number> | undefined,
+  };
+}
