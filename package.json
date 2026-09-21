@@ -1,0 +1,57 @@
+{
+  "name": "sahabatkreator",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ],
+    "catalog": {
+      "dotenv": "^17.4.2",
+      "zod": "^4.4.3",
+      "@types/bun": "^1.4.0",
+      "hono": "^4.12.27",
+      "better-auth": "1.6.22",
+      "react": "^19.2.8",
+      "@types/react": "^19.2.18",
+      "vitest": "4.1.8",
+      "@vitest/ui": "4.1.8",
+      "@vitest/coverage-v8": "4.1.8",
+      "jsdom": "^29.1.1",
+      "@playwright/test": "^1.62.1",
+      "playwright": "^1.62.1"
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "dev:web": "turbo -F web dev",
+    "dev:server": "turbo -F server dev",
+    "db:push": "turbo -F @sahabatkreator/db db:push",
+    "db:studio": "turbo -F @sahabatkreator/db db:studio",
+    "db:generate": "turbo -F @sahabatkreator/db db:generate",
+    "db:migrate": "turbo -F @sahabatkreator/db db:migrate",
+    "db:reset": "turbo -F @sahabatkreator/db db:reset",
+    "db:seed": "turbo -F @sahabatkreator/db db:seed",
+    "test": "bun run --filter web test && bun run --filter server test && bun run --filter @sahabatkreator/api test",
+    "check": "biome check --write ."
+  },
+  "dependencies": {
+    "@sahabatkreator/env": "workspace:*",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.10",
+    "@sahabatkreator/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "turbo": "2.10.11",
+    "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "kysely": "0.28.17"
+  },
+  "packageManager": "bun@1.4.0"
+}

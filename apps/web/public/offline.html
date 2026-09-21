@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Offline — Sahabat Kreator</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fdfbf7;
+      color: #1c1917;
+      padding: 1.5rem;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: #171412; color: #f5f5f4; }
+      .card { background: #211e1b !important; }
+      p { color: #a8a29e !important; }
+    }
+    .card {
+      max-width: 24rem;
+      width: 100%;
+      text-align: center;
+      background: #fff;
+      border-radius: 1rem;
+      border: 1px solid rgba(28, 25, 23, 0.1);
+      padding: 2.5rem 1.5rem;
+    }
+    img { width: 4rem; height: 4rem; margin: 0 auto 1rem; }
+    h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+    p { font-size: 0.875rem; color: #57534e; line-height: 1.5; margin-bottom: 1.25rem; }
+    button {
+      background: #08a5fc;
+      color: #fff;
+      border: 0;
+      border-radius: 0.5rem;
+      padding: 0.625rem 1.5rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #078ad6; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="/logo-sahabat-kreator-baru.png" alt="Sahabat Kreator" />
+    <h1>Tidak ada koneksi internet</h1>
+    <p>
+      Kamu sedang offline. Periksa koneksi internetmu lalu coba lagi —
+      data kontenmu aman dan tersinkron otomatis saat kembali online.
+    </p>
+    <button type="button" onclick="window.location.reload()">Coba Lagi</button>
+  </div>
+</body>
+</html>
