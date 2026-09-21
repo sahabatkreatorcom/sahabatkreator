@@ -1,10 +1,11 @@
 // Halaman Strategi Konten — brand voice, pillars, template caption, koleksi hashtag
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Hash, Layers, Loader2, Mic, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { FileText, Hash, Layers, Loader2, Mic, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -108,14 +109,11 @@ function TagListInput({
 
 function BrandVoiceTab() {
   const queryClient = useQueryClient();
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["brand-voice"],
     queryFn: () => api.get<{ brandVoice: BrandVoice | null }>("/strategy/brand-voice"),
   });
   const [draft, setDraft] = useState<BrandVoice | null>(null);
-  // Sinkron draft saat data pertama kali termuat
-  const loaded = useState(() => true)[0];
-  void loaded;
   const voice = draft ??
     data?.brandVoice ?? {
       description: "",
@@ -147,6 +145,13 @@ function BrandVoiceTab() {
 
   return (
     <div className="max-w-2xl space-y-5">
+      {isLoading && (
+        <div className="space-y-3">
+          <div className="h-24 animate-pulse rounded-[var(--radius-md)] bg-[var(--bg-tertiary)]" />
+          <div className="h-12 animate-pulse rounded-[var(--radius-md)] bg-[var(--bg-tertiary)]" />
+          <div className="h-12 animate-pulse rounded-[var(--radius-md)] bg-[var(--bg-tertiary)]" />
+        </div>
+      )}
       <p className="text-[var(--text-secondary)] text-sm">
         Tentukan suara brand Anda — dipakai otomatis oleh AI saat generate caption & rewrite agar
         konsisten di semua platform.
@@ -233,7 +238,7 @@ function PillarsTab() {
   const [color, setColor] = useState<string>(PILLAR_COLORS[0]);
   const [expanded, setExpanded] = useState(false);
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["pillars"],
     queryFn: () => api.get<{ pillars: Pillar[] }>("/strategy/pillars"),
   });
@@ -269,11 +274,18 @@ function PillarsTab() {
 
   return (
     <div className="max-w-2xl space-y-5">
+      {isLoading && (
+        <div className="space-y-3">
+          <div className="h-14 animate-pulse rounded-[var(--radius-md)] bg-[var(--bg-tertiary)]" />
+          <div className="h-14 animate-pulse rounded-[var(--radius-md)] bg-[var(--bg-tertiary)]" />
+          <div className="h-14 animate-pulse rounded-[var(--radius-md)] bg-[var(--bg-tertiary)]" />
+        </div>
+      )}
       <p className="text-[var(--text-secondary)] text-sm">
         Kategori strategi konten Anda — mis. Edukasi 40%, Promosi 30%, Hiburan 30%.
       </p>
       <form
-        className="space-y-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] p-4"
+        className="card space-y-3 p-4"
         onSubmit={(e) => {
           e.preventDefault();
           if (name.trim()) create.mutate();
@@ -341,15 +353,19 @@ function PillarsTab() {
         )}
       </form>
       {pillars.length === 0 ? (
-        <p className="text-[var(--text-muted)] text-sm">
-          Belum ada pillar — mulai dengan 3–4 kategori konten utama Anda.
-        </p>
+        !isLoading && (
+          <EmptyState
+            icon={<Layers className="h-6 w-6" />}
+            title="Belum ada pillar"
+            description="Mulai dengan 3–4 kategori konten utama Anda."
+          />
+        )
       ) : (
         <ul className="space-y-2">
           {pillars.map((p) => (
             <li
               key={p.id}
-              className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-3"
+              className="card flex items-center justify-between px-4 py-3"
             >
               <div className="flex min-w-0 items-start gap-3">
                 {p.color && (
@@ -390,7 +406,7 @@ function TemplatesTab() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ name: "", content: "", hashtags: "" });
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["templates"],
     queryFn: () => api.get<{ templates: Template[] }>("/strategy/templates"),
   });
@@ -456,9 +472,13 @@ function TemplatesTab() {
       </form>
 
       {templates.length === 0 ? (
-        <p className="text-[var(--text-muted)] text-sm">
-          Belum ada template — simpan caption yang sering dipakai agar tidak menulis ulang.
-        </p>
+        !isLoading && (
+          <EmptyState
+            icon={<FileText className="h-6 w-6" />}
+            title="Belum ada template"
+            description="Simpan caption yang sering dipakai agar tidak menulis ulang."
+          />
+        )
       ) : (
         <ul className="space-y-3">
           {templates.map((t) => (
@@ -505,7 +525,7 @@ function HashtagsTab() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ name: "", hashtags: "" });
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["hashtag-collections"],
     queryFn: () => api.get<{ collections: Collection[] }>("/strategy/hashtag-collections"),
   });
@@ -564,10 +584,13 @@ function HashtagsTab() {
       </form>
 
       {collections.length === 0 ? (
-        <p className="text-[var(--text-muted)] text-sm">
-          Belum ada koleksi — kelompokkan hashtag per tema/kampanye untuk dipakai sekali klik saat
-          compose.
-        </p>
+        !isLoading && (
+          <EmptyState
+            icon={<Hash className="h-6 w-6" />}
+            title="Belum ada koleksi"
+            description="Kelompokkan hashtag per tema/kampanye untuk dipakai sekali klik saat compose."
+          />
+        )
       ) : (
         <ul className="space-y-3">
           {collections.map((col) => (
@@ -611,29 +634,35 @@ export function StrategyPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-bold text-2xl">Strategi Konten</h1>
+        <h1 className="flex items-center gap-2 font-bold text-2xl">
+          <Sparkles className="h-6 w-6 text-[var(--accent-gold)]" />
+          Strategi Konten
+        </h1>
         <p className="mt-1 text-[var(--text-secondary)] text-sm">
           Suara brand, kategori konten, dan aset siap pakai untuk compose
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-1 rounded-[var(--radius-md)] border border-[var(--border)] p-1">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={cn(
-              "flex items-center gap-1.5 rounded px-3 py-1.5 text-sm",
-              tab === t.id
-                ? "bg-[var(--accent-gold-light)] font-medium text-[var(--accent-gold)]"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-            )}
-          >
-            <t.icon className="h-3.5 w-3.5" />
-            {t.label}
-          </button>
-        ))}
+      <div className="scrollbar-hide flex gap-1.5 overflow-x-auto border-[var(--border-light)] border-b pb-0">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 font-medium text-sm transition-colors",
+                tab === t.id
+                  ? "border-[var(--accent-gold)] text-[var(--accent-gold)]"
+                  : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {tab === "voice" && <BrandVoiceTab />}
