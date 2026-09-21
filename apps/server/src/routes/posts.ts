@@ -10,10 +10,11 @@ import {
   productTag,
   socialAccount,
 } from "@sahabatkreator/db/schema";
-import { claimPostById, publishPost, syncWorkspacePosts } from "@sahabatkreator/publishing";
+import { claimPostById, publishPost, replizActiveCredentials, replizRemoveSchedule, replizRetrySchedule, syncWorkspacePosts } from "@sahabatkreator/publishing";
 import {
   cancelPostReminder,
   cancelPublishJob,
+  enqueuePoll,
   enqueuePostReminder,
   enqueuePublish,
 } from "@sahabatkreator/queue";
@@ -628,6 +629,28 @@ postsRoute.patch("/:id", async (c) => {
 /** DELETE /posts/item/:id — hapus satu jadwal post (satu platform) dari group.
  * Group dihapus otomatis bila ini jadwal terakhir (group kosong tidak berguna).
  */
+/**
+ * Batalkan schedule di sisi Repliz bila post sudah pernah disubmit ke bridge.
+ * cancelPublishJob() hanya menghapus job BullMQ lokal — untuk post yg sudah
+ * masuk pipeline Repliz (status publishing/failed dgn scheduleId di
+ * platformPostId), schedule-nya TIDAK ter-cancel dan post tetap tayang di
+ * waktu terjadwal meski baris DB sudah dihapus. Best-effort: kegagalan tidak
+ * menggagalkan delete lokal (post tetap hilang dari DB).
+ */
+async function cancelReplizScheduleIfAny(platformPostId: string): Promise<void> {
+  const cred = await replizActiveCredentials();
+  if (!cred) return;
+  try {
+    await replizRemoveSchedule(cred, platformPostId);
+  } catch (error) {
+    // 404 = schedule sudah hilang (sudah tayang/dibatalkan) — kondisi normal.
+    console.warn(
+      `[posts] Batal schedule Repliz ${platformPostId} best-effort gagal:`,
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
 postsRoute.delete("/item/:id", async (c) => {
   try {
     const ctx = await requireOrg(c);
@@ -638,6 +661,8 @@ postsRoute.delete("/item/:id", async (c) => {
       .select({
         id: post.id,
         platform: post.platform,
+        status: post.status,
+        platformPostId: post.platformPostId,
         groupId: sql<string>`${post.postGroupId}`,
       })
       .from(post)
@@ -647,6 +672,10 @@ postsRoute.delete("/item/:id", async (c) => {
     if (!row?.groupId) return c.json({ message: "Post tidak ditemukan" }, 404);
 
     await cancelPublishJob(row.id, row.platform);
+    // Sudah masuk pipeline Repliz? cancel schedule-nya juga (bukan hanya job lokal)
+    if (row.status === "publishing" || row.status === "failed") {
+      if (row.platformPostId) await cancelReplizScheduleIfAny(row.platformPostId);
+    }
     await db.delete(post).where(eq(post.id, row.id));
 
     // Group kosong → hapus (beserta pengingat manualnya bila aktif)
@@ -681,11 +710,15 @@ postsRoute.delete("/:id", async (c) => {
 
     // Batalkan job publish tertunda sebelum hapus
     const groupPosts = await db
-      .select({ id: post.id, platform: post.platform })
+      .select({ id: post.id, platform: post.platform, status: post.status, platformPostId: post.platformPostId })
       .from(post)
       .where(eq(post.postGroupId, group.id));
     for (const p of groupPosts) {
       await cancelPublishJob(p.id, p.platform);
+      // Sudah masuk pipeline Repliz? cancel schedule-nya juga (bukan hanya job lokal)
+      if (p.status === "publishing" || p.status === "failed") {
+        if (p.platformPostId) await cancelReplizScheduleIfAny(p.platformPostId);
+      }
     }
     // Batalkan juga pengingat manual bila aktif
     await cancelPostReminder(group.id);
@@ -814,6 +847,78 @@ postsRoute.post("/:id/publish", async (c) => {
     const failed = results.filter((r) => r === "failed").length;
 
     return c.json({ ok: true, published, processing, failed });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** POST /posts/:id/retry — antrikan ulang post bridge Repliz yg gagal.
+ * Hanya utk post failed yg dipublish via bridge (ada scheduleId Repliz di
+ * platformPostId — disimpan pipeline saat adapter return "processing").
+ * Memakai PUT /public/schedule/{id}/retry (konten & pengaturan sama). */
+postsRoute.post("/:id/retry", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+    const [row] = await db
+      .select({
+        id: post.id,
+        platform: post.platform,
+        status: post.status,
+        platformPostId: post.platformPostId,
+        socialAccountId: post.socialAccountId,
+        groupId: sql<string>`${post.postGroupId}`,
+      })
+      .from(post)
+      .innerJoin(postGroup, eq(post.postGroupId, postGroup.id))
+      .where(and(eq(post.id, c.req.param("id")), eq(postGroup.organizationId, ctx.organization.id)))
+      .limit(1);
+    if (!row) return c.json({ message: "Post tidak ditemukan" }, 404);
+    if (row.status !== "failed") {
+      return c.json({ message: "Hanya post gagal yang bisa diulang" }, 400);
+    }
+    // Handle schedule Repliz (platformPostId saat masih processing/gagal).
+    // Post native tidak punya scheduleId Repliz → harus lewat /publish ulang.
+    if (!row.platformPostId) {
+      return c.json(
+        { message: "Post ini tidak memiliki schedule bridge — gunakan Publish Ulang" },
+        400,
+      );
+    }
+
+    const [account] = await db
+      .select({ metadata: socialAccount.metadata })
+      .from(socialAccount)
+      .where(eq(socialAccount.id, row.socialAccountId))
+      .limit(1);
+    const replizAccountId = (account?.metadata as { replizAccountId?: string } | null)?.replizAccountId;
+    if (!replizAccountId) {
+      return c.json(
+        { message: "Akun platform ini tidak terhubung via bridge Repliz" },
+        400,
+      );
+    }
+
+    const cred = await replizActiveCredentials();
+    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
+
+    await replizRetrySchedule(cred, row.platformPostId);
+
+    // Reset ke publishing + jalankan poll chain (sama dgn flow publish normal)
+    await db
+      .update(post)
+      .set({ status: "publishing", errorCode: null, errorMessage: null })
+      .where(eq(post.id, row.id));
+    await enqueuePoll(row.id, row.platform);
+
+    void fireActivity({
+      orgId: ctx.organization.id,
+      action: "post.retry",
+      targetType: "post",
+      targetId: row.id,
+      metadata: { platform: row.platform },
+    });
+
+    return c.json({ ok: true });
   } catch (error) {
     return errorResponse(error);
   }

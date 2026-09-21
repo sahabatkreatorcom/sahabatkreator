@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Loader2,
   RefreshCw,
+  RotateCcw,
   Send,
   Share2,
   Trash2,
@@ -122,6 +123,17 @@ export function QueuePage() {
     mutationFn: (id: string) => api.post(`/posts/${id}/publish`),
     onSuccess: () => {
       toast.success("Post dimasukkan ke antrian publish");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  /** Retry post bridge Repliz yg gagal (PUT /public/schedule/{id}/retry).
+   * Hanya muncul untuk post failed yg dipublish via bridge. */
+  const retryFailed = useMutation({
+    mutationFn: (id: string) => api.post(`/posts/${id}/retry`),
+    onSuccess: () => {
+      toast.success("Post dimasukkan kembali ke antrian Repliz");
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -424,6 +436,21 @@ export function QueuePage() {
                                     className="ml-auto shrink-0 rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--error-light)] hover:text-[var(--error)] disabled:opacity-50"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                {/* Retry post bridge gagal — platformPostId = scheduleId
+                                    Repliz (disimpan pipeline saat adapter return processing) */}
+                                {p.status === "failed" && p.platformPostId && (
+                                  <button
+                                    type="button"
+                                    title="Coba lagi via bridge Repliz"
+                                    disabled={
+                                      retryFailed.isPending && retryFailed.variables === p.id
+                                    }
+                                    onClick={() => retryFailed.mutate(p.id)}
+                                    className="shrink-0 rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--success-light)] hover:text-[var(--success)] disabled:opacity-50"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
                                   </button>
                                 )}
                                 {/* Hapus di platform (khusus Threads — scope threads_delete) */}
