@@ -12,6 +12,36 @@ import { PublishError } from "./types";
 
 const API_BASE = "https://api.repliz.com";
 
+// [DEBUG sementara] Verifikasi klaim "token dilempar saat redirect" —
+// log permintaan/respons Repliz di jalur OAuth connect. Nilai dimasking.
+const OAUTH_DEBUG = true;
+function mask(v: unknown): string {
+  if (v === null || v === undefined) return "(null)";
+  const s = String(v);
+  if (s === "") return "(empty)";
+  if (s.length <= 12) return `${s.slice(0, 2)}…(${s.length} chars)`;
+  return `${s.slice(0, 6)}…${s.slice(-4)} (${s.length} chars)`;
+}
+function dbgReq(label: string, path: string, body: unknown): void {
+  if (!OAUTH_DEBUG) return;
+  const b =
+    body && typeof body === "object"
+      ? JSON.stringify(
+          Object.fromEntries(
+            Object.entries(body as Record<string, unknown>).map(([k, v]) => [
+              k,
+              /code|token|secret/i.test(k) ? mask(v) : v,
+            ]),
+          ),
+        )
+      : String(body);
+  console.info(`[repliz-oauth] → ${label}\n  endpoint: ${path}\n  body    : ${b}`);
+}
+function dbgRes(label: string, detail: string): void {
+  if (!OAUTH_DEBUG) return;
+  console.info(`[repliz-oauth] ← ${label}\n  ${detail}`);
+}
+
 /**
  * Platform yang didukung bridge Repliz (mapping enum platform kita → type akun Repliz).
  * NOTE: Repliz hanya punya SATU type "linkedin" — app LinkedIn mereka membawahi
@@ -196,10 +226,12 @@ export async function replizExchangeCode(
   code: string,
 ): Promise<string> {
   const type = REPLIZ_PLATFORMS[platformKey];
+  dbgReq(`exchange [${platformKey}]`, `/public/account/${type}/exchange`, { code });
   const data = await replizRequest<{ token: string }>(cred, `/public/account/${type}/exchange`, {
     method: "POST",
     body: { code },
   });
+  dbgRes(`exchange [${platformKey}]`, `token=${mask(data?.token)}`);
   if (!data?.token) {
     throw new PublishError("repliz_no_token", "Repliz tidak mengembalikan token exchange.", false);
   }
@@ -271,10 +303,12 @@ export async function replizConnectAccount(
   input: ReplizConnectInput,
 ): Promise<string> {
   const type = REPLIZ_PLATFORMS[platformKey];
+  dbgReq(`connect [${platformKey}]`, `/public/account/${type}/connect`, input);
   const data = await replizRequest<{ accountId: string }>(cred, `/public/account/${type}/connect`, {
     method: "POST",
     body: input,
   });
+  dbgRes(`connect [${platformKey}]`, `accountId=${mask(data?.accountId)}`);
   if (!data?.accountId) {
     throw new PublishError("repliz_no_account_id", "Repliz tidak mengembalikan accountId.", false);
   }

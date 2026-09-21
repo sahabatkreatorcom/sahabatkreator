@@ -15,6 +15,11 @@ import { checkFeatureGate } from "../lib/billing";
 import { decrypt } from "../lib/crypto";
 import { generateId } from "../lib/id";
 import { upsertSocialAccount } from "../lib/oauth-connect";
+import {
+  logReplizRequest,
+  logReplizResponse,
+  maskSecret,
+} from "../lib/repliz-oauth-debug";
 
 export const accountsRoute = new Hono();
 
@@ -224,7 +229,23 @@ accountsRoute.post("/pending/:id/select", async (c) => {
           : row.platform === "youtube"
             ? { channelId: page.pageId, token: entityToken }
             : { organizationId: page.pageId, token: entityToken };
+      // [DEBUG] verifikasi token yg dikirim ke Repliz connect (multi-entity)
+      logReplizRequest(
+        `connect [${row.platform}]`,
+        `/public/account/${String(platformKey)}/connect`,
+        connectInput,
+      );
+      if (!entityToken) {
+        console.warn(
+          `[repliz-oauth] entity token KOSONG untuk ${row.platform} ${page.pageId} — Repliz mungkin tidak melempar token saat redirect`,
+        );
+      }
       const accountId = await replizConnectAccount(cred, platformKey, connectInput);
+      logReplizResponse(
+        `connect [${row.platform}]`,
+        Boolean(accountId),
+        `accountId=${maskSecret(accountId)}`,
+      );
       const info = await replizGetAccount(cred, accountId);
 
       const [existingRepliz] = await db
