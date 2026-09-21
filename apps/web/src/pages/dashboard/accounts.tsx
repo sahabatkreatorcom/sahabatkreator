@@ -106,6 +106,19 @@ export function AccountsPage() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["accounts"] });
 
+  // Filter platform (local — daftar di-derive dari akun + konfig PLATFORMS)
+  const [platformFilter, setPlatformFilter] = useState<string>("all");
+  const allAccounts = data?.accounts ?? [];
+  const platformOptions = [
+    { key: "all", label: "Semua platform" },
+    ...Object.keys(PLATFORMS)
+      .filter((p) => allAccounts.some((a) => a.platform === p))
+      .map((p) => ({ key: p, label: PLATFORMS[p as keyof typeof PLATFORMS].label })),
+  ];
+  const accounts = platformFilter === "all"
+    ? allAccounts
+    : allAccounts.filter((a) => a.platform === platformFilter);
+
   async function startConnect(platform: string) {
     setPlatformDialogOpen(false);
     if (platform === "bluesky") {
@@ -181,7 +194,6 @@ export function AccountsPage() {
 
   if (isLoading) return <PageLoader />;
 
-  const accounts = data?.accounts ?? [];
   const platformEntries = Object.entries(PLATFORMS).filter(([key]) => key !== "manual");
 
   return (
@@ -199,6 +211,43 @@ export function AccountsPage() {
           Hubungkan Akun
         </Button>
       </div>
+
+      {/* Filter platform */}
+      {allAccounts.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[var(--text-muted)] text-xs">Filter:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {platformOptions.map((opt) => {
+              const active = platformFilter === opt.key;
+              const cfg =
+                opt.key !== "all"
+                  ? PLATFORMS[opt.key as keyof typeof PLATFORMS]
+                  : null;
+              const Icon = cfg?.icon;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setPlatformFilter(opt.key)}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                    active
+                      ? "border-[var(--accent-gold)] bg-[var(--accent-gold-light)] font-medium text-[var(--text-primary)]"
+                      : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent-gold)] hover:bg-[var(--bg-tertiary)]"
+                  }`}
+                >
+                  {Icon && <Icon className="h-3.5 w-3.5" style={cfg ? { color: cfg.color } : undefined} />}
+                  {opt.label}
+                  <span className="text-[var(--text-muted)]">
+                    {opt.key === "all"
+                      ? allAccounts.length
+                      : allAccounts.filter((a) => a.platform === opt.key).length}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Akun terhubung */}
       {accounts.length > 0 && (
@@ -402,8 +451,19 @@ export function AccountsPage() {
         </div>
       )}
 
-      {/* Empty state */}
-      {accounts.length === 0 && (
+      {/* Empty state — filter aktif tapi tidak ada akun untuk platform tsb */}
+      {allAccounts.length > 0 && accounts.length === 0 && (
+        <EmptyState
+          icon={<Link2 className="h-6 w-6" />}
+          title="Tidak ada akun untuk platform ini"
+          description={`Belum ada akun ${
+            platformOptions.find((o) => o.key === platformFilter)?.label ?? ""
+          } yang terhubung.`}
+        />
+      )}
+
+      {/* Empty state — belum ada akun sama sekali */}
+      {allAccounts.length === 0 && (
         <EmptyState
           icon={<Link2 className="h-6 w-6" />}
           title="Belum ada akun terhubung"

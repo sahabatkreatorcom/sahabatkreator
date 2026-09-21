@@ -547,7 +547,7 @@ export async function pollPost(postId: string): Promise<"published" | "failed" |
   // Akun bridge: kredensial Repliz + replizAccountId untuk polling schedule
   const replizAccountId = account?.metadata?.replizAccountId as string | undefined;
   if (replizAccountId) {
-    const status = await pollReplizSchedule(postId, row.handle, replizAccountId);
+    const status = await pollReplizSchedule(postId, row.handle, replizAccountId, row.firstComment);
     return status;
   }
 
@@ -601,22 +601,64 @@ export async function pollPost(postId: string): Promise<"published" | "failed" |
   return "processing";
 }
 
-/** Poll satu schedule Repliz (akun bridge) — return status akhir post */
+/**
+ * Poll satu schedule Repliz (akun bridge) — return status akhir post.
+ * Saat sukses: ambil URL post dari Content API (response schedule hanya berisi
+ * postId, tidak ada URL) lalu kirim first comment via Create Comment API
+ * (token platform disimpan Repliz — bukan kita, jadi tidak bisa pakai sendReply
+ * native).
+ */
 async function pollReplizSchedule(
   postId: string,
   scheduleId: string,
   replizAccountId: string,
+  firstComment?: string | null,
 ): Promise<"published" | "failed" | "processing"> {
   const cred = await loadBridgeCredentials();
   if (!cred) {
     await markFailed(postId, "bridge_not_configured", "Bridge Repliz tidak dikonfigurasi.");
     return "failed";
   }
-  const { replizGetSchedule } = await import("./repliz");
+  const { replizCreateComment, replizGetSchedule, replizListContent } = await import("./repliz");
   const sched = await replizGetSchedule(cred, scheduleId, replizAccountId);
   if (!sched) return "processing";
   if (sched.status === "success") {
-    await markPublished(postId, sched.postId ?? scheduleId, null);
+    // Ambil permalink dari Content API (schedule response tidak menyertakan URL).
+    // Best-effort: kegagalan tidak menggagalkan publish; URL tetap bisa diisi
+    // oleh posts-sync saat mengimpor post sebagai external.
+    let postUrl: string | null = null;
+    if (sched.postId) {
+      try {
+        const res = await replizListContent(cred, replizAccountId, { type: "media" });
+        postUrl = res.docs.find((c) => c.id === sched.postId)?.url ?? null;
+      } catch (error) {
+        console.warn(
+          `[publishing] Ambil URL post bridge gagal (${postId}):`,
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+    await markPublished(postId, sched.postId ?? scheduleId, postUrl);
+
+    // First comment untuk akun bridge: kirim lewat Repliz Create Comment API
+    // (POST /public/content/{contentId}/comment) karena token platform asli
+    // tidak ada di sisi kita. Repliz menyimpan token platform, sehingga
+    // komentarnya berfungsi untuk SEMUA platform yang didukungnya (termasuk
+    // TikTok & LinkedIn personal yang native-nya terbatas scope) — gate-nya
+    // bukan supportsFirstComment (itu untuk jalur native) melainkan apakah
+    // platform ini dikelola Repliz (sudah pasti, karena akunnya bridge).
+    const fc = firstComment?.trim();
+    if (fc && sched.postId) {
+      try {
+        await replizCreateComment(cred, sched.postId, replizAccountId, fc);
+      } catch (error) {
+        // Best-effort — post sudah tayang, kegagalan komentar tidak fatal
+        console.error(
+          `[publishing] First comment bridge gagal (${postId}):`,
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
     return "published";
   }
   if (sched.status === "error") {
@@ -673,7 +715,12 @@ export async function pollInFlightPosts(
           processing++;
           continue;
         }
-        const status = await pollReplizSchedule(row.id, row.handle, replizAccountId);
+        const status = await pollReplizSchedule(
+          row.id,
+          row.handle,
+          replizAccountId,
+          row.firstComment,
+        );
         if (status === "published") published++;
         else if (status === "failed") failed++;
         else processing++;
