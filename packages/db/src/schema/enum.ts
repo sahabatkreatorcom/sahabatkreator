@@ -15,6 +15,9 @@ export const platformEnum = pgEnum("platform", [
   "linkedin_org",
   "bluesky",
   "google_business",
+  // Marketplace Shopee — connect via bridge Repliz (seller auth); dipakai add-on
+  // riset produk, bukan publish post sosial.
+  "shopee",
   "manual",
 ]);
 

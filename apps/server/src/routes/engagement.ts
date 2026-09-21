@@ -5,8 +5,16 @@ import { engagementItem, savedResponse, socialAccount } from "@sahabatkreator/db
 import {
   moderateComment,
   PublishError,
+  replizActiveCredentials,
+  replizDeleteContentComment,
+  replizGetComment,
+  replizLikeComment,
+  replizListContentComments,
+  replizMessageComment,
+  replizUpdateCommentStatus,
   sendReply,
   syncAccountEngagement,
+  type ReplizCommentStatus,
 } from "@sahabatkreator/publishing";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
@@ -65,12 +73,20 @@ engagementRoute.get("/", async (c) => {
         labels: engagementItem.labels,
         sentiment: engagementItem.sentiment,
         occurredAt: engagementItem.occurredAt,
+        accountMetadata: socialAccount.metadata,
       })
       .from(engagementItem)
       .innerJoin(socialAccount, eq(engagementItem.socialAccountId, socialAccount.id))
       .where(and(...conditions))
       .orderBy(desc(engagementItem.occurredAt))
-      .limit(200);
+      .limit(200)
+      // Tandai item dari akun bridge Repliz (metadata tidak dilempar ke client)
+      .then((rows) =>
+        rows.map(({ accountMetadata, ...row }) => ({
+          ...row,
+          isBridge: isBridgeAccount(accountMetadata),
+        })),
+      );
 
     // Hitung unread per type untuk badge — agregasi di SQL (count + group by),
     // bukan load semua baris lalu dihitung di memory
@@ -633,10 +649,208 @@ engagementRoute.post("/batch-read", async (c) => {
   }
 });
 
+// ---------- Komentar per post (Content API Repliz, Gold+) ----------
+// Dipakai untuk melihat & memoderasi komentar di satu post terbit — melengkapi
+// antrian inbox global yang hanya menampilkan komentar belum dibalas.
+
+/** GET /engagement/posts/:contentId/comments — list komentar di satu post */
+engagementRoute.get("/posts/:contentId/comments", async (c) => {
+  try {
+    const ctx = await requirePermission(c, "engagement.view");
+    const cred = await replizActiveCredentials();
+    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
+
+    const accountId = await resolveBridgeAccountByPost(ctx.organization.id, c.req.param("contentId"));
+    if (!accountId) return c.json({ message: "Post ini tidak terhubung via bridge" }, 400);
+
+    const data = await replizListContentComments(
+      cred,
+      c.req.param("contentId"),
+      accountId,
+      c.req.query("nextToken") ?? undefined,
+    );
+    return c.json(data);
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** PUT /engagement/comments/:id/status — update status moderasi (resolved/ignored) */
+engagementRoute.put("/comments/:id/status", async (c) => {
+  try {
+    const ctx = await requirePermission(c, "engagement.moderate");
+    const input = z.object({ status: z.enum(["pending", "resolved", "ignored"]) }).parse(
+      await c.req.json(),
+    );
+
+    const [row] = await db
+      .select({
+        id: engagementItem.id,
+        platformItemId: engagementItem.platformItemId,
+        metadata: socialAccount.metadata,
+        organizationId: engagementItem.organizationId,
+      })
+      .from(engagementItem)
+      .innerJoin(socialAccount, eq(engagementItem.socialAccountId, socialAccount.id))
+      .where(
+        and(
+          eq(engagementItem.id, c.req.param("id")),
+          eq(engagementItem.organizationId, ctx.organization.id),
+          eq(engagementItem.type, "comment"),
+        ),
+      )
+      .limit(1);
+    if (!row) throw new HTTPError(404, "Komentar tidak ditemukan");
+
+    const replizAccountId = (row.metadata as { replizAccountId?: string } | null)?.replizAccountId;
+    if (!replizAccountId) {
+      return c.json({ message: "Komentar ini bukan dari akun bridge Repliz" }, 400);
+    }
+
+    const cred = await replizActiveCredentials();
+    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
+    if (!row.platformItemId) {
+      return c.json({ message: "Komentar tidak memiliki ID platform" }, 400);
+    }
+
+    await replizUpdateCommentStatus(
+      cred,
+      row.platformItemId,
+      input.status as ReplizCommentStatus,
+    );
+
+    // Status inbox lokal ikut: resolved → read+replied, ignored → archived
+    const localStatus = input.status === "resolved" ? "replied" : input.status === "ignored" ? "archived" : "read";
+    await db
+      .update(engagementItem)
+      .set({ status: localStatus })
+      .where(eq(engagementItem.id, row.id));
+
+    return c.json({ ok: true, status: input.status });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** POST /engagement/posts/:contentId/comments/:commentId/like — like komentar
+ * (hanya Facebook, TikTok, LinkedIn — gate UI via supportsReplizLike()). */
+engagementRoute.post("/posts/:contentId/comments/:commentId/like", async (c) => {
+  try {
+    const ctx = await requirePermission(c, "engagement.moderate");
+    const cred = await replizActiveCredentials();
+    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
+
+    const accountId = await resolveBridgeAccountByPost(ctx.organization.id, c.req.param("contentId"));
+    if (!accountId) return c.json({ message: "Post ini tidak terhubung via bridge" }, 400);
+
+    await replizLikeComment(cred, c.req.param("contentId"), c.req.param("commentId"));
+    return c.json({ ok: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** POST /engagement/posts/:contentId/comments/message — balas komentar via DM
+ * (POST /public/content/{id}/message — hanya Facebook & Instagram). */
+engagementRoute.post("/posts/:contentId/comments/message", async (c) => {
+  try {
+    const ctx = await requirePermission(c, "engagement.moderate");
+    const input = z.object({ text: z.string().min(1).max(2000) }).parse(await c.req.json());
+
+    const accountId = await resolveBridgeAccountByPost(ctx.organization.id, c.req.param("contentId"));
+    if (!accountId) return c.json({ message: "Post ini tidak terhubung via bridge" }, 400);
+
+    const cred = await replizActiveCredentials();
+    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
+
+    const messageId = await replizMessageComment(
+      cred,
+      c.req.param("contentId"),
+      accountId,
+      input.text,
+    );
+    return c.json({ ok: true, messageId });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** DELETE /engagement/posts/:contentId/comments/:commentId — hapus komentar di post */
+engagementRoute.delete("/posts/:contentId/comments/:commentId", async (c) => {
+  try {
+    const ctx = await requirePermission(c, "engagement.moderate");
+    const cred = await replizActiveCredentials();
+    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
+
+    const accountId = await resolveBridgeAccountByPost(ctx.organization.id, c.req.param("contentId"));
+    if (!accountId) return c.json({ message: "Post ini tidak terhubung via bridge" }, 400);
+
+    await replizDeleteContentComment(cred, c.req.param("contentId"), c.req.param("commentId"));
+    return c.json({ ok: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** GET /engagement/comments/:id/detail — detail satu komentar dari Repliz */
+engagementRoute.get("/comments/:id/detail", async (c) => {
+  try {
+    const ctx = await requirePermission(c, "engagement.view");
+    const [row] = await db
+      .select({ platformItemId: engagementItem.platformItemId, metadata: socialAccount.metadata })
+      .from(engagementItem)
+      .innerJoin(socialAccount, eq(engagementItem.socialAccountId, socialAccount.id))
+      .where(
+        and(
+          eq(engagementItem.id, c.req.param("id")),
+          eq(engagementItem.organizationId, ctx.organization.id),
+        ),
+      )
+      .limit(1);
+    if (!row) throw new HTTPError(404, "Komentar tidak ditemukan");
+
+    const replizAccountId = (row.metadata as { replizAccountId?: string } | null)?.replizAccountId;
+    if (!replizAccountId) {
+      return c.json({ message: "Komentar ini bukan dari akun bridge Repliz" }, 400);
+    }
+
+    const cred = await replizActiveCredentials();
+    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
+    if (!row.platformItemId) {
+      return c.json({ message: "Komentar tidak memiliki ID platform" }, 400);
+    }
+    const data = await replizGetComment(cred, row.platformItemId);
+    if (!data) return c.json({ message: "Komentar tidak ditemukan di Repliz" }, 404);
+    return c.json(data);
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/**
+ * Ambil replizAccountId org dari post yang dikomentari.
+ * contentId = platformPostId post terbit (Repliz content id == platform post id,
+ * lihat pipeline.ts:replizGetContent(cred, sched.postId, …)).
+ */
+async function resolveBridgeAccountByPost(
+  orgId: string,
+  contentId: string,
+): Promise<string | null> {
+  const { post: postTable, postGroup } = await import("@sahabatkreator/db/schema");
+  const [p] = await db
+    .select({ metadata: socialAccount.metadata })
+    .from(postTable)
+    .innerJoin(socialAccount, eq(postTable.socialAccountId, socialAccount.id))
+    .innerJoin(postGroup, eq(postTable.postGroupId, postGroup.id))
+    .where(and(eq(postTable.platformPostId, contentId), eq(postGroup.organizationId, orgId)))
+    .limit(1);
+  const meta = p?.metadata as { replizAccountId?: string } | null;
+  return meta?.replizAccountId ?? null;
+}
+
 // ---------- Saved responses ----------
 
-engagementRoute.get("/saved-responses", async (c) => {
-  try {
+engagementRoute.get("/saved-responses", async (c) => {  try {
     const ctx = await requirePermission(c, "engagement.view");
     const responses = await db
       .select()

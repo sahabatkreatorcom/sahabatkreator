@@ -428,5 +428,12 @@ export async function fetchPlatformProfile(
         "Bluesky connect via app password (input manual), bukan OAuth redirect.",
         false,
       );
+
+    case "shopee":
+      throw new PublishError(
+        "oauth_shopee_bridge_only",
+        "Shopee connect hanya via bridge Repliz (seller auth), bukan OAuth native.",
+        false,
+      );
   }
 }

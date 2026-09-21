@@ -319,6 +319,48 @@ accountsRoute.post("/pending/:id/select", async (c) => {
   }
 });
 
+/** GET /accounts/:id/statistic — statistik agregat akun bridge Repliz
+ * (follower/post/message count). 404 graceful: beberapa platform (FB page,
+ * YouTube channel) tidak support → return null. */
+accountsRoute.get("/:id/statistic", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+    const [row] = await db
+      .select({ metadata: socialAccount.metadata })
+      .from(socialAccount)
+      .where(
+        and(
+          eq(socialAccount.id, c.req.param("id")),
+          eq(socialAccount.organizationId, ctx.organization.id),
+        ),
+      )
+      .limit(1);
+    if (!row) return c.json({ message: "Akun tidak ditemukan" }, 404);
+
+    const replizAccountId = (row.metadata as { replizAccountId?: string } | null)?.replizAccountId;
+    if (!replizAccountId) {
+      return c.json({ message: "Akun ini tidak terhubung via bridge Repliz" }, 400);
+    }
+    const { getReplizCredentials } = await import("../lib/bridge");
+    const cred = await getReplizCredentials();
+    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
+
+    const { replizGetAccountStatistic } = await import("@sahabatkreator/publishing");
+    try {
+      return c.json({ statistic: await replizGetAccountStatistic(cred, replizAccountId) });
+    } catch (err) {
+      // 404 = platform tidak support statistic (FB page/YouTube channel) — bukan error
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("404") || msg.includes("not found")) {
+        return c.json({ statistic: null, unsupported: true });
+      }
+      throw err;
+    }
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
 /** DELETE /accounts/:id — disconnect akun */
 accountsRoute.delete("/:id", async (c) => {
   try {

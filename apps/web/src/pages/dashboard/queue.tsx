@@ -9,6 +9,7 @@ import {
   Clock,
   ExternalLink,
   Loader2,
+  Pencil,
   RefreshCw,
   RotateCcw,
   Send,
@@ -41,6 +42,8 @@ type QueuePost = {
   username: string | null;
   displayName: string | null;
   avatarUrl: string | null;
+  /** Dipublikasi via bridge Repliz (bukan API native) — aksi khusus bridge */
+  isBridge?: boolean;
 };
 
 type QueueGroup = {
@@ -110,6 +113,8 @@ export function QueuePage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<(typeof STATUS_TABS)[number]["key"]>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
+  /** Checkbox multi-select untuk bulk cancel (DELETE /public/schedule/mass) */
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
 
   const { data, isLoading } = useQuery({
     queryKey: ["queue-posts"],
@@ -184,6 +189,40 @@ export function QueuePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /** Hapus post bridge yang SUDAH tayang di platform (DELETE /public/content/{id}).
+   * Berbeda dgn removeItem (hapus jadwal) — ini menghapus konten terbit. */
+  const removePublishedFromPlatform = useMutation({
+    mutationFn: (id: string) => api.delete(`/posts/item/${id}/published`),
+    onSuccess: () => {
+      toast.success("Post dihapus dari platform");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  /** Edit konten/waktu schedule bridge (PUT /public/schedule/{id}). */
+  const editSchedule = useMutation({
+    mutationFn: ({ id, content, scheduledAt }: { id: string; content?: string; scheduledAt?: string }) =>
+      api.put(`/posts/item/${id}/schedule`, { content, scheduledAt }),
+    onSuccess: () => {
+      toast.success("Schedule bridge diperbarui");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  /** Hapus beberapa jadwal sekaligus (DELETE /public/schedule/mass). */
+  const massDelete = useMutation({
+    mutationFn: (ids: string[]) =>
+      api.post<{ deleted: number }>("/posts/mass-delete", { postIds: ids }),
+    onSuccess: (data) => {
+      toast.success(`${data?.deleted ?? 0} jadwal dihapus`);
+      setCheckedIds(new Set());
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const groups = data?.groups ?? [];
   const filtered = groups.filter((g) => {
     if (tab === "all") return true;
@@ -239,6 +278,39 @@ export function QueuePage() {
         />
       ) : (
         <div className="space-y-3">
+          {/* Bulk action bar — hapus beberapa jadwal sekaligus (schedule/mass) */}
+          {checkedIds.size > 0 && (
+            <div className="sticky top-2 z-10 flex items-center justify-between gap-3 rounded-lg border border-[var(--accent-gold)] bg-[var(--accent-gold-light)] p-3 shadow-sm">
+              <span className="font-medium text-[var(--accent-gold)] text-sm">
+                {checkedIds.size} jadwal dipilih
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCheckedIds(new Set())}
+                  className="rounded-lg border border-[var(--border)] px-3 py-1.5 font-medium text-[var(--text-secondary)] text-sm hover:bg-[var(--bg-tertiary)]"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={massDelete.isPending}
+                  onClick={() => {
+                    if (
+                      confirm(
+                        `Hapus ${checkedIds.size} jadwal terpilih? Schedule bridge Repliz juga dibatalkan.`,
+                      )
+                    ) {
+                      massDelete.mutate([...checkedIds]);
+                    }
+                  }}
+                  className="rounded-lg bg-[var(--error)] px-3 py-1.5 font-medium text-sm text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {massDelete.isPending ? "Menghapus…" : "Hapus massal"}
+                </button>
+              </div>
+            </div>
+          )}
           {filtered.map((group) => {
             const status = groupStatus(group.posts);
             const isFailed = status === "failed";
@@ -405,6 +477,21 @@ export function QueuePage() {
                           >
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
+                                {/* Checkbox bulk-select — hanya jadwal yang bisa dihapus */}
+                                {["draft", "scheduled", "failed"].includes(p.status) && (
+                                  <input
+                                    type="checkbox"
+                                    checked={checkedIds.has(p.id)}
+                                    onChange={(e) => {
+                                      const next = new Set(checkedIds);
+                                      if (e.target.checked) next.add(p.id);
+                                      else next.delete(p.id);
+                                      setCheckedIds(next);
+                                    }}
+                                    className="h-3.5 w-3.5 shrink-0 accent-[var(--accent-gold)]"
+                                    aria-label="Pilih untuk hapus massal"
+                                  />
+                                )}
                                 <span
                                   className="font-semibold text-xs"
                                   style={{ color: cfg?.color }}
@@ -483,6 +570,66 @@ export function QueuePage() {
                                       )}
                                     </button>
                                   )}
+                                {/* Edit schedule bridge — ubah caption/waktu tanpa hapus+buat
+                                    (PUT /public/schedule/{id}). Hanya post terjadwal/gagal
+                                    punya scheduleId. */}
+                                {p.isBridge &&
+                                  (p.status === "publishing" || p.status === "failed") &&
+                                  p.platformPostId && (
+                                    <button
+                                      type="button"
+                                      title="Edit jadwal via bridge Repliz"
+                                      disabled={
+                                        editSchedule.isPending && editSchedule.variables?.id === p.id
+                                      }
+                                      onClick={() => {
+                                        const scheduledAt = group.scheduledAt
+                                          ? new Date(group.scheduledAt).toISOString().slice(0, 16)
+                                          : "";
+                                        const newTime = prompt(
+                                          "Waktu jadwal baru (YYYY-MM-DDTHH:mm):",
+                                          scheduledAt,
+                                        );
+                                        if (!newTime) return;
+                                        editSchedule.mutate({
+                                          id: p.id,
+                                          scheduledAt: new Date(newTime).toISOString(),
+                                        });
+                                      }}
+                                      className="shrink-0 rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--accent-gold-light)] hover:text-[var(--accent-gold)] disabled:opacity-50"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                {/* Hapus post bridge yang sudah tayang di platform
+                                    (DELETE /public/content/{id}) — Gold+. */}
+                                {p.isBridge && p.status === "published" && p.platformPostId && (
+                                  <button
+                                    type="button"
+                                    title="Hapus post terbit via bridge Repliz"
+                                    disabled={
+                                      removePublishedFromPlatform.isPending &&
+                                      removePublishedFromPlatform.variables === p.id
+                                    }
+                                    onClick={() => {
+                                      if (
+                                        confirm(
+                                          `Hapus permanen post ${cfg?.label ?? p.platform} @${p.username ?? "—"} yang sudah tayang?`,
+                                        )
+                                      ) {
+                                        removePublishedFromPlatform.mutate(p.id);
+                                      }
+                                    }}
+                                    className="ml-auto shrink-0 rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--error-light)] hover:text-[var(--error)] disabled:opacity-50"
+                                  >
+                                    {removePublishedFromPlatform.isPending &&
+                                    removePublishedFromPlatform.variables === p.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    )}
+                                  </button>
+                                )}
                               </div>
                               {p.errorMessage && (
                                 <p className="mt-1 font-mono text-[var(--error)] text-xs">

@@ -49,6 +49,8 @@ type Item = {
   repliedAt: string | null;
   sentiment: string | null;
   occurredAt: string;
+  // True bila komentar masuk via akun bridge Repliz (moderasi sync Repliz)
+  isBridge: boolean;
 };
 
 type Inbox = { items: Item[]; unreadByType: Record<string, number> };
@@ -188,6 +190,18 @@ function EngagementCard({ item }: { item: Item }) {
     onSuccess: () => {
       invalidate();
       toast.success("Komentar dihapus");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Moderasi bridge Repliz: resolved (selesai) / ignored (abaikan) — sync ke
+  // inbox Repliz sekaligus update status lokal (replied / archived).
+  const moderate = useMutation({
+    mutationFn: (status: "resolved" | "ignored") =>
+      api.put(`/engagement/comments/${item.id}/status`, { status }),
+    onSuccess: (_data, status) => {
+      invalidate();
+      toast.success(status === "resolved" ? "Komentar ditandai selesai" : "Komentar diabaikan");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -411,6 +425,36 @@ function EngagementCard({ item }: { item: Item }) {
                       <Trash2 className="h-3.5 w-3.5" />
                     )}
                     Hapus
+                  </Button>
+                </>
+              )}
+
+              {/* Moderasi bridge Repliz: sync status resolved/ignored ke Repliz */}
+              {item.type === "comment" && item.isBridge && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => moderate.mutate("resolved")}
+                    disabled={moderate.isPending}
+                    title="Tandai selesai dan sync ke Repliz"
+                  >
+                    {moderate.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <CheckCheck className="h-3.5 w-3.5" />
+                    )}
+                    Selesai
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => moderate.mutate("ignored")}
+                    disabled={moderate.isPending}
+                    title="Abaikan komentar di Repliz"
+                  >
+                    <Archive className="h-3.5 w-3.5" />
+                    Abaikan
                   </Button>
                 </>
               )}

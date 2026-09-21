@@ -189,6 +189,14 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
     tokenUrl: "",
     scopes: [],
   },
+  // Shopee: authorize URL dibangun Repliz (open.shopee.com), bukan app kita.
+  // Config di sini hanya agar Record<OAuthPlatform, OAuthConfig> lengkap;
+  // routing connect dilakukan route oauth/start via isReplizRouted().
+  shopee: {
+    authorizeUrl: "",
+    tokenUrl: "",
+    scopes: [],
+  },
 };
 
 /** Platform dengan OAuth redirect flow aktif (bluesky belum — app password) */

@@ -45,6 +45,8 @@ type Account = {
   tokenExpiresAt: string | null;
   hasRefreshToken: boolean;
   createdAt: string;
+  // True bila akun dikelola via bridge Repliz (token platform disimpan Repliz)
+  isBridge: boolean;
 };
 
 /** Hitung status expiry token — null bila token tidak ada batasnya (manual/bluesky) */
@@ -343,6 +345,11 @@ export function AccountsPage() {
 
                 {/* Username + copy */}
                 <div className="mt-4">
+                  {/* Statistik ringan dari Repliz (post/komentar/DM terkini).
+                      Hanya untuk akun bridge; fetch on-demand, cache 5 menit. */}
+                  {account.isBridge && account.isConnected && (
+                    <BridgeStats accountId={account.id} />
+                  )}
                   <div className="flex items-center gap-1.5">
                     <p className="font-medium text-[var(--text-primary)] text-sm">
                       @{account.username}
@@ -660,6 +667,62 @@ export function AccountsPage() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Statistik ringan akun bridge Repliz (jumlah post terjadwal, komentar masuk,
+ * DM belum dibaca). Di-fetch on-demand saat kartu ditampilkan dan di-cache
+ * 5 menit — analytics Repliz tidak boleh disimpan ke DB (lihat catatan
+ * Pinterest sandbox di MEMORY.md, aturan yang sama berlaku untuk semua
+ * statistik bridge on-demand).
+ */
+function BridgeStats({ accountId }: { accountId: string }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["bridge-stats", accountId],
+    queryFn: () =>
+      api.get<{
+        statistic: Record<string, number> | null;
+        unsupported?: boolean;
+      }>(`/accounts/${accountId}/statistic`),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="mb-3 flex items-center gap-1.5 text-[var(--text-muted)] text-xs">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Memuat statistik bridge…
+      </div>
+    );
+  }
+
+  // Bridge terkadang tidak mengembalikan statistik (akun baru / endpoint
+  // belum siap) — gagal secara senyap, bukan tampilkan error merah.
+  if (error || !data?.statistic) return null;
+
+  const s = data.statistic;
+  const stats = [
+    { label: "Post terjadwal", value: s.scheduledPosts ?? s.posts ?? 0 },
+    { label: "Komentar", value: s.comments ?? 0 },
+    { label: "DM belum dibaca", value: s.unreadChats ?? s.chats ?? 0 },
+  ].filter((x) => x.value > 0);
+
+  if (stats.length === 0) return null;
+
+  return (
+    <div className="mb-3 flex flex-wrap gap-1.5">
+      {stats.map((x) => (
+        <span
+          key={x.label}
+          className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]"
+          title={`Statistik Repliz: ${x.label}`}
+        >
+          {x.label} <strong className="font-semibold">{x.value}</strong>
+        </span>
+      ))}
     </div>
   );
 }

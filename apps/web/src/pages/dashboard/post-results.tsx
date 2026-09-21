@@ -4,16 +4,18 @@
 //
 // Layout grid dgn thumbnail media (seperti profil sosmed) — lebih mudah
 // mengenali post secara visual dibanding list teks.
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
   ExternalLink,
   Eye,
   Heart,
   ImageIcon,
+  Loader2,
   MessageCircle,
   Play,
   Share2,
+  Trash2,
   TrendingUp,
   X,
 } from "lucide-react";
@@ -25,6 +27,7 @@ import { formatCompact, formatDate } from "@/lib/format";
 import { PLATFORMS } from "@/lib/platforms";
 import { useSeo } from "@/lib/seo";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type PostMedia = {
   url: string;
@@ -38,6 +41,8 @@ type TopPost = {
   platform: string;
   content: string;
   platformPostUrl: string | null;
+  platformPostId: string | null;
+  isBridge: boolean;
   publishedAt: string | null;
   username: string | null;
   displayName: string | null;
@@ -84,7 +89,32 @@ function sortPosts(posts: TopPost[], sort: SortKey): TopPost[] {
   return [...posts].sort((a, b) => value(b) - value(a));
 }
 
-function PostCard({ post, rank, onPlay }: { post: TopPost; rank: number; onPlay: () => void }) {
+function PostCard({
+  post,
+  rank,
+  onPlay,
+}: {
+  post: TopPost;
+  rank: number;
+  onPlay: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+
+  // Hapus post terbit dari platform (bridge Repliz only — hapus permanen di
+  // sisi platform, tidak bisa di-undo).
+  const deletePlatformPost = useMutation({
+    mutationFn: () => api.delete(`/posts/item/${post.postId}/published`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["top-posts"] });
+      toast.success("Post dihapus di platform");
+      setConfirming(false);
+    },
+    onError: (e: Error) => {
+      toast.error(e.message);
+      setConfirming(false);
+    },
+  });
   const cfg = PLATFORMS[post.platform as keyof typeof PLATFORMS];
   const Icon = cfg?.icon;
   const isVideo = post.media?.type === "video";
@@ -234,11 +264,52 @@ function PostCard({ post, rank, onPlay }: { post: TopPost; rank: number; onPlay:
               href={post.platformPostUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="ml-auto inline-flex items-center gap-1 text-[11px] text-[var(--accent-gold)] hover:underline"
+              className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-gold)] hover:underline"
               aria-label="Buka post di platform"
             >
               <ExternalLink className="h-3 w-3" />
             </a>
+          )}
+
+          {/* Hapus post di platform — hanya untuk akun bridge Repliz.
+              Konfirmasi inline karena tindakan permanen (undo tidak ada). */}
+          {post.isBridge && post.platformPostId && (
+            <div className="ml-auto flex items-center">
+              {confirming ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => deletePlatformPost.mutate()}
+                    disabled={deletePlatformPost.isPending}
+                    className="inline-flex items-center gap-1 rounded bg-red-500/15 px-1.5 py-0.5 font-medium text-[10px] text-red-600 hover:bg-red-500/25 disabled:opacity-40"
+                  >
+                    {deletePlatformPost.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3 w-3" />
+                    )}
+                    Yakin?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(false)}
+                    className="ml-1 text-[10px] text-[var(--text-muted)] hover:underline"
+                  >
+                    Batal
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirming(true)}
+                  className="inline-flex items-center text-[11px] text-[var(--text-muted)] opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+                  aria-label="Hapus post di platform"
+                  title="Hapus post di platform (permanen)"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

@@ -10,7 +10,7 @@ import {
   productTag,
   socialAccount,
 } from "@sahabatkreator/db/schema";
-import { claimPostById, publishPost, replizActiveCredentials, replizRemoveSchedule, replizRetrySchedule, syncWorkspacePosts } from "@sahabatkreator/publishing";
+import { claimPostById, publishPost, replizActiveCredentials, replizDeleteContent, replizListContent, replizMassDeleteSchedules, replizRemoveSchedule, replizRetrySchedule, replizUpdateSchedule, syncWorkspacePosts } from "@sahabatkreator/publishing";
 import {
   cancelPostReminder,
   cancelPublishJob,
@@ -108,6 +108,9 @@ postsRoute.get("/", async (c) => {
         username: socialAccount.username,
         displayName: socialAccount.displayName,
         avatarUrl: socialAccount.avatarUrl,
+        // Flag routing: post ini dipublikasi via bridge Repliz (bukan API native).
+        // UI memakainya untuk menampilkan aksi khusus bridge (retry, hapus di platform).
+        isBridge: sql<boolean>`(${socialAccount.metadata}->>'replizAccountId') IS NOT NULL`,
       })
       .from(post)
       .innerJoin(socialAccount, eq(post.socialAccountId, socialAccount.id))
@@ -729,6 +732,241 @@ postsRoute.delete("/:id", async (c) => {
     return errorResponse(error);
   }
 });
+
+/** PUT /posts/item/:id/schedule — ubah konten/waktu schedule bridge Repliz.
+ * Hanya utk post publishing/failed yg punya scheduleId (platformPostId).
+ * Dipakai queue page utk "edit jadwal" tanpa harus hapus + buat ulang. */
+postsRoute.put("/item/:id/schedule", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+    const [row] = await db
+      .select({
+        id: post.id,
+        platform: post.platform,
+        status: post.status,
+        platformPostId: post.platformPostId,
+        content: post.content,
+        socialAccountId: post.socialAccountId,
+        groupId: sql<string>`${post.postGroupId}`,
+        scheduledAt: postGroup.scheduledAt,
+      })
+      .from(post)
+      .innerJoin(postGroup, eq(post.postGroupId, postGroup.id))
+      .where(and(eq(post.id, c.req.param("id")), eq(postGroup.organizationId, ctx.organization.id)))
+      .limit(1);
+    if (!row) return c.json({ message: "Post tidak ditemukan" }, 404);
+    if (row.status !== "publishing" && row.status !== "failed") {
+      return c.json({ message: "Hanya post terjadwal/gagal yang bisa diubah schedule-nya" }, 400);
+    }
+    if (!row.platformPostId) {
+      return c.json({ message: "Post ini tidak memiliki schedule bridge" }, 400);
+    }
+
+    const input = z
+      .object({
+        content: z.string().optional(),
+        scheduledAt: z.string().datetime().optional(),
+      })
+      .parse(await c.req.json());
+
+    const [account] = await db
+      .select({ metadata: socialAccount.metadata })
+      .from(socialAccount)
+      .where(eq(socialAccount.id, row.socialAccountId))
+      .limit(1);
+    const replizAccountId = (account?.metadata as { replizAccountId?: string } | null)?.replizAccountId;
+    if (!replizAccountId) {
+      return c.json({ message: "Akun platform ini tidak terhubung via bridge Repliz" }, 400);
+    }
+
+    const cred = await replizActiveCredentials();
+    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
+
+    // Ambungkan input: content baru + waktu baru (fallback ke yang ada).
+    const newContent = input.content ?? row.content ?? "";
+    const newTime = input.scheduledAt ?? (row.scheduledAt ? row.scheduledAt.toISOString() : undefined);
+    if (!newTime) return c.json({ message: "Waktu jadwal wajib diisi" }, 400);
+
+    // Schedule Repliz berbasis media URL; update hanya caption/waktu — medias
+    // tidak bisa diubah lewat endpoint ini (docs: PUT pakai shape create sama,
+    // tapi media upload ulang di luar scope ini). Type diset "text" bila tak ada
+    // media; Repliz menolak type tanpa medias hanya utk image/video.
+    await replizUpdateSchedule(cred, row.platformPostId, {
+      description: newContent,
+      type: "text",
+      medias: [],
+      accountId: replizAccountId,
+      scheduleAt: newTime,
+      topic: row.platform,
+    });
+
+    if (input.scheduledAt) {
+      await db
+        .update(postGroup)
+        .set({ scheduledAt: new Date(input.scheduledAt) })
+        .where(eq(postGroup.id, row.groupId));
+    }
+    if (input.content !== undefined) {
+      await db.update(post).set({ content: input.content }).where(eq(post.id, row.id));
+    }
+
+    void fireActivity({
+      orgId: ctx.organization.id,
+      action: "post.schedule_updated",
+      targetType: "post",
+      targetId: row.id,
+      metadata: { platform: row.platform, via: "repliz" },
+    });
+
+    return c.json({ ok: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** POST /posts/mass-delete — hapus beberapa schedule bridge sekaligus.
+ * Body { postIds: string[] } — semua harus milik org & punya scheduleId.
+ * Pakai DELETE /public/schedule/mass (scheduleIds[]) — efisien utk bulk cancel. */
+postsRoute.post("/mass-delete", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+    const input = z.object({ postIds: z.array(z.string().min(1)).min(1).max(100) }).parse(
+      await c.req.json(),
+    );
+
+    const rows = await db
+      .select({
+        id: post.id,
+        platform: post.platform,
+        status: post.status,
+        platformPostId: post.platformPostId,
+      })
+      .from(post)
+      .innerJoin(postGroup, eq(post.postGroupId, postGroup.id))
+      .where(and(inArray(post.id, input.postIds), eq(postGroup.organizationId, ctx.organization.id)));
+    if (rows.length === 0) return c.json({ message: "Post tidak ditemukan" }, 404);
+
+    const scheduleIds = rows
+      .filter((r) => r.platformPostId && (r.status === "publishing" || r.status === "failed"))
+      .map((r) => String(r.platformPostId));
+
+    const cred = await replizActiveCredentials();
+    if (cred && scheduleIds.length > 0) {
+      try {
+        await replizMassDeleteSchedules(cred, scheduleIds);
+      } catch (err) {
+        // Best-effort: jangan gagalkan delete lokal (sama dgn cancel single).
+        console.warn("[posts] Mass delete Repliz best-effort gagal:", err);
+      }
+    }
+
+    // Job lokal dimatikan + baris DB dihapus per item.
+    for (const r of rows) {
+      await cancelPublishJob(r.id, r.platform);
+      await db.delete(post).where(eq(post.id, r.id));
+    }
+
+    void fireActivity({
+      orgId: ctx.organization.id,
+      action: "post.mass_deleted",
+      targetType: "post",
+      targetId: ctx.organization.id,
+      metadata: { count: rows.length, via: "repliz" },
+    });
+
+    return c.json({ ok: true, deleted: rows.length, scheduleCancelled: scheduleIds.length });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** DELETE /posts/item/:id/published — hapus post yang SUDAH tayang di platform.
+ * Khusus akun bridge (Gold+): DELETE /public/content/{id}?accountId=…
+ * Post native butuh token platform masing-masing (di luar scope ini). */
+postsRoute.delete("/item/:id/published", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+    const [row] = await db
+      .select({
+        id: post.id,
+        platform: post.platform,
+        status: post.status,
+        platformPostId: post.platformPostId,
+        socialAccountId: post.socialAccountId,
+      })
+      .from(post)
+      .innerJoin(postGroup, eq(post.postGroupId, postGroup.id))
+      .where(and(eq(post.id, c.req.param("id")), eq(postGroup.organizationId, ctx.organization.id)))
+      .limit(1);
+    if (!row) return c.json({ message: "Post tidak ditemukan" }, 404);
+    if (row.status !== "published" || !row.platformPostId) {
+      return c.json({ message: "Hanya post sudah tayang yang bisa dihapus dari platform" }, 400);
+    }
+
+    const [account] = await db
+      .select({ metadata: socialAccount.metadata })
+      .from(socialAccount)
+      .where(eq(socialAccount.id, row.socialAccountId))
+      .limit(1);
+    const replizAccountId = (account?.metadata as { replizAccountId?: string } | null)?.replizAccountId;
+    if (!replizAccountId) {
+      return c.json({ message: "Akun platform ini tidak terhubung via bridge Repliz" }, 400);
+    }
+
+    const cred = await replizActiveCredentials();
+    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
+
+    // Cek konten ada di Repliz (404 = sudah hilang/belum terbentuk → tetap lanjut).
+    const contentId = await resolveReplizContentId(cred, replizAccountId, row.platformPostId);
+    if (contentId) {
+      await replizDeleteContent(cred, contentId, replizAccountId);
+    }
+
+    await db
+      .update(post)
+      .set({ status: "canceled", platformPostUrl: null })
+      .where(eq(post.id, row.id));
+
+    void fireActivity({
+      orgId: ctx.organization.id,
+      action: "post.deleted_from_platform",
+      targetType: "post",
+      targetId: row.id,
+      metadata: { platform: row.platform, via: "repliz" },
+    });
+
+    return c.json({ ok: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/**
+ * Cari contentId Repliz untuk post yang sudah tayang. PlatformPostId kita =
+ * postId platform (mis. IG media id). ContentId Repliz bisa sama atau berbeda —
+ * scan halaman pertama GET /public/content?accountId=… untuk cocokkan id/url.
+ * Return null bila tidak ketemu (post mungkin dihapus user di platform langsung).
+ */
+async function resolveReplizContentId(
+  cred: NonNullable<Awaited<ReturnType<typeof replizActiveCredentials>>>,
+  replizAccountId: string,
+  platformPostId: string,
+): Promise<string | null> {
+  try {
+    let nextToken: string | undefined;
+    for (let page = 0; page < 5; page++) {
+      const res = await replizListContent(cred, replizAccountId, { type: "media", nextToken });
+      const hit = res.docs.find((d) => d.id === platformPostId);
+      if (hit) return hit.id;
+      if (!res.nextToken) break;
+      nextToken = res.nextToken;
+    }
+    return null;
+  } catch (err) {
+    console.warn("[posts] Cari contentId Repliz gagal:", err);
+    return null;
+  }
+}
 
 /** POST /posts/:id/reminder — aktifkan pengingat push untuk post manual terjadwal.
  * Post manual (platform "manual") tidak dipublikasi otomatis — pengingat dikirim

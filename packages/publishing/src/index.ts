@@ -147,6 +147,47 @@ export {
   replizGetLinkMetadata,
   type ReplizCommentStatus,
   type ReplizLinkMetadata,
+  // Automation & template (Gold+)
+  type ReplizAutomation,
+  type ReplizAutomationConfig,
+  type ReplizAutomationTemplate,
+  replizCreateAutomation,
+  replizGetOneAutomation,
+  replizListAutomations,
+  replizUpdateAutomation,
+  replizRemoveAutomation,
+  replizCreateTemplate,
+  replizGetOneTemplate,
+  replizListTemplates,
+  replizUpdateTemplate,
+  replizRemoveTemplate,
+  // Report eksekusi automation
+  type ReplizReport,
+  type ReplizReportStatus,
+  type ReplizReportType,
+  replizGetOneReport,
+  replizListReports,
+  replizRetryReport,
+  // Research Threads
+  type ReplizThreadsContent,
+  type ReplizThreadsUser,
+  replizListThreadsUserContent,
+  replizSearchThreadsContent,
+  replizSearchThreadsUser,
+  // Add-on: Shopee product & TikTok music
+  type ReplizShopeeProduct,
+  type ReplizTiktokMusic,
+  type ReplizTiktokMusicDateRange,
+  type ReplizTiktokMusicGenre,
+  replizListShopeeProducts,
+  replizListTiktokMusic,
+  // Chat detail & schedule list
+  replizGetOneChat,
+  replizListSchedules,
+  // OAuth helpers
+  replizNeedsEntity,
+  replizNeedsExchange,
+  replizReconnectInput,
 } from "./repliz";
 export * from "./reply";
 export {

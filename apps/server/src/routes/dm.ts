@@ -262,9 +262,43 @@ dmRoute.get("/", async (c) => {
   }
 });
 
-/** GET /dm/unread-count — badge sidebar/notifikasi */
-dmRoute.get("/unread-count", async (c) => {
+/** GET /dm/:id/chat — detail percakapan di sisi Repliz (akun bridge only).
+ * Melengkapi data lokal: pesan partisipan, status read platform, dll.
+ * Untuk akun bridge, platform_conversation_id = Repliz chat _id (lihat dm-sync). */
+dmRoute.get("/:id/chat", async (c) => {
   try {
+    const ctx = await requirePermission(c, "engagement.view");
+    const [row] = await db
+      .select({
+        platformConversationId: dmConversation.platformConversationId,
+        metadata: socialAccount.metadata,
+      })
+      .from(dmConversation)
+      .innerJoin(socialAccount, eq(dmConversation.socialAccountId, socialAccount.id))
+      .where(
+        and(eq(dmConversation.id, c.req.param("id")), eq(dmConversation.organizationId, ctx.organization.id)),
+      )
+      .limit(1);
+    if (!row) return c.json({ message: "Percakapan tidak ditemukan" }, 404);
+
+    const isBridge = isBridgeAccount(row.metadata);
+    if (!isBridge) {
+      return c.json({ message: "Percakapan ini bukan dari akun bridge Repliz" }, 400);
+    }
+    const cred = await getReplizCredentials();
+    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
+
+    const { replizGetOneChat } = await import("@sahabatkreator/publishing");
+    const data = await replizGetOneChat(cred, row.platformConversationId);
+    if (!data) return c.json({ message: "Percakapan tidak ditemukan di Repliz" }, 404);
+    return c.json(data);
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** GET /dm/unread-count — badge sidebar/notifikasi */
+dmRoute.get("/unread-count", async (c) => {  try {
     const ctx = await requirePermission(c, "engagement.view");
     const [row] = await db
       .select({

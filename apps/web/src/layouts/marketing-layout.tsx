@@ -34,10 +34,13 @@ function useSitewideJsonLd() {
             description:
               "Platform manajemen social media all-in-one untuk kreator dan bisnis Indonesia — jadwal posting, analitik, dan kolaborasi tim.",
             sameAs: [
-              "https://www.instagram.com/sahabatkreator",
-              "https://www.tiktok.com/@sahabatkreator",
-              "https://www.youtube.com/@sahabatkreator",
-              "https://x.com/sahabatkreator",
+              "https://www.facebook.com/sahabatkreatorcom",
+              "https://www.instagram.com/sahabatkreatorcom",
+              "https://www.youtube.com/@sahabatkreatorcom",
+              "https://www.tiktok.com/@sahabatkreatorcom",
+              "https://www.threads.com/@sahabatkreatorcom",
+              "https://www.linkedin.com/company/sahabat-kreator",
+              "https://www.pinterest.com/sahabatkreator",
             ],
           },
           {

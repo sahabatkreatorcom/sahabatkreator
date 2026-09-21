@@ -54,6 +54,10 @@ export async function handleReplizCallback(c: Context): Promise<Response> {
     if (errorParam) return failRedirect(errorParam);
     if (!code || !state) return failRedirect("Kode otorisasi tidak lengkap");
 
+    // Shopee mengembalikan code + shop_id terpisah di redirect; Repliz connect
+    // butuh keduanya digabung "{code}_{shop_id}" (docs "Connect Shopee").
+    const shopeeShopId = isPost ? null : c.req.query("shop_id");
+
     const [stateRow] = await db
       .delete(oauthState)
       .where(and(eq(oauthState.state, state), eq(oauthState.platform, platform)))
@@ -83,10 +87,14 @@ export async function handleReplizCallback(c: Context): Promise<Response> {
       platform === "instagram" ||
       platform === "instagram_standalone" ||
       platform === "threads" ||
-      platform === "tiktok"
+      platform === "tiktok" ||
+      platform === "shopee"
     ) {
       const { replizConnectAccount, replizGetAccount } = await import("@sahabatkreator/publishing");
-      const accountId = await replizConnectAccount(cred, platformKey, { code });
+      // Shopee: code_{shop_id}; platform lain: code mentah.
+      const connectCode =
+        platform === "shopee" && shopeeShopId ? `${code}_${shopeeShopId}` : code;
+      const accountId = await replizConnectAccount(cred, platformKey, { code: connectCode });
       const info = await replizGetAccount(cred, accountId);
       return await upsertReplizAccount(c, { platform, accountId, info, stateRow });
     }
