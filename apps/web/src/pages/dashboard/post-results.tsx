@@ -343,6 +343,15 @@ export function PostResultsPage() {
     refetchInterval: 60_000,
   });
 
+  // Daftar akun terhubung — chip platform di-derive dari sini (bukan hanya
+  // dari post yg ada) agar SEMUA platform terhubung muncul, meski belum ada
+  // post tayang. Platform tanpa post → filter menampilkan empty state.
+  const { data: accountsData } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: () => api.get<{ accounts: { platform: string; isConnected: boolean }[] }>("/accounts"),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const allPosts = data?.posts ?? [];
 
   // Daftar akun stabil dari dataset lengkap (username unik per org).
@@ -373,9 +382,28 @@ export function PostResultsPage() {
     sort,
   );
 
-  // Daftar platform filter stabil — diambil dari data LENGKAP, bukan hasil
-  // filter, agar tombol tidak pernah hilang saat salah satu dipilih.
-  const availablePlatforms = [...new Set(allPosts.map((p) => p.platform))];
+  // Daftar platform filter stabil — gabungan platform dari akun TERHUBUNG
+  // (agar semua platform muncul meski belum ada post) + platform yg punya
+  // post (mis. post impor/eksternal dari akun yg sudah dihapus). Diambil dari
+  // data lengkap, bukan hasil filter, agar tombol tidak pernah hilang saat
+  // salah satu dipilih.
+  const availablePlatforms = [
+    ...new Set<string>([
+      ...(accountsData?.accounts ?? [])
+        .filter((a) => a.isConnected)
+        .map((a) => a.platform),
+      ...allPosts.map((p) => p.platform),
+    ]),
+  ].sort((a, b) => {
+    // Urut sesuai urutan definisi PLATFORMS, platform asing di belakang.
+    const order = Object.keys(PLATFORMS);
+    const ia = order.indexOf(a);
+    const ib = order.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
 
   // Ringkasan agregat untuk tampilan saat ini (mencocokkan grid yang terlihat)
   const totals = posts.reduce(
@@ -547,8 +575,12 @@ export function PostResultsPage() {
       ) : posts.length === 0 ? (
         <EmptyState
           icon={<BarChart3 className="h-10 w-10" />}
-          title="Belum ada post tayang"
-          description="Hasil post muncul di sini setidaknya satu post berhasil diterbitkan dan analytics-nya tersinkron."
+          title={platform !== "all" ? "Belum ada post untuk platform ini" : "Belum ada post tayang"}
+          description={
+            platform !== "all"
+              ? `Akun ${PLATFORMS[platform as keyof typeof PLATFORMS]?.label ?? platform} sudah terhubung, tapi belum ada post yang diterbitkan melalui platform ini.`
+              : "Hasil post muncul di sini setidaknya satu post berhasil diterbitkan dan analytics-nya tersinkron."
+          }
         />
       ) : (
         // Grid responsif: 2 kolom mobile → 5 kolom layar besar

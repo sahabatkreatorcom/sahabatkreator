@@ -213,9 +213,25 @@ function BrandVoiceTab() {
 // Tab Content Pillars
 // ---------------------------------------------------------------------------
 
+/** Palet warna pilar — dipakai sebagai identitas visual pilar di seluruh app.
+ *  Sengaja preset (bukan color picker bebas) supaya selalu kontras & konsisten. */
+const PILLAR_COLORS = [
+  "#3b82f6", // biru
+  "#8b5cf6", // ungu
+  "#ec4899", // pink
+  "#ef4444", // merah
+  "#f59e0b", // amber
+  "#10b981", // hijau
+  "#14b8a6", // teal
+  "#64748b", // abu
+];
+
 function PillarsTab() {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [color, setColor] = useState<string>(PILLAR_COLORS[0]);
+  const [expanded, setExpanded] = useState(false);
 
   const { data } = useQuery({
     queryKey: ["pillars"],
@@ -223,10 +239,18 @@ function PillarsTab() {
   });
 
   const create = useMutation({
-    mutationFn: () => api.post("/strategy/pillars", { name }),
+    mutationFn: () =>
+      api.post("/strategy/pillars", {
+        name: name.trim(),
+        description: description.trim() || null,
+        color,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pillars"] });
       setName("");
+      setDescription("");
+      setColor(PILLAR_COLORS[0]);
+      setExpanded(false);
       toast.success("Pillar ditambahkan");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -249,20 +273,72 @@ function PillarsTab() {
         Kategori strategi konten Anda — mis. Edukasi 40%, Promosi 30%, Hiburan 30%.
       </p>
       <form
-        className="flex gap-2"
+        className="space-y-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] p-4"
         onSubmit={(e) => {
           e.preventDefault();
           if (name.trim()) create.mutate();
         }}
       >
-        <Input
-          placeholder="Nama pillar, mis. Edukasi Produk"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Button type="submit" disabled={create.isPending || !name.trim()}>
-          <Plus className="h-4 w-4" /> Tambah
-        </Button>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Nama pillar, mis. Edukasi Produk"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="flex-1"
+          />
+          <Button type="submit" disabled={create.isPending || !name.trim()}>
+            <Plus className="h-4 w-4" /> Tambah
+          </Button>
+        </div>
+
+        {expanded && (
+          <>
+            <div className="space-y-1.5">
+              <Label className="text-xs">
+                Deskripsi <span className="text-[var(--text-muted)]">(opsional)</span>
+              </Label>
+              <Textarea
+                placeholder="Topik & angle apa yang masuk pilar ini? Mis. tutorial produk, tips pemakaian, FAQ"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                maxLength={500}
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Warna pilar</Label>
+              <div className="flex flex-wrap gap-2">
+                {PILLAR_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    aria-label={`Pilih warna ${c}`}
+                    aria-pressed={color === c}
+                    className={cn(
+                      "h-7 w-7 rounded-full transition",
+                      color === c
+                        ? "ring-2 ring-[var(--text)] ring-offset-2 ring-offset-[var(--bg-secondary)]"
+                        : "opacity-60 hover:opacity-100",
+                    )}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {!expanded && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="text-[var(--text-muted)] text-xs hover:underline"
+          >
+            + Tambah deskripsi & warna
+          </button>
+        )}
       </form>
       {pillars.length === 0 ? (
         <p className="text-[var(--text-muted)] text-sm">
@@ -275,11 +351,20 @@ function PillarsTab() {
               key={p.id}
               className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-3"
             >
-              <div>
-                <p className="font-medium text-sm">{p.name}</p>
-                {p.description && (
-                  <p className="text-[var(--text-muted)] text-xs">{p.description}</p>
+              <div className="flex min-w-0 items-start gap-3">
+                {p.color && (
+                  <span
+                    className="mt-1 h-3 w-3 shrink-0 rounded-full"
+                    style={{ backgroundColor: p.color }}
+                    aria-hidden
+                  />
                 )}
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">{p.name}</p>
+                  {p.description && (
+                    <p className="text-[var(--text-muted)] text-xs">{p.description}</p>
+                  )}
+                </div>
               </div>
               <button
                 type="button"

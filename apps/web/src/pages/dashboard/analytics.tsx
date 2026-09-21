@@ -459,7 +459,92 @@ export function AnalyticsPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Top posts */}
+        {/* Followers per akun — dipindah ke atas, sejajar dengan "Waktu Terbaik
+            Posting" (keduanya pendek). "Konten Terbaik" (panjang) turun ke
+            bawah menemani "Performa Hashtag" agar tinggi card seimbang. */}
+        <div className="card p-6">
+          <h2 className="mb-4 font-semibold">Followers per Akun</h2>
+          {(overview?.accounts ?? []).length === 0 ? (
+            <EmptyState title="Belum ada akun terhubung" />
+          ) : (
+            <ul className="space-y-3">
+              {(overview?.accounts ?? []).map((a) => {
+                const cfg = PLATFORMS[a.platform as keyof typeof PLATFORMS];
+                const Icon = cfg?.icon;
+                return (
+                  <li key={a.id} className="flex items-center gap-3">
+                    {Icon && (
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bg-tertiary)]">
+                        <Icon className="h-4 w-4" style={{ color: cfg.color }} />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-sm">@{a.username}</p>
+                      <p className="text-[var(--text-muted)] text-xs">{cfg?.label}</p>
+                    </div>
+                    <span className="font-semibold">
+                      {a.followers != null ? formatNumber(a.followers) : "—"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Waktu terbaik posting */}
+        <div className="card p-6">
+          <div className="mb-1 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-[var(--accent-gold)]" />
+            <h2 className="font-semibold">Waktu Terbaik Posting</h2>
+          </div>
+          <p className="mb-4 text-[var(--text-secondary)] text-xs">
+            {optimalTimes?.allHeuristic
+              ? "Saran berbasis pola aktif pengguna sosmed Indonesia (WIB) — akan membaik seiring data historis Anda."
+              : "Slot dengan engagement tertinggi dari data historis Anda (WIB)."}
+          </p>
+          {(optimalTimes?.slots ?? []).length === 0 ? (
+            <EmptyState title="Belum ada saran" />
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {(optimalTimes?.slots ?? []).map((s) => {
+                const cfg = PLATFORMS[s.platform as keyof typeof PLATFORMS];
+                const Icon = cfg?.icon;
+                return (
+                  <div
+                    key={`${s.platform}-${s.dayOfWeek}-${s.hour}`}
+                    className="flex flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] p-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-sm">{s.label}</span>
+                      <span
+                        className={
+                          s.score >= 80
+                            ? "font-bold text-emerald-600 text-xs dark:text-emerald-400"
+                            : s.score >= 60
+                              ? "font-bold text-amber-600 text-xs dark:text-amber-400"
+                              : "font-bold text-[var(--text-muted)] text-xs"
+                        }
+                      >
+                        {s.score}
+                      </span>
+                    </div>
+                    {Icon && (
+                      <span className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+                        <Icon className="h-3 w-3" style={{ color: cfg.color }} />
+                        {cfg.label}
+                        {s.heuristic ? " · estimasi" : ` · ${s.sampleCount} post`}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Konten Terbaik — dipindah ke bawah, menemani "Performa Hashtag"
+            (keduanya panjang) agar tidak ada card pendangkal di sampingnya. */}
         <div className="card p-6">
           <h2 className="mb-4 font-semibold">Konten Terbaik</h2>
           {topLoading ? (
@@ -525,90 +610,8 @@ export function AnalyticsPage() {
           )}
         </div>
 
-        {/* Waktu terbaik posting */}
-        <div className="card p-6">
-          <div className="mb-1 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-[var(--accent-gold)]" />
-            <h2 className="font-semibold">Waktu Terbaik Posting</h2>
-          </div>
-          <p className="mb-4 text-[var(--text-secondary)] text-xs">
-            {optimalTimes?.allHeuristic
-              ? "Saran berbasis pola aktif pengguna sosmed Indonesia (WIB) — akan membaik seiring data historis Anda."
-              : "Slot dengan engagement tertinggi dari data historis Anda (WIB)."}
-          </p>
-          {(optimalTimes?.slots ?? []).length === 0 ? (
-            <EmptyState title="Belum ada saran" />
-          ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {(optimalTimes?.slots ?? []).map((s) => {
-                const cfg = PLATFORMS[s.platform as keyof typeof PLATFORMS];
-                const Icon = cfg?.icon;
-                return (
-                  <div
-                    key={`${s.platform}-${s.dayOfWeek}-${s.hour}`}
-                    className="flex flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] p-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-sm">{s.label}</span>
-                      <span
-                        className={
-                          s.score >= 80
-                            ? "font-bold text-emerald-600 text-xs dark:text-emerald-400"
-                            : s.score >= 60
-                              ? "font-bold text-amber-600 text-xs dark:text-amber-400"
-                              : "font-bold text-[var(--text-muted)] text-xs"
-                        }
-                      >
-                        {s.score}
-                      </span>
-                    </div>
-                    {Icon && (
-                      <span className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
-                        <Icon className="h-3 w-3" style={{ color: cfg.color }} />
-                        {cfg.label}
-                        {s.heuristic ? " · estimasi" : ` · ${s.sampleCount} post`}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Followers per akun */}
-        <div className="card p-6">
-          <h2 className="mb-4 font-semibold">Followers per Akun</h2>
-          {(overview?.accounts ?? []).length === 0 ? (
-            <EmptyState title="Belum ada akun terhubung" />
-          ) : (
-            <ul className="space-y-3">
-              {(overview?.accounts ?? []).map((a) => {
-                const cfg = PLATFORMS[a.platform as keyof typeof PLATFORMS];
-                const Icon = cfg?.icon;
-                return (
-                  <li key={a.id} className="flex items-center gap-3">
-                    {Icon && (
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bg-tertiary)]">
-                        <Icon className="h-4 w-4" style={{ color: cfg.color }} />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-sm">@{a.username}</p>
-                      <p className="text-[var(--text-muted)] text-xs">{cfg?.label}</p>
-                    </div>
-                    <span className="font-semibold">
-                      {a.followers != null ? formatNumber(a.followers) : "—"}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-
-        {/* Performa hashtag — diletakkan di grid agar sejajar dengan "Followers
-            per Akun" (tidak ada kolom kosong di sampingnya). Demografi Audiens
+        {/* Performa hashtag — diletakkan di grid agar sejajar dengan "Konten
+            Terbaik" (tidak ada kolom kosong di sampingnya). Demografi Audiens
             tetap full-width di bawah grid. */}
         <HashtagPerformancePanel days={effectiveDays} />
       </div>
