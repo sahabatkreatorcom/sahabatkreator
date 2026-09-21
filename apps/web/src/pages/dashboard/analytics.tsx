@@ -606,6 +606,11 @@ export function AnalyticsPage() {
             </ul>
           )}
         </div>
+
+        {/* Performa hashtag — diletakkan di grid agar sejajar dengan "Followers
+            per Akun" (tidak ada kolom kosong di sampingnya). Demografi Audiens
+            tetap full-width di bawah grid. */}
+        <HashtagPerformancePanel days={effectiveDays} />
       </div>
 
       {/* Demografi audiens (IG) — gender × usia */}
@@ -616,9 +621,6 @@ export function AnalyticsPage() {
           username: a.username,
         }))}
       />
-
-      {/* Performa hashtag — top hashtag berdasarkan engagement */}
-      <HashtagPerformancePanel days={effectiveDays} />
 
       {/* Analytics Pinterest — fetch on-demand (compliance: tidak disimpan) */}
       <PinterestAnalyticsPanel />

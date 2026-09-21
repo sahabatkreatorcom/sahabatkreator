@@ -122,15 +122,13 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
           {(error as Error).message || "Gagal memuat demografi audiens"}
         </p>
       ) : !data || !hasData ? (
-        <div className="space-y-2">
-          <EmptyState
-            title="Data belum tersedia"
-            description="Platform belum mengirim data demografi untuk akun ini (butuh audiens minimum). Coba lagi nanti."
-          />
-          {data?.notice && (
-            <p className="break-words text-[11px] text-[var(--text-muted)]">{data.notice}</p>
-          )}
-        </div>
+        <EmptyState
+          title="Data belum tersedia"
+          description={
+            data?.notice ??
+            "Platform belum mengirim data demografi untuk akun ini (butuh audiens minimum). Coba lagi nanti."
+          }
+        />
       ) : (
         <div className="space-y-5">
           {/* Ringkasan per gender */}

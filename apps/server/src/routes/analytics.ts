@@ -19,6 +19,7 @@ import {
 import { and, eq, gte, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { errorResponse, HTTPError, requireOrg } from "../lib/auth-guard";
+import { isBridgeAccount } from "../lib/bridge";
 import { decrypt } from "../lib/crypto";
 
 export const analyticsRoute = new Hono();
@@ -634,6 +635,21 @@ analyticsRoute.get("/demographics", async (c) => {
     }
 
     if (!account.isConnected || !account.accessTokenEnc) {
+      // Akun bridge Repliz tidak menyimpan token platform di sini (Repliz yang
+      // memegangnya), sehingga tidak bisa memanggil Insights API langsung.
+      // Beri notice yang jelas alih-alih error "hubungkan ulang" — reconnect
+      // via bridge tetap tidak akan menghasilkan data ini.
+      if (isBridgeAccount(account.metadata)) {
+        return c.json({
+          genderAge: [],
+          byGender: [],
+          byAge: [],
+          source: account.platform,
+          username: account.username,
+          notice:
+            "Demografi audiens tidak tersedia untuk akun yang dihubungkan via bridge Repliz — token platform tidak disimpan di sini. Hubungkan akun secara langsung (native) untuk mendapatkan data gender & usia.",
+        });
+      }
       throw new HTTPError(400, "Akun belum terhubung — hubungkan ulang akun");
     }
 
