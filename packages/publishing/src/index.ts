@@ -128,6 +128,25 @@ export {
   replizRemoveSchedule,
   replizReplyComment,
   replizSendChatMessage,
+  // Schedule management (edit / retry / mass-delete)
+  replizUpdateSchedule,
+  replizRetrySchedule,
+  replizMassDeleteSchedules,
+  // Comment moderation & engagement
+  replizUpdateCommentStatus,
+  replizGetComment,
+  replizListContentComments,
+  replizLikeComment,
+  replizMessageComment,
+  replizDeleteContentComment,
+  replizDeleteContent,
+  // Account stats & count
+  replizGetAccountStatistic,
+  replizCountAccounts,
+  // Add-on: link metadata
+  replizGetLinkMetadata,
+  type ReplizCommentStatus,
+  type ReplizLinkMetadata,
 } from "./repliz";
 export * from "./reply";
 export {

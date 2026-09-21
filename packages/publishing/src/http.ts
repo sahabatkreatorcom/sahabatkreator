@@ -7,7 +7,7 @@ export type HttpOptions = {
   method?: string;
   headers?: Record<string, string>;
   body?: string | FormData | Blob | ArrayBuffer;
-  query?: Record<string, string | number | boolean | undefined>;
+  query?: Record<string, string | number | boolean | string[] | undefined>;
   timeoutMs?: number;
   /** Max retry otomatis untuk 429/5xx (default 2, backoff dari Retry-After header) */
   retries?: number;
@@ -69,7 +69,14 @@ export async function httpRequest<T = unknown>(
   if (query) {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) {
-      if (v !== undefined) qs.set(k, String(v));
+      if (v === undefined) continue;
+      // Nilai array (mis. scheduleIds[]) → repeat key per elemen. Pakai append,
+      // BUKAN set: set hanya menyimpan nilai terakhir (silent data loss).
+      if (Array.isArray(v)) {
+        for (const item of v) if (item !== undefined) qs.append(k, String(item));
+      } else {
+        qs.set(k, String(v));
+      }
     }
     target = `${url}${url.includes("?") ? "&" : "?"}${qs.toString()}`;
   }

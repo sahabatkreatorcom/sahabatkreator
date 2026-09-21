@@ -102,7 +102,7 @@ function basicAuthHeader(cred: ReplizCredentials): string {
 async function replizRequest<T>(
   cred: ReplizCredentials,
   path: string,
-  options: { method?: string; body?: unknown; query?: Record<string, string> } = {},
+  options: { method?: string; body?: unknown; query?: Record<string, string | string[] | undefined> } = {},
 ): Promise<T> {
   const res: HttpResponse<T> = await httpRequest<T>(`${API_BASE}${path}`, {
     method: options.method ?? "GET",
@@ -121,10 +121,11 @@ async function replizRequest<T>(
 async function replizEmpty(
   cred: ReplizCredentials,
   path: string,
-  options: { method?: string; body?: unknown } = {},
+  options: { method?: string; body?: unknown; query?: Record<string, string | string[] | undefined> } = {},
 ): Promise<void> {
   const res = await httpRequest(`${API_BASE}${path}`, {
     method: options.method ?? "POST",
+    query: options.query,
     headers: {
       Authorization: basicAuthHeader(cred),
       ...(options.body ? { "Content-Type": "application/json" } : {}),
@@ -457,6 +458,14 @@ export type ReplizCommentDoc = {
 
 export type ReplizCommentMedia = { url?: string; type?: string };
 
+/** Open Graph metadata URL (GET /public/link/metadata). */
+export type ReplizLinkMetadata = {
+  title?: string;
+  description?: string;
+  image?: string;
+  url: string;
+};
+
 /**
  * List komentar di antrian Repliz (GET /public/comment).
  * status: "pending" (baru/belum dibalas) | "resolved" | "ignored".
@@ -745,5 +754,224 @@ export async function replizGetContent(
     url: data.url ? String(data.url) : undefined,
     createdAt: data.createdAt ? String(data.createdAt) : undefined,
     statistic: data.statistic as Record<string, number> | undefined,
+  };
+}
+
+// ---------- Schedule management (Premium+) ----------
+// Endpoint edit/retry/mass-delete docs "Schedule". Sebelumnya tidak terpakai
+// sama sekali — queue page hanya bisa cancel satu-satu via DELETE by-id.
+
+/** Update konten/waktu schedule (PUT /public/schedule/{id}, 204). */
+export async function replizUpdateSchedule(
+  cred: ReplizCredentials,
+  scheduleId: string,
+  input: ReplizScheduleInput,
+): Promise<void> {
+  await replizEmpty(cred, `/public/schedule/${scheduleId}`, {
+    method: "PUT",
+    body: input,
+  });
+}
+
+/** Antrikan ulang schedule gagal (PUT /public/schedule/{id}/retry, 204). */
+export async function replizRetrySchedule(
+  cred: ReplizCredentials,
+  scheduleId: string,
+): Promise<void> {
+  await replizEmpty(cred, `/public/schedule/${scheduleId}/retry`, {
+    method: "PUT",
+    body: {},
+  });
+}
+
+/** Hapus beberapa schedule sekaligus (DELETE /public/schedule/mass). */
+export async function replizMassDeleteSchedules(
+  cred: ReplizCredentials,
+  scheduleIds: string[],
+): Promise<void> {
+  // Key WAJIB "scheduleIds[]" (bracket) — bentuk tunggal diabaikan API,
+  // sama pola dgn accountIds[] di GET /public/comment.
+  await replizEmpty(cred, "/public/schedule/mass", {
+    method: "DELETE",
+    query: { "scheduleIds[]": scheduleIds },
+  });
+}
+
+// ---------- Comment moderation & engagement (Standard+/Gold+) ----------
+
+/** Status moderasi komentar di antrian Repliz. */
+export type ReplizCommentStatus = "pending" | "resolved" | "ignored";
+
+/**
+ * Update status moderasi comment (PUT /public/comment/{id}/status, 204).
+ * Pakai untuk mark resolved/ignored — workflow inbox.
+ */
+export async function replizUpdateCommentStatus(
+  cred: ReplizCredentials,
+  commentId: string,
+  status: ReplizCommentStatus,
+): Promise<void> {
+  await replizEmpty(cred, `/public/comment/${commentId}/status`, {
+    method: "PUT",
+    body: { status },
+  });
+}
+
+/** Ambil satu comment by id (GET /public/comment/{commentId}). */
+export async function replizGetComment(
+  cred: ReplizCredentials,
+  commentId: string,
+): Promise<ReplizCommentDoc | null> {
+  const data = await replizRequest<Record<string, unknown>>(
+    cred,
+    `/public/comment/${commentId}`,
+  );
+  if (!data || (!data.id && !data._id)) return null;
+  return {
+    _id: String(data._id ?? data.id),
+    id: data.id ? String(data.id) : undefined,
+    comment: data.comment as ReplizCommentDoc["comment"],
+    status: data.status as ReplizCommentStatus,
+  };
+}
+
+/** List comment di satu konten (GET /public/content/{id}/comment, Gold+). */
+export async function replizListContentComments(
+  cred: ReplizCredentials,
+  contentId: string,
+  accountId: string,
+  nextToken?: string,
+): Promise<{ comments: ReplizCommentDoc[]; nextToken?: string }> {
+  const data = await replizRequest<{
+    docs?: Array<Record<string, unknown>>;
+    nextToken?: string;
+  }>(cred, `/public/content/${contentId}/comment`, {
+    query: { accountId, nextToken },
+  });
+  return {
+    comments: (data?.docs ?? []).map((d) => ({
+      _id: String(d._id ?? d.id),
+      id: d.id ? String(d.id) : undefined,
+      comment: d.comment as ReplizCommentDoc["comment"],
+      status: d.status as ReplizCommentStatus,
+    })),
+    nextToken: data?.nextToken,
+  };
+}
+
+/**
+ * Like/reaction ke comment (POST /public/content/{id}/like/{commentId}, 204).
+ * Hanya Facebook, TikTok, LinkedIn — gate di UI via supportsReplizLike().
+ */
+export async function replizLikeComment(
+  cred: ReplizCredentials,
+  contentId: string,
+  commentId: string,
+): Promise<void> {
+  await replizEmpty(cred, `/public/content/${contentId}/like/${commentId}`, {
+    method: "POST",
+    body: {},
+  });
+}
+
+/**
+ * Balas comment via Content API (POST /public/content/{id}/message, Gold+).
+ * Berbeda dgn POST /public/comment/{id}: ini kirim balasan langsung ke thread
+ * platform. Hanya Facebook & Instagram.
+ */
+export async function replizMessageComment(
+  cred: ReplizCredentials,
+  contentId: string,
+  accountId: string,
+  text: string,
+): Promise<string | null> {
+  const data = await replizRequest<{ messageId?: string }>(
+    cred,
+    `/public/content/${contentId}/message`,
+    { method: "POST", body: { accountId, text } },
+  );
+  return data?.messageId ?? null;
+}
+
+/** Hapus comment di konten (DELETE /public/content/{id}/comment/{commentId}). */
+export async function replizDeleteContentComment(
+  cred: ReplizCredentials,
+  contentId: string,
+  commentId: string,
+): Promise<void> {
+  await replizEmpty(cred, `/public/content/${contentId}/comment/${commentId}`, {
+    method: "DELETE",
+  });
+}
+
+/** Hapus post terpublish (DELETE /public/content/{id}, Gold+). */
+export async function replizDeleteContent(
+  cred: ReplizCredentials,
+  contentId: string,
+  accountId: string,
+): Promise<void> {
+  await replizEmpty(cred, `/public/content/${contentId}`, {
+    method: "DELETE",
+    query: { accountId },
+  });
+}
+
+// ---------- Account stats & count (Standard+) ----------
+
+/**
+ * Statistik agregat per akun (GET /public/account/{id}/statistic).
+ * Penting: {id} adalah internal Repliz ObjectId 24-char (`_id`/`id` di doc
+ * akun, disimpan kita di `metadata.replizAccountId`) — BUKAN `generatedId`
+ * (id platform, mis. `UC…` YouTube atau `urn:li:organization:…` LinkedIn).
+ * Diverifikasi live: generatedId ditolak (400 "must be a 24 character hex").
+ * Diverifikasi live 21 Sep 2026: berfungsi utk instagram/threads/tiktok;
+ * facebook & youtube (akun page/channel kita) → 404 "account not found"
+ * (keterbatasan platform, bukan bug). Panggilan wajib graceful 404.
+ */
+export async function replizGetAccountStatistic(
+  cred: ReplizCredentials,
+  accountId: string,
+): Promise<Record<string, number>> {
+  return replizRequest(cred, `/public/account/${accountId}/statistic`);
+}
+
+/** Jumlah akun per platform + batas paket (GET /public/account/count). */
+export async function replizCountAccounts(
+  cred: ReplizCredentials,
+): Promise<{ total: number; limit: number; perPlatform: Record<string, number> }> {
+  const data = await replizRequest<Record<string, unknown>>(
+    cred,
+    "/public/account/count",
+  );
+  const perPlatform: Record<string, number> = {};
+  for (const [k, v] of Object.entries(data ?? {})) {
+    if (k === "total" || k === "limit") continue;
+    if (typeof v === "number") perPlatform[k] = v;
+  }
+  return {
+    total: Number(data?.total ?? 0),
+    limit: Number(data?.limit ?? 0),
+    perPlatform,
+  };
+}
+
+// ---------- Add-on: link metadata (Premium+) ----------
+
+/** Open Graph metadata sebuah URL (GET /public/link/metadata). */
+export async function replizGetLinkMetadata(
+  cred: ReplizCredentials,
+  url: string,
+): Promise<ReplizLinkMetadata | null> {
+  const data = await replizRequest<Record<string, unknown>>(
+    cred,
+    "/public/link/metadata",
+    { query: { url } },
+  );
+  if (!data || (!data.title && !data.url)) return null;
+  return {
+    title: data.title ? String(data.title) : undefined,
+    description: data.description ? String(data.description) : undefined,
+    image: data.image ? String(data.image) : undefined,
+    url: data.url ? String(data.url) : url,
   };
 }
