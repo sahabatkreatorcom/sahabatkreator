@@ -15,6 +15,13 @@
       "when": 1789968908557,
       "tag": "0001_true_kabuki",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790078128081,
+      "tag": "0002_video_render",
+      "breakpoints": true
     }
   ]
 }

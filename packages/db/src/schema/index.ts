@@ -22,3 +22,4 @@ export * from "./seb";
 export * from "./social";
 export * from "./sound";
 export * from "./strategy";
+export * from "./video";

@@ -34,10 +34,12 @@ import {
   createAutoReplyWorker,
   createPublishWorker,
   createReminderWorker,
+  createVideoRenderWorker,
   enqueueAutoReply,
   getRedisConnection,
   runAutoReplyCycle,
   runReminderCycle,
+  runVideoRenderCycle,
 } from "@sahabatkreator/queue";
 import { registerAutoReplyEnqueue } from "@sahabatkreator/publishing";
 import type { Context } from "hono";
@@ -240,6 +242,9 @@ if (mode === "bullmq") {
   // Worker ini yang menjalankan processAutoReplyJob saat due (claim atomik di
   // dalamnya melindungi race vs fallback loop di bawah).
   createAutoReplyWorker();
+  // Processor job "video render" — render via Modal (ffmpeg + whisper).
+  // Concurrency 2; resource berat jalan di Modal, bukan server ini.
+  createVideoRenderWorker();
   // Recovery sweep tetap jalan (job hilang saat Redis flush / worker crash sebelum enqueue poll)
   setInterval(() => {
     recoverStalePosts()
@@ -393,6 +398,32 @@ setInterval(() => {
 }, AUTO_REPLY_TICK_MS);
 // Cek pertama 15 detik setelah start
 setTimeout(() => runAutoReply().catch(() => {}), 15_000);
+
+// ---- Video Render loop (kedua mode) ----
+// Mode BullMQ: job diproses createVideoRenderWorker — loop ini hanya safety net
+// (job hilang saat Redis flush / enqueue gagal). Mode fallback: satu-satunya
+// jalur eksekusi — polling video_job.status='queued'.
+const VIDEO_RENDER_TICK_MS = 30_000;
+let videoRendering = false;
+async function runVideoRender(): Promise<void> {
+  const r = await runVideoRenderCycle();
+  if (r.claimed > 0) {
+    console.log(
+      `[video-render] claimed=${r.claimed} done=${r.done} failed=${r.failed} (fallback)`,
+    );
+  }
+}
+setInterval(() => {
+  if (videoRendering) return;
+  videoRendering = true;
+  runVideoRender()
+    .catch((error) => console.error("[video-render] cycle error:", error))
+    .finally(() => {
+      videoRendering = false;
+    });
+}, VIDEO_RENDER_TICK_MS);
+// Cek pertama 25 detik setelah start (stagger setelah auto-reply startup)
+setTimeout(() => runVideoRender().catch(() => {}), 25_000);
 
 // ---- Scheduled Reports loop (kedua mode) ----
 // Tiap jam cek jadwal laporan email due (weekly/monthly, dedupe 20 jam)

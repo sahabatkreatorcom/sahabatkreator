@@ -21,6 +21,7 @@
     "@sahabatkreator/env": "workspace:*",
     "@sahabatkreator/publishing": "workspace:*",
     "@sahabatkreator/queue": "workspace:*",
+    "@sahabatkreator/render": "workspace:*",
     "@scalar/hono-api-reference": "^0.11.16",
     "better-auth": "catalog:",
     "dotenv": "catalog:",

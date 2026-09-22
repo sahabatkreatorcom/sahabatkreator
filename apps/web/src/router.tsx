@@ -99,6 +99,9 @@ const CarouselGeneratorPage = lazy(() =>
 const MediaPage = lazy(() =>
   import("./pages/dashboard/media").then((m) => ({ default: m.MediaPage })),
 );
+const VideoRenderPage = lazy(() =>
+  import("./pages/dashboard/video").then((m) => ({ default: m.VideoRenderPage })),
+);
 const AnalyticsPage = lazy(() =>
   import("./pages/dashboard/analytics").then((m) => ({ default: m.AnalyticsPage })),
 );
@@ -317,6 +320,7 @@ export const router = createBrowserRouter([
           { path: "/generator/repurpose", element: withFallback(<RepurposePage />) },
           { path: "/generator/carousel", element: withFallback(<CarouselGeneratorPage />) },
           { path: "/media", element: withFallback(<MediaPage />) },
+          { path: "/video", element: withFallback(<VideoRenderPage />) },
           { path: "/engagement", element: withFallback(<EngagementPage />) },
           { path: "/inbox", element: withFallback(<InboxPage />) },
           { path: "/automation", element: withFallback(<AutomationPage />) },

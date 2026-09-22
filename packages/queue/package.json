@@ -11,9 +11,12 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1116.0",
+    "@aws-sdk/s3-request-presigner": "^3.1116.0",
     "@sahabatkreator/db": "workspace:*",
     "@sahabatkreator/env": "workspace:*",
     "@sahabatkreator/publishing": "workspace:*",
+    "@sahabatkreator/render": "workspace:*",
     "bullmq": "^6.3.4",
     "drizzle-orm": "^0.45.2",
     "ioredis": "^5.4.1"

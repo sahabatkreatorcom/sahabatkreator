@@ -85,6 +85,10 @@ export const env = createEnv({
     WORKER_PORT: z.coerce.number().default(3001),
     // Redis (BullMQ) — publish queue. Kosong = fallback DB polling di worker.
     REDIS_URL: z.string().optional(),
+    // Modal.com — render video serverless (ffmpeg + whisper). Lihat RFC §11.
+    // Kosong = fitur video render nonaktif (route 503, worker skip queue).
+    MODAL_TOKEN: z.string().optional(),
+    MODAL_RENDER_URL: z.url().optional(),
     // Lainnya
     CRON_SECRET: z.string().optional(),
     // AES-256-GCM key (base64 32-byte) untuk enkripsi kredensial platform.

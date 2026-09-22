@@ -26,6 +26,7 @@ import {
   Sparkles,
   Sun,
   Users,
+  Wand2,
   X,
   Zap,
 } from "lucide-react";
@@ -91,6 +92,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Aset",
     items: [
       { to: "/media", label: "Media", icon: ImageIcon },
+      { to: "/video", label: "Render Video", icon: Wand2 },
       { to: "/products", label: "Katalog Produk", icon: Package },
     ],
   },

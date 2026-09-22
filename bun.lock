@@ -29,6 +29,7 @@
         "@sahabatkreator/env": "workspace:*",
         "@sahabatkreator/publishing": "workspace:*",
         "@sahabatkreator/queue": "workspace:*",
+        "@sahabatkreator/render": "workspace:*",
         "@scalar/hono-api-reference": "^0.11.16",
         "better-auth": "catalog:",
         "dotenv": "catalog:",
@@ -221,12 +222,27 @@
       "name": "@sahabatkreator/queue",
       "version": "0.0.0",
       "dependencies": {
+        "@aws-sdk/client-s3": "^3.1116.0",
+        "@aws-sdk/s3-request-presigner": "^3.1116.0",
         "@sahabatkreator/db": "workspace:*",
         "@sahabatkreator/env": "workspace:*",
         "@sahabatkreator/publishing": "workspace:*",
+        "@sahabatkreator/render": "workspace:*",
         "bullmq": "^6.3.4",
         "drizzle-orm": "^0.45.2",
         "ioredis": "^5.4.1",
+      },
+      "devDependencies": {
+        "@sahabatkreator/config": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "^6.0.3",
+      },
+    },
+    "packages/render": {
+      "name": "@sahabatkreator/render",
+      "version": "0.0.0",
+      "dependencies": {
+        "@sahabatkreator/env": "workspace:*",
       },
       "devDependencies": {
         "@sahabatkreator/config": "workspace:*",
@@ -821,6 +837,8 @@
     "@sahabatkreator/publishing": ["@sahabatkreator/publishing@workspace:packages/publishing"],
 
     "@sahabatkreator/queue": ["@sahabatkreator/queue@workspace:packages/queue"],
+
+    "@sahabatkreator/render": ["@sahabatkreator/render@workspace:packages/render"],
 
     "@scalar/client-side-rendering": ["@scalar/client-side-rendering@0.3.9", "", { "dependencies": { "@scalar/schemas": "0.8.3", "@scalar/types": "0.18.2", "@scalar/validation": "0.6.3" } }, "sha512-Gg+VLhreiWHmHN0i9uatEoIxzsr0FaJoq0x+PkypmFgZFniD477DVCAnmWqx+KXlpFg0VtDanDHARIJXZ1fIeQ=="],
 
