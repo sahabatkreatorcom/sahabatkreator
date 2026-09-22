@@ -16,11 +16,14 @@ Endpoint (FastAPI, auth Bearer MODAL_TOKEN):
 Pipeline (port dari MassVEPro src/core/, dibersihkan):
     1. fetch input dari R2 (presigned URL)
     2. probe durasi voiceover (master — tidak pernah dimodifikasi)
-    3. replace/mix audio (voiceover + BGM)
+    3. replace/mix audio (voiceover + BGM, volume masing-masing)
     4. resize ke orientation + resolution target
     5. transcribe via faster-whisper → SRT (bila caption enabled)
-    6. burn subtitle (bila caption enabled)
-    7. upload output + SRT balik ke R2 (presigned PUT)
+    6. burn subtitle (bila caption enabled):
+       - wordHighlight → ASS karaoke per-kata (kata aktif menyala)
+       - tanpa highlight → SRT + force_style
+    7. headline overlay (bila diisi) — drawtext, posisi Y normalisasi
+    8. upload output + SRT balik ke R2 (presigned PUT)
 
 FASE 1 = SYNC: satu render per request, selesai dalam satu koneksi.
 Karena render cpu=1, concurrency per container dibatasi 1 (Modal scale-out
@@ -273,11 +276,15 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
     if cap.get("enabled") and voice:
         model = _whisper(cap.get("model", "base"))
         lang = None if cap.get("language") == "auto" else cap.get("language", "id")
+        # word_timestamps True hanya kalau karaoke dipakai — hemat CPU & memori
         segments, info = model.transcribe(
             voice, language=lang, beam_size=5, vad_filter=True,
             word_timestamps=bool(cap.get("wordHighlight")),
         )
         detected_lang = getattr(info, "language", None)
+
+        # SRT selalu dibuat (di-upload untuk transcript terbuka), tapi burn
+        # memakai ASS saat wordHighlight agar ada highlight per-kata.
         srt_path = f"{tmpdir}/caption.srt"
         Path(srt_path).write_text(_segments_to_srt(segments), encoding="utf-8")
 
@@ -285,25 +292,73 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
             _upload(srt_path, req["srtUploadUrl"], "application/x-subrip")
 
         burned = f"{tmpdir}/burned.mp4"
-        # posisi vertikal subtitle
-        pos_map = {"bottom": "0.85", "top": "0.15", "center": "0.5"}
-        y = pos_map.get(cap.get("position", "bottom"), "0.85")
-        # force_style berisi koma — WAJIB dibungkus quote tunggal. Tanpa itu
-        # filtergraph parser belah koma sebagai pemisah filter → "No such
-        # filter: 'PrimaryColour'" (nilai ASS style jadi filter sendiri).
-        # Quote di dalam graphparser melindungi koma & karakter khusus.
-        style = (
-            f"FontSize={cap.get('fontSize', 24)},"
-            f"PrimaryColour={_ass_color(cap.get('fontColor', 'white'))},"
-            f"Alignment=2,MarginV={(1 - float(y)) * target[1]:.0f}"
-        )
+        if cap.get("wordHighlight"):
+            ass_path = f"{tmpdir}/caption.ass"
+            Path(ass_path).write_text(
+                _segments_to_ass(segments, cap, target), encoding="utf-8"
+            )
+            # ASS bawa style sendiri — jangan pakai force_style
+            _ffmpeg([
+                "-i", current, "-vf", f"subtitles={ass_path}",
+                "-c:v", "libx264", "-preset", "medium", "-crf", "23",
+                "-c:a", "copy", burned,
+            ])
+        else:
+            # posisi vertikal subtitle (force_style butuh Alignment numpad ASS)
+            pos_y = {"bottom": 0.85, "top": 0.15, "center": 0.5}.get(
+                cap.get("position", "bottom"), 0.85
+            )
+            align = _ASS_ALIGN.get(cap.get("position", "bottom"), 2)
+            if align == 5:
+                margin = 0
+            elif align == 8:
+                margin = int(pos_y * target[1])
+            else:
+                margin = int((1 - pos_y) * target[1])
+            # force_style berisi koma — WAJIB dibungkus quote tunggal. Tanpa itu
+            # filtergraph parser belah koma sebagai pemisah filter → "No such
+            # filter: 'PrimaryColour'" (nilai ASS style jadi filter sendiri).
+            # Quote di dalam graphparser melindungi koma & karakter khusus.
+            style = (
+                f"FontSize={cap.get('fontSize', 24)},"
+                f"PrimaryColour={_ass_color(cap.get('fontColor', 'white'))},"
+                f"Alignment={align},MarginV={margin}"
+            )
+            _ffmpeg([
+                "-i", current, "-vf",
+                f"subtitles={srt_path}:force_style='{style}'",
+                "-c:v", "libx264", "-preset", "medium", "-crf", "23",
+                "-c:a", "copy", burned,
+            ])
+        current = burned
+
+    # --- headline stage ---
+    # Headline overlay: teks besar di atas video (hook). drawtext butuh font
+    # file absolute; fontfile path tidak boleh berisi karakter filtergraph.
+    headline = settings.get("headline")
+    if headline and (headline.get("text") or "").strip():
+        hl_text = f"{tmpdir}/headline.txt"
+        Path(hl_text).write_text(headline["text"], encoding="utf-8")
+        # font DejaVu dari paket fonts-dejavu-core (sudah di apt_install)
+        font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        hl_size = headline.get("fontSize", 48)
+        hl_color = _DRAWTEXT_COLORS.get(headline.get("fontColor", "white"), "white")
+        pos_y = float(headline.get("positionY", 0.1))
+        hl_out = f"{tmpdir}/headline.mp4"
+        # textfile & fontfile path di-quote tunggal; isinya tanpa karakter
+        # filtergraph (tmpdir /usr/share/fonts, bukan path Windows).
+        # line_spacing hanya berlaku multiline; box semi-transparan untuk
+        # kontras teks terhadap video.
         _ffmpeg([
             "-i", current, "-vf",
-            f"subtitles={srt_path}:force_style='{style}'",
+            f"drawtext=textfile='{hl_text}':fontfile='{font}'"
+            f":fontsize={hl_size}:fontcolor={hl_color}"
+            f":x=(w-text_w)/2:y=h*{pos_y}"
+            ":box=1:boxcolor=black@0.5:boxborderw=12:line_spacing=8",
             "-c:v", "libx264", "-preset", "medium", "-crf", "23",
-            "-c:a", "copy", burned,
+            "-c:a", "copy", hl_out,
         ])
-        current = burned
+        current = hl_out
 
     # --- upload output ---
     _upload(current, req["outputUploadUrl"], "video/mp4")
@@ -322,10 +377,110 @@ _ASS_COLORS = {
     "white": "&H00FFFFFF", "black": "&H00000000", "yellow": "&H0000FFFF",
     "red": "&H000000FF", "green": "&H0000FF00", "blue": "&H00FF0000",
 }
+# Warna highlight kata aktif (karaoke). Kuning kontras di mayoritas video.
+_ASS_HIGHLIGHT = "&H0000FFFF"
+
+# Alignment numpad ASS: 2 bawah-tengah, 5 tengah, 8 atas-tengah
+_ASS_ALIGN = {"bottom": 2, "center": 5, "top": 8}
 
 
 def _ass_color(name: str) -> str:
     return _ASS_COLORS.get(name, "&H00FFFFFF")
+
+
+# Warna untuk drawtext (headline) — nama warna ffmpeg, bukan ASS hex
+_DRAWTEXT_COLORS = {
+    "white": "white", "black": "black", "yellow": "yellow",
+    "red": "red", "green": "green", "blue": "blue",
+}
+
+
+def _fmt_ass(seconds: float) -> str:
+    """Timestamp ASS: H:MM:SS.cc (centiseconds)."""
+    if seconds < 0:
+        seconds = 0.0
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    cs = int(round(seconds % 1 * 100))
+    if cs >= 100:
+        cs = 99
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+
+def _esc_ass(text: str) -> str:
+    """Escape karakter khusus ASS: {} mulai override block, \\ tag."""
+    return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}").replace("\n", " ")
+
+
+def _segments_to_ass(segments, cap: dict, target: tuple[int, int]) -> str:
+    """ASS karaoke per-kata (\\k) — kata aktif menyala saat diucapkan.
+
+    Catatan semantik (diverifikasi terhadap ffmpeg+libass): kata AKTIF dan
+    yang sudah lewat dirender dengan PrimaryColour; kata yang belum dicapai
+    dengan SecondaryColour. Karena itu Primary = warna highlight, Secondary
+    = warna base — kebalik dari intuisi. Efek visual: tiap kata menyala
+    saat diucapkan dan tetap menyala (klasik karaoke).
+
+    word_timestamps wajib True saat transcribe (dilakukan caller saat
+    wordHighlight aktif).
+    """
+    font_size = cap.get("fontSize", 24)
+    align = _ASS_ALIGN.get(cap.get("position", "bottom"), 2)
+    # MarginV: jarak dari tepi bawah/atas. Alignment=5 (tengah) simetris —
+    # MarginV besar akan tekan text ke tinggi nol, jadi pakai 0 (center murni).
+    pos_y = {"bottom": 0.85, "top": 0.15, "center": 0.5}.get(cap.get("position", "bottom"), 0.85)
+    if align == 5:
+        margin_v = 0
+    elif align == 8:  # atas: jarak dari tepi atas
+        margin_v = int(pos_y * target[1])
+    else:  # bawah: jarak dari tepi bawah
+        margin_v = int((1 - pos_y) * target[1])
+
+    base = _ass_color(cap.get("fontColor", "white"))
+    # Primary = highlight (kata aktif), Secondary = base (belum tercapai)
+    highlight = _ASS_HIGHLIGHT
+
+    lines = [
+        "[Script Info]",
+        "ScriptType: v4.00+",
+        f"PlayResX: {target[0]}",
+        f"PlayResY: {target[1]}",
+        "ScaledBorderAndShadow: yes",
+        "",
+        "[V4+ Styles]",
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+        "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+        "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+        "Alignment, MarginL, MarginR, MarginV, Encoding",
+        f"Style: Default,DejaVu Sans,{font_size},{highlight},{base},"
+        "&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,"
+        f"{align},40,40,{margin_v},1",
+        "",
+        "[Events]",
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, Effect, Text",
+    ]
+    for seg in segments:
+        words = [w for w in (getattr(seg, "words", None) or []) if (w.word or "").strip()]
+        if not words:
+            # Fallback: teks segment utuh sebagai satu suku
+            text = _esc_ass((seg.text or "").strip())
+            if text:
+                dur = max(1, int((seg.end - seg.start) * 100))
+                lines.append(
+                    f"Dialogue: 0,{_fmt_ass(seg.start)},{_fmt_ass(seg.end)},"
+                    f"Default,,0,0,0,{{\\k{dur}}}{text}"
+                )
+            continue
+        parts = []
+        for w in words:
+            dur = max(1, int(round((w.end - w.start) * 100)))
+            parts.append(f"{{\\k{dur}}}{_esc_ass(w.word.strip())}")
+        lines.append(
+            f"Dialogue: 0,{_fmt_ass(seg.start)},{_fmt_ass(seg.end)},"
+            f"Default,,0,0,0,{''.join(parts)}"
+        )
+    return "\n".join(lines) + "\n"
 
 
 def _retryable(exc: Exception) -> bool:
