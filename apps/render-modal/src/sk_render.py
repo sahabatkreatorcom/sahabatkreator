@@ -47,7 +47,25 @@ import modal
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg", "fonts-dejavu-core")
-    .pip_install("faster-whisper==1.1.1", "fastapi[standard]")
+    # huggingface-hub WAJIB <1: faster-whisper 1.1.1 deklarasi ">=0.13" tanpa
+    # upper bound, tapi hub 1.x drop `requests` dari base deps (ganti httpx)
+    # padahal faster-whisper masih `import requests` → ModuleNotFoundError
+    # saat caption pertama di-render. Pin ke range yang asli di-test.
+    .pip_install(
+        "faster-whisper==1.1.1",
+        "huggingface-hub>=0.13,<1",
+        "requests>=2.31.0",
+        "fastapi[standard]",
+    )
+    # Smoke test import saat build — dua bug terakhir (curl hilang, requests
+    # hilang) hanya muncul saat render pertama jalan. Import di sini bikin
+    # dependency missing → deploy gagal, bukan job pertama gagal.
+    .run_commands(
+        'python -c "import faster_whisper, requests; '
+        "import huggingface_hub as h; "
+        "assert int(h.__version__.split('.')[0]) < 1, h.__version__; "
+        "print('deps ok')\""
+    )
 )
 
 app = modal.App("sahabatkreator-render", image=image)
