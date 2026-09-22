@@ -8,6 +8,7 @@ import {
   ListChecks,
   Loader2,
   Pencil,
+  Play,
   Sparkles,
   Trash2,
   Upload,
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/modal";
 import { PageLoader } from "@/components/ui/spinner";
 import { api } from "@/lib/api";
 import { formatBytes, formatDate } from "@/lib/format";
@@ -58,6 +60,7 @@ export function MediaPage() {
   const [showImport, setShowImport] = useState(false);
   const [importUrl, setImportUrl] = useState("");
   const [editing, setEditing] = useState<EditState | null>(null);
+  const [previewing, setPreviewing] = useState<MediaItem | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
   // Mode bulk select — Set berisi id media yang dicentang
   const [selectMode, setSelectMode] = useState(false);
@@ -509,11 +512,23 @@ export function MediaPage() {
                         <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[var(--text-muted)]">
                           <ImageIcon className="h-8 w-8" />
                           <span className="text-xs">audio</span>
+                          {!selectMode && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewing(item)}
+                              className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--bg-secondary)] px-2.5 py-1 text-xs text-[var(--text-primary)] shadow"
+                            >
+                              <Play className="h-3 w-3 fill-current" />
+                              Putar
+                            </button>
+                          )}
                         </div>
                       )}
 
-                      {/* Mode pilih: seluruh kartu jadi toggle checkbox */}
-                      {selectMode && (
+                      {/* Mode pilih: seluruh kartu jadi toggle checkbox.
+                          Bukan mode pilih: klik untuk preview (kecuali audio
+                          yang tetap butuh tombol — lihat bawah). */}
+                      {selectMode ? (
                         <button
                           type="button"
                           onClick={() => toggleSelected(item.id)}
@@ -523,7 +538,14 @@ export function MediaPage() {
                           }
                           aria-pressed={isSelected}
                         />
-                      )}
+                      ) : item.type !== "audio" ? (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewing(item)}
+                          className="absolute inset-0 h-full w-full cursor-zoom-in"
+                          aria-label={`Pratinjau ${item.name}`}
+                        />
+                      ) : null}
 
                       {/* Checkbox overlay kiri atas */}
                       {selectMode && (
@@ -720,6 +742,51 @@ export function MediaPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Preview player: video/audio/image full */}
+      {previewing && (
+        <Modal
+          open
+          onClose={() => setPreviewing(null)}
+          title={previewing.name}
+          description={`${previewing.mimeType} · ${formatBytes(previewing.sizeBytes)} · ${formatDate(previewing.createdAt)}`}
+          size="xl"
+        >
+          <div className="flex justify-center">
+            {previewing.mimeType.startsWith("video/") ? (
+              <video
+                key={previewing.id}
+                src={previewing.url}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[60vh] w-auto rounded-[var(--radius-md)]"
+              />
+            ) : previewing.mimeType.startsWith("audio/") ? (
+              <div className="w-full max-w-md space-y-4 py-8">
+                <div className="flex justify-center">
+                  <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[var(--bg-tertiary)]">
+                    <Play className="h-10 w-10 fill-[var(--accent-gold)] text-[var(--accent-gold)]" />
+                  </div>
+                </div>
+                <audio
+                  key={previewing.id}
+                  src={previewing.url}
+                  controls
+                  autoPlay
+                  className="w-full"
+                />
+              </div>
+            ) : (
+              <img
+                src={previewing.url}
+                alt={previewing.altText ?? previewing.name}
+                className="max-h-[60vh] w-auto rounded-[var(--radius-md)] object-contain"
+              />
+            )}
+          </div>
+        </Modal>
       )}
     </div>
   );

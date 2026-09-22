@@ -48,12 +48,16 @@ ARG INDEXABLE=""
 # GA4 Measurement ID (G-XXXXXXX) — hanya produksi. Staging biarkan kosong
 # agar tidak ada tracking di host noindex.
 ARG GA_MEASUREMENT_ID=""
+# URL publik manifest render video (R2) untuk halaman /renders. Kosong
+# → halaman menampilkan pesan belum dikonfigurasi.
+ARG RENDERS_MANIFEST_URL=""
 # Root .env sengaja tidak ikut (lihat .dockerignore) — variabel VITE_*
 # di-inject lewat process env; Vite mengeksposnya ke import.meta.env saat build.
 ENV VITE_SERVER_URL=${SERVER_URL} \
     VITE_WEB_URL=${SITE_URL} \
     VITE_INDEXABLE=${INDEXABLE} \
-    VITE_GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID}
+    VITE_GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID} \
+    VITE_RENDERS_MANIFEST_URL=${RENDERS_MANIFEST_URL}
 COPY . .
 RUN --mount=type=cache,target=/root/.bun/install/cache bun run build \
     && mkdir -p apps/server/web-dist \

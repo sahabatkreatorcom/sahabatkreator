@@ -18,6 +18,10 @@ export {
 } from "./connection";
 export { markPostFailed } from "./mark-failed";
 export {
+  publishRenderManifest,
+  rebuildRenderManifest,
+} from "./render-processor";
+export {
   cancelPublishJob,
   createPublishWorker,
   enqueuePoll,

@@ -221,7 +221,7 @@ videoRoute.get("/:id", async (c) => {
   }
 });
 
-/** DELETE /video/:id — batalkan job queued (tidak bisa untuk yang sedang jalan) */
+/** DELETE /video/:id — batalkan job queued, atau hapus job terminal (failed/canceled) dari riwayat */
 videoRoute.delete("/:id", async (c) => {
   try {
     const ctx = await requireOrg(c);
@@ -241,6 +241,13 @@ videoRoute.delete("/:id", async (c) => {
       return c.json({ message: "Job sudah selesai" }, 409);
     }
 
+    if (row.status === "failed" || row.status === "canceled") {
+      // Job terminal — hapus dari riwayat. Output (bila ada) tetap di media library.
+      await db.delete(videoJob).where(eq(videoJob.id, id));
+      return c.json({ ok: true });
+    }
+
+    // status queued → batalkan
     await db
       .update(videoJob)
       .set({ status: "canceled", updatedAt: new Date() })
@@ -251,6 +258,67 @@ videoRoute.delete("/:id", async (c) => {
     await cancelVideoRenderJob(id);
 
     return c.json({ ok: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** POST /video/:id/retry — buat ulang job dari konfigurasi job gagal/dibatalkan */
+videoRoute.post("/:id/retry", async (c) => {
+  try {
+    if (!isRenderConfigured()) {
+      return c.json(
+        {
+          message:
+            "Fitur render video belum dikonfigurasi. Set MODAL_TOKEN dan MODAL_RENDER_URL di server.",
+        },
+        503,
+      );
+    }
+
+    const ctx = await requireOrg(c);
+    const id = c.req.param("id");
+
+    const [job] = await db
+      .select()
+      .from(videoJob)
+      .where(and(eq(videoJob.id, id), eq(videoJob.organizationId, ctx.organization.id)))
+      .limit(1);
+
+    if (!job) return c.json({ message: "Job tidak ditemukan" }, 404);
+    if (job.status !== "failed" && job.status !== "canceled") {
+      return c.json({ message: "Hanya job gagal atau dibatalkan yang bisa diulang" }, 409);
+    }
+
+    const newId = generateId("video_job");
+    await db.insert(videoJob).values({
+      id: newId,
+      organizationId: job.organizationId,
+      baseVideoMediaId: job.baseVideoMediaId,
+      voiceoverMediaId: job.voiceoverMediaId,
+      bgmAudioTrackId: job.bgmAudioTrackId,
+      settings: job.settings,
+      status: "queued",
+      createdByUserId: ctx.user.id,
+    });
+
+    const enqueued = await enqueueVideoRender(newId);
+    if (!enqueued) {
+      console.warn(`[video] Redis tidak ada — job ${newId} menunggu fallback polling`);
+    }
+
+    const [row] = await db
+      .select({
+        id: videoJob.id,
+        status: videoJob.status,
+        progress: videoJob.progress,
+        createdAt: videoJob.createdAt,
+      })
+      .from(videoJob)
+      .where(eq(videoJob.id, newId))
+      .limit(1);
+
+    return c.json({ job: row }, 201);
   } catch (error) {
     return errorResponse(error);
   }

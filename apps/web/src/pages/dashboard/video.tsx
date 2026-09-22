@@ -14,7 +14,10 @@ import {
   Film,
   Loader2,
   Music2,
+  Play,
+  RotateCcw,
   Sparkles,
+  Trash2,
   Type,
   Wand2,
 } from "lucide-react";
@@ -123,6 +126,7 @@ export function VideoRenderPage() {
   const [headlineFontSize, setHeadlineFontSize] = useState(48);
   const [headlineColor, setHeadlineColor] = useState("yellow");
   const [pollingId, setPollingId] = useState<string | null>(null);
+  const [showAllVideos, setShowAllVideos] = useState(false);
 
   // List media untuk picker (filter video / audio saja)
   const { data: mediaData, isLoading: mediaLoading } = useQuery({
@@ -219,6 +223,31 @@ export function VideoRenderPage() {
     },
   });
 
+  const retryJob = useMutation({
+    mutationFn: (id: string) => api.post<{ job: VideoJobRow }>(`/video/${id}/retry`),
+    onSuccess: (res) => {
+      toast.success("Job dibuat ulang — sedang diproses");
+      setPollingId(res.job.id);
+      queryClient.invalidateQueries({ queryKey: ["video-jobs"] });
+    },
+    onError: (error) => {
+      const msg = error instanceof ApiError ? error.message : "Gagal mengulang job";
+      toast.error(msg);
+    },
+  });
+
+  const deleteJob = useMutation({
+    mutationFn: (id: string) => api.delete(`/video/${id}`),
+    onSuccess: () => {
+      toast.success("Job dihapus dari riwayat");
+      queryClient.invalidateQueries({ queryKey: ["video-jobs"] });
+    },
+    onError: (error) => {
+      const msg = error instanceof ApiError ? error.message : "Gagal menghapus job";
+      toast.error(msg);
+    },
+  });
+
   if (jobsLoading || mediaLoading) return <PageLoader />;
 
   if (!renderEnabled) {
@@ -283,35 +312,69 @@ export function VideoRenderPage() {
               description="Upload video footage terlebih dahulu di halaman Media."
             />
           ) : (
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {videos.slice(0, 8).map((v) => (
+            <div className="space-y-2">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {(showAllVideos ? videos : videos.slice(0, 8)).map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setBaseVideoId(v.id)}
+                    className={cn(
+                      "group relative aspect-video overflow-hidden rounded-[var(--radius-md)] border bg-[var(--bg-tertiary)] transition",
+                      baseVideoId === v.id
+                        ? "border-[var(--accent-gold)] ring-2 ring-[var(--accent-gold)]"
+                        : "border-[var(--border)] hover:border-[var(--border-secondary)]",
+                    )}
+                  >
+                    {v.thumbnailUrl ? (
+                      <img
+                        src={v.thumbnailUrl}
+                        alt={v.name ?? "video"}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Film className="h-5 w-5 text-[var(--text-muted)]" />
+                      </div>
+                    )}
+                    {/* Hover preview — putar frame saat mouse di atas (muted).
+                        Klik tetap memilih video. */}
+                    {v.url && (
+                      <video
+                        src={v.url}
+                        muted
+                        playsInline
+                        preload="none"
+                        className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity group-hover:opacity-100"
+                        onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.pause();
+                          e.currentTarget.currentTime = 0;
+                        }}
+                      />
+                    )}
+                    <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1.5 py-0.5 text-left text-[10px] text-white">
+                      {v.name}
+                    </span>
+                    {v.url && (
+                      <span className="absolute top-1 right-1 rounded bg-black/60 p-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Play className="h-3 w-3 fill-white text-white" />
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              {videos.length > 8 && (
                 <button
-                  key={v.id}
                   type="button"
-                  onClick={() => setBaseVideoId(v.id)}
-                  className={cn(
-                    "group relative aspect-video overflow-hidden rounded-[var(--radius-md)] border bg-[var(--bg-tertiary)] transition",
-                    baseVideoId === v.id
-                      ? "border-[var(--accent-gold)] ring-2 ring-[var(--accent-gold)]"
-                      : "border-[var(--border)] hover:border-[var(--border-secondary)]",
-                  )}
+                  onClick={() => setShowAllVideos((v) => !v)}
+                  className="text-xs text-[var(--text-secondary)] underline-offset-2 hover:underline"
                 >
-                  {v.thumbnailUrl ? (
-                    <img
-                      src={v.thumbnailUrl}
-                      alt={v.name ?? "video"}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Film className="h-5 w-5 text-[var(--text-muted)]" />
-                    </div>
-                  )}
-                  <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1.5 py-0.5 text-left text-[10px] text-white">
-                    {v.name}
-                  </span>
+                  {showAllVideos
+                    ? "Sembunyikan"
+                    : `Tampilkan semua (${videos.length} video)`}
                 </button>
-              ))}
+              )}
             </div>
           )}
         </div>
@@ -321,12 +384,21 @@ export function VideoRenderPage() {
             <Music2 className="h-4 w-4" /> Voiceover (opsional)
           </Label>
           {selectedVoice ? (
-            <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border)] p-2">
-              <Music2 className="h-4 w-4 text-[var(--text-muted)]" />
-              <span className="flex-1 truncate text-sm">{selectedVoice.name}</span>
-              <Button size="sm" variant="ghost" onClick={() => setVoiceoverId(null)}>
-                Hapus
-              </Button>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border)] p-2">
+                <Music2 className="h-4 w-4 text-[var(--text-muted)]" />
+                <span className="flex-1 truncate text-sm">{selectedVoice.name}</span>
+                <Button size="sm" variant="ghost" onClick={() => setVoiceoverId(null)}>
+                  Hapus
+                </Button>
+              </div>
+              {/* Preview audio langsung sebelum render */}
+              <audio
+                src={selectedVoice.url}
+                controls
+                preload="metadata"
+                className="h-9 w-full"
+              />
             </div>
           ) : (
             <Select
@@ -792,17 +864,43 @@ export function VideoRenderPage() {
                       <p className="mt-1 text-xs text-red-600">{job.errorMessage}</p>
                     )}
                   </div>
-                  {job.status === "done" && job.outputMediaId && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        window.open("/media", "_self");
-                      }}
-                    >
-                      Lihat output
-                    </Button>
-                  )}
+                  <div className="flex shrink-0 items-center gap-1">
+                    {job.status === "done" && job.outputMediaId && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          window.open("/media", "_self");
+                        }}
+                      >
+                        Lihat output
+                      </Button>
+                    )}
+                    {(job.status === "failed" || job.status === "canceled") && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={retryJob.isPending}
+                          onClick={() => retryJob.mutate(job.id)}
+                          title="Render ulang dengan konfigurasi yang sama"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Render ulang
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={deleteJob.isPending}
+                          onClick={() => deleteJob.mutate(job.id)}
+                          className="text-red-600 hover:text-red-700"
+                          title="Hapus dari riwayat"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })}
