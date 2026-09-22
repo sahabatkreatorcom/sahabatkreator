@@ -3,14 +3,25 @@
 Deploy terpisah dari monorepo TS (Modal butuh akun & CLI sendiri).
 
 ```bash
-pip install modal
-modal token new            # sekali
+pipx install modal                          # atau venv; pip polos sering tolak PEP 668
+modal token new                             # sekali, login via browser
+
+# sekali: token Bearer untuk auth antara worker ↔ function. Nilai yang sama
+# jadi MODAL_TOKEN di env server SahabatKreator.
+modal secret create sk-render-auth MODAL_TOKEN=$(python -c "import secrets;print(secrets.token_urlsafe(32))")
+
 cd apps/render-modal
-modal deploy src/sk_render.py
+modal deploy src/sk_render.py               # → URL function, jadi MODAL_RENDER_URL
 ```
 
-Output URL function jadi nilai `MODAL_RENDER_URL` di `.env` SahabatKreator.
-Token API Modal → `MODAL_TOKEN`.
+Verifikasi (URL dari output deploy):
+
+```bash
+curl -H "Authorization: Bearer <MODAL_TOKEN>" https://<workspace>--sahabatkreator-render-web.modal.run/health
+# {"status":"ok"}
+```
+
+Endpoint: `POST /render` (pipeline sync, fase 1) + `GET /health` (smoke test).
 
 ## Kenapa terpisah
 

@@ -15,9 +15,10 @@
 //    (server SahabatKreator tidak pernah download video besar)
 // 4. Response berisi metadata output (durasi, dimensi, size).
 //
-// Untuk job yang melebihi timeout HTTP Modal (300s default fungsi), function
-// return status "processing" + jobId → worker poll endpoint status sampai done.
-// Ini alami karena worker BullMQ sudah punya retry + backoff.
+// FASE 1 = SYNC: function Modal menjalankan pipeline sampai selesai dalam satu
+// request. Async (submit + poll /status untuk video panjang) adalah fase 2 —
+// lihat docs/rfc-video-render.md. BullMQ worker sudah punya retry + backoff
+// jadi kegagalan sementara aman.
 import { env } from "@sahabatkreator/env/server";
 import {
   type RenderAdapter,
@@ -25,11 +26,6 @@ import {
   type RenderResponse,
   RenderError,
 } from "./types";
-
-const POLL_INTERVAL_MS = 5_000;
-const POLL_MAX_ATTEMPTS = 240; // 20 menit total (5s × 240)
-
-type ModalPhase = "rendering" | "captioning" | "uploading" | "done";
 
 /** Response Modal function — sukses */
 type ModalSuccess = {
@@ -41,15 +37,6 @@ type ModalSuccess = {
   detectedLanguage?: string;
 };
 
-/** Response Modal function — masih jalan, poll status */
-type ModalProcessing = {
-  status: "processing";
-  /** ID internal Modal untuk poll status */
-  modalJobId: string;
-  phase: ModalPhase;
-  progress: number;
-};
-
 /** Response Modal function — gagal */
 type ModalFailure = {
   status: "failed";
@@ -58,7 +45,7 @@ type ModalFailure = {
   retryable: boolean;
 };
 
-type ModalResponse = ModalSuccess | ModalProcessing | ModalFailure;
+type ModalResponse = ModalSuccess | ModalFailure;
 
 export class ModalRenderAdapter implements RenderAdapter {
   readonly name = "modal";
@@ -107,7 +94,6 @@ export class ModalRenderAdapter implements RenderAdapter {
       throw this.toRenderError(error);
     }
 
-    // 2. Kalau langsung selesai (video pendek), kembali
     if (current.status === "done") {
       onProgress?.(100);
       return {
@@ -119,62 +105,20 @@ export class ModalRenderAdapter implements RenderAdapter {
       };
     }
 
-    if (current.status === "failed") {
-      throw new RenderError(current.message, current.code, current.retryable);
-    }
-
-    // 3. Masih jalan → poll status sampai done/failed.
-    // Narrow: setelah cek di atas, current adalah ModalProcessing.
-    let processing: ModalProcessing = current;
-    onProgress?.(processing.progress);
-
-    for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
-      await sleep(POLL_INTERVAL_MS);
-      try {
-        current = await this.callFn(`/status/${processing.modalJobId}`, null, "GET");
-      } catch (error) {
-        // Network error saat poll = sementara, lanjut
-        console.warn(`[render-modal] poll gagal (attempt ${attempt}): ${String(error)}`);
-        continue;
-      }
-
-      if (current.status === "done") {
-        onProgress?.(100);
-        return {
-          durationSeconds: current.durationSeconds,
-          width: current.width,
-          height: current.height,
-          sizeBytes: current.sizeBytes,
-          detectedLanguage: current.detectedLanguage,
-        };
-      }
-      if (current.status === "failed") {
-        throw new RenderError(current.message, current.code, current.retryable);
-      }
-      processing = current;
-      onProgress?.(processing.progress);
-    }
-
-    throw new RenderError(
-      `Render timeout setelah ${POLL_MAX_ATTEMPTS * POLL_INTERVAL_MS / 1000}s polling`,
-      "render_timeout",
-      true,
-    );
+    // Fase 1 selalu done/failed di satu request; cabang processing tidak
+    // diproduksi function Modal (async = fase 2).
+    throw new RenderError(current.message, current.code, current.retryable);
   }
 
   /** Panggil Modal function endpoint */
-  private async callFn(
-    path: string,
-    body: unknown,
-    method: "POST" | "GET" = "POST",
-  ): Promise<ModalResponse> {
+  private async callFn(path: string, body: unknown): Promise<ModalResponse> {
     const res = await fetch(`${this.baseUrl}${path}`, {
-      method,
+      method: "POST",
       headers: {
         Authorization: `Bearer ${this.token}`,
-        ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+        "Content-Type": "application/json",
       },
-      ...(method === "POST" && body ? { body: JSON.stringify(body) } : {}),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -198,8 +142,4 @@ export class ModalRenderAdapter implements RenderAdapter {
       true,
     );
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

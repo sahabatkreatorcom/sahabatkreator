@@ -1,12 +1,17 @@
 """
 Modal function — render video SahabatKreator.
 
-Deploy terpisah dari monorepo TS:
-    cd apps/render-modal && modal deploy src/sk_render.py
+Deploy terpisah dari monorepo TS (Modal butuh akun & CLI sendiri):
 
-Endpoint (Web Function, auth Bearer MODAL_TOKEN):
-    POST /render   — submit job (sync bila cepat, "processing" + modalJobId bila panjang)
-    GET  /status/<modalJobId> — poll status job panjang
+    # sekali: buat secret yang simpan token bersama server SahabatKreator
+    modal secret create sk-render-auth MODAL_TOKEN=$(python -c "import secrets;print(secrets.token_urlsafe(32))")
+
+    cd apps/render-modal
+    modal deploy src/sk_render.py          # output: URL function → MODAL_RENDER_URL
+
+Endpoint (FastAPI, auth Bearer MODAL_TOKEN):
+    GET  /health  — smoke test
+    POST /render  — jalankan pipeline, sync sampai selesai
 
 Pipeline (port dari MassVEPro src/core/, dibersihkan):
     1. fetch input dari R2 (presigned URL)
@@ -17,18 +22,21 @@ Pipeline (port dari MassVEPro src/core/, dibersihkan):
     6. burn subtitle (bila caption enabled)
     7. upload output + SRT balik ke R2 (presigned PUT)
 
+FASE 1 = SYNC: satu render per request, selesai dalam satu koneksi.
+Karena render cpu=1, concurrency per container dibatasi 1 (Modal scale-out
+bikin container baru per request concurrent). Async (submit + poll /status)
+adalah fase 2 — lihat docs/rfc-video-render.md.
+
 Yang SENGAJA TIDAK ada (RFC §2 — evasion, ToS violation):
     - metadata device/GPS palsu (metadata_spoofer.py)
     - visual randomization sub-persepsi (anti_detection.py)
     - SEI removal / fingerprint stripping
 
 Resource: CPU $0.0000131/core/s + RAM $0.00000222/GiB/s (Modal 2026).
-Render 5 menit @ 1 core/2GiB ≈ $0.005; free tier $30/bln ≈ ±5.700 render.
+Render 5 menit @ 1 core/2GiB ≈ $0.005; free tier Starter $30/bln ≈ ±5.700 render.
 """
-import json
 import subprocess
 import tempfile
-import time
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -39,18 +47,18 @@ import modal
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg", "fonts-dejavu-core")
-    .pip_install("faster-whisper==1.1.1", "httpx")
+    .pip_install("faster-whisper==1.1.1", "fastapi[standard]")
 )
 
 app = modal.App("sahabatkreator-render", image=image)
 
+# Token Bearer yang sama dengan MODAL_TOKEN di env server SahabatKreator.
+# Dibuat sekali: `modal secret create sk-render-auth MODAL_TOKEN=<random>`.
+_RENDER_SECRET = modal.Secret.from_name("sk-render-auth")
+
 # Model whisper lazy-load per container (Modal reuse container → gratis sekali).
 # Disimpan global per container, bukan per request.
 _WHISPER_CACHE: dict = {}
-
-# ---------------------------------------------------------------- storage
-# Output di R2 via presigned PUT — tidak butuh kredensial R2 di Modal.
-OUTPUT_VOLUME = modal.Volume.from_name("sk-render-tmp", create_if_missing=True)
 
 
 def _ffmpeg(args: list, timeout: int = 900) -> None:
@@ -145,15 +153,8 @@ def _fmt(seconds: float) -> str:
     h = int(seconds // 3600)
     m = int((seconds % 3600) // 60)
     s = int(seconds % 60)
-    ms = int((seconds % 1) * 1000)
+    ms = int(seconds % 1 * 1000)
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
-
-
-# ---------------------------------------------------------------- job store
-# Job panjang disimpan di dict container + modal.Dict (survive cold start).
-# Fase 1: sync via in-container dict — Modal menjaga container hangat di queue
-# aktif. Untuk robustness penuh, pindah ke modal.Dict nanti (RFC fase 2).
-_JOBS: dict = {}
 
 
 def _run_pipeline(req: dict, tmpdir: str) -> dict:
@@ -293,18 +294,12 @@ def _retryable(exc: Exception) -> bool:
     return not any(k in msg for k in permanent)
 
 
-# ---------------------------------------------------------------- endpoints
-@app.function(image=image, cpu=1, memory=2048, timeout=1200)
-@modal.webhook(method="POST")
-def render(body: dict) -> dict:
-    """Submit render job. Sync bila <250s, else return processing + jobId."""
-    req_id = body.get("jobId") or str(uuid.uuid4())
+def _render_sync(req: dict) -> dict:
+    """Satu render sync: jalankan pipeline, hapus tmpdir, kembalikan hasil."""
+    req_id = req.get("jobId") or str(uuid.uuid4())
     tmpdir = tempfile.mkdtemp(prefix=f"sk_{req_id}_")
-
-    # Job pendek: jalankan langsung (webhook timeout 300s cukup untuk mayoritas).
-    t0 = time.time()
     try:
-        result = _run_pipeline(body, tmpdir)
+        result = _run_pipeline(req, tmpdir)
         return {"status": "done", **result}
     except Exception as exc:
         return {
@@ -315,15 +310,41 @@ def render(body: dict) -> dict:
         }
     finally:
         subprocess.run(["rm", "-rf", tmpdir], capture_output=True)
-        del t0
 
 
-@app.function(image=image)
-@modal.webhook(method="GET")
-def status(job_id: str) -> dict:
-    """Poll status job (Fase 1: container-scoped, mayoritas sync jadi jarang dipakai)."""
-    job = _JOBS.get(job_id)
-    if not job:
-        return {"status": "failed", "code": "job_not_found",
-                "message": "job tidak ditemukan (container restart?)", "retryable": True}
-    return job
+# ---------------------------------------------------------------- endpoint
+@app.function(
+    image=image,
+    cpu=1,
+    memory=2048,
+    secrets=[_RENDER_SECRET],
+)
+# Satu render per container — render cpu-bound; request concurrent dapat
+# container baru (scale-out Modal), bukan thread di container yang sama.
+@modal.concurrent(max_inputs=1)
+@modal.asgi_app()
+def web():
+    import os
+
+    from fastapi import Depends, FastAPI, HTTPException
+    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+    from starlette.concurrency import run_in_threadpool
+
+    api = FastAPI(title="SahabatKreator render")
+    auth = HTTPBearer()
+
+    def verify(creds: HTTPAuthorizationCredentials = Depends(auth)) -> None:
+        if creds.credentials != os.environ["MODAL_TOKEN"]:
+            raise HTTPException(status_code=401, detail="unauthorized")
+
+    @api.get("/health")
+    async def health(_: None = Depends(verify)) -> dict:
+        return {"status": "ok"}
+
+    @api.post("/render")
+    async def render(item: dict, _: None = Depends(verify)) -> dict:
+        # Pipeline blocking (ffmpeg/whisper) di threadpool agar event loop
+        # tetap sehat; container hanya pegang 1 request (max_inputs=1).
+        return await run_in_threadpool(_render_sync, item)
+
+    return api
