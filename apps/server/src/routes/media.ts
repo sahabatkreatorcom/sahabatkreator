@@ -46,7 +46,13 @@ const ALLOWED_TYPES = [
   "video/webm",
   "audio/mpeg",
   "audio/mp4",
+  // WAV: browser tidak konsisten — Chrome/Windows kirim "audio/x-wav",
+  // Firefox "audio/wave", IANA "audio/wav". Ketiganya format yang sama.
   "audio/wav",
+  "audio/x-wav",
+  "audio/wave",
+  // Rekaman browser (MediaRecorder API) → Opus dalam container WebM.
+  "audio/webm",
 ];
 
 /**
@@ -144,6 +150,17 @@ function sniffMatches(claimed: string, sniffed: string | null): boolean {
     (claimed === "video/quicktime" && sniffed === "video/mp4")
   )
     return true;
+  // WAV: klaim browser (x-wav/wave) vs sniff RIFF....WAVE → audio/wav.
+  // Nama beda, format sama.
+  if (
+    (claimed === "audio/x-wav" || claimed === "audio/wave") &&
+    sniffed === "audio/wav"
+  )
+    return true;
+  // WebM: container EBML identik untuk audio-only (rekaman browser) dan
+  // video — magic bytes tidak bisa membedakan tanpa parse elemen DocType.
+  // Keduanya di-whitelist, jadi izinkan silang.
+  if (claimed === "audio/webm" && sniffed === "video/webm") return true;
   return false;
 }
 

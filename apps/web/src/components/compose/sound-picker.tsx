@@ -221,7 +221,7 @@ export function SoundPicker({
         <input
           ref={fileInputRef}
           type="file"
-          accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/x-m4a,audio/ogg,audio/webm"
+          accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/x-wav,audio/wave,audio/x-m4a,audio/ogg,audio/webm"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];

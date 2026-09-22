@@ -119,7 +119,7 @@ export function MediaLibraryPicker({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm,audio/mpeg,audio/mp4,audio/wav"
+          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm,audio/mpeg,audio/mp4,audio/wav,audio/x-wav,audio/wave,audio/webm"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];

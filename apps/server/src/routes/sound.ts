@@ -22,7 +22,11 @@ const ALLOWED_TYPES = [
   "audio/mpeg",
   "audio/mp4",
   "audio/aac",
+  // WAV: browser tidak konsisten — Chrome/Windows "audio/x-wav",
+  // Firefox "audio/wave", IANA "audio/wav". Format yang sama.
   "audio/wav",
+  "audio/x-wav",
+  "audio/wave",
   "audio/x-m4a",
   "audio/ogg",
   "audio/webm",
