@@ -59,6 +59,8 @@ temp
 .bts/recovery
 docs/
 meta-scope.md
-.workbuddy-ai/__pycache__/
+# Catatan internal sesi AI (strategi, analisis bisnis) — tidak untuk repo.
+# Path ini juga dicek pre-commit; jangan commit apa pun di dalamnya.
+.workbuddy-ai/
 __pycache__/
 *.pyc
