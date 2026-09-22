@@ -96,24 +96,41 @@ def _probe_dimensions(path: str) -> tuple[int, int]:
 
 
 def _download(url: str, dest: str) -> None:
-    """Download presigned URL ke file lokal."""
-    proc = subprocess.run(
-        ["curl", "-sfL", "-o", dest, url],
-        capture_output=True, timeout=600,
+    """Download presigned URL ke file lokal (stream, hemat memori)."""
+    import shutil
+    import urllib.error
+    import urllib.request
+
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "SahabatKreator-Render/1.0"})
+        with urllib.request.urlopen(req, timeout=600) as r, open(dest, "wb") as f:
+            shutil.copyfileobj(r, f)
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"download gagal {url[:80]}: {exc}")
+
+
+def _upload(local: str, presigned_url: str, content_type: str) -> None:
+    """PUT file ke R2 via presigned URL.
+
+    Content-Type WAJIB sama dengan saat presign dibuat — masuk signature
+    SigV4, salah → 403 SignatureDoesNotMatch.
+    """
+    import urllib.error
+    import urllib.request
+
+    # Bytes eksplisit (bukan file object) — urllib baru set Content-Length untuk
+    # data bytes-like; tanpa itu S3 presigned PUT gagal (chunked butuh signing
+    # STREAMING-AWS4-HMAC-SHA256-PAYLOAD yang urllib tidak produksi).
+    data = Path(local).read_bytes()
+    req = urllib.request.Request(
+        presigned_url, data=data, method="PUT", headers={"Content-Type": content_type}
     )
-    if proc.returncode != 0:
-        raise RuntimeError(f"download gagal {url[:80]}: {proc.stderr.decode()[-200:]}")
-
-
-def _upload(local: str, presigned_url: str) -> None:
-    """PUT file ke R2 via presigned URL."""
-    with open(local, "rb") as f:
-        proc = subprocess.run(
-            ["curl", "-sfL", "-X", "PUT", "--data-binary", "@-", presigned_url],
-            stdin=f, capture_output=True, timeout=900,
-        )
-    if proc.returncode != 0:
-        raise RuntimeError(f"upload gagal: {proc.stderr.decode()[-200:]}")
+    try:
+        with urllib.request.urlopen(req, timeout=900) as r:
+            r.read()
+    except urllib.error.HTTPError as exc:
+        body = exc.read()[:300]
+        raise RuntimeError(f"upload gagal HTTP {exc.code}: {body}")
 
 
 _RESOLUTIONS = {"720p": (1280, 720), "1080p": (1920, 1080)}
@@ -247,7 +264,7 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
         Path(srt_path).write_text(_segments_to_srt(segments), encoding="utf-8")
 
         if req.get("srtUploadUrl"):
-            _upload(srt_path, req["srtUploadUrl"])
+            _upload(srt_path, req["srtUploadUrl"], "application/x-subrip")
 
         burned = f"{tmpdir}/burned.mp4"
         # posisi vertikal subtitle
@@ -265,7 +282,7 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
         current = burned
 
     # --- upload output ---
-    _upload(current, req["outputUploadUrl"])
+    _upload(current, req["outputUploadUrl"], "video/mp4")
 
     w, h = _probe_dimensions(current)
     return {
