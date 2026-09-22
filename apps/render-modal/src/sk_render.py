@@ -288,12 +288,18 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
         # posisi vertikal subtitle
         pos_map = {"bottom": "0.85", "top": "0.15", "center": "0.5"}
         y = pos_map.get(cap.get("position", "bottom"), "0.85")
-        _ffmpeg([
-            "-i", current, "-vf",
-            f"subtitles={srt_path}:force_style="
+        # force_style berisi koma — WAJIB dibungkus quote tunggal. Tanpa itu
+        # filtergraph parser belah koma sebagai pemisah filter → "No such
+        # filter: 'PrimaryColour'" (nilai ASS style jadi filter sendiri).
+        # Quote di dalam graphparser melindungi koma & karakter khusus.
+        style = (
             f"FontSize={cap.get('fontSize', 24)},"
             f"PrimaryColour={_ass_color(cap.get('fontColor', 'white'))},"
-            f"Alignment=2,MarginV={(1 - float(y)) * target[1]:.0f}",
+            f"Alignment=2,MarginV={(1 - float(y)) * target[1]:.0f}"
+        )
+        _ffmpeg([
+            "-i", current, "-vf",
+            f"subtitles={srt_path}:force_style='{style}'",
             "-c:v", "libx264", "-preset", "medium", "-crf", "23",
             "-c:a", "copy", burned,
         ])
