@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
   CalendarDays,
+  Clapperboard,
   Command as CommandIcon,
   CreditCard,
   GalleryHorizontalEnd,
@@ -160,6 +161,14 @@ const NAVIGATION_COMMANDS: PaletteCommand[] = [
     icon: ImageIcon,
     group: "Navigasi",
     run: (n) => n("/media"),
+  },
+  {
+    id: "nav-renders",
+    label: "Video Renders",
+    keywords: ["video", "render", "mp4", "tiktok", "reels", "shorts"],
+    icon: Clapperboard,
+    group: "Navigasi",
+    run: (n) => n("/renders"),
   },
   {
     id: "nav-products",

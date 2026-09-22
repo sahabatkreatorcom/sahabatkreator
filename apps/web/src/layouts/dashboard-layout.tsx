@@ -4,6 +4,7 @@ import {
   Activity as ActivityIcon,
   BarChart3,
   CalendarDays,
+  Clapperboard,
   CreditCard,
   GalleryHorizontalEnd,
   Image as ImageIcon,
@@ -93,6 +94,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { to: "/media", label: "Media", icon: ImageIcon },
       { to: "/video", label: "Render Video", icon: Wand2 },
+      { to: "/renders", label: "Video Renders", icon: Clapperboard },
       { to: "/products", label: "Katalog Produk", icon: Package },
     ],
   },

@@ -12,6 +12,9 @@ export const env = createEnv({
     VITE_WEB_URL: z.url().default("http://localhost:5173"),
     // Google Analytics 4 Measurement ID (format G-XXXXXXX). Kosong → GA tidak dimuat.
     VITE_GA_MEASUREMENT_ID: z.string().optional(),
+    // URL publik manifest render video (R2), mis. https://pub-xxx.r2.dev/renders.json.
+    // Kosong → halaman Renders menampilkan pesan belum dikonfigurasi.
+    VITE_RENDERS_MANIFEST_URL: z.string().optional(),
   },
   runtimeEnv: (import.meta as ImportMeta & { env: ImportMetaEnvRecord }).env,
   emptyStringAsUndefined: true,
