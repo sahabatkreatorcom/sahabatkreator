@@ -59,4 +59,6 @@ temp
 .bts/recovery
 docs/
 meta-scope.md
-.workbuddy-ai/
+.workbuddy-ai/__pycache__/
+__pycache__/
+*.pyc
