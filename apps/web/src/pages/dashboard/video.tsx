@@ -66,6 +66,7 @@ type VideoProcessingSettings = {
   loopMode: "sequential" | "random" | "reverse";
   overlay: {
     file: File | null;
+    mediaId: string | null;
     position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center" | "random";
     scale: number;
     opacity: number;
@@ -153,7 +154,7 @@ export function VideoRenderPage() {
     mirror: false,
     speed: 1.0,
     loopMode: "sequential",
-    overlay: { file: null, position: "top-right", scale: 0.15, opacity: 1.0 },
+    overlay: { file: null, mediaId: null, position: "top-right", scale: 0.15, opacity: 1.0 },
   });
   // Batch mode — submit multiple jobs sekaligus dengan voiceover berbeda
   const [batchMode, setBatchMode] = useState(false);
@@ -242,7 +243,7 @@ export function VideoRenderPage() {
       if (videoProcessing.mirror) vp.mirror = true;
       if (videoProcessing.speed !== 1.0) vp.speed = videoProcessing.speed;
       if (videoProcessing.loopMode !== "sequential") vp.loopMode = videoProcessing.loopMode;
-      // Upload overlay file jika ada
+      // Overlay: upload file baru ATAU pakai media yang sudah ada
       if (videoProcessing.overlay.file) {
         const fd = new FormData();
         fd.append("file", videoProcessing.overlay.file);
@@ -253,6 +254,16 @@ export function VideoRenderPage() {
           scale: videoProcessing.overlay.scale,
           opacity: videoProcessing.overlay.opacity,
         };
+      } else if (videoProcessing.overlay.mediaId) {
+        const m = (mediaData?.items ?? []).find((x) => x.id === videoProcessing.overlay.mediaId);
+        if (m) {
+          vp.overlay = {
+            url: m.url,
+            position: videoProcessing.overlay.position,
+            scale: videoProcessing.overlay.scale,
+            opacity: videoProcessing.overlay.opacity,
+          };
+        }
       }
       return api.post<{ job: VideoJobRow }>("/video", {
         baseVideoMediaId: baseVideoId,
@@ -309,7 +320,7 @@ export function VideoRenderPage() {
       if (videoProcessing.mirror) baseVp.mirror = true;
       if (videoProcessing.speed !== 1.0) baseVp.speed = videoProcessing.speed;
       if (videoProcessing.loopMode !== "sequential") baseVp.loopMode = videoProcessing.loopMode;
-      // Upload overlay file jika ada
+      // Overlay: upload file baru ATAU pakai media yang sudah ada
       if (videoProcessing.overlay.file) {
         const fd = new FormData();
         fd.append("file", videoProcessing.overlay.file);
@@ -320,6 +331,16 @@ export function VideoRenderPage() {
           scale: videoProcessing.overlay.scale,
           opacity: videoProcessing.overlay.opacity,
         };
+      } else if (videoProcessing.overlay.mediaId) {
+        const m = (mediaData?.items ?? []).find((x) => x.id === videoProcessing.overlay.mediaId);
+        if (m) {
+          baseVp.overlay = {
+            url: m.url,
+            position: videoProcessing.overlay.position,
+            scale: videoProcessing.overlay.scale,
+            opacity: videoProcessing.overlay.opacity,
+          };
+        }
       }
 
       const voiceIds = batchMode && batchVoiceoverIds.length > 0
@@ -1157,6 +1178,51 @@ export function VideoRenderPage() {
                   {videoProcessing.overlay.file.name}
                 </p>
               )}
+
+              {/* Pilih dari media library */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-[var(--text-muted)]">atau pilih dari media:</span>
+                <select
+                  className="flex-1 rounded border border-[var(--border)] bg-[var(--bg-tertiary)] px-2 py-1 text-xs"
+                  value={videoProcessing.overlay.mediaId ?? ""}
+                  onChange={(e) => {
+                    const mediaId = e.target.value || null;
+                    setVideoProcessing((v) => ({
+                      ...v,
+                      overlay: {
+                        ...v.overlay,
+                        mediaId,
+                        // Clear file kalau pilih media (dan sebaliknya)
+                        file: mediaId ? null : v.overlay.file,
+                      },
+                    }));
+                  }}
+                >
+                  <option value="">— Tidak dipilih —</option>
+                  {(mediaData?.items ?? [])
+                    .filter((m) => m.type === "image" || m.type === "video")
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name ?? "tanpa nama"} ({m.type})
+                      </option>
+                    ))}
+                </select>
+              </div>
+              {videoProcessing.overlay.mediaId && (() => {
+                const m = (mediaData?.items ?? []).find((x) => x.id === videoProcessing.overlay.mediaId);
+                return m ? (
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={m.thumbnailUrl ?? m.url}
+                      alt={m.name ?? "overlay"}
+                      className="h-8 w-8 rounded border border-[var(--border)] object-cover"
+                    />
+                    <span className="text-[10px] text-[var(--text-muted)] truncate">
+                      {m.name ?? "tanpa nama"}
+                    </span>
+                  </div>
+                ) : null;
+              })()}
             </div>
 
             {/* Position */}
@@ -1657,6 +1723,16 @@ export function VideoRenderPage() {
                             {job.publishedToGallery ? "Privat" : "Publik"}
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-1.5 text-red-600 hover:text-red-700"
+                          disabled={deleteJob.isPending || isBusy}
+                          onClick={() => deleteJob.mutate(job.id)}
+                          title="Hapus dari riwayat"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                     </div>
                   );
