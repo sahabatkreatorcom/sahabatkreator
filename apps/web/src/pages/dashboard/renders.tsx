@@ -1,4 +1,4 @@
-// Halaman Renders — pustaka video hasil render CI (baca manifest publik dari R2)
+// Halaman Renders — pustaka video hasil render (manifest via API terauthentikasi)
 import { useQuery } from "@tanstack/react-query";
 import {
   Check,
@@ -18,11 +18,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { PageLoader } from "@/components/ui/spinner";
-import { env } from "@sahabatkreator/env/web";
+import { api } from "@/lib/api";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-/** Satu entry di renders.json — ditulis oleh CI publish job. */
+/** Satu entry manifest — dibangun dari job done yang opt-in publikasi. */
 type RenderEntry = {
   id: string;
   project: string;
@@ -56,23 +56,13 @@ const ORIENTATION_META: Record<
   square: { label: "Square 1:1", icon: Film },
 };
 
-async function fetchManifest(url: string): Promise<RendersManifest> {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Manifest fetch gagal: HTTP ${res.status}`);
-  const data = (await res.json()) as RendersManifest;
-  if (!Array.isArray(data.renders)) throw new Error("Format manifest tidak valid");
-  return data;
-}
-
 export function RendersPage() {
-  const manifestUrl = env.VITE_RENDERS_MANIFEST_URL;
   const [filter, setFilter] = useState<OrientationFilter>("all");
   const [preview, setPreview] = useState<RenderEntry | null>(null);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["renders-manifest", manifestUrl],
-    queryFn: () => fetchManifest(manifestUrl as string),
-    enabled: !!manifestUrl,
+    queryKey: ["renders-manifest"],
+    queryFn: () => api.get<RendersManifest>("/renders/manifest"),
     staleTime: 60_000,
     retry: 1,
   });
@@ -97,20 +87,6 @@ export function RendersPage() {
     () => (filter === "all" ? renders : renders.filter((r) => r.orientation === filter)),
     [renders, filter],
   );
-
-  // Manifest URL belum dikonfigurasi → onboarding jelas, bukan error teknis.
-  if (!manifestUrl) {
-    return (
-      <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 md:px-8">
-        <PageHeader />
-        <EmptyState
-          icon={<Clapperboard className="h-6 w-6" />}
-          title="Manifest render belum dikonfigurasi"
-          description="Set VITE_RENDERS_MANIFEST_URL (URL publik renders.json di Cloudflare R2) di environment web app. Setelah CI mempublikasikan render, video akan muncul di sini otomatis."
-        />
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (

@@ -251,26 +251,10 @@ export async function processVideoRenderJob(
       })
       .where(eq(videoJob.id, videoJobId));
 
-    // --- publikasikan ke manifest publik (halaman /renders) ---
-    // HANYA bila user opt-in (publishedToGallery). Default false — hasil
-    // render adalah karya klien private; mempublikasikannya tanpa persetujuan
-    // adalah kebocoran data (manifest publik = directory listing + download).
-    if (job.publishedToGallery) {
-      await publishRenderManifest({
-        id: videoJobId,
-        organizationId: job.organizationId,
-        title: outputName,
-        orientation: job.settings.orientation,
-        videoUrl: `${env.R2_PUBLIC_URL?.replace(/\/$/, "") ?? ""}/${outputStorageKey}`,
-        sizeBytes: result.sizeBytes,
-        durationSeconds: Math.round(result.durationSeconds),
-        width: result.width,
-        height: result.height,
-        renderedAt: new Date().toISOString(),
-      }).catch((err) => {
-        console.warn(`[render] gagal publish manifest untuk ${videoJobId}:`, err);
-      });
-    }
+    // Catatan: manifest galeri /renders dibangun dari DB saat request
+    // (GET /renders/manifest) — tidak ada file publik yang ditulis. Flag
+    // publishedToGallery di job sudah cukup; publish/unpublish adalah
+    // operasi murni DB di route gallery.
 
     return { ok: true, outputMediaId: outputId };
   } catch (error) {
@@ -290,11 +274,15 @@ export async function processVideoRenderJob(
 }
 
 // ============================================================
-// Manifest render publik (renders.json di R2) — dibaca halaman /renders.
-// Satu entry per render yang selesai. di-upsert (id = video job id) agar
-// render ulang tidak menduplikasi entry.
+// Manifest galeri /renders — dibangun dari DB saat request (GET
+// /renders/manifest), BUKAN file renders.json publik di R2.
+//
+// Sebelumnya manifest ditulis ke R2 publik (media.sahabatkreator.com/
+// renders.json) — itu directory listing anonim dari semua karya klien.
+// Sekarang manifest di-serving melalui API terauthentikasi (halaman /renders
+// sendiri ada di dalam RequireAuth), jadi tidak ada alasan publish file-nya.
+// Flag publishedToGallery di video_job jadi satu-satunya sumber kebenaran.
 // ============================================================
-const MANIFEST_KEY = "renders.json";
 const MANIFEST_MAX_ENTRIES = 200;
 
 export type RenderManifestEntry = {
@@ -312,98 +300,17 @@ export type RenderManifestEntry = {
   renderedAt: string;
 };
 
-type RenderManifest = {
+export type RenderManifest = {
   version: number;
   generatedAt: string;
   renders: RenderManifestEntry[];
 };
 
-async function fetchManifest(): Promise<RenderManifest | null> {
-  try {
-    const res = await getS3().send(
-      new GetObjectCommand({ Bucket: env.R2_BUCKET, Key: MANIFEST_KEY }),
-    );
-    const text = await res.Body?.transformToString("utf-8");
-    if (!text) return null;
-    const parsed = JSON.parse(text) as RenderManifest;
-    return Array.isArray(parsed.renders) ? parsed : null;
-  } catch (error) {
-    // Belum pernah ada manifest — normal, bukan error.
-    if (error instanceof Error && error.name === "NoSuchKey") return null;
-    throw error;
-  }
-}
-
-async function uploadManifest(entries: RenderManifestEntry[]): Promise<void> {
-  const manifest: RenderManifest = {
-    version: 1,
-    generatedAt: new Date().toISOString(),
-    renders: entries.slice(0, MANIFEST_MAX_ENTRIES),
-  };
-  await getS3().send(
-    new PutObjectCommand({
-      Bucket: env.R2_BUCKET,
-      Key: MANIFEST_KEY,
-      Body: JSON.stringify(manifest, null, 2),
-      ContentType: "application/json",
-      CacheControl: "public, max-age=60",
-    }),
-  );
-}
-
-/** Append/upsert satu entry ke manifest publik (dipanggil setelah render done). */
-export async function publishRenderManifest(entry: {
-  id: string;
-  organizationId: string;
-  title: string;
-  orientation: "portrait" | "landscape" | "square";
-  videoUrl: string;
-  sizeBytes: number;
-  durationSeconds: number;
-  width: number;
-  height: number;
-  renderedAt: string;
-}): Promise<void> {
-  const [org] = await db
-    .select({ slug: organization.slug })
-    .from(organization)
-    .where(eq(organization.id, entry.organizationId))
-    .limit(1);
-
-  const rendered: RenderManifestEntry = {
-    id: entry.id,
-    project: org?.slug ?? entry.organizationId,
-    title: entry.title,
-    orientation: entry.orientation,
-    videoUrl: entry.videoUrl,
-    sizeBytes: entry.sizeBytes,
-    durationSeconds: entry.durationSeconds,
-    width: entry.width,
-    height: entry.height,
-    commitSha: "",
-    branch: "",
-    renderedAt: entry.renderedAt,
-  };
-
-  const existing = await fetchManifest();
-  const others = (existing?.renders ?? []).filter((r) => r.id !== rendered.id);
-  await uploadManifest([rendered, ...others]);
-}
-
-/** Hapus satu entry dari manifest publik (saat user unpublikasi / hapus job). */
-export async function unpublishRenderManifest(jobId: string): Promise<void> {
-  const existing = await fetchManifest();
-  if (!existing) return;
-  const others = existing.renders.filter((r) => r.id !== jobId);
-  await uploadManifest(others);
-}
-
 /**
- * Rebuild manifest dari semua job done yang opt-in publikasi (backfill).
- * Hanya publishedToGallery=true — karya klien private tidak masuk galeri.
- * Dipanggil script publish-renders-manifest.ts.
+ * Bangun manifest galeri dari DB. Hanya job done + opt-in publikasi
+ * (publishedToGallery=true). Dipanggil route GET /renders/manifest.
  */
-export async function rebuildRenderManifest(): Promise<{ published: number }> {
+export async function getRenderManifest(): Promise<RenderManifest> {
   // Output video ada di tabel media; base video juga di tabel media. drizzle-orm
   // 0.45 tidak punya helper alias top-level, jadi nama base diambil terpisah.
   const rows = await db
@@ -436,7 +343,7 @@ export async function rebuildRenderManifest(): Promise<{ published: number }> {
   const baseNameById = new Map(baseRows.map((r) => [r.id, r.name]));
 
   // Drizzle jsonb select mengembalikan object mentah — cast aman untuk field yang dibaca.
-  const entries: RenderManifestEntry[] = rows.map((r) => {
+  const renders: RenderManifestEntry[] = rows.map((r) => {
     const settings = r.settings as RenderSettings;
     const baseName = baseNameById.get(r.baseVideoMediaId);
     return {
@@ -455,8 +362,7 @@ export async function rebuildRenderManifest(): Promise<{ published: number }> {
     };
   });
 
-  await uploadManifest(entries);
-  return { published: entries.length };
+  return { version: 1, generatedAt: new Date().toISOString(), renders };
 }
 
 /** Tandai job failed permanen */

@@ -448,43 +448,8 @@ videoRoute.patch("/:id/gallery", async (c) => {
       .set({ publishedToGallery: published, updatedAt: new Date() })
       .where(eq(videoJob.id, id));
 
-    // Sinkron manifest: tambah bila publish, hapus bila unpublish.
-    const { publishRenderManifest, unpublishRenderManifest } = await import(
-      "@sahabatkreator/queue"
-    );
-    if (published) {
-      const [output] = job.outputMediaId
-        ? await db
-            .select({
-              url: media.url,
-              sizeBytes: media.sizeBytes,
-              width: media.width,
-              height: media.height,
-              durationSeconds: media.durationSeconds,
-            })
-            .from(media)
-            .where(eq(media.id, job.outputMediaId))
-            .limit(1)
-        : [];
-      if (output) {
-        await publishRenderManifest({
-          id: job.id,
-          organizationId: ctx.organization.id,
-          title: `render-${job.createdAt.getFullYear()}`,
-          orientation: job.settings.orientation,
-          videoUrl: output.url,
-          sizeBytes: output.sizeBytes ?? 0,
-          durationSeconds: output.durationSeconds ?? 0,
-          width: output.width ?? 0,
-          height: output.height ?? 0,
-          renderedAt: job.createdAt.toISOString(),
-        }).catch((err) => console.warn("[video] gagal publish manifest:", err));
-      }
-    } else {
-      await unpublishRenderManifest(job.id).catch((err) =>
-        console.warn("[video] gagal unpublish manifest:", err),
-      );
-    }
+    // Manifest galeri dibangun dari DB saat request (GET /renders/manifest)
+    // — toggle flag saja, tidak ada file publik yang perlu disinkronkan.
 
     return c.json({ ok: true, published });
   } catch (error) {

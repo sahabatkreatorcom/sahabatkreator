@@ -36,8 +36,6 @@ x-app-build: &app-build
     SITE_URL: https://sahabatkreator.com
     # Kosong → staging SEO guard aktif saat build web (noindex total).
     INDEXABLE: ""
-    # Manifest render video (halaman /renders) — R2 public URL.
-    RENDERS_MANIFEST_URL: https://media.sahabatkreator.com/renders.json
 
 services:
   redis:

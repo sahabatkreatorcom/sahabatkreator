@@ -18,9 +18,9 @@ export {
 } from "./connection";
 export { markPostFailed } from "./mark-failed";
 export {
-  publishRenderManifest,
-  rebuildRenderManifest,
-  unpublishRenderManifest,
+  type RenderManifest,
+  type RenderManifestEntry,
+  getRenderManifest,
 } from "./render-processor";
 export {
   cancelPublishJob,

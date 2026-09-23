@@ -680,6 +680,14 @@ export function VideoRenderPage() {
             {captionEnabled ? "Subtitle aktif" : "Subtitle nonaktif"}
           </button>
 
+          {captionEnabled && !voiceoverId && removeOriginalAudio && (
+            <p className="text-xs text-[var(--text-muted)]">
+              Tidak ada audio untuk ditranskripsi: pilih voiceover, atau
+              pertahankan audio asli di atas. Tanpa itu, subtitle tidak akan
+              muncul di hasil render.
+            </p>
+          )}
+
           {captionEnabled && (
             <div className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] p-3 sm:grid-cols-2">
               <div className="space-y-1.5">

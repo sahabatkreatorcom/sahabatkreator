@@ -41,8 +41,6 @@ x-app-build: &app-build
     INDEXABLE: "true"
     # GA4 Measurement ID produksi — tracking hanya di domain produksi.
     GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID}
-    # Manifest render video (halaman /renders) — R2 public URL.
-    RENDERS_MANIFEST_URL: https://media.sahabatkreator.com/renders.json
 
 # Koneksi DB internal (di-merge ke environment tiap service app).
 # POSTGRES_PASSWORD di-interpolate dari --env-file .env.prod.

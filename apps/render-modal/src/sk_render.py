@@ -116,6 +116,17 @@ def _probe_dimensions(path: str) -> tuple[int, int]:
     return int(w), int(h)
 
 
+def _probe_has_audio(path: str) -> bool:
+    """Apakah file punya stream audio? (montage meng-strip audio per-segmen.)"""
+    proc = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a",
+         "-show_entries", "stream=codec_type",
+         "-of", "csv=p=0", path],
+        capture_output=True, timeout=120,
+    )
+    return b"audio" in proc.stdout
+
+
 def _download(url: str, dest: str) -> None:
     """Download presigned URL ke file lokal (stream, hemat memori)."""
     import shutil
@@ -361,15 +372,26 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
     current = resized
 
     # --- caption stage ---
+    # Sumber transkripsi: voiceover (prioritas), atau audio asli video bila
+    # dipertahankan. Bila removeOriginalAudio dan tidak ada voiceover, tidak
+    # ada audio sama sekali — caption tidak mungkin (divalidasi di API, tapi
+    # tetap di-guard di sini agar render tidak gagal sia-sia).
     cap = settings.get("caption", {})
     srt_path: Optional[str] = None
     detected_lang: Optional[str] = None
-    if cap.get("enabled") and voice:
+    # Voiceover adalah sumber terbaik (sudah di-mix bersih). Bila tidak ada,
+    # fall back ke audio_stage (berisi audio asli bila dipertahankan). Probe
+    # stream audio: montage mem-strip audio per-segmen, jadi base_video bisa
+    # tanpa audio meskipun removeOriginalAudio=false.
+    caption_src = voice if voice else (
+        audio_stage if not settings.get("removeOriginalAudio") and _probe_has_audio(audio_stage) else None
+    )
+    if cap.get("enabled") and caption_src:
         model = _whisper(cap.get("model", "base"))
         lang = None if cap.get("language") == "auto" else cap.get("language", "id")
         # word_timestamps True hanya kalau karaoke dipakai — hemat CPU & memori
         segments, info = model.transcribe(
-            voice, language=lang, beam_size=5, vad_filter=True,
+            caption_src, language=lang, beam_size=5, vad_filter=True,
             word_timestamps=bool(cap.get("wordHighlight")),
         )
         detected_lang = getattr(info, "language", None)
