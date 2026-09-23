@@ -234,6 +234,8 @@ def _loop_video(video_path: str, target_duration: float, tmpdir: str,
     if loops_needed <= 1:
         return video_path  # sudah cukup panjang
 
+    print(f"[DEBUG] _loop_video: mode={mode}, video_dur={video_dur:.1f}, target={target_duration:.1f}, loops={loops_needed}")
+
     list_file = f"{tmpdir}/loop_concat.txt"
     abs_path = video_path.replace("\\", "/")
 
@@ -465,6 +467,7 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
     # --- video processing: trim, mirror, speed ---
     # Diproses SEBELUM audio stage agar output konsisten.
     vp = settings.get("videoProcessing") or {}
+    print(f"[DEBUG] videoProcessing settings: {vp}")
     # Custom trim points (start/end dalam detik)
     trim_start = vp.get("trimStart")
     trim_end = vp.get("trimEnd")
@@ -498,6 +501,7 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
         # yang menyebabkan frame freeze sementara audio masih jalan.
         elif video_dur < voice_dur - 0.1:
             loop_mode = vp.get("loopMode", "sequential")
+            print(f"[DEBUG] loop_mode={loop_mode}, video_dur={video_dur:.1f}, voice_dur={voice_dur:.1f}")
             base_video = _loop_video(base_video, voice_dur, tmpdir, mode=loop_mode)
 
         if bgm:
