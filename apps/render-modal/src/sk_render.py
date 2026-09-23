@@ -544,17 +544,6 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
     speed = vp.get("speed")
     if isinstance(speed, (int, float)) and 0.25 <= speed <= 4.0:
         base_video = _speed_video(base_video, float(speed), tmpdir)
-    # Overlay (gambar/video) — port dari MassVEPro
-    overlay_cfg = vp.get("overlay") or {}
-    overlay_url = overlay_cfg.get("url") or req.get("overlayUrl")
-    print(f"[DEBUG] overlay: url={overlay_url}, cfg={overlay_cfg}")
-    if overlay_url:
-        base_video = _apply_overlay(
-            base_video, overlay_url, tmpdir,
-            position=overlay_cfg.get("position", "top-right"),
-            scale=overlay_cfg.get("scale", 0.15),
-            opacity=overlay_cfg.get("opacity", 1.0),
-        )
 
     # --- audio stage: replace / mix ---
     audio_stage = f"{tmpdir}/audio.mp4"
@@ -608,7 +597,7 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
         else:
             audio_stage = base_video
 
-    # --- resize stage ---
+    # --- resize stage + overlay (gabung 1 pass) ---
     res = _RESOLUTIONS.get(settings["resolution"], (1920, 1080))
     target = _ORIENTATION.get(settings["orientation"], (1080, 1920))
     # scale pakai force_original_aspect_ratio=decrease + pad ke target rasio
@@ -616,14 +605,72 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
         f"scale={target[0]}:{target[1]}:force_original_aspect_ratio=decrease,"
         f"pad={target[0]}:{target[1]}:(ow-iw)/2:(oh-ih)/2:color=black"
     )
+
+    # Overlay — download & probe dulu, gabung ke filter_complex
+    overlay_cfg = vp.get("overlay") or {}
+    overlay_url = overlay_cfg.get("url") or req.get("overlayUrl")
+    overlay_file: Optional[str] = None
+    overlay_filter = ""
+    if overlay_url:
+        print(f"[DEBUG] overlay: url={overlay_url}, cfg={overlay_cfg}")
+        overlay_file = f"{tmpdir}/overlay_input"
+        _download(overlay_url, overlay_file)
+        import mimetypes as _mime
+        mime_type, _ = _mime.guess_type(overlay_url)
+        is_img = mime_type and mime_type.startswith("image/") if mime_type else overlay_file.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".bmp"))
+        vid_w, vid_h = _probe_dimensions(audio_stage)
+        pos_map = {
+            "top-left": (0.05, 0.05), "top-right": (0.80, 0.05),
+            "bottom-left": (0.05, 0.80), "bottom-right": (0.80, 0.80),
+            "center": (0.425, 0.425),
+        }
+        pos = overlay_cfg.get("position", "top-right")
+        if pos == "random":
+            import random as _rnd
+            pos_norm = (_rnd.uniform(0.05, 0.75), _rnd.uniform(0.05, 0.75))
+        else:
+            pos_norm = pos_map.get(pos, pos_map["top-right"])
+        import random as _rnd2
+        xn = max(0, min(0.9, pos_norm[0] + _rnd2.uniform(-0.05, 0.05)))
+        yn = max(0, min(0.9, pos_norm[1] + _rnd2.uniform(-0.05, 0.05)))
+        x_px = int(xn * vid_w)
+        y_px = int(yn * vid_h)
+        ovl_w = int(vid_w * overlay_cfg.get("scale", 0.15))
+        opa = overlay_cfg.get("opacity", 1.0)
+        if opa < 1.0:
+            overlay_filter = (
+                f",split[main][ov];[ov]scale={ovl_w}:-1,format=rgba,"
+                f"colorchannelmixer=aa={opa:.2f}[ov2];"
+                f"[main][ov2]overlay={x_px}:{y_px}:enable='gte(t,0)'"
+            )
+        else:
+            overlay_filter = (
+                f",split[main][ov];[ov]scale={ovl_w}:-1[ov2];"
+                f"[main][ov2]overlay={x_px}:{y_px}:enable='gte(t,0)'"
+            )
+
     resized = f"{tmpdir}/resized.mp4"
-    _ffmpeg([
-        "-i", audio_stage,
-        "-vf", vf,
-        "-c:v", "libx264", "-preset", "medium", "-crf", "23",
-        "-c:a", "aac", "-shortest",
-        resized,
-    ])
+    if overlay_file:
+        input_args = ["-i", audio_stage]
+        if is_img:
+            input_args += ["-loop", "1", "-framerate", "30"]
+        input_args += ["-i", overlay_file]
+        _ffmpeg(input_args + [
+            "-filter_complex",
+            f"[0:v]{vf}{overlay_filter}[out]",
+            "-map", "[out]", "-map", "0:a?",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+            "-c:a", "aac", "-shortest",
+            resized,
+        ])
+    else:
+        _ffmpeg([
+            "-i", audio_stage,
+            "-vf", vf,
+            "-c:v", "libx264", "-preset", "medium", "-crf", "23",
+            "-c:a", "aac", "-shortest",
+            resized,
+        ])
 
     current = resized
 
