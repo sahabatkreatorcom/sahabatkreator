@@ -372,19 +372,21 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
     current = resized
 
     # --- caption stage ---
-    # Sumber transkripsi: voiceover (prioritas), atau audio asli video bila
-    # dipertahankan. Bila removeOriginalAudio dan tidak ada voiceover, tidak
-    # ada audio sama sekali — caption tidak mungkin (divalidasi di API, tapi
-    # tetap di-guard di sini agar render tidak gagal sia-sia).
+    # Sumber transkripsi (prioritas): voiceover > BGM > audio asli video.
+    # Bila removeOriginalAudio dan tidak ada voiceover/BGM, tidak ada audio
+    # sama sekali — caption tidak mungkin.
     cap = settings.get("caption", {})
     srt_path: Optional[str] = None
     detected_lang: Optional[str] = None
     # Voiceover adalah sumber terbaik (sudah di-mix bersih). Bila tidak ada,
-    # fall back ke audio_stage (berisi audio asli bila dipertahankan). Probe
-    # stream audio: montage mem-strip audio per-segmen, jadi base_video bisa
-    # tanpa audio meskipun removeOriginalAudio=false.
+    # coba BGM (ada audio meskipun musik). Terakhir, fallback ke audio_stage
+    # (berisi audio asli bila dipertahankan). Probe stream audio: montage
+    # mem-strip audio per-segmen, jadi base_video bisa tanpa audio meskipun
+    # removeOriginalAudio=false.
     caption_src = voice if voice else (
-        audio_stage if not settings.get("removeOriginalAudio") and _probe_has_audio(audio_stage) else None
+        bgm if bgm else (
+            audio_stage if not settings.get("removeOriginalAudio") and _probe_has_audio(audio_stage) else None
+        )
     )
     if cap.get("enabled") and caption_src:
         model = _whisper(cap.get("model", "base"))

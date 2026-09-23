@@ -132,6 +132,10 @@ export function VideoRenderPage() {
   const [pollingId, setPollingId] = useState<string | null>(null);
   const [showAllVideos, setShowAllVideos] = useState(false);
   const [publishToGallery, setPublishToGallery] = useState(false);
+  // Batch mode — submit multiple jobs sekaligus dengan voiceover berbeda
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchVoiceoverIds, setBatchVoiceoverIds] = useState<string[]>([]);
+  const [batchOutputCount, setBatchOutputCount] = useState(2);
 
   // List media untuk picker (filter video / audio saja)
   const { data: mediaData, isLoading: mediaLoading } = useQuery({
@@ -230,6 +234,64 @@ export function VideoRenderPage() {
     },
     onError: (error) => {
       const msg = error instanceof ApiError ? error.message : "Gagal membuat job render";
+      toast.error(msg);
+    },
+  });
+
+  // Batch render — buat beberapa job sekaligus (satu per voiceover terpilih)
+  const createBatchJobs = useMutation({
+    mutationFn: async () => {
+      if (!baseVideoId) throw new Error("Base video belum dipilih");
+      const voiceIds = batchMode && batchVoiceoverIds.length > 0
+        ? batchVoiceoverIds
+        : voiceoverId ? [voiceoverId] : [null];
+      const count = batchMode ? Math.min(batchOutputCount, voiceIds.length) : 1;
+      const jobs: VideoJobRow[] = [];
+      for (let i = 0; i < count; i++) {
+        const voiceId = voiceIds[i % voiceIds.length];
+        const res = await api.post<{ job: VideoJobRow }>("/video", {
+          baseVideoMediaId: baseVideoId,
+          clipMediaIds: clipIds,
+          voiceoverMediaId: voiceId,
+          bgmAudioTrackId: bgmTrackId,
+          publishToGallery,
+          settings: {
+            orientation,
+            resolution,
+            removeOriginalAudio,
+            voiceVolume,
+            bgmVolume,
+            montage: clipIds.length ? { minSegmentSeconds: 2, maxSegmentSeconds: 5 } : undefined,
+            caption: { ...caption, enabled: captionEnabled },
+            headline: headlineText.trim()
+              ? {
+                  text: headlineText.trim(),
+                  fontSize: headlineFontSize,
+                  fontColor: headlineColor,
+                  positionY: 0.1,
+                }
+              : undefined,
+          },
+        });
+        jobs.push(res.job);
+      }
+      return jobs;
+    },
+    onSuccess: (jobs) => {
+      toast.success(`${jobs.length} job render dibuat — sedang diproses`);
+      setPollingId(jobs[0]?.id ?? null);
+      queryClient.invalidateQueries({ queryKey: ["video-jobs"] });
+      setBaseVideoId(null);
+      setClipIds([]);
+      setVoiceoverId(null);
+      setBgmTrackId(null);
+      setHeadlineText("");
+      setPublishToGallery(false);
+      setBatchMode(false);
+      setBatchVoiceoverIds([]);
+    },
+    onError: (error) => {
+      const msg = error instanceof ApiError ? error.message : "Gagal membuat job batch";
       toast.error(msg);
     },
   });
@@ -523,6 +585,99 @@ export function VideoRenderPage() {
           </div>
         )}
 
+        {/* Batch mode — submit multiple jobs sekaligus */}
+        {audios.length > 1 && (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => {
+                setBatchMode((v) => !v);
+                if (batchMode) setBatchVoiceoverIds([]);
+              }}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-[var(--radius-md)] border px-3 py-2 text-sm transition",
+                batchMode
+                  ? "border-[var(--accent-gold)] bg-[var(--accent-gold-light)]"
+                  : "border-[var(--border)] text-[var(--text-secondary)]",
+              )}
+            >
+              <span
+                className={cn(
+                  "h-4 w-7 rounded-full p-0.5 transition",
+                  batchMode ? "bg-[var(--accent-gold)]" : "bg-[var(--bg-tertiary)]",
+                )}
+              >
+                <span
+                  className={cn(
+                    "block h-3 w-3 rounded-full bg-white transition",
+                    batchMode ? "translate-x-3" : "translate-x-0",
+                  )}
+                />
+              </span>
+              <span className="flex-1 text-left">
+                Batch mode — render beberapa voiceover sekaligus
+              </span>
+            </button>
+
+            {batchMode && (
+              <div className="space-y-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] p-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-[var(--text-secondary)]">
+                    Pilih voiceover untuk batch (centang beberapa)
+                  </Label>
+                  <div className="max-h-40 space-y-1 overflow-y-auto">
+                    {audios.map((a) => (
+                      <label
+                        key={a.id}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm transition hover:bg-[var(--bg-tertiary)]",
+                          batchVoiceoverIds.includes(a.id) && "bg-[var(--accent-gold-light)]",
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={batchVoiceoverIds.includes(a.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setBatchVoiceoverIds((prev) => [...prev, a.id]);
+                            } else {
+                              setBatchVoiceoverIds((prev) => prev.filter((id) => id !== a.id));
+                            }
+                          }}
+                          className="accent-[var(--accent-gold)]"
+                        />
+                        <span className="flex-1 truncate">{a.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Label className="text-xs text-[var(--text-secondary)] whitespace-nowrap">
+                    Jumlah output:
+                  </Label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={batchVoiceoverIds.length || 10}
+                    value={batchOutputCount}
+                    onChange={(e) => setBatchOutputCount(Number(e.target.value))}
+                    className="w-20 rounded border border-[var(--border)] bg-[var(--bg-primary)] px-2 py-1 text-sm"
+                  />
+                  <span className="text-xs text-[var(--text-muted)]">
+                    (maks {batchVoiceoverIds.length || 1})
+                  </span>
+                </div>
+                {batchVoiceoverIds.length > 0 && (
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Akan membuat {Math.min(batchOutputCount, batchVoiceoverIds.length)} job —
+                    tiap job pakai voiceover berbeda dengan base video & setting yang sama.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label className="flex items-center gap-1.5">
             <Music2 className="h-4 w-4" /> Background music (opsional)
@@ -680,9 +835,9 @@ export function VideoRenderPage() {
             {captionEnabled ? "Subtitle aktif" : "Subtitle nonaktif"}
           </button>
 
-          {captionEnabled && !voiceoverId && removeOriginalAudio && (
+          {captionEnabled && !voiceoverId && !bgmTrackId && removeOriginalAudio && (
             <p className="text-xs text-[var(--text-muted)]">
-              Tidak ada audio untuk ditranskripsi: pilih voiceover, atau
+              Tidak ada audio untuk ditranskripsi: pilih voiceover atau BGM, atau
               pertahankan audio asli di atas. Tanpa itu, subtitle tidak akan
               muncul di hasil render.
             </p>
@@ -885,16 +1040,31 @@ export function VideoRenderPage() {
         </div>
 
         <Button
-          onClick={() => createJob.mutate()}
-          disabled={!baseVideoId || createJob.isPending}
+          onClick={() => {
+            if (batchMode && batchVoiceoverIds.length > 0) {
+              createBatchJobs.mutate();
+            } else {
+              createJob.mutate();
+            }
+          }}
+          disabled={
+            !baseVideoId ||
+            createJob.isPending ||
+            createBatchJobs.isPending ||
+            (batchMode && batchVoiceoverIds.length === 0)
+          }
           className="w-full"
         >
-          {createJob.isPending ? (
+          {createJob.isPending || createBatchJobs.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Sparkles className="h-4 w-4" />
           )}
-          {clipIds.length > 0 ? `Render montage (${clipIds.length + 1} video)` : "Render video"}
+          {batchMode && batchVoiceoverIds.length > 0
+            ? `Batch render (${Math.min(batchOutputCount, batchVoiceoverIds.length)} video)`
+            : clipIds.length > 0
+              ? `Render montage (${clipIds.length + 1} video)`
+              : "Render video"}
         </Button>
 
         {/* Publikasi ke galeri publik — opt-in, default OFF.

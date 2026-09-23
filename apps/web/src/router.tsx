@@ -105,6 +105,9 @@ const VideoRenderPage = lazy(() =>
 const RendersPage = lazy(() =>
   import("./pages/dashboard/renders").then((m) => ({ default: m.RendersPage })),
 );
+const SoundPage = lazy(() =>
+  import("./pages/dashboard/sound").then((m) => ({ default: m.SoundPage })),
+);
 const AnalyticsPage = lazy(() =>
   import("./pages/dashboard/analytics").then((m) => ({ default: m.AnalyticsPage })),
 );
@@ -325,6 +328,7 @@ export const router = createBrowserRouter([
           { path: "/media", element: withFallback(<MediaPage />) },
           { path: "/video", element: withFallback(<VideoRenderPage />) },
           { path: "/renders", element: withFallback(<RendersPage />) },
+          { path: "/sound", element: withFallback(<SoundPage />) },
           { path: "/engagement", element: withFallback(<EngagementPage />) },
           { path: "/inbox", element: withFallback(<InboxPage />) },
           { path: "/automation", element: withFallback(<AutomationPage />) },
