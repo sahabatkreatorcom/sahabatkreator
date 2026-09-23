@@ -70,6 +70,15 @@ const createSchema = z.object({
           positionY: z.number().min(0).max(1).default(0.1),
         })
         .nullish(),
+      videoProcessing: z
+        .object({
+          trimStart: z.number().min(0).optional(),
+          trimEnd: z.number().min(0).optional(),
+          mirror: z.boolean().default(false),
+          speed: z.number().min(0.25).max(4).default(1),
+          loopMode: z.enum(["sequential", "random", "reverse"]).default("sequential"),
+        })
+        .nullish(),
     })
     .default(DEFAULT_RENDER_SETTINGS),
 });
