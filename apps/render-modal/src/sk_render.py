@@ -238,29 +238,18 @@ def _loop_video(video_path: str, target_duration: float, tmpdir: str,
     abs_path = video_path.replace("\\", "/")
 
     if mode == "random":
-        # Random: setiap loop mulai dari titik acak dalam video
-        # Kita buat beberapa segmen pendek dari titik acak, lalu concat
+        # Random: buat segmen-segmen pendek dari titik acak, lalu concat
         import random
         segment_dur = max(1.0, video_dur / 3)  # tiap segmen ~1/3 durasi video
         segments_needed = math.ceil(target_duration / segment_dur)
-        with open(list_file, "w", encoding="utf-8") as f:
-            for _ in range(segments_needed):
-                max_start = max(0, video_dur - segment_dur)
-                start = random.uniform(0, max_start) if max_start > 0 else 0
-                f.write(f"file '{abs_path}'\n")
-                # Kita pakai concat demuxer biasa, tapi dengan -ss dan -t
-                # Sayangnya concat demuxer tidak support -ss per file
-                # Jadi kita buat segmen-segmen kecil dulu
-        # Alternatif: buat segmen kecil via ffmpeg, lalu concat
-        import random
         seg_files = []
         for i in range(segments_needed):
             max_start = max(0, video_dur - segment_dur)
             start = random.uniform(0, max_start) if max_start > 0 else 0
             seg_file = f"{tmpdir}/rand_seg_{i}.mp4"
             _ffmpeg([
-                "-ss", str(start), "-i", video_path,
-                "-t", str(segment_dur),
+                "-ss", f"{start:.3f}", "-i", video_path,
+                "-t", f"{segment_dur:.3f}",
                 "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
                 "-an", seg_file,
             ])
