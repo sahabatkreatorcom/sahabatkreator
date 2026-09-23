@@ -150,6 +150,7 @@ export function VideoRenderPage() {
   const [batchMode, setBatchMode] = useState(false);
   const [batchVoiceoverIds, setBatchVoiceoverIds] = useState<string[]>([]);
   const [batchOutputCount, setBatchOutputCount] = useState(2);
+  const [batchUniqueVariation, setBatchUniqueVariation] = useState(false);
   // Riwayat filter & pagination
   const [historyFilter, setHistoryFilter] = useState<"all" | VideoJobRow["status"]>("all");
   const [historyPage, setHistoryPage] = useState(1);
@@ -268,12 +269,13 @@ export function VideoRenderPage() {
   const createBatchJobs = useMutation({
     mutationFn: async () => {
       if (!baseVideoId) throw new Error("Base video belum dipilih");
-      // Build videoProcessing objek (skip yang kosong/default)
-      const vp: Record<string, unknown> = {};
-      if (videoProcessing.trimStart) vp.trimStart = parseFloat(videoProcessing.trimStart);
-      if (videoProcessing.trimEnd) vp.trimEnd = parseFloat(videoProcessing.trimEnd);
-      if (videoProcessing.mirror) vp.mirror = true;
-      if (videoProcessing.speed !== 1.0) vp.speed = videoProcessing.speed;
+      // Base videoProcessing dari form user
+      const baseVp: Record<string, unknown> = {};
+      if (videoProcessing.trimStart) baseVp.trimStart = parseFloat(videoProcessing.trimStart);
+      if (videoProcessing.trimEnd) baseVp.trimEnd = parseFloat(videoProcessing.trimEnd);
+      if (videoProcessing.mirror) baseVp.mirror = true;
+      if (videoProcessing.speed !== 1.0) baseVp.speed = videoProcessing.speed;
+
       const voiceIds = batchMode && batchVoiceoverIds.length > 0
         ? batchVoiceoverIds
         : voiceoverId ? [voiceoverId] : [null];
@@ -281,6 +283,23 @@ export function VideoRenderPage() {
       const jobs: VideoJobRow[] = [];
       for (let i = 0; i < count; i++) {
         const voiceId = voiceIds[i % voiceIds.length];
+
+        // Variasi unik per job: acak trim, mirror, speed
+        let vp = { ...baseVp };
+        if (batchUniqueVariation && batchMode) {
+          // Acak trim start (0 - 20 detik)
+          const trimStart = Math.round(Math.random() * 200) / 10;
+          // Durasi segmen: 10 - 25 detik
+          const trimEnd = Math.round((trimStart + 10 + Math.random() * 15) * 10) / 10;
+          vp = {
+            ...vp,
+            trimStart,
+            trimEnd,
+            mirror: Math.random() > 0.5, // 50% chance mirror
+            speed: Math.round((0.85 + Math.random() * 0.3) * 100) / 100, // 0.85x - 1.15x
+          };
+        }
+
         const res = await api.post<{ job: VideoJobRow }>("/video", {
           baseVideoMediaId: baseVideoId,
           clipMediaIds: clipIds,
@@ -323,6 +342,7 @@ export function VideoRenderPage() {
       setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0 });
       setBatchMode(false);
       setBatchVoiceoverIds([]);
+      setBatchUniqueVariation(false);
     },
     onError: (error) => {
       const msg = error instanceof ApiError ? error.message : "Gagal membuat job batch";
@@ -720,6 +740,52 @@ export function VideoRenderPage() {
                     Akan membuat {Math.min(batchOutputCount, batchVoiceoverIds.length)} job —
                     tiap job pakai voiceover berbeda dengan base video & setting yang sama.
                   </p>
+                )}
+
+                {/* Variasi Unik */}
+                {batchVoiceoverIds.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setBatchUniqueVariation((v) => !v)}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-[var(--radius-md)] border px-2.5 py-2 text-xs transition",
+                      batchUniqueVariation
+                        ? "border-green-500 bg-green-50 text-green-700"
+                        : "border-[var(--border)] text-[var(--text-secondary)]",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-3.5 w-6 shrink-0 rounded-full p-0.5 transition",
+                        batchUniqueVariation ? "bg-green-500" : "bg-[var(--bg-tertiary)]",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "block h-2.5 w-2.5 rounded-full bg-white transition",
+                          batchUniqueVariation ? "translate-x-2.5" : "translate-x-0",
+                        )}
+                      />
+                    </span>
+                    <span className="flex-1 text-left">
+                      <span className="font-medium">Variasi Unik</span> — acak trim, mirror & speed per job
+                    </span>
+                  </button>
+                )}
+
+                {batchUniqueVariation && batchVoiceoverIds.length > 1 && (
+                  <div className="rounded-[var(--radius-md)] border border-green-200 bg-green-50 p-2.5 text-xs text-green-700">
+                    <p className="font-medium">Yang diacak per job:</p>
+                    <ul className="mt-1 space-y-0.5 list-disc list-inside">
+                      <li>Trim start: 0 - 20 detik (acak)</li>
+                      <li>Durasi segmen: 10 - 25 detik</li>
+                      <li>Mirror: random 50/50</li>
+                      <li>Speed: 0.85x - 1.15x</li>
+                    </ul>
+                    <p className="mt-1 text-[var(--text-muted)]">
+                      Base video yang sama, tapi setiap output punya variasi berbeda.
+                    </p>
+                  </div>
                 )}
               </div>
             )}
