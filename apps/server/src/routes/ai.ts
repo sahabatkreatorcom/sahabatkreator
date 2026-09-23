@@ -49,19 +49,112 @@ async function brandVoicePrompt(organizationId: string): Promise<string> {
   return `\n\nBRAND VOICE (patuhi dengan ketat):\n${parts.join("\n")}`;
 }
 
-/** Konteks style per platform untuk prompt AI */
+/** Konteks style per platform untuk prompt AI — detail aturan agar caption disukai algoritma */
 const PLATFORM_STYLE: Record<string, string> = {
   instagram:
-    "Instagram: hook kuat di 2 baris pertama, emoji secukupnya, hashtags di akhir, maksimal 2200 karakter.",
-  facebook: "Facebook: konversasional, ajukan pertanyaan untuk mendorong engagement.",
-  tiktok: "TikTok: pendek, punchy, trend-aware, hashtag relevan, maksimal 2200 karakter.",
-  youtube: "YouTube: kaya keyword, CTA jelas, SEO-friendly.",
-  linkedin: "LinkedIn: profesional tapi personal, storytelling, tanpa emoji berlebihan.",
+    `Instagram — ATURAN:
+- Hook kuat di 2 baris pertama (stop scroll!)
+- Gunakan emoji secukupnya (3-5 per caption, jangan berlebihan)
+- Paragraph singkat, maksimal 2-3 baris per paragraf
+- Gunakan line break untuk readability
+- Hashtag di AKHIR caption (3-5 hashtag relevan, campuran populer + niche)
+- CTA jelas: "Save buat nanti", "Tag temen", "Komen pendapat kamu"
+- Panjang ideal: 125-150 karakter (reach tertinggi), maksimal 2200 karakter
+- Hindari: link di caption (letakkan di bio), kata-kata spammy seperti "free", "winner"
+- Gunakan storytelling atau bullet points untuk edukasi`,
+
+  facebook:
+    `Facebook — ATURAN:
+- Mulai dengan pertanyaan atau pernyataan provokatif
+- Gunakan gaya konversasional, seperti bicara dengan teman
+- Panjang: 40-80 karakter untuk engagement tertinggi, bisa panjang untuk storytelling
+- Gunakan emoji untuk break text (tidak wajib)
+- Ajukan pertanyaan di akhir untuk mendorong komentar
+- Share personal experience atau behind-the-scenes
+- Hindari: CTA berlebihan, konten terlalu promosi
+- Facebook suka konten yang memicu diskusi dan share`,
+
+  tiktok:
+    `TikTok — ATURAN:
+- Hook dalam 1-2 detik pertama (文字Overlay atau kalimat pembuka kuat)
+- Caption PENDek: 1-3 kalimat, langsung ke inti
+- Gunakan trending sounds/topics bila relevan
+- Hashtag: 3-5 campuran trending + niche (letakkan di caption)
+- CTA: "Follow untuk tips lain", "Duet ini", "Comment yang mana"
+- Gaya: autentik, tidak terlalu polished, "relatable"
+- Panjang maksimal: 2200 karakter (tapi lebih pendek = lebih baik)
+- Hindari: formal language, terlalu banyak emoji, CTA like/share
+- TikTok menghukum konten yang terlihat seperti iklan`,
+
+  youtube:
+    `YouTube — ATURAN:
+- Judul video: 60-70 karakter, keyword di depan, click-worthy tapi bukan clickbait
+- Deskripsi: paragraf pertama 150-200 karakter (muncul di search), lalu detail
+- Tags: 10-15 keyword relevan
+- CTA: "Subscribe", "Like", "Comment", "Share"
+- Gunakan timestamps/chapters untuk video panjang
+- Hook di 30 detik pertama video
+- Hindari: judul terlalu panjang, tag spam, deskripsi kosong
+- YouTube SEO: gunakan keyword di judul, deskripsi, dan spoken content`,
+
+  linkedin:
+    `LinkedIn — ATURAN:
+- Hook di 1-2 baris pertama (muncul sebelum "...lihat lainnya")
+- Gunakan storytelling personal atau professional insight
+- 3-5 paragraf pendek, setiap paragraf 1-2 kalimat
+- Gunakan line break antar paragraf (readability)
+- Minimal emoji (1-3, profesional)
+- CTA: "What do you think?", "Share your experience", "Connect"
+- Hashtag: 3-5 di akhir (campuran industri + topik)
+- Panjang ideal: 1300-2000 karakter (sweet spot engagement)
+- Hindari: hashtag berlebihan, konten terlalu promosi, emoji berlebihan
+- LinkedIn suka: pelajaran, insight, cerita kegagalan/keberhasilan`,
+
   linkedin_org:
-    "LinkedIn halaman company: profesional, informatif, sudut pandang brand/perusahaan, CTA jelas, tanpa emoji berlebihan.",
-  pinterest: "Pinterest: kaya keyword, deskriptif, search-optimized.",
-  threads: "Threads: maksimal 500 karakter, ringan dan konversasional.",
-  x: "X/Twitter: maksimal 280 karakter, tajam dan langsung.",
+    `LinkedIn Company Page — ATURAN:
+- Sudut pandang brand/perusahaan (bukan personal)
+- Ton profesional tapi approachable
+- Share updates perusahaan, pencapaian, budaya kerja
+- Gunakan data/skill untuk credibility
+- CTA jelas: "Learn more", "Apply now", "Visit our website"
+- Hashtag: 3-5 (brand + industri)
+- Hindari: terlalu casual, meme, konten tidak profesional`,
+
+  pinterest:
+    `Pinterest — ATURAN:
+- Deskripsi: 100-200 karakter, kaya keyword (search-optimized)
+- Gunakan long-tail keywords (misal: "tips bisnis online untuk pemula")
+- Judul: 100 karakter, keyword utama di depan
+- Call-to-action: "Save this pin", "Click for tutorial"
+- Panjang deskripsi: tidak ada batasan ketat, tapi 100-500 ideal
+- Pinterest adalah SEARCH ENGINE — optimasi untuk pencarian
+- Gunakan keywords alami dalam deskripsi
+- Hindari: hashtag berlebihan (tidak relevan di Pinterest), CTA like/share
+- Konten vertikal (2:3 ratio) performa lebih baik`,
+
+  threads:
+    `Threads — ATURAN:
+- MAKSIMAL 500 karakter (sweet spot: 100-200 karakter)
+- Gaya: ringan, konversasional, seperti Twitter tapi lebih relaxed
+- Bisa pakai emoji tapi jangan berlebihan
+- reply ke thread sendiri untuk konten panjang (threading)
+- CTA: "Thoughts?", "Agree?", "What do you think?"
+- Hashtag: tidak wajib, bila pakai 1-2 saja
+- Hindari: link berlebihan (reach turun), konten terlalu panjang
+- Threads suka: opini, hot takes, behind-the-scenes, humor`,
+
+  x:
+    `X/Twitter — ATURAN:
+- MAKSIMAL 280 karakter (weet), 25.000 karakter (unverified), 100.000 (verified)
+- Sweet spot: 71-100 karakter (engagement tertinggi)
+- Hook kuat di kalimat pertama
+- Gunakan thread untuk konten panjang (reply ke tweet sendiri)
+- Hashtag: 1-2 max (tidak wajib, jangan berlebihan)
+- CTA: "RT if you agree", "Reply your thoughts"
+- Media attachment meningkatkan engagement 3-4x
+- Hindari: link berlebihan (reach turun), terlalu banyak hashtag
+- X/Twitter suka: hot takes, berita terkini, humor, thread edukasi
+- Waktu posting: jam 8-10 pagi atau 12-1 siang (WIB)`,
 };
 
 const PLATFORMS = [
@@ -199,7 +292,22 @@ aiRoute.post("/caption", async (c) => {
     // Hashtag JANGAN ditempel di caption — platform punya field hashtag
     // terpisah, dan adapter menggabungkannya via composeCaption saat publish.
     // Caption bertype hashtag + field hashtag = dobel saat tayang.
-    const system = `Kamu adalah copywriter social media profesional Indonesia. Tulis caption ${input.tone} dalam Bahasa Indonesia untuk konten kreator UMKM.\n${style}${voice}\n${input.includeHashtags ? "Selesai menulis caption, tambahkan satu baris baru berisi persis 'HASHTAG:' lalu 3-8 hashtag relevan dipisah spasi. Caption di ATAS baris HASHTAG: wajib bebas tanda pagar (#)." : "JANGAN sertakan hashtag sama sekali (tidak perlu baris HASHTAG:)."}\nKembalikan HANYA teks caption, tanpa penjelasan tambahan.`;
+    const system = `Kamu adalah copywriter social media profesional Indonesia yang ahli di setiap platform. Tulis caption dengan tone ${input.tone} dalam Bahasa Indonesia untuk konten kreator UMKM.
+
+ATURAN PENTING:
+- PATUHI aturan spesifik platform di bawah (panjang, format, emoji, hashtag)
+- Gunakan bahasa yang natural, tidak terkesan AI-generated
+- Hook harus kuat di baris pertama (stop scroll!)
+- Sesuaikan gaya bahasa dengan platform (formal untuk LinkedIn, casual untuk TikTok)
+- Jangan pernah menggunakan hashtag di body caption (hanya di baris HASHTAG: bila diminta)
+
+${style}
+
+${voice}
+
+${input.includeHashtags ? "Selesai menulis caption, tambahkan satu baris baru berisi persis 'HASHTAG:' lalu 3-8 hashtag relevan dipisah spasi. Caption di ATAS baris HASHTAG: wajib bebas tanda pagar (#). JANGAN sertakan hashtag di body caption." : "JANGAN sertakan hashtag sama sekali (tidak perlu baris HASHTAG:)."}
+
+Kembalikan HANYA teks caption, tanpa penjelasan tambahan, tanpa judul, tanpa format markdown.`;
 
     const raw = await chatCompletion(config, system, input.prompt, {
       temperature: 0.85,

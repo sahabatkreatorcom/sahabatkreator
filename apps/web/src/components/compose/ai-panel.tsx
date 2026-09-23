@@ -4,7 +4,7 @@
 // Saat variant="inline", panel tampil sebagai tombol toggle (mirip EmojiPicker) yang
 // membuka popover berisi form — bukan langsung expand menjadi form penuh.
 import { useMutation } from "@tanstack/react-query";
-import { Hash, Loader2, Sparkles, Wand2 } from "lucide-react";
+import { Hash, Info, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,46 @@ const REWRITE_STYLES = [
   { value: "hook-kuat", label: "Hook Kuat" },
   { value: "seo", label: "SEO" },
 ] as const;
+
+/** Panduan singkat per platform — ditampilkan saat user generate caption */
+const PLATFORM_GUIDE: Record<string, { label: string; tips: string[] }> = {
+  instagram: {
+    label: "Instagram",
+    tips: ["Hook kuat 2 baris pertama", "3-5 emoji", "Hashtag di akhir", "Ideal: 125-150 char"],
+  },
+  facebook: {
+    label: "Facebook",
+    tips: ["Mulai pertanyaan/provokatif", "Konversasional", "Pertanyaan di akhir", "40-80 char = sweet spot"],
+  },
+  tiktok: {
+    label: "TikTok",
+    tips: ["Hook 1-2 detik", "Caption pendek 1-3 kalimat", "3-5 hashtag trending", "Autentik, bukan iklan"],
+  },
+  youtube: {
+    label: "YouTube",
+    tips: ["Judul: 60-70 char, keyword di depan", "Deskripsi: paragraf pertama SEO", "CTA: Subscribe/Like"],
+  },
+  linkedin: {
+    label: "LinkedIn",
+    tips: ["Hook 1-2 baris (stop scroll)", "Storytelling personal", "3-5 paragraf pendek", "3-5 hashtag di akhir"],
+  },
+  linkedin_org: {
+    label: "LinkedIn Company",
+    tips: ["Sudut pandang brand", "Profesional tapi approachable", "Share data/skill", "CTA jelas"],
+  },
+  pinterest: {
+    label: "Pinterest",
+    tips: ["Search engine, bukan social", "Long-tail keywords", "Deskripsi 100-500 char", "Konten vertikal 2:3"],
+  },
+  threads: {
+    label: "Threads",
+    tips: ["Maks 500 char (sweet spot: 100-200)", "Ringan & konversasional", "Thread untuk konten panjang", "1-2 hashtag max"],
+  },
+  x: {
+    label: "X/Twitter",
+    tips: ["Maks 280 char (sweet spot: 71-100)", "Hook kuat di awal", "1-2 hashtag max", "Media attachment = 3-4x engagement"],
+  },
+};
 
 /** Platform yang diterima endpoint AI (zod enum server) — selain ini di-fallback */
 const AI_PLATFORMS = new Set([
@@ -206,6 +246,26 @@ export function AiComposerPanel({
           ))}
         </div>
       </div>
+
+      {/* Panduan platform — tips singkat agar caption disukai algoritma */}
+      {PLATFORM_GUIDE[aiPlatform] && (
+        <div className="rounded-[var(--radius-md)] border border-[var(--border-light)] bg-[var(--bg-secondary)] p-2.5">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[var(--text-secondary)]">
+            <Info className="h-3 w-3" />
+            <span className="text-[10px] font-medium uppercase tracking-wide">
+              {PLATFORM_GUIDE[aiPlatform].label} — Tips
+            </span>
+          </div>
+          <ul className="space-y-0.5">
+            {PLATFORM_GUIDE[aiPlatform].tips.map((tip) => (
+              <li key={tip} className="flex items-start gap-1.5 text-[var(--text-muted)] text-xs">
+                <span className="mt-0.5 h-1 w-1 shrink-0 rounded-full bg-[var(--accent-gold)]" />
+                {tip}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <Button
         type="button"
