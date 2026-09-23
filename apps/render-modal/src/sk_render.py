@@ -38,6 +38,7 @@ Yang SENGAJA TIDAK ada (RFC §2 — evasion, ToS violation):
 Resource: CPU $0.0000131/core/s + RAM $0.00000222/GiB/s (Modal 2026).
 Render 5 menit @ 1 core/2GiB ≈ $0.005; free tier Starter $30/bln ≈ ±5.700 render.
 """
+import math
 import subprocess
 import tempfile
 import uuid
@@ -206,6 +207,37 @@ def _fmt(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
+def _loop_video(video_path: str, target_duration: float, tmpdir: str) -> str:
+    """Loop video untuk match target_duration (voiceover lebih panjang dari video).
+
+    Port dari MassVEPro video_processor.py loop_video(). Pakai concat demuxer
+    (stream copy, cepat) lalu trim ke exact duration.
+    """
+    video_dur = _probe_duration(video_path)
+    if video_dur <= 0:
+        raise RuntimeError("video durasi tidak valid untuk looping")
+
+    loops_needed = math.ceil(target_duration / video_dur)
+    if loops_needed <= 1:
+        return video_path  # sudah cukup panjang
+
+    # Concat demuxer: list video yang sama N kali
+    list_file = f"{tmpdir}/loop_concat.txt"
+    abs_path = video_path.replace("\\", "/")
+    with open(list_file, "w", encoding="utf-8") as f:
+        for _ in range(loops_needed):
+            f.write(f"file '{abs_path}'\n")
+
+    looped = f"{tmpdir}/looped.mp4"
+    _ffmpeg([
+        "-f", "concat", "-safe", "0", "-i", list_file,
+        "-t", str(target_duration),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
+        "-an", looped,
+    ])
+    return looped
+
+
 def _build_montage(
     base_video: str,
     clip_urls: list,
@@ -327,6 +359,9 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
             _ffmpeg(["-ss", "0", "-i", base_video, "-t", str(voice_dur + 0.5),
                      "-c", "copy", "-an", seg])
             base_video = seg
+        # Kalau video lebih pendek dari voiceover → loop video agar match durasi
+        elif video_dur < voice_dur - 0.5:
+            base_video = _loop_video(base_video, voice_dur, tmpdir)
 
         if bgm:
             # Mix voiceover + BGM (voice 1.0, bgm 0.3 default)
@@ -409,10 +444,15 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
             _upload(srt_path, req["srtUploadUrl"], "application/x-subrip")
 
         burned = f"{tmpdir}/burned.mp4"
+        # Scale font berdasarkan video height — user set fontSize untuk 1080p
+        # (height=1080), kita scale proporsional. Reference: height=1080 → 1x.
+        ref_height = 1080
+        scale = target[1] / ref_height
+        scaled_font = max(12, int(cap.get("fontSize", 24) * scale))
         if cap.get("wordHighlight"):
             ass_path = f"{tmpdir}/caption.ass"
             Path(ass_path).write_text(
-                _segments_to_ass(segments, cap, target), encoding="utf-8"
+                _segments_to_ass(segments, cap, target, scaled_font), encoding="utf-8"
             )
             # ASS bawa style sendiri — jangan pakai force_style
             _ffmpeg([
@@ -437,7 +477,7 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
             # filter: 'PrimaryColour'" (nilai ASS style jadi filter sendiri).
             # Quote di dalam graphparser melindungi koma & karakter khusus.
             style = (
-                f"FontSize={cap.get('fontSize', 24)},"
+                f"FontSize={scaled_font},"
                 f"PrimaryColour={_ass_color(cap.get('fontColor', 'white'))},"
                 f"Alignment={align},MarginV={margin}"
             )
@@ -543,7 +583,7 @@ def _esc_ass(text: str) -> str:
     return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}").replace("\n", " ")
 
 
-def _segments_to_ass(segments, cap: dict, target: tuple[int, int]) -> str:
+def _segments_to_ass(segments, cap: dict, target: tuple[int, int], scaled_font: int = 24) -> str:
     """ASS karaoke per-kata (\\k) — kata aktif menyala saat diucapkan.
 
     Catatan semantik (diverifikasi terhadap ffmpeg+libass): kata AKTIF dan
@@ -555,7 +595,7 @@ def _segments_to_ass(segments, cap: dict, target: tuple[int, int]) -> str:
     word_timestamps wajib True saat transcribe (dilakukan caller saat
     wordHighlight aktif).
     """
-    font_size = cap.get("fontSize", 24)
+    font_size = scaled_font
     align = _ASS_ALIGN.get(cap.get("position", "bottom"), 2)
     # MarginV: jarak dari tepi bawah/atas. Alignment=5 (tengah) simetris —
     # MarginV besar akan tekan text ke tinggi nol, jadi pakai 0 (center murni).
