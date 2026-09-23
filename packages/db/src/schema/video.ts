@@ -76,7 +76,7 @@ export type RenderSettings = {
     /** Posisi Y normalisasi 0-1 */
     positionY: number;
   };
-  /** Video processing: trim, mirror, speed (opsional) */
+  /** Video processing: trim, mirror, speed, overlay (opsional) */
   videoProcessing?: {
     /** Mulai trim (detik) */
     trimStart?: number;
@@ -88,6 +88,17 @@ export type RenderSettings = {
     speed?: number;
     /** Mode loop saat video lebih pendek dari voiceover */
     loopMode?: "sequential" | "random" | "reverse";
+    /** Overlay: gambar atau video yang ditempel di atas video */
+    overlay?: {
+      /** URL overlay (gambar: png/jpg, video: mp4) */
+      url: string;
+      /** Posisi overlay */
+      position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center" | "random";
+      /** Skala overlay (0.05 - 0.5, default 0.15 = 15% lebar video) */
+      scale: number;
+      /** Opasitas (0.0 - 1.0, default 1.0) */
+      opacity: number;
+    };
   };
 };
 

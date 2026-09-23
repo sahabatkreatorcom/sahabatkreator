@@ -77,6 +77,14 @@ const createSchema = z.object({
           mirror: z.boolean().default(false),
           speed: z.number().min(0.25).max(4).default(1),
           loopMode: z.enum(["sequential", "random", "reverse"]).default("sequential"),
+          overlay: z
+            .object({
+              url: z.string().url(),
+              position: z.enum(["top-left", "top-right", "bottom-left", "bottom-right", "center", "random"]).default("top-right"),
+              scale: z.number().min(0.05).max(0.5).default(0.15),
+              opacity: z.number().min(0).max(1).default(1),
+            })
+            .nullish(),
         })
         .nullish(),
     })

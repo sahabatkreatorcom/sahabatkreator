@@ -57,13 +57,19 @@ export type RenderRequest = {
       fontColor: string;
       positionY: number;
     };
-    /** Video processing: trim, mirror, speed, loop mode (opsional) */
+    /** Video processing: trim, mirror, speed, overlay, loop mode (opsional) */
     videoProcessing?: {
       trimStart?: number;
       trimEnd?: number;
       mirror?: boolean;
       speed?: number;
       loopMode?: "sequential" | "random" | "reverse";
+      overlay?: {
+        url: string;
+        position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center" | "random";
+        scale: number;
+        opacity: number;
+      };
     };
   };
   /** Presigned URL upload output video ke R2 (adapter PUT hasilnya ke sini) */

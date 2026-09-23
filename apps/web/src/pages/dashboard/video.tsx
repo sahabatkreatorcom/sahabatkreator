@@ -64,6 +64,12 @@ type VideoProcessingSettings = {
   mirror: boolean;
   speed: number;
   loopMode: "sequential" | "random" | "reverse";
+  overlay: {
+    file: File | null;
+    position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center" | "random";
+    scale: number;
+    opacity: number;
+  };
 };
 
 type VideoJobRow = {
@@ -147,6 +153,7 @@ export function VideoRenderPage() {
     mirror: false,
     speed: 1.0,
     loopMode: "sequential",
+    overlay: { file: null, position: "top-right", scale: 0.15, opacity: 1.0 },
   });
   // Batch mode — submit multiple jobs sekaligus dengan voiceover berbeda
   const [batchMode, setBatchMode] = useState(false);
@@ -176,6 +183,17 @@ export function VideoRenderPage() {
 
   const selectedBase = videos.find((v) => v.id === baseVideoId) ?? null;
   const selectedVoice = audios.find((a) => a.id === voiceoverId) ?? null;
+
+  // Probe video duration via hidden video element
+  const [videoDuration, setVideoDuration] = useState<number>(0);
+  useEffect(() => {
+    if (!selectedBase?.url) { setVideoDuration(0); return; }
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.onloadedmetadata = () => { setVideoDuration(v.duration || 0); v.remove(); };
+    v.onerror = () => { setVideoDuration(0); v.remove(); };
+    v.src = selectedBase.url;
+  }, [selectedBase?.url]);
 
   // List job render
   const {
@@ -216,7 +234,7 @@ export function VideoRenderPage() {
   }, [activeJob, queryClient]);
 
   const createJob = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       // Build videoProcessing objek (skip yang kosong/default)
       const vp: Record<string, unknown> = {};
       if (videoProcessing.trimStart) vp.trimStart = parseFloat(videoProcessing.trimStart);
@@ -224,6 +242,18 @@ export function VideoRenderPage() {
       if (videoProcessing.mirror) vp.mirror = true;
       if (videoProcessing.speed !== 1.0) vp.speed = videoProcessing.speed;
       if (videoProcessing.loopMode !== "sequential") vp.loopMode = videoProcessing.loopMode;
+      // Upload overlay file jika ada
+      if (videoProcessing.overlay.file) {
+        const fd = new FormData();
+        fd.append("file", videoProcessing.overlay.file);
+        const uploadRes = await api.post<{ media: { url: string } }>("/media/upload", fd);
+        vp.overlay = {
+          url: uploadRes.media.url,
+          position: videoProcessing.overlay.position,
+          scale: videoProcessing.overlay.scale,
+          opacity: videoProcessing.overlay.opacity,
+        };
+      }
       return api.post<{ job: VideoJobRow }>("/video", {
         baseVideoMediaId: baseVideoId,
         clipMediaIds: clipIds,
@@ -260,7 +290,7 @@ export function VideoRenderPage() {
       setBgmTrackId(null);
       setHeadlineText("");
       setPublishToGallery(false);
-      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0, loopMode: "sequential" });
+      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0, loopMode: "sequential", overlay: { file: null, position: "top-right", scale: 0.15, opacity: 1.0 } });
     },
     onError: (error) => {
       const msg = error instanceof ApiError ? error.message : "Gagal membuat job render";
@@ -279,6 +309,18 @@ export function VideoRenderPage() {
       if (videoProcessing.mirror) baseVp.mirror = true;
       if (videoProcessing.speed !== 1.0) baseVp.speed = videoProcessing.speed;
       if (videoProcessing.loopMode !== "sequential") baseVp.loopMode = videoProcessing.loopMode;
+      // Upload overlay file jika ada
+      if (videoProcessing.overlay.file) {
+        const fd = new FormData();
+        fd.append("file", videoProcessing.overlay.file);
+        const uploadRes = await api.post<{ media: { url: string } }>("/media/upload", fd);
+        baseVp.overlay = {
+          url: uploadRes.media.url,
+          position: videoProcessing.overlay.position,
+          scale: videoProcessing.overlay.scale,
+          opacity: videoProcessing.overlay.opacity,
+        };
+      }
 
       const voiceIds = batchMode && batchVoiceoverIds.length > 0
         ? batchVoiceoverIds
@@ -288,20 +330,43 @@ export function VideoRenderPage() {
       for (let i = 0; i < count; i++) {
         const voiceId = voiceIds[i % voiceIds.length];
 
-        // Variasi unik per job: acak trim, mirror, speed, loop mode
+        // Variasi unik per job: calculate_segment_start dari MassVEPro
         let vp = { ...baseVp };
-        if (batchUniqueVariation && batchMode) {
-          // Acak trim start (0 - 20 detik)
-          const trimStart = Math.round(Math.random() * 200) / 10;
-          // Durasi segmen: 10 - 25 detik
-          const trimEnd = Math.round((trimStart + 10 + Math.random() * 15) * 10) / 10;
+        if (batchUniqueVariation && batchMode && videoDuration > 0) {
+          // Estimasi durasi voiceover (probe dari audio element)
+          const voiceDur = await new Promise<number>((resolve) => {
+            const selectedVoiceItem = audios.find((a) => a.id === voiceId);
+            if (!selectedVoiceItem?.url) { resolve(15); return; }
+            const a = document.createElement("audio");
+            a.preload = "metadata";
+            a.onloadedmetadata = () => { resolve(a.duration || 15); a.remove(); };
+            a.onerror = () => { resolve(15); a.remove(); };
+            a.src = selectedVoiceItem.url;
+          });
+
+          // calculate_segment_start — port dari MassVEPro
+          const maxStart = Math.max(0, videoDuration - voiceDur);
+          const totalJobs = count;
           const loopModes = ["sequential", "random", "reverse"] as const;
+
+          // Sequential: distribusi merata, Random: acak
+          let trimStart: number;
+          const mode = Math.random() > 0.5 ? "sequential" : "random";
+          if (mode === "sequential" && totalJobs > 1) {
+            const step = maxStart / (totalJobs - 1);
+            trimStart = Math.min(maxStart, i * step);
+          } else {
+            trimStart = maxStart > 0 ? Math.random() * maxStart : 0;
+          }
+          trimStart = Math.round(trimStart * 10) / 10;
+          const trimEnd = Math.round((trimStart + voiceDur + 0.5) * 10) / 10;
+
           vp = {
             ...vp,
             trimStart,
             trimEnd,
-            mirror: Math.random() > 0.5, // 50% chance mirror
-            speed: Math.round((0.85 + Math.random() * 0.3) * 100) / 100, // 0.85x - 1.15x
+            mirror: Math.random() > 0.5,
+            speed: Math.round((0.9 + Math.random() * 0.2) * 100) / 100, // 0.9x - 1.1x
             loopMode: loopModes[Math.floor(Math.random() * loopModes.length)],
           };
         }
@@ -345,7 +410,7 @@ export function VideoRenderPage() {
       setBgmTrackId(null);
       setHeadlineText("");
       setPublishToGallery(false);
-      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0, loopMode: "sequential" });
+      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0, loopMode: "sequential", overlay: { file: null, position: "top-right", scale: 0.15, opacity: 1.0 } });
       setBatchMode(false);
       setBatchVoiceoverIds([]);
       setBatchUniqueVariation(false);
@@ -1046,6 +1111,121 @@ export function VideoRenderPage() {
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Overlay */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-1.5">
+            <Film className="h-4 w-4" /> Overlay (gambar/video)
+          </Label>
+          <div className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] p-3 sm:grid-cols-2">
+            {/* File picker */}
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-xs text-[var(--text-secondary)]">File overlay (opsional)</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setVideoProcessing((v) => ({
+                      ...v,
+                      overlay: { ...v.overlay, file },
+                    }));
+                  }}
+                  className="w-full text-xs file:mr-2 file:rounded file:border-0 file:bg-[var(--accent-gold)] file:px-2 file:py-1 file:text-xs file:font-medium file:text-white"
+                />
+                {videoProcessing.overlay.file && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      setVideoProcessing((v) => ({
+                        ...v,
+                        overlay: { ...v.overlay, file: null },
+                      }))
+                    }
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+              {videoProcessing.overlay.file && (
+                <p className="text-[10px] text-[var(--text-muted)]">
+                  {videoProcessing.overlay.file.name}
+                </p>
+              )}
+            </div>
+
+            {/* Position */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[var(--text-secondary)]">Posisi</Label>
+              <div className="flex flex-wrap gap-1">
+                {(["top-left", "top-right", "bottom-left", "bottom-right", "center", "random"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() =>
+                      setVideoProcessing((v) => ({
+                        ...v,
+                        overlay: { ...v.overlay, position: p },
+                      }))
+                    }
+                    className={cn(
+                      "rounded border px-1.5 py-0.5 text-[10px] transition",
+                      videoProcessing.overlay.position === p
+                        ? "border-[var(--accent-gold)] bg-[var(--accent-gold-light)] font-medium"
+                        : "border-[var(--border)] text-[var(--text-secondary)]",
+                    )}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Scale */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[var(--text-secondary)]">
+                Skala — {Math.round(videoProcessing.overlay.scale * 100)}%
+              </Label>
+              <input
+                type="range"
+                min={0.05}
+                max={0.5}
+                step={0.01}
+                value={videoProcessing.overlay.scale}
+                onChange={(e) =>
+                  setVideoProcessing((v) => ({
+                    ...v,
+                    overlay: { ...v.overlay, scale: parseFloat(e.target.value) },
+                  }))
+                }
+                className="w-full accent-[var(--accent-gold)]"
+              />
+            </div>
+
+            {/* Opacity */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[var(--text-secondary)]">
+                Opasitas — {Math.round(videoProcessing.overlay.opacity * 100)}%
+              </Label>
+              <input
+                type="range"
+                min={0.1}
+                max={1}
+                step={0.05}
+                value={videoProcessing.overlay.opacity}
+                onChange={(e) =>
+                  setVideoProcessing((v) => ({
+                    ...v,
+                    overlay: { ...v.overlay, opacity: parseFloat(e.target.value) },
+                  }))
+                }
+                className="w-full accent-[var(--accent-gold)]"
+              />
             </div>
           </div>
         </div>

@@ -356,6 +356,68 @@ def _speed_video(video_path: str, speed: float, tmpdir: str) -> str:
     return out
 
 
+def _apply_overlay(video_path: str, overlay_url: str, tmpdir: str,
+                   position: str = "top-right", scale: float = 0.15,
+                   opacity: float = 1.0) -> str:
+    """Terapkan overlay (gambar/video) ke video.
+
+    Port dari MassVEPro AntiDetectionEngine.apply_overlay_variations().
+    Overlay ditempatkan di posisi relatif (0-1) dengan skala dan opasitas.
+    """
+    import random as _rand
+
+    overlay_file = f"{tmpdir}/overlay_input"
+    _download(overlay_url, overlay_file)
+
+    # Probe overlay type (image atau video)
+    probe_cmd = [
+        "ffprobe", "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream=codec_type,duration",
+        "-of", "csv=p=0", overlay_file,
+    ]
+    proc = subprocess.run(probe_cmd, capture_output=True, timeout=30)
+    probe_out = proc.stdout.decode().strip()
+    is_video = "video" in probe_out and "audio" not in probe_out
+
+    # Probe video dimensions
+    vid_w, vid_h = _probe_resolution(video_path)
+
+    # Posisi overlay (randomized sedikit seperti MassVEPro)
+    pos_map = {
+        "top-left": (0.05, 0.05),
+        "top-right": (0.80, 0.05),
+        "bottom-left": (0.05, 0.80),
+        "bottom-right": (0.80, 0.80),
+        "center": (0.425, 0.425),
+        "random": (_rand.uniform(0.05, 0.75), _rand.uniform(0.05, 0.75)),
+    }
+    x_norm, y_norm = pos_map.get(position, pos_map["top-right"])
+    # Tambah jitter kecil (MassVEPro: ±5%)
+    x_norm = max(0, min(0.9, x_norm + _rand.uniform(-0.05, 0.05)))
+    y_norm = max(0, min(0.9, y_norm + _rand.uniform(-0.05, 0.05)))
+    x_px = int(x_norm * vid_w)
+    y_px = int(y_norm * vid_h)
+
+    # Skala overlay (persentase dari lebar video)
+    overlay_w = int(vid_w * scale)
+    # Enable overlay sepanjang video (atau durasi overlay kalau video)
+    enable = "gte(t,0)"
+    if is_video:
+        enable = "gte(t,0)"  # sepanjang durasi
+
+    out = f"{tmpdir}/overlaid.mp4"
+    _ffmpeg([
+        "-i", video_path, "-i", overlay_file,
+        "-filter_complex",
+        f"[1:v]scale={overlay_w}:-1,format=rgba,colorchannelmixer=aa={opacity}[ov];"
+        f"[0:v][ov]overlay={x_px}:{y_px}:enable='{enable}'",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
+        "-c:a", "copy",
+        out,
+    ])
+    return out
+
+
 def _build_montage(
     base_video: str,
     clip_urls: list,
@@ -480,6 +542,16 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
     speed = vp.get("speed")
     if isinstance(speed, (int, float)) and 0.25 <= speed <= 4.0:
         base_video = _speed_video(base_video, float(speed), tmpdir)
+    # Overlay (gambar/video) — port dari MassVEPro
+    overlay_cfg = vp.get("overlay") or {}
+    overlay_url = overlay_cfg.get("url") or req.get("overlayUrl")
+    if overlay_url:
+        base_video = _apply_overlay(
+            base_video, overlay_url, tmpdir,
+            position=overlay_cfg.get("position", "top-right"),
+            scale=overlay_cfg.get("scale", 0.15),
+            opacity=overlay_cfg.get("opacity", 1.0),
+        )
 
     # --- audio stage: replace / mix ---
     audio_stage = f"{tmpdir}/audio.mp4"
