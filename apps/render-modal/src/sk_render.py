@@ -396,6 +396,8 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
             caption_src, language=lang, beam_size=5, vad_filter=True,
             word_timestamps=bool(cap.get("wordHighlight")),
         )
+        # materialize generator — SRT dan ASS keduanya iterate segments
+        segments = list(segments)
         detected_lang = getattr(info, "language", None)
 
         # SRT selalu dibuat (di-upload untuk transcript terbuka), tapi burn
