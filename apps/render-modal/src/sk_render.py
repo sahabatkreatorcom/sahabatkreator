@@ -245,6 +245,66 @@ def _loop_video(video_path: str, target_duration: float, tmpdir: str) -> str:
     return looped
 
 
+def _mirror_video(video_path: str, tmpdir: str) -> str:
+    """Reverse (mirror) video — berguna agar tidak terdeteksi duplikat oleh algoritma platform."""
+    video_dur = _probe_duration(video_path)
+    if video_dur <= 0:
+        return video_path
+    mirrored = f"{tmpdir}/mirrored.mp4"
+    _ffmpeg([
+        "-i", video_path,
+        "-vf", "reverse",
+        "-af", "areverse",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
+        "-c:a", "aac",
+        mirrored,
+    ])
+    return mirrored
+
+
+def _trim_video(video_path: str, start: float, end: float, tmpdir: str) -> str:
+    """Trim video ke segmen tertentu (start → end dalam detik)."""
+    dur = end - start
+    if dur <= 0:
+        return video_path
+    trimmed = f"{tmpdir}/trimmed.mp4"
+    _ffmpeg([
+        "-ss", str(start), "-i", video_path,
+        "-t", str(dur),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
+        "-c:a", "aac",
+        trimmed,
+    ])
+    return trimmed
+
+
+def _speed_video(video_path: str, speed: float, tmpdir: str) -> str:
+    """Ubah kecepatan video (0.5 = lambat, 2.0 = cepat). Tidak mengubah pitch audio."""
+    if speed <= 0 or abs(speed - 1.0) < 0.01:
+        return video_path
+    out = f"{tmpdir}/speed.mp4"
+    # setpts untuk video, atempo untuk audio (range 0.5-2.0, chain untuk >2x)
+    vf = f"setpts={1/speed}*PTS"
+    af_filters = []
+    remaining = speed
+    while remaining > 2.0:
+        af_filters.append("atempo=2.0")
+        remaining /= 2.0
+    while remaining < 0.5:
+        af_filters.append("atempo=0.5")
+        remaining /= 0.5
+    af_filters.append(f"atempo={remaining}")
+    af = ",".join(af_filters)
+    _ffmpeg([
+        "-i", video_path,
+        "-vf", vf, "-af", af,
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
+        "-c:a", "aac",
+        out,
+    ])
+    return out
+
+
 def _build_montage(
     base_video: str,
     clip_urls: list,
@@ -352,6 +412,22 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
             base_video, clip_urls, voice, settings.get("montage"), tmpdir
         )
         base_video = montage
+
+    # --- video processing: trim, mirror, speed ---
+    # Diproses SEBELUM audio stage agar output konsisten.
+    vp = settings.get("videoProcessing") or {}
+    # Custom trim points (start/end dalam detik)
+    trim_start = vp.get("trimStart")
+    trim_end = vp.get("trimEnd")
+    if isinstance(trim_start, (int, float)) and isinstance(trim_end, (int, float)):
+        base_video = _trim_video(base_video, float(trim_start), float(trim_end), tmpdir)
+    # Mirror / reverse video
+    if vp.get("mirror"):
+        base_video = _mirror_video(base_video, tmpdir)
+    # Speed control (0.5x - 2.0x)
+    speed = vp.get("speed")
+    if isinstance(speed, (int, float)) and 0.25 <= speed <= 4.0:
+        base_video = _speed_video(base_video, float(speed), tmpdir)
 
     # --- audio stage: replace / mix ---
     audio_stage = f"{tmpdir}/audio.mp4"

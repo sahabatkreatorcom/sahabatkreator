@@ -58,6 +58,13 @@ type CaptionSettings = {
   wordHighlight: boolean;
 };
 
+type VideoProcessingSettings = {
+  trimStart: string;
+  trimEnd: string;
+  mirror: boolean;
+  speed: number;
+};
+
 type VideoJobRow = {
   id: string;
   status: "queued" | "rendering" | "uploading" | "done" | "failed" | "canceled";
@@ -132,6 +139,13 @@ export function VideoRenderPage() {
   const [pollingId, setPollingId] = useState<string | null>(null);
   const [showAllVideos, setShowAllVideos] = useState(false);
   const [publishToGallery, setPublishToGallery] = useState(false);
+  // Video processing: trim, mirror, speed
+  const [videoProcessing, setVideoProcessing] = useState<VideoProcessingSettings>({
+    trimStart: "",
+    trimEnd: "",
+    mirror: false,
+    speed: 1.0,
+  });
   // Batch mode — submit multiple jobs sekaligus dengan voiceover berbeda
   const [batchMode, setBatchMode] = useState(false);
   const [batchVoiceoverIds, setBatchVoiceoverIds] = useState<string[]>([]);
@@ -199,8 +213,14 @@ export function VideoRenderPage() {
   }, [activeJob, queryClient]);
 
   const createJob = useMutation({
-    mutationFn: () =>
-      api.post<{ job: VideoJobRow }>("/video", {
+    mutationFn: () => {
+      // Build videoProcessing objek (skip yang kosong/default)
+      const vp: Record<string, unknown> = {};
+      if (videoProcessing.trimStart) vp.trimStart = parseFloat(videoProcessing.trimStart);
+      if (videoProcessing.trimEnd) vp.trimEnd = parseFloat(videoProcessing.trimEnd);
+      if (videoProcessing.mirror) vp.mirror = true;
+      if (videoProcessing.speed !== 1.0) vp.speed = videoProcessing.speed;
+      return api.post<{ job: VideoJobRow }>("/video", {
         baseVideoMediaId: baseVideoId,
         clipMediaIds: clipIds,
         voiceoverMediaId: voiceoverId,
@@ -212,7 +232,6 @@ export function VideoRenderPage() {
           removeOriginalAudio,
           voiceVolume,
           bgmVolume,
-          // Montage aktif hanya bila ada clip tambahan — segmen default 2-5s.
           montage: clipIds.length ? { minSegmentSeconds: 2, maxSegmentSeconds: 5 } : undefined,
           caption: { ...caption, enabled: captionEnabled },
           headline: headlineText.trim()
@@ -223,8 +242,10 @@ export function VideoRenderPage() {
                 positionY: 0.1,
               }
             : undefined,
+          ...(Object.keys(vp).length ? { videoProcessing: vp } : {}),
         },
-      }),
+      });
+    },
     onSuccess: (res) => {
       toast.success("Job render dibuat — sedang diproses");
       setPollingId(res.job.id);
@@ -235,6 +256,7 @@ export function VideoRenderPage() {
       setBgmTrackId(null);
       setHeadlineText("");
       setPublishToGallery(false);
+      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0 });
     },
     onError: (error) => {
       const msg = error instanceof ApiError ? error.message : "Gagal membuat job render";
@@ -246,6 +268,12 @@ export function VideoRenderPage() {
   const createBatchJobs = useMutation({
     mutationFn: async () => {
       if (!baseVideoId) throw new Error("Base video belum dipilih");
+      // Build videoProcessing objek (skip yang kosong/default)
+      const vp: Record<string, unknown> = {};
+      if (videoProcessing.trimStart) vp.trimStart = parseFloat(videoProcessing.trimStart);
+      if (videoProcessing.trimEnd) vp.trimEnd = parseFloat(videoProcessing.trimEnd);
+      if (videoProcessing.mirror) vp.mirror = true;
+      if (videoProcessing.speed !== 1.0) vp.speed = videoProcessing.speed;
       const voiceIds = batchMode && batchVoiceoverIds.length > 0
         ? batchVoiceoverIds
         : voiceoverId ? [voiceoverId] : [null];
@@ -275,6 +303,7 @@ export function VideoRenderPage() {
                   positionY: 0.1,
                 }
               : undefined,
+            ...(Object.keys(vp).length ? { videoProcessing: vp } : {}),
           },
         });
         jobs.push(res.job);
@@ -291,6 +320,7 @@ export function VideoRenderPage() {
       setBgmTrackId(null);
       setHeadlineText("");
       setPublishToGallery(false);
+      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0 });
       setBatchMode(false);
       setBatchVoiceoverIds([]);
     },
@@ -822,6 +852,98 @@ export function VideoRenderPage() {
             </button>
           </div>
         )}
+
+        {/* Video Processing: trim, mirror, speed */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-1.5">
+            <RotateCcw className="h-4 w-4" /> Video Processing
+          </Label>
+          <div className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] p-3 sm:grid-cols-2">
+            {/* Trim */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[var(--text-secondary)]">Trim (detik)</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  placeholder="Mulai"
+                  min="0"
+                  step="0.5"
+                  value={videoProcessing.trimStart}
+                  onChange={(e) =>
+                    setVideoProcessing((v) => ({ ...v, trimStart: e.target.value }))
+                  }
+                  className="w-full text-xs"
+                />
+                <Input
+                  type="number"
+                  placeholder="Akhir"
+                  min="0"
+                  step="0.5"
+                  value={videoProcessing.trimEnd}
+                  onChange={(e) =>
+                    setVideoProcessing((v) => ({ ...v, trimEnd: e.target.value }))
+                  }
+                  className="w-full text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Speed */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[var(--text-secondary)]">
+                Kecepatan — {videoProcessing.speed}x
+              </Label>
+              <input
+                type="range"
+                min={0.25}
+                max={4.0}
+                step={0.25}
+                value={videoProcessing.speed}
+                onChange={(e) =>
+                  setVideoProcessing((v) => ({ ...v, speed: parseFloat(e.target.value) }))
+                }
+                className="w-full accent-[var(--accent-gold)]"
+              />
+              <div className="flex justify-between text-[10px] text-[var(--text-muted)]">
+                <span>0.25x (lambat)</span>
+                <span>4x (cepat)</span>
+              </div>
+            </div>
+
+            {/* Mirror */}
+            <div className="flex items-end sm:col-span-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setVideoProcessing((v) => ({ ...v, mirror: !v.mirror }))
+                }
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-[var(--radius-md)] border px-2.5 py-1.5 text-xs transition",
+                  videoProcessing.mirror
+                    ? "border-[var(--accent-gold)] bg-[var(--accent-gold-light)]"
+                    : "border-[var(--border)] text-[var(--text-secondary)]",
+                )}
+              >
+                <span
+                  className={cn(
+                    "h-3.5 w-6 rounded-full p-0.5 transition",
+                    videoProcessing.mirror
+                      ? "bg-[var(--accent-gold)]"
+                      : "bg-[var(--bg-tertiary)]",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "block h-2.5 w-2.5 rounded-full bg-white transition",
+                      videoProcessing.mirror ? "translate-x-2.5" : "translate-x-0",
+                    )}
+                  />
+                </span>
+                Mirror (reverse) — hindari deteksi duplikat
+              </button>
+            </div>
+          </div>
+        </div>
 
         <div className="space-y-2">
           <Label className="flex items-center gap-1.5">

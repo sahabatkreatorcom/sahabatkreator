@@ -76,6 +76,17 @@ export type RenderSettings = {
     /** Posisi Y normalisasi 0-1 */
     positionY: number;
   };
+  /** Video processing: trim, mirror, speed (opsional) */
+  videoProcessing?: {
+    /** Mulai trim (detik) */
+    trimStart?: number;
+    /** Akhir trim (detik) */
+    trimEnd?: number;
+    /** Mirror / reverse video */
+    mirror?: boolean;
+    /** Kecepatan video: 0.25 - 4.0 (1.0 = normal) */
+    speed?: number;
+  };
 };
 
 /** Default settings — caption id + base, portrait 1080p (standar TikTok/Reels) */
