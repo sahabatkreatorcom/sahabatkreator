@@ -136,6 +136,10 @@ export function VideoRenderPage() {
   const [batchMode, setBatchMode] = useState(false);
   const [batchVoiceoverIds, setBatchVoiceoverIds] = useState<string[]>([]);
   const [batchOutputCount, setBatchOutputCount] = useState(2);
+  // Riwayat filter & pagination
+  const [historyFilter, setHistoryFilter] = useState<"all" | VideoJobRow["status"]>("all");
+  const [historyPage, setHistoryPage] = useState(1);
+  const HISTORY_PER_PAGE = 8;
 
   // List media untuk picker (filter video / audio saja)
   const { data: mediaData, isLoading: mediaLoading } = useQuery({
@@ -334,6 +338,19 @@ export function VideoRenderPage() {
     },
   });
 
+  // Filter & paginate jobs
+  const filteredJobs = historyFilter === "all"
+    ? jobs
+    : jobs.filter((j) => j.status === historyFilter);
+  const historyTotalPages = Math.max(1, Math.ceil(filteredJobs.length / HISTORY_PER_PAGE));
+  const pagedJobs = filteredJobs.slice(
+    (historyPage - 1) * HISTORY_PER_PAGE,
+    historyPage * HISTORY_PER_PAGE,
+  );
+
+  // Reset page ke 1 saat filter berubah
+  useEffect(() => { setHistoryPage(1); }, [historyFilter]);
+
   if (jobsLoading || mediaLoading) return <PageLoader />;
 
   if (!renderEnabled) {
@@ -357,7 +374,7 @@ export function VideoRenderPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <div>
         <h1 className="flex items-center gap-2 text-xl font-semibold">
           <Clapperboard className="h-5 w-5" /> Render Video
@@ -367,8 +384,9 @@ export function VideoRenderPage() {
         </p>
       </div>
 
-      {/* Form compose */}
-      <div className="card space-y-5 p-5">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+        {/* Kolom kiri — Form compose */}
+        <div className="card space-y-5 p-5">
         <div className="space-y-2">
           <Label className="flex items-center gap-1.5">
             <Film className="h-4 w-4" /> Base video
@@ -1100,140 +1118,175 @@ export function VideoRenderPage() {
             </span>
           </span>
         </button>
-      </div>
+        </div>
 
-      {/* Riwayat job */}
-      <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-[var(--text-secondary)]">
-          Riwayat render
-        </h2>
-        {jobs.length === 0 ? (
-          <EmptyState
-            icon={<Clapperboard className="h-5 w-5" />}
-            title="Belum ada job render"
-            description="Pilih base video di atas dan mulai render pertama Anda."
-          />
-        ) : (
-          <div className="space-y-2">
-            {jobs.map((job) => {
-              const meta = STATUS_META[job.status];
-              const isBusy = job.status === "rendering" || job.status === "uploading";
-              return (
-                <div
-                  key={job.id}
-                  className="card flex items-center gap-3 p-3"
-                >
-                  {job.baseVideoThumbnailUrl ? (
-                    <img
-                      src={job.baseVideoThumbnailUrl}
-                      alt={job.baseVideoName ?? "video"}
-                      className="h-12 w-12 rounded object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded bg-[var(--bg-tertiary)]">
-                      <Film className="h-4 w-4 text-[var(--text-muted)]" />
-                    </div>
+        {/* Kolom kanan — Riwayat render */}
+        <div className="space-y-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+          <div className="card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-[var(--text-secondary)]">
+                Riwayat render
+              </h2>
+              <span className="text-xs text-[var(--text-muted)]">
+                {filteredJobs.length} job
+              </span>
+            </div>
+
+            {/* Filter */}
+            <div className="flex flex-wrap gap-1.5">
+              {(["all", "done", "rendering", "failed"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setHistoryFilter(f)}
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 text-[11px] transition",
+                    historyFilter === f
+                      ? "border-[var(--accent-gold)] bg-[var(--accent-gold-light)] font-medium"
+                      : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border-secondary)]",
                   )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium">
-                        {job.baseVideoName ?? "video"}
-                      </span>
-                      <Badge className={cn("shrink-0", meta.className)}>{meta.label}</Badge>
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                      <span>{formatRelativeTime(job.createdAt)}</span>
-                      <span>·</span>
-                      <span>
-                        {job.settings.orientation} · {job.settings.resolution}
-                      </span>
-                    {job.settings.caption.enabled && (
-                      <>
-                        <span>·</span>
-                        <span>caption {job.settings.caption.language}</span>
-                      </>
-                    )}
-                    {job.publishedToGallery && (
-                      <>
-                        <span>·</span>
-                        <span className="text-[var(--accent-gold)]">publik</span>
-                      </>
-                    )}
-                    </div>
-                    {isBusy && (
-                      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
-                        <div
-                          className="h-full bg-[var(--accent-gold)] transition-all"
-                          style={{ width: `${job.progress}%` }}
+                >
+                  {f === "all" ? "Semua" : f === "done" ? "Selesai" : f === "rendering" ? "Merender" : "Gagal"}
+                </button>
+              ))}
+            </div>
+
+            {pagedJobs.length === 0 ? (
+              <EmptyState
+                icon={<Clapperboard className="h-5 w-5" />}
+                title="Belum ada job render"
+                description="Pilih base video di kiri dan mulai render pertama Anda."
+              />
+            ) : (
+              <div className="space-y-2">
+                {pagedJobs.map((job) => {
+                  const meta = STATUS_META[job.status];
+                  const isBusy = job.status === "rendering" || job.status === "uploading";
+                  return (
+                    <div
+                      key={job.id}
+                      className="flex items-center gap-2.5 rounded-[var(--radius-md)] border border-[var(--border)] p-2.5"
+                    >
+                      {job.baseVideoThumbnailUrl ? (
+                        <img
+                          src={job.baseVideoThumbnailUrl}
+                          alt={job.baseVideoName ?? "video"}
+                          className="h-10 w-10 shrink-0 rounded object-cover"
                         />
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-[var(--bg-tertiary)]">
+                          <Film className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate text-xs font-medium">
+                            {job.baseVideoName ?? "video"}
+                          </span>
+                          <Badge className={cn("shrink-0 text-[10px]", meta.className)}>
+                            {meta.label}
+                          </Badge>
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+                          <span>{formatRelativeTime(job.createdAt)}</span>
+                          <span>·</span>
+                          <span>{job.settings.orientation}</span>
+                        </div>
+                        {isBusy && (
+                          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
+                            <div
+                              className="h-full bg-[var(--accent-gold)] transition-all"
+                              style={{ width: `${job.progress}%` }}
+                            />
+                          </div>
+                        )}
+                        {job.status === "failed" && job.errorMessage && (
+                          <p className="mt-0.5 text-[10px] text-red-600 truncate" title={job.errorMessage}>
+                            {job.errorMessage}
+                          </p>
+                        )}
                       </div>
-                    )}
-                    {job.status === "failed" && job.errorMessage && (
-                      <p className="mt-1 text-xs text-red-600">{job.errorMessage}</p>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {job.status === "done" && job.outputMediaId && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          window.open("/media", "_self");
-                        }}
-                      >
-                        Lihat output
-                      </Button>
-                    )}
-                    {(job.status === "failed" || job.status === "canceled") && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={retryJob.isPending}
-                          onClick={() => retryJob.mutate(job.id)}
-                          title="Render ulang dengan konfigurasi yang sama"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          Render ulang
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={deleteJob.isPending}
-                          onClick={() => deleteJob.mutate(job.id)}
-                          className="text-red-600 hover:text-red-700"
-                          title="Hapus dari riwayat"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </>
-                    )}
-                    {job.status === "done" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={toggleGallery.isPending}
-                        onClick={() =>
-                          toggleGallery.mutate({
-                            id: job.id,
-                            published: !job.publishedToGallery,
-                          })
-                        }
-                        title={
-                          job.publishedToGallery
-                            ? "Hapus dari galeri publik"
-                            : "Tampilkan di galeri publik /renders"
-                        }
-                      >
-                        {job.publishedToGallery ? "Sembunyikan" : "Publikasikan"}
-                      </Button>
-                    )}
-                  </div>
+                      <div className="flex shrink-0 flex-col items-end gap-0.5">
+                        {job.status === "done" && job.outputMediaId && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-1.5 text-[10px]"
+                            onClick={() => window.open("/media", "_self")}
+                          >
+                            Lihat
+                          </Button>
+                        )}
+                        {(job.status === "failed" || job.status === "canceled") && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-1.5"
+                            disabled={retryJob.isPending}
+                            onClick={() => retryJob.mutate(job.id)}
+                            title="Render ulang"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                          </Button>
+                        )}
+                        {job.status === "done" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-1.5 text-[10px]"
+                            disabled={toggleGallery.isPending}
+                            onClick={() =>
+                              toggleGallery.mutate({
+                                id: job.id,
+                                published: !job.publishedToGallery,
+                              })
+                            }
+                            title={
+                              job.publishedToGallery
+                                ? "Hapus dari galeri publik"
+                                : "Publikasikan"
+                            }
+                          >
+                            {job.publishedToGallery ? "Privat" : "Publik"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {historyTotalPages > 1 && (
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] text-[var(--text-muted)]">
+                  Hal {historyPage} / {historyTotalPages}
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[11px]"
+                    disabled={historyPage <= 1}
+                    onClick={() => setHistoryPage((p) => p - 1)}
+                  >
+                    Prev
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[11px]"
+                    disabled={historyPage >= historyTotalPages}
+                    onClick={() => setHistoryPage((p) => p + 1)}
+                  >
+                    Next
+                  </Button>
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
       {jobsError && (
         <p className="text-center text-xs text-red-600">Gagal memuat riwayat render</p>
