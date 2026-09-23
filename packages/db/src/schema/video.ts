@@ -10,7 +10,7 @@
 // sudah 3.5g/3.0cpu). Worker hanya orkestrasi: claim job → HTTP ke Modal →
 // output balik ke R2. Lihat RFC §11.
 import { relations } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { media } from "./content";
 import { audioTrack } from "./sound";
 import { organization } from "./organization";
@@ -41,6 +41,17 @@ export type RenderSettings = {
   voiceVolume: number;
   /** Volume background music (0-1) */
   bgmVolume: number;
+  /**
+   * Mode montage: ambil segmen acak dari beberapa clip, concat jadi satu
+   * video sepanjang voiceover. RFC §6 langkah 3 (mode montage).
+   * Null/undefined = mode single (baseVideoMediaId saja).
+   */
+  montage?: {
+    /** Durasi minimum tiap segmen (detik) */
+    minSegmentSeconds: number;
+    /** Durasi maksimum tiap segmen (detik) */
+    maxSegmentSeconds: number;
+  };
   /** Auto-caption via Whisper */
   caption: {
     enabled: boolean;
@@ -84,6 +95,35 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
     wordHighlight: true,
   },
 };
+
+/**
+ * Clip tambahan untuk mode montage. baseVideoMediaId selalu jadi clip pertama
+ * (NOT NULL —jamin ada minimal 1 bahan); clip di tabel ini menyusul dengan
+ * urutan array. Saat montage non-aktif, tabel ini kosong untuk job itu.
+ *
+ * Pakai tabel (bukan jsonb array id) agar FK ke media tetap terjaga —
+ * media dihapus → clip ikut terhapus (cascade), tidak meninggalkan id mati
+ * di jsonb yang baru ketahuan saat render.
+ */
+export const videoJobClip = pgTable(
+  "video_job_clip",
+  {
+    id: text("id").primaryKey(),
+    videoJobId: text("video_job_id")
+      .notNull()
+      .references(() => videoJob.id, { onDelete: "cascade" }),
+    // Posisi clip di urutan montage (0-based; base video implisit di -1)
+    order: integer("order").notNull(),
+    mediaId: text("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("video_job_clip_videoJobId_idx").on(table.videoJobId),
+    uniqueIndex("video_job_clip_job_order_udx").on(table.videoJobId, table.order),
+  ],
+);
 
 /** Job render video — satu job = satu video output */
 export const videoJob = pgTable(
@@ -138,7 +178,18 @@ export const videoJob = pgTable(
   ],
 );
 
-export const videoJobRelations = relations(videoJob, ({ one }) => ({
+export const videoJobClipRelations = relations(videoJobClip, ({ one }) => ({
+  videoJob: one(videoJob, {
+    fields: [videoJobClip.videoJobId],
+    references: [videoJob.id],
+  }),
+  media: one(media, {
+    fields: [videoJobClip.mediaId],
+    references: [media.id],
+  }),
+}));
+
+export const videoJobRelations = relations(videoJob, ({ one, many }) => ({
   organization: one(organization, {
     fields: [videoJob.organizationId],
     references: [organization.id],
@@ -162,4 +213,5 @@ export const videoJobRelations = relations(videoJob, ({ one }) => ({
     fields: [videoJob.bgmAudioTrackId],
     references: [audioTrack.id],
   }),
+  clips: many(videoJobClip),
 }));

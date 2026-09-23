@@ -65,6 +65,7 @@ type VideoJobRow = {
   settings: {
     orientation: string;
     resolution: string;
+    montage?: { minSegmentSeconds: number; maxSegmentSeconds: number };
     caption: { enabled: boolean; language: string };
   };
   errorCode: string | null;
@@ -106,6 +107,8 @@ const STATUS_META: Record<
 export function VideoRenderPage() {
   const queryClient = useQueryClient();
   const [baseVideoId, setBaseVideoId] = useState<string | null>(null);
+  // Clip montage tambahan (multi-select). Kosong = mode single.
+  const [clipIds, setClipIds] = useState<string[]>([]);
   const [voiceoverId, setVoiceoverId] = useState<string | null>(null);
   const [bgmTrackId, setBgmTrackId] = useState<string | null>(null);
   const [captionEnabled, setCaptionEnabled] = useState(true);
@@ -191,6 +194,7 @@ export function VideoRenderPage() {
     mutationFn: () =>
       api.post<{ job: VideoJobRow }>("/video", {
         baseVideoMediaId: baseVideoId,
+        clipMediaIds: clipIds,
         voiceoverMediaId: voiceoverId,
         bgmAudioTrackId: bgmTrackId,
         publishToGallery,
@@ -200,6 +204,8 @@ export function VideoRenderPage() {
           removeOriginalAudio,
           voiceVolume,
           bgmVolume,
+          // Montage aktif hanya bila ada clip tambahan — segmen default 2-5s.
+          montage: clipIds.length ? { minSegmentSeconds: 2, maxSegmentSeconds: 5 } : undefined,
           caption: { ...caption, enabled: captionEnabled },
           headline: headlineText.trim()
             ? {
@@ -216,6 +222,7 @@ export function VideoRenderPage() {
       setPollingId(res.job.id);
       queryClient.invalidateQueries({ queryKey: ["video-jobs"] });
       setBaseVideoId(null);
+      setClipIds([]);
       setVoiceoverId(null);
       setBgmTrackId(null);
       setHeadlineText("");
@@ -395,6 +402,72 @@ export function VideoRenderPage() {
             </div>
           )}
         </div>
+
+        {/* Clip montage tambahan — toggle per kartu. Saat ada clip, pipeline
+            ambil segmen acak dari tiap video (montage), bukan pakai base
+            video utuh. Inilah nilai jual fitur: 1 base + N clip + voiceover
+            menghasilkan komposisi yang berbeda tiap render. */}
+        {selectedBase && videos.length > 1 && (
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1.5">
+              <Film className="h-4 w-4" /> Clip montage{" "}
+              <span className="font-normal text-[var(--text-muted)]">
+                (opsional — pilih beberapa untuk segmen acak)
+              </span>
+            </Label>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {(showAllVideos ? videos : videos.slice(0, 8))
+                .filter((v) => v.id !== baseVideoId)
+                .map((v) => {
+                  const active = clipIds.includes(v.id);
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() =>
+                        setClipIds((ids) =>
+                          active ? ids.filter((x) => x !== v.id) : [...ids, v.id],
+                        )
+                      }
+                      className={cn(
+                        "group relative aspect-video overflow-hidden rounded-[var(--radius-md)] border bg-[var(--bg-tertiary)] transition",
+                        active
+                          ? "border-[var(--accent-gold)] ring-2 ring-[var(--accent-gold)]"
+                          : "border-[var(--border)] hover:border-[var(--border-secondary)]",
+                      )}
+                    >
+                      {v.thumbnailUrl ? (
+                        <img
+                          src={v.thumbnailUrl}
+                          alt={v.name ?? "video"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <Film className="h-5 w-5 text-[var(--text-muted)]" />
+                        </div>
+                      )}
+                      <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1.5 py-0.5 text-left text-[10px] text-white">
+                        {v.name}
+                      </span>
+                      {active && (
+                        <span className="absolute top-1 left-1 rounded bg-[var(--accent-gold)] px-1 text-[10px] font-medium text-black">
+                          segmen acak
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+            </div>
+            {clipIds.length > 0 && (
+              <p className="text-xs text-[var(--text-muted)]">
+                {clipIds.length + 1} video dipakai (base + {clipIds.length} clip).
+                Tiap render mengambil segmen 2–5 detik acak dari setiap video —
+                hasil berbeda setiap kali dengan voiceover yang sama.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label className="flex items-center gap-1.5">
@@ -813,7 +886,7 @@ export function VideoRenderPage() {
           ) : (
             <Sparkles className="h-4 w-4" />
           )}
-          Render video
+          {clipIds.length > 0 ? `Render montage (${clipIds.length + 1} video)` : "Render video"}
         </Button>
 
         {/* Publikasi ke galeri publik — opt-in, default OFF.

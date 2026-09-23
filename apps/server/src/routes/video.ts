@@ -7,10 +7,10 @@
 // Fitur nonaktif (503 jelas) bila Modal belum dikonfigurasi — sama seperti
 // graceful degradation REDIS_URL opsional. Lihat RFC §11.
 import { db } from "@sahabatkreator/db";
-import { DEFAULT_RENDER_SETTINGS, audioTrack, media, videoJob } from "@sahabatkreator/db/schema";
+import { DEFAULT_RENDER_SETTINGS, audioTrack, media, videoJob, videoJobClip } from "@sahabatkreator/db/schema";
 import { enqueueVideoRender } from "@sahabatkreator/queue";
 import { isRenderConfigured } from "@sahabatkreator/render";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { errorResponse, requireOrg } from "../lib/auth-guard";
@@ -22,8 +22,13 @@ const gallerySchema = z.object({
   published: z.boolean(),
 });
 
+/** Default segmen montage (detik) — dipakai bila clip ada tapi setting kosong */
+const DEFAULT_MONTAGE = { minSegmentSeconds: 2, maxSegmentSeconds: 5 } as const;
+
 const createSchema = z.object({
   baseVideoMediaId: z.string().min(1, "Base video wajib dipilih"),
+  // Clip montage tambahan (id media video). Kosong = mode single.
+  clipMediaIds: z.array(z.string()).optional(),
   voiceoverMediaId: z.string().nullish(),
   bgmAudioTrackId: z.string().nullish(),
   // Publikasikan output ke galeri publik /renders? Default false — hasil
@@ -36,6 +41,16 @@ const createSchema = z.object({
       removeOriginalAudio: z.boolean().default(true),
       voiceVolume: z.number().min(0).max(1).default(1.0),
       bgmVolume: z.number().min(0).max(1).default(0.3),
+      // Mode montage: segmen acak per clip. min <= max, keduanya > 0.
+      montage: z
+        .object({
+          minSegmentSeconds: z.number().min(0.5).max(30).default(2),
+          maxSegmentSeconds: z.number().min(0.5).max(60).default(5),
+        })
+        .refine((m) => m.minSegmentSeconds <= m.maxSegmentSeconds, {
+          message: "minSegmentSeconds tidak boleh lebih besar dari maxSegmentSeconds",
+        })
+        .nullish(),
       caption: z
         .object({
           enabled: z.boolean().default(true),
@@ -130,6 +145,32 @@ videoRoute.post("/", async (c) => {
       return c.json({ message: "Media yang dipilih harus berupa video" }, 400);
     }
 
+    // Validasi clip montage: milik org, bertipe video, dan tidak duplikat
+    // (base video tidak boleh muncul lagi di clip list).
+    const clipIds = [...new Set(body.clipMediaIds ?? [])].filter(
+      (id) => id !== body.baseVideoMediaId,
+    );
+    let validClipIds: string[] = [];
+    if (clipIds.length) {
+      const clipRows = await db
+        .select({ id: media.id })
+        .from(media)
+        .where(
+          and(
+            inArray(media.id, clipIds),
+            eq(media.organizationId, ctx.organization.id),
+            eq(media.type, "video"),
+          ),
+        );
+      validClipIds = clipRows.map((r) => r.id);
+      if (validClipIds.length !== clipIds.length) {
+        return c.json(
+          { message: "Satu atau beberapa clip montage tidak valid" },
+          400,
+        );
+      }
+    }
+
     // Validasi voiceover (opsional, harus audio milik org)
     if (body.voiceoverMediaId) {
       const [voice] = await db
@@ -163,18 +204,38 @@ videoRoute.post("/", async (c) => {
       if (!bgm) return c.json({ message: "Background music tidak ditemukan" }, 404);
     }
 
-    // Insert job
+    // Insert job + clip montage (bila ada). Montage aktif hanya bila ada clip —
+    // settings.montage tanpa clip tidak ada efek (worker abaikan).
     const id = generateId("video_job");
-    await db.insert(videoJob).values({
-      id,
-      organizationId: ctx.organization.id,
-      baseVideoMediaId: body.baseVideoMediaId,
-      voiceoverMediaId: body.voiceoverMediaId ?? null,
-      bgmAudioTrackId: body.bgmAudioTrackId ?? null,
-      settings: { ...body.settings, headline: body.settings.headline ?? undefined },
-      publishedToGallery: body.publishToGallery,
-      status: "queued",
-      createdByUserId: ctx.user.id,
+    const hasClips = validClipIds.length > 0;
+    await db.transaction(async (tx) => {
+      await tx.insert(videoJob).values({
+        id,
+        organizationId: ctx.organization.id,
+        baseVideoMediaId: body.baseVideoMediaId,
+        voiceoverMediaId: body.voiceoverMediaId ?? null,
+        bgmAudioTrackId: body.bgmAudioTrackId ?? null,
+        settings: {
+          ...body.settings,
+          // Hilangkan konfigurasi montage bila tidak ada clip (jaga konsistensi).
+          montage: hasClips ? body.settings.montage ?? DEFAULT_MONTAGE : undefined,
+          headline: body.settings.headline ?? undefined,
+        },
+        publishedToGallery: body.publishToGallery,
+        status: "queued",
+        createdByUserId: ctx.user.id,
+      });
+
+      if (hasClips) {
+        await tx.insert(videoJobClip).values(
+          validClipIds.map((mediaId, order) => ({
+            id: generateId("video_clip"),
+            videoJobId: id,
+            order,
+            mediaId,
+          })),
+        );
+      }
     });
 
     // Enqueue worker — null bila Redis tidak ada (fallback polling akan ambil)
@@ -300,17 +361,37 @@ videoRoute.post("/:id/retry", async (c) => {
     }
 
     const newId = generateId("video_job");
-    await db.insert(videoJob).values({
-      id: newId,
-      organizationId: job.organizationId,
-      baseVideoMediaId: job.baseVideoMediaId,
-      voiceoverMediaId: job.voiceoverMediaId,
-      bgmAudioTrackId: job.bgmAudioTrackId,
-      settings: job.settings,
-      // Preserve preferensi publikasi job asli
-      publishedToGallery: job.publishedToGallery,
-      status: "queued",
-      createdByUserId: ctx.user.id,
+    // Clip montage job lama disalin agar retry menghasilkan komposisi sama.
+    const oldClips = await db
+      .select({ mediaId: videoJobClip.mediaId, order: videoJobClip.order })
+      .from(videoJobClip)
+      .where(eq(videoJobClip.videoJobId, id))
+      .orderBy(asc(videoJobClip.order));
+
+    await db.transaction(async (tx) => {
+      await tx.insert(videoJob).values({
+        id: newId,
+        organizationId: job.organizationId,
+        baseVideoMediaId: job.baseVideoMediaId,
+        voiceoverMediaId: job.voiceoverMediaId,
+        bgmAudioTrackId: job.bgmAudioTrackId,
+        settings: job.settings,
+        // Preserve preferensi publikasi job asli
+        publishedToGallery: job.publishedToGallery,
+        status: "queued",
+        createdByUserId: ctx.user.id,
+      });
+
+      if (oldClips.length) {
+        await tx.insert(videoJobClip).values(
+          oldClips.map((clip) => ({
+            id: generateId("video_clip"),
+            videoJobId: newId,
+            order: clip.order,
+            mediaId: clip.mediaId,
+          })),
+        );
+      }
     });
 
     const enqueued = await enqueueVideoRender(newId);

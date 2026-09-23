@@ -14,8 +14,18 @@
 export type RenderRequest = {
   /** ID internal job (untuk logging, bukan untuk auth) */
   jobId: string;
-  /** Presigned URL download base video dari R2 */
+  /**
+   * Presigned URL download base video dari R2. Ini selalu clip PERTAMA;
+   * saat montage, clip tambahan menyusul di clipUrls (urutan = urutan
+   * montage setelah base).
+   */
   baseVideoUrl: string;
+  /**
+   * Presigned URL download clip montage tambahan (opsional). Kosong = mode
+   * single (baseVideoUrl saja). Saat diisi, pipeline ambil segmen acak dari
+   * tiap clip lalu concat — RFC §6 langkah 3 (mode montage).
+   */
+  clipUrls: string[];
   /** Presigned URL download voiceover (opsional; null = pakai audio asli) */
   voiceoverUrl: string | null;
   /** Presigned URL download BGM (opsional) */
@@ -27,6 +37,11 @@ export type RenderRequest = {
     removeOriginalAudio: boolean;
     voiceVolume: number;
     bgmVolume: number;
+    /** Mode montage: durasi segmen acak per clip (opsional) */
+    montage?: {
+      minSegmentSeconds: number;
+      maxSegmentSeconds: number;
+    };
     caption: {
       enabled: boolean;
       language: "id" | "en" | "auto";

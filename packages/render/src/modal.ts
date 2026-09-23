@@ -80,6 +80,7 @@ export class ModalRenderAdapter implements RenderAdapter {
     const submitBody = {
       jobId: req.jobId,
       baseVideoUrl: req.baseVideoUrl,
+      clipUrls: req.clipUrls,
       voiceoverUrl: req.voiceoverUrl,
       bgmUrl: req.bgmUrl,
       settings: req.settings,

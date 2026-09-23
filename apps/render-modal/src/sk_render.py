@@ -195,6 +195,86 @@ def _fmt(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
+def _build_montage(
+    base_video: str,
+    clip_urls: list,
+    voice: Optional[str],
+    montage_cfg: Optional[dict],
+    tmpdir: str,
+) -> str:
+    """
+    Mode montage (RFC §6 langkah 3): ambil segmen acak dari tiap clip, concat.
+
+    base_video = clip pertama (sudah ada lokal); clip_urls = clip kedua dst.
+    Tiap clip disumbangkan satu segmen acak sepanjang [min, max] detik
+    (default 2-5s), lalu di-concat. Bila voiceover ada, montage dipotong
+    sepanjang durasi voiceover (sisanya dibuang) — voiceover tetap master.
+
+    Ulangi clip bila total belum mencapai target (siklus penuh) — tapi selalu
+    minimal 1 segmen per clip agar variasi terjaga.
+    """
+    import random
+
+    min_seg = 2.0
+    max_seg = 5.0
+    if montage_cfg:
+        min_seg = max(0.5, float(montage_cfg.get("minSegmentSeconds", min_seg)))
+        max_seg = max(min_seg + 0.5, float(montage_cfg.get("maxSegmentSeconds", max_seg)))
+
+    target_dur = _probe_duration(voice) if voice else None
+
+    # Kumpulkan path lokal semua clip (base sudah ada; sisanya download).
+    clip_paths = [base_video]
+    for i, url in enumerate(clip_urls):
+        p = f"{tmpdir}/clip{i}.mp4"
+        _download(url, p)
+        clip_paths.append(p)
+
+    # Ambil 1 segmen acak per clip (urutan acak agar tiap render berbeda).
+    order = list(range(len(clip_paths)))
+    random.shuffle(order)
+
+    segs = []
+    total = 0.0
+    # Siklus: ulangi clip sampai target tercapai (atau minimal 1 putaran penuh).
+    for _cycle in range(max(1, 4)):
+        for idx in order:
+            src = clip_paths[idx]
+            dur = _probe_duration(src)
+            if dur <= 0.5:
+                continue
+            seg_dur = min(random.uniform(min_seg, max_seg), dur)
+            start = random.uniform(0, max(0, dur - seg_dur))
+            out = f"{tmpdir}/seg_{len(segs)}.mp4"
+            # -an: audio ditangani audio stage (voiceover/BGM), bukan per-clip.
+            _ffmpeg([
+                "-ss", f"{start:.3f}", "-i", src, "-t", f"{seg_dur:.3f}",
+                "-c", "copy", "-an", out,
+            ])
+            segs.append(out)
+            total += seg_dur
+            if target_dur and total >= target_dur:
+                break
+        if target_dur and total >= target_dur:
+            break
+
+    if not segs:
+        raise RuntimeError("montage gagal: tidak ada clip yang menghasilkan segmen")
+
+    if len(segs) == 1:
+        return segs[0]
+
+    # concat via concat demuxer (butuh file list; stream copy cepat).
+    list_file = f"{tmpdir}/concat.txt"
+    with open(list_file, "w", encoding="utf-8") as f:
+        for s in segs:
+            # path tmpdir aman untuk concat demuxer (tidak ada karakter khusus).
+            f.write(f"file '{s}'\n")
+    out = f"{tmpdir}/montage.mp4"
+    _ffmpeg(["-f", "concat", "-safe", "0", "-i", list_file, "-c", "copy", out])
+    return out
+
+
 def _run_pipeline(req: dict, tmpdir: str) -> dict:
     """Pipeline render inti. Throw bila gagal (dipetakan caller ke retryable)."""
     settings = req["settings"]
@@ -211,6 +291,17 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
     if req.get("bgmUrl"):
         bgm = f"{tmpdir}/bgm.mp3"
         _download(req["bgmUrl"], bgm)
+
+    # --- montage stage (bila ada clip tambahan) ---
+    # RFC §6 langkah 3 mode montage: ambil segmen acak dari tiap clip, concat.
+    # base_video selalu clip pertama; clip dari clipUrls menyusul. Output montage
+    # menyetim durasi voiceover (bila ada) — sisanya dibuang.
+    clip_urls = [u for u in (req.get("clipUrls") or []) if u]
+    if clip_urls:
+        montage = _build_montage(
+            base_video, clip_urls, voice, settings.get("montage"), tmpdir
+        )
+        base_video = montage
 
     # --- audio stage: replace / mix ---
     audio_stage = f"{tmpdir}/audio.mp4"

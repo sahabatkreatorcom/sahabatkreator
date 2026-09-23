@@ -15,10 +15,11 @@ import {
   media,
   organization,
   videoJob,
+  videoJobClip,
   type RenderSettings,
 } from "@sahabatkreator/db/schema";
 import { getRenderAdapter, RenderError } from "@sahabatkreator/render";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   GetObjectCommand,
   PutObjectCommand,
@@ -135,6 +136,42 @@ export async function processVideoRenderJob(
         .limit(1);
     }
 
+    // Clip montage tambahan (urutan ascending; base video implisit di depan).
+    // Hanya clip milik org yang dihitung — keamanan sama seperti base video.
+    const clipRows = await db
+      .select({ mediaId: videoJobClip.mediaId, order: videoJobClip.order })
+      .from(videoJobClip)
+      .innerJoin(media, eq(media.id, videoJobClip.mediaId))
+      .where(
+        and(
+          eq(videoJobClip.videoJobId, videoJobId),
+          eq(media.organizationId, job.organizationId),
+          eq(media.type, "video"),
+        ),
+      )
+      .orderBy(asc(videoJobClip.order));
+
+    let clips: { storageKey: string }[] = [];
+    if (clipRows.length) {
+      const clipMedia = await db
+        .select({ id: media.id, storageKey: media.storageKey })
+        .from(media)
+        .where(
+          and(
+            inArray(
+              media.id,
+              clipRows.map((c) => c.mediaId),
+            ),
+            eq(media.organizationId, job.organizationId),
+          ),
+        );
+      // Re-join di app (urutan dari clipRows, lookup by id).
+      const byId = new Map(clipMedia.map((m) => [m.id, m]));
+      clips = clipRows
+        .map((c) => byId.get(c.mediaId))
+        .filter((m): m is { id: string; storageKey: string } => !!m && !!m.storageKey);
+    }
+
     // --- presigned URL untuk Modal ---
     const datePrefix = `${job.organizationId}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, "0")}`;
     const outputStorageKey = `${datePrefix}/render_${videoJobId}.mp4`;
@@ -142,6 +179,10 @@ export async function processVideoRenderJob(
     const srtStorageKey = job.settings.caption?.enabled
       ? `${datePrefix}/render_${videoJobId}.srt`
       : null;
+
+    const clipUrls = await Promise.all(
+      clips.map((c) => presignGet(c.storageKey)),
+    );
 
     const [baseVideoUrl, voiceoverUrl, bgmUrl, outputUploadUrl, srtUploadUrl, thumbnailUploadUrl] = await Promise.all([
       presignGet(baseVideo.storageKey),
@@ -157,6 +198,7 @@ export async function processVideoRenderJob(
       {
         jobId: videoJobId,
         baseVideoUrl,
+        clipUrls,
         voiceoverUrl,
         bgmUrl,
         settings: job.settings,
