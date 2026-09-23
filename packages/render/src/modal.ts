@@ -85,6 +85,7 @@ export class ModalRenderAdapter implements RenderAdapter {
       settings: req.settings,
       outputUploadUrl: req.outputUploadUrl,
       srtUploadUrl: req.srtUploadUrl,
+      thumbnailUploadUrl: req.thumbnailUploadUrl,
     };
 
     let current: ModalResponse;

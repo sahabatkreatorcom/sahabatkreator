@@ -136,17 +136,20 @@ export async function processVideoRenderJob(
     }
 
     // --- presigned URL untuk Modal ---
-    const outputStorageKey = `${job.organizationId}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, "0")}/render_${videoJobId}.mp4`;
+    const datePrefix = `${job.organizationId}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+    const outputStorageKey = `${datePrefix}/render_${videoJobId}.mp4`;
+    const thumbnailStorageKey = `${datePrefix}/render_${videoJobId}_thumb.jpg`;
     const srtStorageKey = job.settings.caption?.enabled
-      ? `${job.organizationId}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, "0")}/render_${videoJobId}.srt`
+      ? `${datePrefix}/render_${videoJobId}.srt`
       : null;
 
-    const [baseVideoUrl, voiceoverUrl, bgmUrl, outputUploadUrl, srtUploadUrl] = await Promise.all([
+    const [baseVideoUrl, voiceoverUrl, bgmUrl, outputUploadUrl, srtUploadUrl, thumbnailUploadUrl] = await Promise.all([
       presignGet(baseVideo.storageKey),
       voiceover?.storageKey ? presignGet(voiceover.storageKey) : Promise.resolve(null),
       bgm?.storageKey ? presignGet(bgm.storageKey) : Promise.resolve(null),
       presignPut(outputStorageKey, "video/mp4"),
       srtStorageKey ? presignPut(srtStorageKey, "application/x-subrip") : Promise.resolve(null),
+      presignPut(thumbnailStorageKey, "image/jpeg"),
     ]);
 
     // --- panggil adapter (Modal) ---
@@ -159,6 +162,7 @@ export async function processVideoRenderJob(
         settings: job.settings,
         outputUploadUrl,
         srtUploadUrl,
+        thumbnailUploadUrl,
       },
       (percent) => {
         onProgress?.(percent);
@@ -186,6 +190,9 @@ export async function processVideoRenderJob(
       width: result.width,
       height: result.height,
       durationSeconds: Math.round(result.durationSeconds),
+      // Thumbnail (frame pertama output) di-generate Modal dan di-upload ke
+      // R2 — media library memakainya sebagai poster kartu.
+      thumbnailUrl: `${env.R2_PUBLIC_URL?.replace(/\/$/, "") ?? ""}/${thumbnailStorageKey}`,
       uploadedByUserId: job.createdByUserId ?? null,
     });
 

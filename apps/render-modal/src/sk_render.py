@@ -363,6 +363,19 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
     # --- upload output ---
     _upload(current, req["outputUploadUrl"], "video/mp4")
 
+    # Thumbnail: frame pertama output (JPEG). Media library memakai ini sebagai
+    # poster kartu; tanpa ini, frontend render <video preload="metadata"> per
+    # kartu → berat dan tidak konsisten antar browser.
+    if req.get("thumbnailUploadUrl"):
+        thumb = f"{tmpdir}/thumb.jpg"
+        _ffmpeg([
+            "-ss", "0", "-i", current, "-frames:v", "1", "-q:v", "3",
+            "-vf", f"scale={target[0]}:{target[1]}:force_original_aspect_ratio=decrease,"
+                   f"pad={target[0]}:{target[1]}:(ow-iw)/2:(oh-ih)/2:color=black",
+            thumb,
+        ])
+        _upload(thumb, req["thumbnailUploadUrl"], "image/jpeg")
+
     w, h = _probe_dimensions(current)
     return {
         "durationSeconds": round(_probe_duration(current), 2),

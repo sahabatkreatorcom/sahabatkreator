@@ -47,6 +47,8 @@ export type RenderRequest = {
   outputUploadUrl: string;
   /** Presigned URL upload file SRT ke R2 (opsional, kalau caption aktif) */
   srtUploadUrl: string | null;
+  /** Presigned URL upload thumbnail JPEG ke R2 (opsional; frame pertama output) */
+  thumbnailUploadUrl: string | null;
 };
 
 /**
