@@ -63,6 +63,7 @@ type VideoProcessingSettings = {
   trimEnd: string;
   mirror: boolean;
   speed: number;
+  loopMode: "sequential" | "random" | "reverse";
 };
 
 type VideoJobRow = {
@@ -145,6 +146,7 @@ export function VideoRenderPage() {
     trimEnd: "",
     mirror: false,
     speed: 1.0,
+    loopMode: "sequential",
   });
   // Batch mode — submit multiple jobs sekaligus dengan voiceover berbeda
   const [batchMode, setBatchMode] = useState(false);
@@ -221,6 +223,7 @@ export function VideoRenderPage() {
       if (videoProcessing.trimEnd) vp.trimEnd = parseFloat(videoProcessing.trimEnd);
       if (videoProcessing.mirror) vp.mirror = true;
       if (videoProcessing.speed !== 1.0) vp.speed = videoProcessing.speed;
+      if (videoProcessing.loopMode !== "sequential") vp.loopMode = videoProcessing.loopMode;
       return api.post<{ job: VideoJobRow }>("/video", {
         baseVideoMediaId: baseVideoId,
         clipMediaIds: clipIds,
@@ -257,7 +260,7 @@ export function VideoRenderPage() {
       setBgmTrackId(null);
       setHeadlineText("");
       setPublishToGallery(false);
-      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0 });
+      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0, loopMode: "sequential" });
     },
     onError: (error) => {
       const msg = error instanceof ApiError ? error.message : "Gagal membuat job render";
@@ -275,6 +278,7 @@ export function VideoRenderPage() {
       if (videoProcessing.trimEnd) baseVp.trimEnd = parseFloat(videoProcessing.trimEnd);
       if (videoProcessing.mirror) baseVp.mirror = true;
       if (videoProcessing.speed !== 1.0) baseVp.speed = videoProcessing.speed;
+      if (videoProcessing.loopMode !== "sequential") baseVp.loopMode = videoProcessing.loopMode;
 
       const voiceIds = batchMode && batchVoiceoverIds.length > 0
         ? batchVoiceoverIds
@@ -284,19 +288,21 @@ export function VideoRenderPage() {
       for (let i = 0; i < count; i++) {
         const voiceId = voiceIds[i % voiceIds.length];
 
-        // Variasi unik per job: acak trim, mirror, speed
+        // Variasi unik per job: acak trim, mirror, speed, loop mode
         let vp = { ...baseVp };
         if (batchUniqueVariation && batchMode) {
           // Acak trim start (0 - 20 detik)
           const trimStart = Math.round(Math.random() * 200) / 10;
           // Durasi segmen: 10 - 25 detik
           const trimEnd = Math.round((trimStart + 10 + Math.random() * 15) * 10) / 10;
+          const loopModes = ["sequential", "random", "reverse"] as const;
           vp = {
             ...vp,
             trimStart,
             trimEnd,
             mirror: Math.random() > 0.5, // 50% chance mirror
             speed: Math.round((0.85 + Math.random() * 0.3) * 100) / 100, // 0.85x - 1.15x
+            loopMode: loopModes[Math.floor(Math.random() * loopModes.length)],
           };
         }
 
@@ -339,7 +345,7 @@ export function VideoRenderPage() {
       setBgmTrackId(null);
       setHeadlineText("");
       setPublishToGallery(false);
-      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0 });
+      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0, loopMode: "sequential" });
       setBatchMode(false);
       setBatchVoiceoverIds([]);
       setBatchUniqueVariation(false);
@@ -781,6 +787,7 @@ export function VideoRenderPage() {
                       <li>Durasi segmen: 10 - 25 detik</li>
                       <li>Mirror: random 50/50</li>
                       <li>Speed: 0.85x - 1.15x</li>
+                      <li>Loop mode: sequential / random / reverse (acak)</li>
                     </ul>
                     <p className="mt-1 text-[var(--text-muted)]">
                       Base video yang sama, tapi setiap output punya variasi berbeda.
@@ -1007,6 +1014,38 @@ export function VideoRenderPage() {
                 </span>
                 Mirror (reverse) — hindari deteksi duplikat
               </button>
+            </div>
+
+            {/* Loop Mode */}
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-xs text-[var(--text-secondary)]">
+                Mode Loop — saat video lebih pendek dari voiceover
+              </Label>
+              <div className="flex gap-1.5">
+                {([
+                  { value: "sequential", label: "Sequential", desc: "Ulang dari awal ke akhir" },
+                  { value: "random", label: "Acak", desc: "Segmen random tiap loop" },
+                  { value: "reverse", label: "Reverse", desc: "Normal → balik → normal" },
+                ] as const).map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setVideoProcessing((v) => ({ ...v, loopMode: m.value }))}
+                    className={cn(
+                      "flex-1 rounded-[var(--radius-md)] border px-2 py-1.5 text-left text-xs transition",
+                      videoProcessing.loopMode === m.value
+                        ? "border-[var(--accent-gold)] bg-[var(--accent-gold-light)] font-medium"
+                        : "border-[var(--border)] text-[var(--text-secondary)]",
+                    )}
+                    title={m.desc}
+                  >
+                    <span className="block">{m.label}</span>
+                    <span className="mt-0.5 block text-[10px] font-normal text-[var(--text-muted)]">
+                      {m.desc}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

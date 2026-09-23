@@ -86,6 +86,8 @@ export type RenderSettings = {
     mirror?: boolean;
     /** Kecepatan video: 0.25 - 4.0 (1.0 = normal) */
     speed?: number;
+    /** Mode loop saat video lebih pendek dari voiceover */
+    loopMode?: "sequential" | "random" | "reverse";
   };
 };
 

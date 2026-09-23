@@ -214,11 +214,17 @@ def _fmt(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
-def _loop_video(video_path: str, target_duration: float, tmpdir: str) -> str:
+def _loop_video(video_path: str, target_duration: float, tmpdir: str,
+                mode: str = "sequential") -> str:
     """Loop video untuk match target_duration (voiceover lebih panjang dari video).
 
     Port dari MassVEPro video_processor.py loop_video(). Pakai concat demuxer
-    (stream copy, cepat) lalu trim ke exact duration.
+    lalu trim ke exact duration.
+
+    Mode:
+    - sequential: ulang dari awal ke akhir (default)
+    - random: setiap loop mulai dari titik acak dalam video
+    - reverse: loop normal, lalu reverse, bergantian
     """
     video_dur = _probe_duration(video_path)
     if video_dur <= 0:
@@ -228,12 +234,66 @@ def _loop_video(video_path: str, target_duration: float, tmpdir: str) -> str:
     if loops_needed <= 1:
         return video_path  # sudah cukup panjang
 
-    # Concat demuxer: list video yang sama N kali
     list_file = f"{tmpdir}/loop_concat.txt"
     abs_path = video_path.replace("\\", "/")
-    with open(list_file, "w", encoding="utf-8") as f:
-        for _ in range(loops_needed):
-            f.write(f"file '{abs_path}'\n")
+
+    if mode == "random":
+        # Random: setiap loop mulai dari titik acak dalam video
+        # Kita buat beberapa segmen pendek dari titik acak, lalu concat
+        import random
+        segment_dur = max(1.0, video_dur / 3)  # tiap segmen ~1/3 durasi video
+        segments_needed = math.ceil(target_duration / segment_dur)
+        with open(list_file, "w", encoding="utf-8") as f:
+            for _ in range(segments_needed):
+                max_start = max(0, video_dur - segment_dur)
+                start = random.uniform(0, max_start) if max_start > 0 else 0
+                f.write(f"file '{abs_path}'\n")
+                # Kita pakai concat demuxer biasa, tapi dengan -ss dan -t
+                # Sayangnya concat demuxer tidak support -ss per file
+                # Jadi kita buat segmen-segmen kecil dulu
+        # Alternatif: buat segmen kecil via ffmpeg, lalu concat
+        import random
+        seg_files = []
+        for i in range(segments_needed):
+            max_start = max(0, video_dur - segment_dur)
+            start = random.uniform(0, max_start) if max_start > 0 else 0
+            seg_file = f"{tmpdir}/rand_seg_{i}.mp4"
+            _ffmpeg([
+                "-ss", str(start), "-i", video_path,
+                "-t", str(segment_dur),
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
+                "-an", seg_file,
+            ])
+            seg_files.append(seg_file)
+        # Concat semua segmen
+        with open(list_file, "w", encoding="utf-8") as f:
+            for sf in seg_files:
+                f.write(f"file '{sf}'\n")
+
+    elif mode == "reverse":
+        # Reverse alternatif: normal, lalu reverse, bergantian
+        import random
+        # Buat 2 versi: normal dan reversed
+        reversed_file = f"{tmpdir}/reversed.mp4"
+        _ffmpeg([
+            "-i", video_path,
+            "-vf", "reverse",
+            "-af", "areverse",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
+            "-an", reversed_file,
+        ])
+        with open(list_file, "w", encoding="utf-8") as f:
+            for i in range(loops_needed):
+                if i % 2 == 0:
+                    f.write(f"file '{abs_path}'\n")
+                else:
+                    f.write(f"file '{reversed_file}'\n")
+
+    else:
+        # Sequential: ulang dari awal ke akhir (default)
+        with open(list_file, "w", encoding="utf-8") as f:
+            for _ in range(loops_needed):
+                f.write(f"file '{abs_path}'\n")
 
     looped = f"{tmpdir}/looped.mp4"
     _ffmpeg([
@@ -448,7 +508,8 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
         # Threshold 0.1s (bukan 0.5s) untuk mencegah video stream habis duluan
         # yang menyebabkan frame freeze sementara audio masih jalan.
         elif video_dur < voice_dur - 0.1:
-            base_video = _loop_video(base_video, voice_dur, tmpdir)
+            loop_mode = vp.get("loopMode", "sequential")
+            base_video = _loop_video(base_video, voice_dur, tmpdir, mode=loop_mode)
 
         if bgm:
             # Mix voiceover + BGM (voice 1.0, bgm 0.3 default)
