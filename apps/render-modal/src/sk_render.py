@@ -437,32 +437,40 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
 
         # Kalau video lebih panjang dari voiceover → ambil segmen sepanjang voiceover
         # (smart segmentation dari MassVEPro, dipertahankan).
+        # Re-encode (bukan -c copy) agar potongan tepat (bukan keyframe-aligned).
         if video_dur > voice_dur + 1.0:
             seg = f"{tmpdir}/seg.mp4"
             _ffmpeg(["-ss", "0", "-i", base_video, "-t", str(voice_dur + 0.5),
-                     "-c", "copy", "-an", seg])
+                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
+                     "-an", seg])
             base_video = seg
-        # Kalau video lebih pendek dari voiceover → loop video agar match durasi
-        elif video_dur < voice_dur - 0.5:
+        # Kalau video lebih pendek dari voiceover → loop video agar match durasi.
+        # Threshold 0.1s (bukan 0.5s) untuk mencegah video stream habis duluan
+        # yang menyebabkan frame freeze sementara audio masih jalan.
+        elif video_dur < voice_dur - 0.1:
             base_video = _loop_video(base_video, voice_dur, tmpdir)
 
         if bgm:
             # Mix voiceover + BGM (voice 1.0, bgm 0.3 default)
+            # -shortest: hentikan output saat stream paling pendek selesai
+            # (mencegah video stuck/frozen sementara audio masih jalan).
             _ffmpeg([
                 "-i", base_video, "-i", voice, "-i", bgm,
                 "-filter_complex",
                 f"[1:a]volume={settings['voiceVolume']}[v];"
                 f"[2:a]volume={settings['bgmVolume']},aloop=loop=-1:size=2e9[b];"
-                f"[v][b]amix=inputs=2:duration=first[a]",
+                f"[v][b]amix=inputs=2:duration=first:dropout_transition=0[a]",
                 "-map", "0:v", "-map", "[a]",
-                "-c:v", "copy", "-c:a", "aac", audio_stage,
+                "-c:v", "copy", "-c:a", "aac", "-shortest",
+                audio_stage,
             ])
         else:
             _ffmpeg([
                 "-i", base_video, "-i", voice,
                 "-filter_complex", f"[1:a]volume={settings['voiceVolume']}[a]",
                 "-map", "0:v", "-map", "[a]",
-                "-c:v", "copy", "-c:a", "aac", audio_stage,
+                "-c:v", "copy", "-c:a", "aac", "-shortest",
+                audio_stage,
             ])
     else:
         # Tanpa voiceover: pakai audio asli (atau -an kalau remove_original_audio)
@@ -484,7 +492,8 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
         "-i", audio_stage,
         "-vf", vf,
         "-c:v", "libx264", "-preset", "medium", "-crf", "23",
-        "-c:a", "aac", resized,
+        "-c:a", "aac", "-shortest",
+        resized,
     ])
 
     current = resized
