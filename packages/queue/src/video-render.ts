@@ -30,10 +30,9 @@ export function getVideoRenderQueue(): import("bullmq").Queue<VideoRenderJobData
     queue = new Queue<VideoRenderJobData>(VIDEO_RENDER_QUEUE_NAME, {
       connection: conn,
       defaultJobOptions: {
-        // Render berat — retry pendek saja. Error permanen (input tidak valid)
-        // langsung failed oleh processor, tidak kena retry.
-        attempts: 3,
-        backoff: { type: "exponential", delay: 60_000 },
+        // Render berat + Modal preemption — retry cukup banyak.
+        attempts: 5,
+        backoff: { type: "exponential", delay: 30_000 },
         removeOnComplete: { age: 24 * 3600, count: 500 },
         removeOnFail: { age: 7 * 24 * 3600 },
       },

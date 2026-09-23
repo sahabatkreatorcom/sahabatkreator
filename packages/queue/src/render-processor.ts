@@ -19,7 +19,7 @@ import {
   type RenderSettings,
 } from "@sahabatkreator/db/schema";
 import { getRenderAdapter, RenderError } from "@sahabatkreator/render";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import {
   GetObjectCommand,
   PutObjectCommand,
@@ -78,7 +78,13 @@ async function claimJob(
   const [row] = await db
     .update(videoJob)
     .set({ status: "rendering", progress: 0, updatedAt: new Date() })
-    .where(and(eq(videoJob.id, id), eq(videoJob.status, "queued")))
+    .where(
+      and(
+        eq(videoJob.id, id),
+        // Accept "queued" (normal) OR "rendering" (retry — status dari attempt sebelumnya)
+        or(eq(videoJob.status, "queued"), eq(videoJob.status, "rendering")),
+      ),
+    )
     .returning({
       id: videoJob.id,
       organizationId: videoJob.organizationId,
@@ -266,9 +272,10 @@ export async function processVideoRenderJob(
             "render_unknown",
             true,
           );
-    await markVideoRenderFailed(videoJobId, renderErr.code, renderErr.message);
-    // throw agar BullMQ retry (kalau retryable)
+    // throw agar BullMQ retry (kalau retryable) — jangan mark failed dulu,
+    // karena status "failed" permanen di UI padahal worker masih retry.
     if (renderErr.retryable) throw error;
+    await markVideoRenderFailed(videoJobId, renderErr.code, renderErr.message);
     return { ok: false };
   }
 }
