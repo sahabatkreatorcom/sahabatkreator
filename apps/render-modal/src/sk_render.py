@@ -365,19 +365,14 @@ def _apply_overlay(video_path: str, overlay_url: str, tmpdir: str,
     Overlay ditempatkan di posisi relatif (0-1) dengan skala dan opasitas.
     """
     import random as _rand
+    import mimetypes
 
     overlay_file = f"{tmpdir}/overlay_input"
     _download(overlay_url, overlay_file)
 
-    # Probe overlay type (image atau video)
-    probe_cmd = [
-        "ffprobe", "-v", "error", "-select_streams", "v:0",
-        "-show_entries", "stream=codec_type,duration",
-        "-of", "csv=p=0", overlay_file,
-    ]
-    proc = subprocess.run(probe_cmd, capture_output=True, timeout=30)
-    probe_out = proc.stdout.decode().strip()
-    is_video = "video" in probe_out and "audio" not in probe_out
+    # Deteksi tipe file
+    mime, _ = mimetypes.guess_type(overlay_url)
+    is_image = mime and mime.startswith("image/") if mime else overlay_file.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".bmp"))
 
     # Probe video dimensions
     vid_w, vid_h = _probe_resolution(video_path)
@@ -392,29 +387,39 @@ def _apply_overlay(video_path: str, overlay_url: str, tmpdir: str,
         "random": (_rand.uniform(0.05, 0.75), _rand.uniform(0.05, 0.75)),
     }
     x_norm, y_norm = pos_map.get(position, pos_map["top-right"])
-    # Tambah jitter kecil (MassVEPro: ±5%)
     x_norm = max(0, min(0.9, x_norm + _rand.uniform(-0.05, 0.05)))
     y_norm = max(0, min(0.9, y_norm + _rand.uniform(-0.05, 0.05)))
     x_px = int(x_norm * vid_w)
     y_px = int(y_norm * vid_h)
 
-    # Skala overlay (persentase dari lebar video)
     overlay_w = int(vid_w * scale)
-    # Enable overlay sepanjang video (atau durasi overlay kalau video)
-    enable = "gte(t,0)"
-    if is_video:
-        enable = "gte(t,0)"  # sepanjang durasi
 
     out = f"{tmpdir}/overlaid.mp4"
-    _ffmpeg([
-        "-i", video_path, "-i", overlay_file,
-        "-filter_complex",
-        f"[1:v]scale={overlay_w}:-1,format=rgba,colorchannelmixer=aa={opacity}[ov];"
-        f"[0:v][ov]overlay={x_px}:{y_px}:enable='{enable}'",
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
-        "-c:a", "copy",
-        out,
-    ])
+    if is_image:
+        # Gambar: -loop 1 agar menjadi video stream
+        _ffmpeg([
+            "-i", video_path,
+            "-loop", "1", "-i", overlay_file,
+            "-filter_complex",
+            f"[1:v]scale={overlay_w}:-1,format=rgba,"
+            f"colorchannelmixer=aa={opacity}[ov];"
+            f"[0:v][ov]overlay={x_px}:{y_px}:enable='gte(t,0)'",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
+            "-c:a", "copy", "-shortest",
+            out,
+        ])
+    else:
+        # Video overlay
+        _ffmpeg([
+            "-i", video_path, "-i", overlay_file,
+            "-filter_complex",
+            f"[1:v]scale={overlay_w}:-1,format=rgba,"
+            f"colorchannelmixer=aa={opacity}[ov];"
+            f"[0:v][ov]overlay={x_px}:{y_px}:enable='gte(t,0)'",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
+            "-c:a", "copy", "-shortest",
+            out,
+        ])
     return out
 
 
@@ -545,6 +550,7 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
     # Overlay (gambar/video) — port dari MassVEPro
     overlay_cfg = vp.get("overlay") or {}
     overlay_url = overlay_cfg.get("url") or req.get("overlayUrl")
+    print(f"[DEBUG] overlay: url={overlay_url}, cfg={overlay_cfg}")
     if overlay_url:
         base_video = _apply_overlay(
             base_video, overlay_url, tmpdir,
