@@ -14,6 +14,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { errorResponse, requireOrg } from "../lib/auth-guard";
+import { fireActivity } from "../lib/activity-log";
 import { generateId } from "../lib/id";
 
 export const videoRoute = new Hono();
@@ -261,6 +262,14 @@ videoRoute.post("/", async (c) => {
       console.warn(`[video] Redis tidak ada — job ${id} menunggu fallback polling`);
     }
 
+    fireActivity({
+      orgId: ctx.organization.id,
+      userId: ctx.user.id,
+      action: "video.created",
+      targetType: "video_job",
+      targetId: id,
+    });
+
     const [row] = await db
       .select({
         id: videoJob.id,
@@ -331,6 +340,13 @@ videoRoute.delete("/:id", async (c) => {
     if (row.status === "failed" || row.status === "canceled") {
       // Job terminal — hapus dari riwayat. Output (bila ada) tetap di media library.
       await db.delete(videoJob).where(eq(videoJob.id, id));
+      fireActivity({
+        orgId: ctx.organization.id,
+        userId: ctx.user.id,
+        action: "video.deleted",
+        targetType: "video_job",
+        targetId: id,
+      });
       return c.json({ ok: true });
     }
 
@@ -344,6 +360,13 @@ videoRoute.delete("/:id", async (c) => {
     const { cancelVideoRenderJob } = await import("@sahabatkreator/queue");
     await cancelVideoRenderJob(id);
 
+    fireActivity({
+      orgId: ctx.organization.id,
+      userId: ctx.user.id,
+      action: "video.canceled",
+      targetType: "video_job",
+      targetId: id,
+    });
     return c.json({ ok: true });
   } catch (error) {
     return errorResponse(error);
@@ -416,6 +439,14 @@ videoRoute.post("/:id/retry", async (c) => {
       console.warn(`[video] Redis tidak ada — job ${newId} menunggu fallback polling`);
     }
 
+    fireActivity({
+      orgId: ctx.organization.id,
+      userId: ctx.user.id,
+      action: "video.retried",
+      targetType: "video_job",
+      targetId: newId,
+    });
+
     const [row] = await db
       .select({
         id: videoJob.id,
@@ -464,6 +495,14 @@ videoRoute.patch("/:id/gallery", async (c) => {
       .update(videoJob)
       .set({ publishedToGallery: published, updatedAt: new Date() })
       .where(eq(videoJob.id, id));
+
+    fireActivity({
+      orgId: ctx.organization.id,
+      userId: ctx.user.id,
+      action: published ? "video.published" : "video.unpublished",
+      targetType: "video_job",
+      targetId: id,
+    });
 
     // Manifest galeri dibangun dari DB saat request (GET /renders/manifest)
     // — toggle flag saja, tidak ada file publik yang perlu disinkronkan.

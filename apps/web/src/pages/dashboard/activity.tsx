@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Download,
   FileText,
+  Film,
   Image as ImageIcon,
   Link2,
   MessageCircle,
@@ -45,6 +46,7 @@ type ActivityResponse = {
 const FILTERS = [
   { id: "", label: "Semua" },
   { id: "post", label: "Post" },
+  { id: "video", label: "Render Video" },
   { id: "media", label: "Media" },
   { id: "account", label: "Akun" },
   { id: "automation", label: "Automation" },
@@ -55,6 +57,7 @@ const FILTERS = [
 /** Ikon per kategori (dari prefix action) */
 const TYPE_ICONS: Record<string, typeof FileText> = {
   post: FileText,
+  video: Film,
   media: ImageIcon,
   account: Link2,
   automation: Zap,
@@ -96,6 +99,19 @@ function actionStyle(action: string): {
         "media.deleted": "menghapus media",
       }),
       variant: "secondary",
+    };
+  }
+  if (action.startsWith("video.")) {
+    return {
+      label: labelFor(action, {
+        "video.created": "membuat job render video",
+        "video.retried": "render ulang video",
+        "video.deleted": "menghapus job render",
+        "video.canceled": "membatalkan job render",
+        "video.published": "memublikasikan render ke galeri",
+        "video.unpublished": "menghapus render dari galeri",
+      }),
+      variant: "info",
     };
   }
   if (action.startsWith("automation.")) {

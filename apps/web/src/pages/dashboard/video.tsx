@@ -1723,16 +1723,18 @@ export function VideoRenderPage() {
                             {job.publishedToGallery ? "Privat" : "Publik"}
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 px-1.5 text-red-600 hover:text-red-700"
-                          disabled={deleteJob.isPending || isBusy}
-                          onClick={() => deleteJob.mutate(job.id)}
-                          title="Hapus dari riwayat"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        {(job.status === "failed" || job.status === "canceled") && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-1.5 text-red-600 hover:text-red-700"
+                            disabled={deleteJob.isPending}
+                            onClick={() => deleteJob.mutate(job.id)}
+                            title="Hapus dari riwayat"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
