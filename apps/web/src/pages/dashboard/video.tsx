@@ -69,6 +69,7 @@ type VideoJobRow = {
   };
   errorCode: string | null;
   errorMessage: string | null;
+  publishedToGallery: boolean | null;
   baseVideoName: string | null;
   baseVideoUrl: string | null;
   baseVideoThumbnailUrl: string | null;
@@ -127,6 +128,7 @@ export function VideoRenderPage() {
   const [headlineColor, setHeadlineColor] = useState("yellow");
   const [pollingId, setPollingId] = useState<string | null>(null);
   const [showAllVideos, setShowAllVideos] = useState(false);
+  const [publishToGallery, setPublishToGallery] = useState(false);
 
   // List media untuk picker (filter video / audio saja)
   const { data: mediaData, isLoading: mediaLoading } = useQuery({
@@ -191,6 +193,7 @@ export function VideoRenderPage() {
         baseVideoMediaId: baseVideoId,
         voiceoverMediaId: voiceoverId,
         bgmAudioTrackId: bgmTrackId,
+        publishToGallery,
         settings: {
           orientation,
           resolution,
@@ -216,6 +219,7 @@ export function VideoRenderPage() {
       setVoiceoverId(null);
       setBgmTrackId(null);
       setHeadlineText("");
+      setPublishToGallery(false);
     },
     onError: (error) => {
       const msg = error instanceof ApiError ? error.message : "Gagal membuat job render";
@@ -244,6 +248,19 @@ export function VideoRenderPage() {
     },
     onError: (error) => {
       const msg = error instanceof ApiError ? error.message : "Gagal menghapus job";
+      toast.error(msg);
+    },
+  });
+
+  const toggleGallery = useMutation({
+    mutationFn: ({ id, published }: { id: string; published: boolean }) =>
+      api.patch(`/video/${id}/gallery`, { published }),
+    onSuccess: (_res, vars) => {
+      toast.success(vars.published ? "Dipublikasi ke galeri publik" : "Dihapus dari galeri publik");
+      queryClient.invalidateQueries({ queryKey: ["video-jobs"] });
+    },
+    onError: (error) => {
+      const msg = error instanceof ApiError ? error.message : "Gagal mengubah publikasi";
       toast.error(msg);
     },
   });
@@ -798,6 +815,40 @@ export function VideoRenderPage() {
           )}
           Render video
         </Button>
+
+        {/* Publikasi ke galeri publik — opt-in, default OFF.
+            renders.json publik tanpa auth; tanpa toggle ini semua karya klien
+            otomatis terekspos (directory listing + download anonim). */}
+        <button
+          type="button"
+          onClick={() => setPublishToGallery((v) => !v)}
+          className={cn(
+            "flex w-full items-center gap-2 rounded-[var(--radius-md)] border px-3 py-2 text-left text-xs transition",
+            publishToGallery
+              ? "border-[var(--accent-gold)] bg-[var(--accent-gold-light)]"
+              : "border-[var(--border)] text-[var(--text-secondary)]",
+          )}
+        >
+          <span
+            className={cn(
+              "h-3.5 w-6 shrink-0 rounded-full p-0.5 transition",
+              publishToGallery ? "bg-[var(--accent-gold)]" : "bg-[var(--bg-tertiary)]",
+            )}
+          >
+            <span
+              className={cn(
+                "block h-2.5 w-2.5 rounded-full bg-white transition",
+                publishToGallery ? "translate-x-2.5" : "translate-x-0",
+              )}
+            />
+          </span>
+          <span>
+            Publikasikan ke galeri publik (/renders)
+            <span className="mt-0.5 block text-[var(--text-muted)]">
+              Video akan dapat dilihat & diunduh siapa saja tanpa login.
+            </span>
+          </span>
+        </button>
       </div>
 
       {/* Riwayat job */}
@@ -845,12 +896,18 @@ export function VideoRenderPage() {
                       <span>
                         {job.settings.orientation} · {job.settings.resolution}
                       </span>
-                      {job.settings.caption.enabled && (
-                        <>
-                          <span>·</span>
-                          <span>caption {job.settings.caption.language}</span>
-                        </>
-                      )}
+                    {job.settings.caption.enabled && (
+                      <>
+                        <span>·</span>
+                        <span>caption {job.settings.caption.language}</span>
+                      </>
+                    )}
+                    {job.publishedToGallery && (
+                      <>
+                        <span>·</span>
+                        <span className="text-[var(--accent-gold)]">publik</span>
+                      </>
+                    )}
                     </div>
                     {isBusy && (
                       <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
@@ -899,6 +956,26 @@ export function VideoRenderPage() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </>
+                    )}
+                    {job.status === "done" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={toggleGallery.isPending}
+                        onClick={() =>
+                          toggleGallery.mutate({
+                            id: job.id,
+                            published: !job.publishedToGallery,
+                          })
+                        }
+                        title={
+                          job.publishedToGallery
+                            ? "Hapus dari galeri publik"
+                            : "Tampilkan di galeri publik /renders"
+                        }
+                      >
+                        {job.publishedToGallery ? "Sembunyikan" : "Publikasikan"}
+                      </Button>
                     )}
                   </div>
                 </div>

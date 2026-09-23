@@ -203,21 +203,25 @@ export async function processVideoRenderJob(
       .where(eq(videoJob.id, videoJobId));
 
     // --- publikasikan ke manifest publik (halaman /renders) ---
-    // Best-effort: kegagalan manifest tidak boleh gagalkan render itu sendiri.
-    await publishRenderManifest({
-      id: videoJobId,
-      organizationId: job.organizationId,
-      title: outputName,
-      orientation: job.settings.orientation,
-      videoUrl: `${env.R2_PUBLIC_URL?.replace(/\/$/, "") ?? ""}/${outputStorageKey}`,
-      sizeBytes: result.sizeBytes,
-      durationSeconds: Math.round(result.durationSeconds),
-      width: result.width,
-      height: result.height,
-      renderedAt: new Date().toISOString(),
-    }).catch((err) => {
-      console.warn(`[render] gagal publish manifest untuk ${videoJobId}:`, err);
-    });
+    // HANYA bila user opt-in (publishedToGallery). Default false — hasil
+    // render adalah karya klien private; mempublikasikannya tanpa persetujuan
+    // adalah kebocoran data (manifest publik = directory listing + download).
+    if (job.publishedToGallery) {
+      await publishRenderManifest({
+        id: videoJobId,
+        organizationId: job.organizationId,
+        title: outputName,
+        orientation: job.settings.orientation,
+        videoUrl: `${env.R2_PUBLIC_URL?.replace(/\/$/, "") ?? ""}/${outputStorageKey}`,
+        sizeBytes: result.sizeBytes,
+        durationSeconds: Math.round(result.durationSeconds),
+        width: result.width,
+        height: result.height,
+        renderedAt: new Date().toISOString(),
+      }).catch((err) => {
+        console.warn(`[render] gagal publish manifest untuk ${videoJobId}:`, err);
+      });
+    }
 
     return { ok: true, outputMediaId: outputId };
   } catch (error) {
@@ -337,9 +341,18 @@ export async function publishRenderManifest(entry: {
   await uploadManifest([rendered, ...others]);
 }
 
+/** Hapus satu entry dari manifest publik (saat user unpublikasi / hapus job). */
+export async function unpublishRenderManifest(jobId: string): Promise<void> {
+  const existing = await fetchManifest();
+  if (!existing) return;
+  const others = existing.renders.filter((r) => r.id !== jobId);
+  await uploadManifest(others);
+}
+
 /**
- * Rebuild manifest dari semua job done (backfill render yang selesai sebelum
- * fitur publish aktif). Dipanggil script publish-renders-manifest.ts.
+ * Rebuild manifest dari semua job done yang opt-in publikasi (backfill).
+ * Hanya publishedToGallery=true — karya klien private tidak masuk galeri.
+ * Dipanggil script publish-renders-manifest.ts.
  */
 export async function rebuildRenderManifest(): Promise<{ published: number }> {
   // Output video ada di tabel media; base video juga di tabel media. drizzle-orm
@@ -360,7 +373,7 @@ export async function rebuildRenderManifest(): Promise<{ published: number }> {
     .from(videoJob)
     .innerJoin(media, eq(media.id, videoJob.outputMediaId))
     .innerJoin(organization, eq(organization.id, videoJob.organizationId))
-    .where(eq(videoJob.status, "done"))
+    .where(and(eq(videoJob.status, "done"), eq(videoJob.publishedToGallery, true)))
     .orderBy(desc(videoJob.createdAt))
     .limit(MANIFEST_MAX_ENTRIES);
 

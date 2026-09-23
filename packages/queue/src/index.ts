@@ -20,6 +20,7 @@ export { markPostFailed } from "./mark-failed";
 export {
   publishRenderManifest,
   rebuildRenderManifest,
+  unpublishRenderManifest,
 } from "./render-processor";
 export {
   cancelPublishJob,

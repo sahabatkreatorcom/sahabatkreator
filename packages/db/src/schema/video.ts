@@ -10,7 +10,7 @@
 // sudah 3.5g/3.0cpu). Worker hanya orkestrasi: claim job → HTTP ke Modal →
 // output balik ke R2. Lihat RFC §11.
 import { relations } from "drizzle-orm";
-import { index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { media } from "./content";
 import { audioTrack } from "./sound";
 import { organization } from "./organization";
@@ -113,6 +113,11 @@ export const videoJob = pgTable(
     }),
     // storage key SRT hasil transkripsi (di R2)
     srtStorageKey: text("srt_storage_key"),
+    // Publikasikan output ke galeri publik (/renders, manifest R2)?
+    // WAJIB opt-in: default false. Tanpa ini, semua hasil render klien
+    // (karya private) otomatis terekspos di URL publik tanpa persetujuan.
+    // Lihat task kebocoran manifest — publishRenderManifest dulu auto-aktif.
+    publishedToGallery: boolean("published_to_gallery").notNull().default(false),
     status: text("status").$type<VideoJobStatus>().notNull().default("queued"),
     // Progress 0-100 (dilaporkan worker dari Modal)
     progress: integer("progress").notNull().default(0),

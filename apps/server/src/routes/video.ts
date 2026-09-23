@@ -18,10 +18,17 @@ import { generateId } from "../lib/id";
 
 export const videoRoute = new Hono();
 
+const gallerySchema = z.object({
+  published: z.boolean(),
+});
+
 const createSchema = z.object({
   baseVideoMediaId: z.string().min(1, "Base video wajib dipilih"),
   voiceoverMediaId: z.string().nullish(),
   bgmAudioTrackId: z.string().nullish(),
+  // Publikasikan output ke galeri publik /renders? Default false — hasil
+  // render adalah karya klien private, publikasi wajib persetujuan user.
+  publishToGallery: z.boolean().default(false),
   settings: z
     .object({
       orientation: z.enum(["portrait", "landscape", "square"]).default("portrait"),
@@ -66,6 +73,7 @@ videoRoute.get("/", async (c) => {
         settings: videoJob.settings,
         errorCode: videoJob.errorCode,
         errorMessage: videoJob.errorMessage,
+        publishedToGallery: videoJob.publishedToGallery,
         createdAt: videoJob.createdAt,
         updatedAt: videoJob.updatedAt,
         // Base video (untuk thumbnail/nama)
@@ -164,6 +172,7 @@ videoRoute.post("/", async (c) => {
       voiceoverMediaId: body.voiceoverMediaId ?? null,
       bgmAudioTrackId: body.bgmAudioTrackId ?? null,
       settings: { ...body.settings, headline: body.settings.headline ?? undefined },
+      publishedToGallery: body.publishToGallery,
       status: "queued",
       createdByUserId: ctx.user.id,
     });
@@ -298,6 +307,8 @@ videoRoute.post("/:id/retry", async (c) => {
       voiceoverMediaId: job.voiceoverMediaId,
       bgmAudioTrackId: job.bgmAudioTrackId,
       settings: job.settings,
+      // Preserve preferensi publikasi job asli
+      publishedToGallery: job.publishedToGallery,
       status: "queued",
       createdByUserId: ctx.user.id,
     });
@@ -319,6 +330,82 @@ videoRoute.post("/:id/retry", async (c) => {
       .limit(1);
 
     return c.json({ job: row }, 201);
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/**
+ * PATCH /video/:id/gallery — toggle publikasi job done ke galeri publik
+ * (/renders). Publikasi default OFF; user harus opt-in explicitly.
+ */
+videoRoute.patch("/:id/gallery", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+    const id = c.req.param("id");
+    const { published } = gallerySchema.parse(await c.req.json());
+
+    const [job] = await db
+      .select({
+        id: videoJob.id,
+        status: videoJob.status,
+        settings: videoJob.settings,
+        outputMediaId: videoJob.outputMediaId,
+        createdAt: videoJob.createdAt,
+      })
+      .from(videoJob)
+      .where(and(eq(videoJob.id, id), eq(videoJob.organizationId, ctx.organization.id)))
+      .limit(1);
+
+    if (!job) return c.json({ message: "Job tidak ditemukan" }, 404);
+    if (job.status !== "done") {
+      return c.json({ message: "Hanya job yang sudah selesai yang bisa dipublikasi" }, 409);
+    }
+
+    await db
+      .update(videoJob)
+      .set({ publishedToGallery: published, updatedAt: new Date() })
+      .where(eq(videoJob.id, id));
+
+    // Sinkron manifest: tambah bila publish, hapus bila unpublish.
+    const { publishRenderManifest, unpublishRenderManifest } = await import(
+      "@sahabatkreator/queue"
+    );
+    if (published) {
+      const [output] = job.outputMediaId
+        ? await db
+            .select({
+              url: media.url,
+              sizeBytes: media.sizeBytes,
+              width: media.width,
+              height: media.height,
+              durationSeconds: media.durationSeconds,
+            })
+            .from(media)
+            .where(eq(media.id, job.outputMediaId))
+            .limit(1)
+        : [];
+      if (output) {
+        await publishRenderManifest({
+          id: job.id,
+          organizationId: ctx.organization.id,
+          title: `render-${job.createdAt.getFullYear()}`,
+          orientation: job.settings.orientation,
+          videoUrl: output.url,
+          sizeBytes: output.sizeBytes ?? 0,
+          durationSeconds: output.durationSeconds ?? 0,
+          width: output.width ?? 0,
+          height: output.height ?? 0,
+          renderedAt: job.createdAt.toISOString(),
+        }).catch((err) => console.warn("[video] gagal publish manifest:", err));
+      }
+    } else {
+      await unpublishRenderManifest(job.id).catch((err) =>
+        console.warn("[video] gagal unpublish manifest:", err),
+      );
+    }
+
+    return c.json({ ok: true, published });
   } catch (error) {
     return errorResponse(error);
   }
