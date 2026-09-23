@@ -375,7 +375,7 @@ def _apply_overlay(video_path: str, overlay_url: str, tmpdir: str,
     is_image = mime and mime.startswith("image/") if mime else overlay_file.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".bmp"))
 
     # Probe video dimensions
-    vid_w, vid_h = _probe_resolution(video_path)
+    vid_w, vid_h = _probe_dimensions(video_path)
 
     # Posisi overlay (randomized sedikit seperti MassVEPro)
     pos_map = {
