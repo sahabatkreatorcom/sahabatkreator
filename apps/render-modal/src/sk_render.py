@@ -356,70 +356,6 @@ def _speed_video(video_path: str, speed: float, tmpdir: str) -> str:
     return out
 
 
-def _apply_overlay(video_path: str, overlay_url: str, tmpdir: str,
-                   position: str = "top-right", scale: float = 0.15,
-                   opacity: float = 1.0) -> str:
-    """Terapkan overlay (gambar/video) ke video.
-
-    Port dari MassVEPro AntiDetectionEngine.apply_overlay_variations().
-    Overlay ditempatkan di posisi relatif (0-1) dengan skala dan opasitas.
-    """
-    import random as _rand
-    import mimetypes
-
-    overlay_file = f"{tmpdir}/overlay_input"
-    _download(overlay_url, overlay_file)
-
-    mime, _ = mimetypes.guess_type(overlay_url)
-    is_image = mime and mime.startswith("image/") if mime else overlay_file.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".bmp"))
-
-    vid_w, vid_h = _probe_dimensions(video_path)
-
-    pos_map = {
-        "top-left": (0.05, 0.05),
-        "top-right": (0.80, 0.05),
-        "bottom-left": (0.05, 0.80),
-        "bottom-right": (0.80, 0.80),
-        "center": (0.425, 0.425),
-        "random": (_rand.uniform(0.05, 0.75), _rand.uniform(0.05, 0.75)),
-    }
-    x_norm, y_norm = pos_map.get(position, pos_map["top-right"])
-    x_norm = max(0, min(0.9, x_norm + _rand.uniform(-0.05, 0.05)))
-    y_norm = max(0, min(0.9, y_norm + _rand.uniform(-0.05, 0.05)))
-    x_px = int(x_norm * vid_w)
-    y_px = int(y_norm * vid_h)
-
-    overlay_w = int(vid_w * scale)
-
-    # Build filter: skip opacity layer jika opacity=1.0 (hemat CPU)
-    if opacity < 1.0:
-        vf = (
-            f"[1:v]scale={overlay_w}:-1,format=rgba,"
-            f"colorchannelmixer=aa={opacity:.2f}[ov];"
-            f"[0:v][ov]overlay={x_px}:{y_px}:enable='gte(t,0)'"
-        )
-    else:
-        vf = (
-            f"[1:v]scale={overlay_w}:-1[ov];"
-            f"[0:v][ov]overlay={x_px}:{y_px}:enable='gte(t,0)'"
-        )
-
-    out = f"{tmpdir}/overlaid.mp4"
-    input_args = ["-i", video_path]
-    if is_image:
-        input_args += ["-loop", "1", "-framerate", "30"]
-    input_args += ["-i", overlay_file]
-
-    _ffmpeg(input_args + [
-        "-filter_complex", vf,
-        "-c:v", "libx264", "-pix_fmt", "yuv420p",
-        "-preset", "ultrafast", "-crf", "23",
-        "-c:a", "copy", "-shortest",
-        out,
-    ])
-    return out
-
-
 def _build_montage(
     base_video: str,
     clip_urls: list,
@@ -610,7 +546,6 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
     overlay_cfg = vp.get("overlay") or {}
     overlay_url = overlay_cfg.get("url") or req.get("overlayUrl")
     overlay_file: Optional[str] = None
-    overlay_filter = ""
     if overlay_url:
         print(f"[DEBUG] overlay: url={overlay_url}, cfg={overlay_cfg}")
         overlay_file = f"{tmpdir}/overlay_input"
@@ -637,17 +572,6 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
         y_px = int(yn * vid_h)
         ovl_w = int(vid_w * overlay_cfg.get("scale", 0.15))
         opa = overlay_cfg.get("opacity", 1.0)
-        if opa < 1.0:
-            overlay_filter = (
-                f",split[main][ov];[ov]scale={ovl_w}:-1,format=rgba,"
-                f"colorchannelmixer=aa={opa:.2f}[ov2];"
-                f"[main][ov2]overlay={x_px}:{y_px}:enable='gte(t,0)'"
-            )
-        else:
-            overlay_filter = (
-                f",split[main][ov];[ov]scale={ovl_w}:-1[ov2];"
-                f"[main][ov2]overlay={x_px}:{y_px}:enable='gte(t,0)'"
-            )
 
     resized = f"{tmpdir}/resized.mp4"
     if overlay_file:
@@ -655,9 +579,22 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
         if is_img:
             input_args += ["-loop", "1", "-framerate", "30"]
         input_args += ["-i", overlay_file]
+        # [0:v] = main video, [1:v] = overlay image/video
+        if opa < 1.0:
+            fc = (
+                f"[0:v]{vf}[padded];"
+                f"[1:v]scale={ovl_w}:-1,format=rgba,"
+                f"colorchannelmixer=aa={opa:.2f}[ov];"
+                f"[padded][ov]overlay={x_px}:{y_px}:enable='gte(t,0)'[out]"
+            )
+        else:
+            fc = (
+                f"[0:v]{vf}[padded];"
+                f"[1:v]scale={ovl_w}:-1[ov];"
+                f"[padded][ov]overlay={x_px}:{y_px}:enable='gte(t,0)'[out]"
+            )
         _ffmpeg(input_args + [
-            "-filter_complex",
-            f"[0:v]{vf}{overlay_filter}[out]",
+            "-filter_complex", fc,
             "-map", "[out]", "-map", "0:a?",
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
             "-c:a", "aac", "-shortest",
