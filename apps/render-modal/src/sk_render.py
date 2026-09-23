@@ -370,14 +370,11 @@ def _apply_overlay(video_path: str, overlay_url: str, tmpdir: str,
     overlay_file = f"{tmpdir}/overlay_input"
     _download(overlay_url, overlay_file)
 
-    # Deteksi tipe file
     mime, _ = mimetypes.guess_type(overlay_url)
     is_image = mime and mime.startswith("image/") if mime else overlay_file.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".bmp"))
 
-    # Probe video dimensions
     vid_w, vid_h = _probe_dimensions(video_path)
 
-    # Posisi overlay (randomized sedikit seperti MassVEPro)
     pos_map = {
         "top-left": (0.05, 0.05),
         "top-right": (0.80, 0.05),
@@ -394,32 +391,32 @@ def _apply_overlay(video_path: str, overlay_url: str, tmpdir: str,
 
     overlay_w = int(vid_w * scale)
 
-    out = f"{tmpdir}/overlaid.mp4"
-    if is_image:
-        # Gambar: -loop 1 agar menjadi video stream
-        _ffmpeg([
-            "-i", video_path,
-            "-loop", "1", "-i", overlay_file,
-            "-filter_complex",
+    # Build filter: skip opacity layer jika opacity=1.0 (hemat CPU)
+    if opacity < 1.0:
+        vf = (
             f"[1:v]scale={overlay_w}:-1,format=rgba,"
-            f"colorchannelmixer=aa={opacity}[ov];"
-            f"[0:v][ov]overlay={x_px}:{y_px}:enable='gte(t,0)'",
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
-            "-c:a", "copy", "-shortest",
-            out,
-        ])
+            f"colorchannelmixer=aa={opacity:.2f}[ov];"
+            f"[0:v][ov]overlay={x_px}:{y_px}:enable='gte(t,0)'"
+        )
     else:
-        # Video overlay
-        _ffmpeg([
-            "-i", video_path, "-i", overlay_file,
-            "-filter_complex",
-            f"[1:v]scale={overlay_w}:-1,format=rgba,"
-            f"colorchannelmixer=aa={opacity}[ov];"
-            f"[0:v][ov]overlay={x_px}:{y_px}:enable='gte(t,0)'",
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
-            "-c:a", "copy", "-shortest",
-            out,
-        ])
+        vf = (
+            f"[1:v]scale={overlay_w}:-1[ov];"
+            f"[0:v][ov]overlay={x_px}:{y_px}:enable='gte(t,0)'"
+        )
+
+    out = f"{tmpdir}/overlaid.mp4"
+    input_args = ["-i", video_path]
+    if is_image:
+        input_args += ["-loop", "1", "-framerate", "30"]
+    input_args += ["-i", overlay_file]
+
+    _ffmpeg(input_args + [
+        "-filter_complex", vf,
+        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        "-preset", "ultrafast", "-crf", "23",
+        "-c:a", "copy", "-shortest",
+        out,
+    ])
     return out
 
 
