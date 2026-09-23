@@ -76,7 +76,7 @@ const PLATFORM_STYLE: Record<string, string> = {
 
   tiktok:
     `TikTok — ATURAN:
-- Hook dalam 1-2 detik pertama (文字Overlay atau kalimat pembuka kuat)
+- Hook dalam 1-2 detik pertama (text overlay atau kalimat pembuka kuat)
 - Caption PENDek: 1-3 kalimat, langsung ke inti
 - Gunakan trending sounds/topics bila relevan
 - Hashtag: 3-5 campuran trending + niche (letakkan di caption)

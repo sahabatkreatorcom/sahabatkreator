@@ -191,6 +191,13 @@ def _segments_to_srt(segments) -> str:
         text = (seg.text or "").strip()
         if not text:
             continue
+        # Rekonstruksi dari words bila seg.text tidak punya spasi
+        # (terjadi saat word_timestamps=True di beberapa model)
+        if " " not in text:
+            words = getattr(seg, "words", None) or []
+            word_list = [w.word.strip() for w in words if (w.word or "").strip()]
+            if word_list:
+                text = " ".join(word_list)
         n += 1
         lines.append(str(n))
         lines.append(f"{_fmt(seg.start)} --> {_fmt(seg.end)}")
@@ -645,7 +652,11 @@ def _segments_to_ass(segments, cap: dict, target: tuple[int, int], scaled_font: 
         parts = []
         for w in words:
             dur = max(1, int(round((w.end - w.start) * 100)))
-            parts.append(f"{{\\k{dur}}}{_esc_ass(w.word.strip())}")
+            word_text = w.word.strip()
+            # Tambah spasi antar kata (w.word dari faster-whisper tidak punya spasi)
+            if parts:
+                parts.append(f" {{\\k0}} ")
+            parts.append(f"{{\\k{dur}}}{_esc_ass(word_text)}")
         lines.append(
             f"Dialogue: 0,{_fmt_ass(seg.start)},{_fmt_ass(seg.end)},"
             f"Default,,0,0,0,{''.join(parts)}"
