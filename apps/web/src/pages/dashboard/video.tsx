@@ -246,7 +246,7 @@ export function VideoRenderPage() {
       if (videoProcessing.overlay.file) {
         const fd = new FormData();
         fd.append("file", videoProcessing.overlay.file);
-        const uploadRes = await api.post<{ media: { url: string } }>("/media/upload", fd);
+        const uploadRes = await api.upload<{ media: { url: string } }>("/media/upload", fd);
         vp.overlay = {
           url: uploadRes.media.url,
           position: videoProcessing.overlay.position,
@@ -313,7 +313,7 @@ export function VideoRenderPage() {
       if (videoProcessing.overlay.file) {
         const fd = new FormData();
         fd.append("file", videoProcessing.overlay.file);
-        const uploadRes = await api.post<{ media: { url: string } }>("/media/upload", fd);
+        const uploadRes = await api.upload<{ media: { url: string } }>("/media/upload", fd);
         baseVp.overlay = {
           url: uploadRes.media.url,
           position: videoProcessing.overlay.position,
