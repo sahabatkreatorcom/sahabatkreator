@@ -38,6 +38,17 @@ export const RESIZE_PRESETS = [
   { platform: "linkedin_org", label: "LinkedIn Page 1.91:1" },
 ] as const;
 
+/** Sound track terpilih untuk konten video (TikTok/Reels) — dari /sound library */
+export type SoundTrack = {
+  id: string;
+  name: string;
+  url: string;
+  durationSeconds: number;
+  waveformData: number[] | null;
+  isFeatured: boolean;
+  category: string | null;
+};
+
 /** Batas karakter per platform */
 export const CHAR_LIMITS: Record<string, number> = {
   instagram: 2200,

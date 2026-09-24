@@ -301,7 +301,7 @@ export function VideoRenderPage() {
       setBgmTrackId(null);
       setHeadlineText("");
       setPublishToGallery(false);
-      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0, loopMode: "sequential", overlay: { file: null, position: "top-right", scale: 0.15, opacity: 1.0 } });
+      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0, loopMode: "sequential", overlay: { file: null, mediaId: null, position: "top-right", scale: 0.15, opacity: 1.0 } });
     },
     onError: (error) => {
       const msg = error instanceof ApiError ? error.message : "Gagal membuat job render";
@@ -431,7 +431,7 @@ export function VideoRenderPage() {
       setBgmTrackId(null);
       setHeadlineText("");
       setPublishToGallery(false);
-      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0, loopMode: "sequential", overlay: { file: null, position: "top-right", scale: 0.15, opacity: 1.0 } });
+      setVideoProcessing({ trimStart: "", trimEnd: "", mirror: false, speed: 1.0, loopMode: "sequential", overlay: { file: null, mediaId: null, position: "top-right", scale: 0.15, opacity: 1.0 } });
       setBatchMode(false);
       setBatchVoiceoverIds([]);
       setBatchUniqueVariation(false);

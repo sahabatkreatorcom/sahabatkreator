@@ -11,13 +11,13 @@ import {
   defaultScheduledAt,
   type MediaItem,
   type RESIZE_PRESETS,
+  type SoundTrack,
 } from "@/components/compose/compose-types";
 import type { EditableMedia } from "@/components/compose/image-editor-modal";
 import {
   buildPlatformSettings,
   type SettingsState,
 } from "@/components/compose/platform-settings-panel";
-import type { SoundTrack } from "@/components/compose/sound-picker";
 import { validatePost } from "@/components/compose/validation-panel";
 import { useComposeDraft } from "@/hooks/use-compose-draft";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";

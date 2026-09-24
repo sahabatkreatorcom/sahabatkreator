@@ -7,14 +7,20 @@
 // Fitur nonaktif (503 jelas) bila Modal belum dikonfigurasi — sama seperti
 // graceful degradation REDIS_URL opsional. Lihat RFC §11.
 import { db } from "@sahabatkreator/db";
-import { DEFAULT_RENDER_SETTINGS, audioTrack, media, videoJob, videoJobClip } from "@sahabatkreator/db/schema";
+import {
+  audioTrack,
+  DEFAULT_RENDER_SETTINGS,
+  media,
+  videoJob,
+  videoJobClip,
+} from "@sahabatkreator/db/schema";
 import { enqueueVideoRender } from "@sahabatkreator/queue";
 import { isRenderConfigured } from "@sahabatkreator/render";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { errorResponse, requireOrg } from "../lib/auth-guard";
 import { fireActivity } from "../lib/activity-log";
+import { errorResponse, requireOrg } from "../lib/auth-guard";
 import { generateId } from "../lib/id";
 
 export const videoRoute = new Hono();
@@ -73,21 +79,28 @@ const createSchema = z.object({
         .nullish(),
       videoProcessing: z
         .object({
+          // Semua field opsional — kontrak DB (RenderSettings) dan pipeline Modal
+          // (sk_render.py) sama-sama mentolerir field hilang: vp.get("mirror")
+          // falsy → skip, speed di luar [0.25,4] → skip. Default zod sebelumnya
+          // membuat field required di output type, tidak cocok dengan RenderSettings.
+          // .optional() (bukan .nullish()) — RenderSettings memakai undefined, bukan null.
           trimStart: z.number().min(0).optional(),
           trimEnd: z.number().min(0).optional(),
-          mirror: z.boolean().default(false),
-          speed: z.number().min(0.25).max(4).default(1),
-          loopMode: z.enum(["sequential", "random", "reverse"]).default("sequential"),
+          mirror: z.boolean().optional(),
+          speed: z.number().min(0.25).max(4).optional(),
+          loopMode: z.enum(["sequential", "random", "reverse"]).optional(),
           overlay: z
             .object({
               url: z.string().url(),
-              position: z.enum(["top-left", "top-right", "bottom-left", "bottom-right", "center", "random"]).default("top-right"),
+              position: z
+                .enum(["top-left", "top-right", "bottom-left", "bottom-right", "center", "random"])
+                .default("top-right"),
               scale: z.number().min(0.05).max(0.5).default(0.15),
               opacity: z.number().min(0).max(1).default(1),
             })
-            .nullish(),
+            .optional(),
         })
-        .nullish(),
+        .optional(),
     })
     .default(DEFAULT_RENDER_SETTINGS),
 });
@@ -149,10 +162,7 @@ videoRoute.post("/", async (c) => {
       .select()
       .from(media)
       .where(
-        and(
-          eq(media.id, body.baseVideoMediaId),
-          eq(media.organizationId, ctx.organization.id),
-        ),
+        and(eq(media.id, body.baseVideoMediaId), eq(media.organizationId, ctx.organization.id)),
       )
       .limit(1);
 
@@ -182,10 +192,7 @@ videoRoute.post("/", async (c) => {
         );
       validClipIds = clipRows.map((r) => r.id);
       if (validClipIds.length !== clipIds.length) {
-        return c.json(
-          { message: "Satu atau beberapa clip montage tidak valid" },
-          400,
-        );
+        return c.json({ message: "Satu atau beberapa clip montage tidak valid" }, 400);
       }
     }
 
@@ -195,10 +202,7 @@ videoRoute.post("/", async (c) => {
         .select({ id: media.id, type: media.type })
         .from(media)
         .where(
-          and(
-            eq(media.id, body.voiceoverMediaId),
-            eq(media.organizationId, ctx.organization.id),
-          ),
+          and(eq(media.id, body.voiceoverMediaId), eq(media.organizationId, ctx.organization.id)),
         )
         .limit(1);
       if (!voice) return c.json({ message: "Voiceover tidak ditemukan" }, 404);
@@ -236,7 +240,7 @@ videoRoute.post("/", async (c) => {
         settings: {
           ...body.settings,
           // Hilangkan konfigurasi montage bila tidak ada clip (jaga konsistensi).
-          montage: hasClips ? body.settings.montage ?? DEFAULT_MONTAGE : undefined,
+          montage: hasClips ? (body.settings.montage ?? DEFAULT_MONTAGE) : undefined,
           headline: body.settings.headline ?? undefined,
         },
         publishedToGallery: body.publishToGallery,
