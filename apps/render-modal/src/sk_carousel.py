@@ -36,6 +36,9 @@ import modal
 
 # ---------------------------------------------------------------- image
 # Pillow + requests saja. Font bundle (subset OFL) di-copy saat build.
+# copy=True WAJIB: .run_commands() setelah add_local_* butuh file sudah ada
+# di image; tanpa copy Modal tolak ("add_local_* must be last") karena file
+# lokal baru di-mount saat container start.
 # Smoke test import + cek font ada — pola tiga bug dependency di sk_render.py.
 _FONTS_DIR = "/fonts"
 _FONT_FILES = [
@@ -49,7 +52,7 @@ _FONT_FILES = [
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install("pillow>=11", "requests>=2.31")
-    .add_local_dir("fonts", _FONTS_DIR)
+    .add_local_dir("fonts", _FONTS_DIR, copy=True)
     .run_commands(
         'python -c "from PIL import Image, ImageDraw, ImageFont; '
         f"import os; assert all(os.path.exists('{_FONTS_DIR}/' + f) for f in {_FONT_FILES!r}), 'font bundle missing'; "
