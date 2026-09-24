@@ -36,6 +36,8 @@ async function publishLinkedIn(input: PublishInput): Promise<PublishResult> {
 
   const image = input.media.find((m) => m.type === "image");
   const video = input.media.find((m) => m.type === "video");
+  // PDF (document post) — carousel LinkedIn. RFC docs/rfc-carousel-render.md §8.
+  const pdf = input.media.find((m) => m.mimeType === "application/pdf");
   if (image && video) {
     throw new PublishError(
       "linkedin_mixed_media",
@@ -156,6 +158,57 @@ async function publishLinkedIn(input: PublishInput): Promise<PublishResult> {
     }
 
     body.content = { media: { id: init.image, altText: image.altText ?? undefined } };
+  } else if (pdf) {
+    // Document post (carousel PDF) — Assets API: registerUpload → upload binary
+    // → post dengan media type DOCUMENT. Riset: docs/social-platforms/linkedin.md
+    const bytes = await downloadMedia(pdf.url, 120_000);
+    const registerRes = await httpRequest<{
+      value?: { uploadMechanism?: string; asset?: string; uploadUrl?: string };
+    }>(`${LINKEDIN_REST_URL}/rest/assets?action=registerUpload`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        registerUploadRequest: {
+          recipes: ["urn:li:digitalmediaRecipe:feedshare-document"],
+          owner,
+          fileType: "application/pdf",
+        },
+      }),
+      timeoutMs: 120_000,
+      onResponse: quotaHook("linkedin", input),
+    });
+    if (!registerRes.ok) await throwFromResponse(registerRes, "LinkedIn document register");
+    const reg = (await registerRes.json()).value;
+    if (!reg?.asset) {
+      throw new PublishError("linkedin_no_upload", "LinkedIn tidak mengembalikan asset URN", true);
+    }
+    const uploadUrl = reg.uploadUrl;
+    if (!uploadUrl) {
+      throw new PublishError("linkedin_no_upload", "LinkedIn tidak mengembalikan upload URL", true);
+    }
+
+    const uploadRes = await httpUpload(uploadUrl, {
+      method: "PUT",
+      body: bytes,
+      headers: { "Content-Type": "application/pdf" },
+      timeoutMs: 120_000,
+    });
+    if (!uploadRes.ok) {
+      throw new PublishError(
+        `linkedin_upload_${uploadRes.status}`,
+        `Upload dokumen LinkedIn gagal (${uploadRes.status})`,
+        uploadRes.status >= 500,
+      );
+    }
+
+    body.content = {
+      media: {
+        id: reg.asset,
+        // type WAJIB "DOCUMENT" untuk document post (bukan IMAGE/VIDEO)
+        type: "DOCUMENT",
+        title: commentary.slice(0, 200) || undefined,
+      },
+    };
   }
 
   const res = await httpRequest(`${LINKEDIN_REST_URL}/rest/posts`, {

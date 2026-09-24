@@ -36,8 +36,14 @@ const PLATFORM_LABELS: Record<string, string> = {
   x: "X",
 };
 
-/** Platform yang tidak mendukung upload multi-gambar (carousel) */
-const NO_CAROUSEL_PLATFORMS = new Set(["tiktok", "youtube", "threads"]);
+/**
+ * Platform yang tidak mendukung upload multi-gambar (carousel).
+ *
+ * TikTok + YouTube: API hanya terima video — carousel di-export jadi MP4
+ * slideshow oleh worker (RFC §8 fase 3), outline tetap relevan sebagai
+ * storyboard. Threads: memang belum ada carousel API-nya.
+ */
+const NO_CAROUSEL_PLATFORMS = new Set(["threads"]);
 
 export function CarouselPanel({
   platform,
@@ -162,8 +168,13 @@ export function CarouselPanel({
         {NO_CAROUSEL_PLATFORMS.has(platform) && (
           <span className="text-[var(--warning)]">
             {" "}
-            — platform ini tidak mendukung upload multi-gambar; gunakan outline sebagai storyboard
-            video/slide.
+            — platform ini tidak mendukung upload multi-gambar; gunakan outline sebagai storyboard.
+          </span>
+        )}
+        {(platform === "tiktok" || platform === "youtube") && (
+          <span className="text-[var(--text-muted)]">
+            {" "}
+            — platform ini hanya terima video; slide di-export otomatis jadi MP4 slideshow.
           </span>
         )}
       </p>

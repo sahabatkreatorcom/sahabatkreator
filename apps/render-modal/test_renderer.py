@@ -121,5 +121,84 @@ cropped = sk_carousel._fit_crop(src, (1080, 1350))
 assert cropped.size == (1080, 1350), cropped.size
 print("OK _fit_crop")
 
+# ---- AI Visual Layout Director (fase 2) ----
+# Layout {zone, align, contrast} harus mengubah posisi teks & warna.
+# Verifikasi: pixel-diff antara layout top vs bottom menunjukkan teks pindah.
+fmt = sk_carousel._FORMATS["portrait4_5"]
+
+
+def _text_bbox(rendered, base):
+    """Bounding box piksel yang berubah (teks) vs background base."""
+    a = base.convert("RGB")
+    b = rendered.convert("RGB")
+    w, h = b.size
+    minx, miny, maxx, maxy = w, h, 0, 0
+    for y in range(0, h, 3):
+        for x in range(0, w, 3):
+            if a.getpixel((x, y)) != b.getpixel((x, y)):
+                minx, miny = min(minx, x), min(miny, y)
+                maxx, maxy = max(maxx, x), max(maxy, y)
+    return (minx, miny, maxx, maxy)
+
+
+slide = {"urutan": 1, "title": "Poin", "body": "Hindari area wajah di kiri atas gambar ini."}
+base = sk_carousel._solid_gradient((fmt["w"], fmt["h"]), GRADIENT)
+
+for zone in ("top", "center", "bottom"):
+    for align in ("left", "center", "right"):
+        s = dict(slide)
+        s["layout"] = {"zone": zone, "align": align, "contrast": "light"}
+        r = sk_carousel._render_slide(base, s, fmt, "box", 235, "Fredoka", "Fredoka")
+        assert r.size == (fmt["w"], fmt["h"])
+        bbox = _text_bbox(r, base)
+        # teks harus tergambar dan dalam canvas
+        assert bbox[2] > bbox[0] and bbox[3] > bbox[1], f"teks tidak tergambar {zone}/{align}"
+    print(f"OK layout zone×align: {zone}")
+
+# zona menempatkan teks di sepertiga canvas yang berbeda
+b_top = _text_bbox(
+    sk_carousel._render_slide(
+        base,
+        {**slide, "layout": {"zone": "top", "align": "center", "contrast": "light"}},
+        fmt, "box", 235, "Fredoka", "Fredoka",
+    ),
+    base,
+)
+b_bot = _text_bbox(
+    sk_carousel._render_slide(
+        base,
+        {**slide, "layout": {"zone": "bottom", "align": "center", "contrast": "light"}},
+        fmt, "box", 235, "Fredoka", "Fredoka",
+    ),
+    base,
+)
+h = fmt["h"]
+assert b_top[3] < h * 0.6, f"zone top seharusnya di atas: {b_top}"
+assert b_bot[1] > h * 0.4, f"zone bottom seharusnya di bawah: {b_bot}"
+print(f"OK zone separation: top bbox y≤{b_top[3]} < {h*0.6:.0f}, bottom y≥{b_bot[1]} > {h*0.4:.0f}")
+
+# kontras dark → teks hitam muncul (outline style, bg terang)
+light_bg = sk_carousel._solid_gradient((fmt["w"], fmt["h"]), ["#F3E8FF", "#E9D5FF"])
+r_dark = sk_carousel._render_slide(
+    light_bg,
+    {**slide, "layout": {"zone": "center", "align": "center", "contrast": "dark"}},
+    fmt, "plain", 235, "Fredoka", "Fredoka",
+)
+assert r_dark.size == (fmt["w"], fmt["h"])
+print("OK contrast=dark pada bg terang")
+
+# layout invalid/kosong → fallback template center (tidak crash)
+r_fallback = sk_carousel._render_slide(
+    base, {**slide, "layout": None}, fmt, "outline", 235, "Fredoka", "Fredoka"
+)
+assert r_fallback.size == (fmt["w"], fmt["h"])
+r_weird = sk_carousel._render_slide(
+    base,
+    {**slide, "layout": {"zone": "di Mana2", "align": 42}},
+    fmt, "outline", 235, "Fredoka", "Fredoka",
+)
+assert r_weird.size == (fmt["w"], fmt["h"])
+print("OK layout fallback (null + nilai invalid → template center)")
+
 n = len(list(OUT.glob("*.png")))
 print(f"\nALL PASS — {n} slide PNG di {OUT}")

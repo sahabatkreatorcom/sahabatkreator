@@ -869,6 +869,134 @@ def _retryable(exc: Exception) -> bool:
     return not any(k in msg for k in permanent)
 
 
+def _slideshow_sync(req: dict) -> dict:
+    """Slideshow MP4 dari array JPEG (RFC §8 fase 3 — TikTok/YouTube carousel).
+
+    Input: slide JPEG yang SUDAH di-render oleh sk_carousel (ada di R2).
+    Output: MP4 tunggal, tiap slide tampil slideDuration detik, transisi fade.
+    Bgm opsional. Tidak butuh whisper/voiceover — ini jalur cepat.
+
+    Request:
+      jobId, slideUrls: [str], slideDuration: float (default 3.0),
+      bgmUrl: str|null, outputUploadUrl, thumbnailUploadUrl
+    """
+    slide_urls = req.get("slideUrls") or []
+    if not slide_urls:
+        raise RuntimeError("tidak ada slide untuk slideshow")
+    if len(slide_urls) > 20:
+        raise RuntimeError("slideshow maksimal 20 slide")
+    duration = req.get("slideDuration") or 3.0
+    if not isinstance(duration, (int, float)) or not 0.5 <= duration <= 15.0:
+        duration = 3.0
+
+    req_id = req.get("jobId") or str(uuid.uuid4())
+    tmpdir = tempfile.mkdtemp(prefix=f"sk_slide_{req_id}_")
+    try:
+        # 1. Download semua slide
+        local_slides: list[str] = []
+        for i, url in enumerate(slide_urls):
+            p = f"{tmpdir}/slide_{i:03d}.jpg"
+            _download(url, p)
+            local_slides.append(p)
+
+        # 2. Probe dimensi slide pertama (semua slide same-size dari renderer)
+        first_dim = _probe_dimensions(local_slides[0])
+        target = first_dim if first_dim else (1080, 1920)
+
+        # 3. ffmpeg: image2 demuxer + xfade transisi antar slide
+        # Pendekatan concat filter dengan fade transisi (crossfade).
+        # Sederhana & robust: tiap slide → stream dengan durasi tetap, lalu
+        # xfade chain. Bila cuma 1 slide, tidak ada transisi.
+        inputs: list[str] = []
+        for p in local_slides:
+            inputs += ["-loop", "1", "-t", str(duration), "-i", p]
+
+        n = len(local_slides)
+        if n == 1:
+            # 1 slide: tidak ada transisi, hanya konversi format pixel.
+            # Label output WAJIB [v] agar -map "[v]" cocok (sama jalur n>1).
+            filtergraph = "[0:v]format=yuv420p[v]"
+        else:
+            # Chain xfade: out0 = xfade(0,1), out1 = xfade(out0,2), ...
+            trans = 0.5  # detik transisi fade
+            parts: list[str] = []
+            prev = "[0:v]"
+            for i in range(1, n):
+                offset = i * duration - (i * trans)
+                out_label = f"[v{i}]" if i < n - 1 else "[v]"
+                parts.append(
+                    f"{prev}[{i}:v]xfade=transition=fade:duration={trans}"
+                    f":offset={offset}{out_label}"
+                )
+                prev = out_label
+            filtergraph = ";".join(parts)
+
+        out_mp4 = f"{tmpdir}/slideshow.mp4"
+        _ffmpeg(
+            [
+                *inputs,
+                "-filter_complex", filtergraph,
+                "-map", "[v]",
+                "-c:v", "libx264",
+                "-pix_fmt", "yuv420p",
+                "-r", "30",
+                "-preset", "medium",
+                "-movflags", "+faststart",
+                out_mp4,
+            ],
+            timeout=600,
+        )
+
+        # 4. Bgm opsional: mix ke output (bila ada)
+        bgm_url = req.get("bgmUrl")
+        final_mp4 = out_mp4
+        if bgm_url:
+            bgm_path = f"{tmpdir}/bgm.mp3"
+            _download(bgm_url, bgm_path)
+            bgm_out = f"{tmpdir}/with_bgm.mp4"
+            total = _probe_duration(out_mp4)
+            _ffmpeg(
+                [
+                    "-i", out_mp4,
+                    "-i", bgm_path,
+                    "-c", "copy",
+                    "-shortest",
+                    "-t", f"{total:.2f}",
+                    bgm_out,
+                ],
+                timeout=300,
+            )
+            final_mp4 = bgm_out
+
+        # 5. Thumbnail = frame pertama
+        thumb_path = f"{tmpdir}/thumb.jpg"
+        _ffmpeg(
+            ["-i", final_mp4, "-frames:v", "1", "-q:v", "2", thumb_path],
+            timeout=120,
+        )
+
+        # 6. Upload MP4 + thumbnail via presigned URL
+        size = Path(final_mp4).stat().st_size
+        out_upload = req.get("outputUploadUrl")
+        if out_upload:
+            _upload(final_mp4, out_upload, "video/mp4")
+        thumb_upload = req.get("thumbnailUploadUrl")
+        if thumb_upload:
+            _upload(thumb_path, thumb_upload, "image/jpeg")
+
+        w, h = _probe_dimensions(final_mp4)
+        dur_total = _probe_duration(final_mp4)
+        return {
+            "durationSeconds": round(dur_total, 2),
+            "width": w,
+            "height": h,
+            "sizeBytes": size,
+            "slideCount": n,
+        }
+    finally:
+        subprocess.run(["rm", "-rf", tmpdir], capture_output=True)
+
+
 def _render_sync(req: dict) -> dict:
     """Satu render sync: jalankan pipeline, hapus tmpdir, kembalikan hasil."""
     req_id = req.get("jobId") or str(uuid.uuid4())
@@ -921,5 +1049,19 @@ def web():
         # Pipeline blocking (ffmpeg/whisper) di threadpool agar event loop
         # tetap sehat; container hanya pegang 1 request (max_inputs=1).
         return await run_in_threadpool(_render_sync, item)
+
+    @api.post("/slideshow")
+    async def slideshow(item: dict, _: None = Depends(verify)) -> dict:
+        # RFC §8 fase 3: carousel slide JPEG → MP4 slideshow (TikTok/YouTube).
+        # Jalur cepat: tanpa whisper/voiceover, hanya xfade + optional bgm.
+        try:
+            return await run_in_threadpool(_slideshow_sync, item)
+        except Exception as exc:
+            return {
+                "status": "failed",
+                "code": "pipeline_error",
+                "message": str(exc)[:400],
+                "retryable": _retryable(exc),
+            }
 
     return api

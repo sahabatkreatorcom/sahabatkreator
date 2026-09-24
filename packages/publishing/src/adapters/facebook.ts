@@ -123,7 +123,71 @@ async function publishFacebook(input: PublishInput, scheduledAt?: Date): Promise
     };
   }
 
-  // Feed post (teks/link/multi-photo via attached_media — sederhanakan: link atau teks)
+  const images = input.media.filter((m) => m.type === "image");
+  if (images.length > 1) {
+    // Multi-photo post (carousel feed) — RFC docs/rfc-carousel-render.md §8.
+    // Flow: upload tiap foto sebagai unpublished (published=false) → dapat
+    // media_fbid → pasang ke /feed via attached_media[]. Limit 10 (Graph).
+    if (images.length > 10) {
+      throw new PublishError(
+        "fb_carousel_limit",
+        "Maksimal 10 foto pada post multi-foto Facebook.",
+        false,
+      );
+    }
+
+    const fbIds: string[] = [];
+    for (const img of images.slice(0, 10)) {
+      const up = await httpRequest<{ id?: string }>(`${GRAPH_FB}/${pageId}/photos`, {
+        method: "POST",
+        query: {
+          url: img.url,
+          published: "false",
+          access_token: input.accessToken,
+        },
+        onResponse: quotaHook("facebook", input),
+      });
+      if (!up.ok) await throwFromResponse(up, "FB carousel photo");
+      const upData = await up.json();
+      if (!upData.id) {
+        throw new PublishError("fb_no_media_fbid", "FB tidak mengembalikan media_fbid", true);
+      }
+      fbIds.push(upData.id);
+    }
+
+    // attached_media[0]={"media_fbid":"..."} — param array Graph style
+    const attachedMedia: Record<string, string> = {};
+    fbIds.forEach((id, i) => {
+      attachedMedia[`attached_media[${i}]`] = JSON.stringify({ media_fbid: id });
+    });
+
+    const res = await httpRequest<{ id?: string }>(`${GRAPH_FB}/${pageId}/feed`, {
+      method: "POST",
+      query: {
+        message: link ? appendLinkToText(message, link) : message,
+        ...attachedMedia,
+        access_token: input.accessToken,
+        ...(scheduleValid
+          ? {
+              published: "false",
+              scheduled_publish_time: Math.floor(scheduledAt.getTime() / 1000),
+            }
+          : {}),
+      },
+      onResponse: quotaHook("facebook", input),
+    });
+    if (!res.ok) await throwFromResponse(res, "FB feed multi-photo");
+    const data = await res.json();
+    if (!data.id) throw new PublishError("fb_no_post_id", "FB tidak mengembalikan post ID", true);
+    return {
+      status: "published",
+      platformPostId: data.id,
+      platformPostUrl: `https://www.facebook.com/${pageId}/posts/${String(data.id).split("_")[1] ?? data.id}`,
+      scheduledOnPlatform: Boolean(scheduleValid),
+    };
+  }
+
+  // Feed post (teks/link — multi-foto sudah ditangani attached_media di atas)
   const res = await httpRequest<{ id?: string }>(`${GRAPH_FB}/${pageId}/feed`, {
     method: "POST",
     query: {

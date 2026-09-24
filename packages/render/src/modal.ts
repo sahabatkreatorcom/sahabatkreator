@@ -22,9 +22,11 @@
 import { env } from "@sahabatkreator/env/server";
 import {
   type RenderAdapter,
+  RenderError,
   type RenderRequest,
   type RenderResponse,
-  RenderError,
+  type SlideshowRequest,
+  type SlideshowResponse,
 } from "./types";
 
 /** Response Modal function — sukses */
@@ -35,6 +37,8 @@ type ModalSuccess = {
   height: number;
   sizeBytes: number;
   detectedLanguage?: string;
+  /** Slideshow-only: jumlah slide yang disusun */
+  slideCount?: number;
 };
 
 /** Response Modal function — gagal */
@@ -109,6 +113,41 @@ export class ModalRenderAdapter implements RenderAdapter {
 
     // Fase 1 selalu done/failed di satu request; cabang processing tidak
     // diproduksi function Modal (async = fase 2).
+    throw new RenderError(current.message, current.code, current.retryable);
+  }
+
+  async slideshow(
+    req: SlideshowRequest,
+    onProgress?: (percent: number) => void,
+  ): Promise<SlideshowResponse> {
+    // RFC §8 fase 3: carousel JPEG → MP4 slideshow (TikTok/YouTube).
+    // Endpoint ini di app render yang sama (ffmpeg tersedia); slide JPEG
+    // sendiri di-render app carousel terpisah (Pillow).
+    onProgress?.(10);
+    let current: ModalResponse;
+    try {
+      current = await this.callFn("/slideshow", {
+        jobId: req.jobId,
+        slideUrls: req.slideUrls,
+        slideDuration: req.slideDuration,
+        bgmUrl: req.bgmUrl,
+        outputUploadUrl: req.outputUploadUrl,
+        thumbnailUploadUrl: req.thumbnailUploadUrl,
+      });
+    } catch (error) {
+      throw this.toRenderError(error);
+    }
+
+    if (current.status === "done") {
+      onProgress?.(100);
+      return {
+        durationSeconds: current.durationSeconds,
+        width: current.width,
+        height: current.height,
+        sizeBytes: current.sizeBytes,
+        slideCount: current.slideCount ?? req.slideUrls.length,
+      };
+    }
     throw new RenderError(current.message, current.code, current.retryable);
   }
 

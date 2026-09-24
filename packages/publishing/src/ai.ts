@@ -31,6 +31,10 @@ export const AI_CREDIT_COST: Record<string, number> = {
   "alt-text": 1,
   repurpose: 1,
   carousel: 2,
+  // AI Visual Layout Director — 1 call multimodal batch seluruh carousel
+  // (RFC docs/rfc-carousel-render.md §7). Sama dengan carousel: prompt +
+  // array image ≈ token carousel outline.
+  carousel_layout: 2,
   coach_advice: 3,
   trend_ideas: 3,
 };
@@ -121,6 +125,57 @@ export async function chatCompletion(
     throw new Error("AI tidak mengembalikan hasil");
   }
   return content;
+}
+
+/**
+ * Panggil OpenRouter dengan content multimodal (text + image_url).
+ *
+ * RFC docs/rfc-carousel-render.md §7 — AI Visual Layout Director: kirim SEMUA
+ * background carousel dalam 1 call (bukan per-slide). Format image OpenRouter:
+ * {"type":"image_url","image_url":{"url":"data:image/jpeg;base64,...","detail":"low"}}
+ *
+ * content adalah array part OpenAI-compatible. Timeout 45s — batch 10 image
+ * butuh lebih lama dari text completion.
+ */
+export async function chatCompletionMultimodal(
+  config: AiConfig,
+  systemPrompt: string,
+  content: unknown[],
+  options?: { temperature?: number; maxTokens?: number },
+): Promise<string> {
+  const res = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    signal: AbortSignal.timeout(45_000),
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": env.SERVER_URL,
+      "X-Title": "Sahabat Kreator",
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content },
+      ],
+      temperature: options?.temperature ?? 0.3,
+      max_tokens: options?.maxTokens ?? 1200,
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`OpenRouter error ${res.status}: ${detail.slice(0, 200)}`);
+  }
+
+  const result = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  const text = result.choices?.[0]?.message?.content?.trim();
+  if (!text) {
+    throw new Error("AI tidak mengembalikan hasil");
+  }
+  return text;
 }
 
 function currentPeriod(): string {

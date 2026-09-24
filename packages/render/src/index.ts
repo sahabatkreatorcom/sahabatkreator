@@ -21,6 +21,8 @@ export {
   RenderError,
   type RenderRequest,
   type RenderResponse,
+  type SlideshowRequest,
+  type SlideshowResponse,
 } from "./types";
 
 import { env } from "@sahabatkreator/env/server";

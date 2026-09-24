@@ -21,6 +21,13 @@ import {
 type ModalSuccess = {
   status: "done";
   slides: { urutan: number; width: number; height: number; sizeBytes: number }[];
+  /** Hanya ada saat exportFormat=pdf (RFC §8 fase 3) */
+  pdf?: {
+    sizeBytes: number;
+    pageCount: number;
+    width: number;
+    height: number;
+  };
 };
 
 /** Response Modal function — gagal */
@@ -84,6 +91,8 @@ export class ModalCarouselAdapter implements CarouselRenderAdapter {
               : null,
           backgroundUrl: s.background.mode === "image" ? s.background.url : null,
           uploadUrl: s.uploadUrl,
+          // AI Visual Layout Director (fase 2) — null/missing = template center
+          layout: s.layout ?? null,
         })),
       });
     } catch (error) {
@@ -93,6 +102,53 @@ export class ModalCarouselAdapter implements CarouselRenderAdapter {
     if (current.status === "done") {
       onProgress?.(100);
       return { slides: current.slides };
+    }
+
+    throw new CarouselRenderError(current.message, current.code, current.retryable);
+  }
+
+  /**
+   * Export PDF — RFC §8 fase 3 (LinkedIn document post).
+   * request.exportFormat=pdf: renderer satukan semua slide jadi 1 PDF
+   * multi-halaman, upload via uploadUrl slide pertama. Metadata pdf di
+   * response (pageCount, width, height).
+   */
+  async renderPdf(req: CarouselRenderRequest): Promise<CarouselRenderResponse> {
+    let current: ModalResponse;
+    try {
+      current = await this.callFn("/carousel", {
+        jobId: req.jobId,
+        format: req.format,
+        style: req.style,
+        boxOpacity: req.boxOpacity,
+        titleFontFamily: req.titleFontFamily,
+        contentFontFamily: req.contentFontFamily,
+        exportFormat: "pdf",
+        slides: req.slides.map((s) => ({
+          urutan: s.urutan,
+          title: s.title,
+          body: s.body,
+          backgroundStops:
+            s.background.mode === "solid"
+              ? [s.background.topColor, s.background.bottomColor]
+              : null,
+          backgroundUrl: s.background.mode === "image" ? s.background.url : null,
+          // Hanya slide pertama yang butuh uploadUrl (target PDF tunggal);
+          // rendererabaikan sisanya saat exportFormat=pdf.
+          uploadUrl: s.urutan === 0 ? s.uploadUrl : null,
+          layout: s.layout ?? null,
+        })),
+      });
+    } catch (error) {
+      throw this.toRenderError(error);
+    }
+
+    if (current.status === "done") {
+      // PDF response: slides meta tetap ada (dimensi halaman), pageCount di field pdf
+      return {
+        slides: current.slides,
+        pdf: (current as ModalSuccess & { pdf?: CarouselRenderResponse["pdf"] }).pdf,
+      };
     }
 
     throw new CarouselRenderError(current.message, current.code, current.retryable);

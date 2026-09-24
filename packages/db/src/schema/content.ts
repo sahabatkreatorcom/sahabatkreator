@@ -259,8 +259,12 @@ export type CarouselSettings = {
   backgroundMode: "library" | "stock" | "solid";
   /** Keyword pencarian stock (backgroundMode=stock) */
   backgroundQuery: string;
-  /** AI Visual Layout Director (fase 2) — opt-in karena berbiaya */
-  aiLayout?: { enabled: boolean; model: string };
+  /**
+   * AI Visual Layout Director (fase 2) — opt-in karena berbiaya.
+   * Model dipilih worker dari platformSettings (admin config), user hanya
+   * toggle enabled. Lihat packages/queue/src/layout-director.ts.
+   */
+  aiLayout?: { enabled: boolean; model?: string };
 };
 
 export const DEFAULT_CAROUSEL_SETTINGS: CarouselSettings = {

@@ -119,6 +119,64 @@ _PLAIN_SHADOW_FILL = (0, 0, 0, 180)
 _PLAIN_SHADOW_OFFSET = 3
 _JPG_QUALITY = 95
 
+# Palet warna per mode kontras — AI Visual Layout Director (RFC §7) memilih
+# kontras teks berdasarkan rata-rata kecerahan background.
+# contrast="light"  → background gelap  → teks putih
+# contrast="dark"   → background terang → teks hitam
+_CONTRAST_FILL = {
+    "light": {  # bg gelap
+        "outline_text": "white",
+        "outline_stroke": "black",
+        "plain_text": "white",
+        "plain_shadow": (0, 0, 0, 180),
+        # box tetap putih + teks hitam (box semi-transparan selalu legible)
+        "box_fill": (255, 255, 255),
+        "box_text": (0, 0, 0),
+    },
+    "dark": {  # bg terang
+        "outline_text": "black",
+        "outline_stroke": "white",
+        "plain_text": "black",
+        "plain_shadow": (255, 255, 255, 200),
+        "box_fill": (255, 255, 255),
+        "box_text": (0, 0, 0),
+    },
+}
+
+
+def _contrast_palette(contrast: Optional[str]):
+    """Pilih palet warna berdasarkan kontras dari layout director. Default light."""
+    # str() — vision model bisa halusinasi tipe non-string; fallback aman.
+    pal = _CONTRAST_FILL.get(str(contrast or "").lower(), _CONTRAST_FILL["light"])
+    return pal
+
+
+def _zone_anchor(zone: Optional[str], canvas_h: int, block_h: int,
+                 safe_margin: int) -> float:
+    """Posisi vertikal blok teks berdasarkan zona layout director.
+
+    top    = 20% atas (dalam safe margin)
+    center = tengah (default, template lama)
+    bottom = 20% bawah (dalam safe margin)
+    """
+    z = str(zone or "center").lower()
+    if z == "top":
+        return float(safe_margin)
+    if z == "bottom":
+        return float(canvas_h - safe_margin - block_h)
+    return (canvas_h - block_h) / 2.0
+
+
+def _align_x(align: Optional[str], canvas_w: int, block_w: int,
+             side_margin: int) -> float:
+    """Posisi horizontal blok teks berdasarkan alignment layout director."""
+    a = str(align or "center").lower()
+    if a == "left":
+        return float(side_margin)
+    if a == "right":
+        return float(canvas_w - side_margin - block_w)
+    return (canvas_w - block_w) / 2.0
+
 
 # ---------------------------------------------------------------- font resolution
 def _font_path(family: Optional[str], weight: str) -> str:
@@ -247,8 +305,12 @@ def _solid_gradient(target: tuple[int, int], stops: Optional[list[str]]) -> "Ima
 
 # ---------------------------------------------------------------- slide render
 def _render_slide(bg, slide: dict, fmt: dict, style: str, box_opacity: int,
-                  title_family: str, content_family: str) -> "Image.Image":
-    """Render satu slide: background + teks sesuai style (port process_slide)."""
+                  title_family: str, content_family: str):
+    """Render satu slide: background + teks sesuai style (port process_slide).
+
+    slide["layout"] (opsional, fase 2): hasil AI Visual Layout Director —
+    {zone, align, contrast}. Bila tidak ada → template center (fallback).
+    """
     from PIL import Image, ImageDraw
 
     target = (fmt["w"], fmt["h"])
@@ -256,7 +318,12 @@ def _render_slide(bg, slide: dict, fmt: dict, style: str, box_opacity: int,
     overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
     box_pad = fmt["boxPadding"]
-    box_fill = (255, 255, 255, int(box_opacity))
+    vlayout = slide.get("layout") or {}
+    pal = _contrast_palette(vlayout.get("contrast"))
+    # Box fill mengikuti opacity setting; box putih legible di bg gelap/terang.
+    box_fill = (pal["box_fill"][0], pal["box_fill"][1], pal["box_fill"][2],
+                int(box_opacity))
+    box_text_fill = pal["box_text"]
     title = (slide.get("title") or "").strip()
     body = (slide.get("body") or "").strip()
     is_cover = not body  # slide 0 (cover) hanya judul
@@ -297,22 +364,27 @@ def _render_slide(bg, slide: dict, fmt: dict, style: str, box_opacity: int,
             t_size -= fmt["shrinkStep"]
             c_size -= fmt["shrinkStep"]
 
-        start_y = (img.height - total) / 2
+        start_y = _zone_anchor(vlayout.get("zone"), img.height, total,
+                               fmt["safeTopBottomMargin"])
 
-        # box judul
-        tx = (img.width - t_w) / 2
+        # box judul — alignment horizontal dari layout director
+        tx = _align_x(vlayout.get("align"), img.width, t_w,
+                      fmt["textSideMargin"] + box_pad)
         draw.rounded_rectangle(
             [tx - box_pad, start_y, tx + t_w + box_pad, start_y + t_box_h],
             radius=box_pad + fmt["radiusExtra"], fill=box_fill,
         )
         draw.multiline_text(
             (tx - t_bbox[0], start_y + box_pad - t_bbox[1]), wrapped_title,
-            font=t_font, fill=_BOX_TEXT_FILL, align="center", spacing=fmt["lineSpacing"],
+            font=t_font, fill=box_text_fill, align="center", spacing=fmt["lineSpacing"],
         )
         cy = start_y + t_box_h + fmt["titleContentSpacing"]
         for para in paras:
-            px = fmt["textSideMargin"] + box_pad
-            box_r = px + max(para["width"], 10) + box_pad
+            # Paragraf box: mengikuti alignment judul (kiri/kanan rapih)
+            px = _align_x(vlayout.get("align"), img.width,
+                          para["width"] + (box_pad * 2),
+                          fmt["textSideMargin"] + box_pad)
+            box_r = px + para["width"] + box_pad
             box_b = cy + para["height"] + (box_pad * 2)
             draw.rounded_rectangle(
                 [px - box_pad, cy, box_r, box_b],
@@ -320,7 +392,7 @@ def _render_slide(bg, slide: dict, fmt: dict, style: str, box_opacity: int,
             )
             draw.multiline_text(
                 (px - para["offset_x"], cy + box_pad - para["offset_y"]), para["text"],
-                font=c_font, fill=_BOX_TEXT_FILL, align="left", spacing=fmt["lineSpacing"],
+                font=c_font, fill=box_text_fill, align="left", spacing=fmt["lineSpacing"],
             )
             cy = box_b + fmt["paragraphSpacing"]
 
@@ -331,38 +403,43 @@ def _render_slide(bg, slide: dict, fmt: dict, style: str, box_opacity: int,
                            "Bold" if is_cover else "Regular")
     initial = fmt["titleFontSize"] if is_cover else fmt["contentFontSize"]
     text = title if is_cover else body
-    size, layout = _fit_font(draw, text, initial, font_path, fmt, style, box_pad)
+    size, text_layout = _fit_font(draw, text, initial, font_path, fmt, style, box_pad)
     font = _load_font(font_path, size)
-    wrapped = layout["wrapped"]
-    x = (img.width - layout["width"]) / 2
-    y = (img.height - layout["height"]) / 2
+    wrapped = text_layout["wrapped"]
+    # Posisi blok teks — dari layout director (zone/align), fallback center.
+    x = _align_x(vlayout.get("align"), img.width, text_layout["width"],
+                 fmt["textSideMargin"])
+    y = _zone_anchor(vlayout.get("zone"), img.height, text_layout["block_height"],
+                     fmt["safeTopBottomMargin"])
 
     if style == "outline":
         stroke = max(2, int(size * _OUTLINE_STROKE_RATIO))
         draw.multiline_text(
-            (x - layout["offset_x"], y - layout["offset_y"]), wrapped, font=font,
-            fill=_OUTLINE_TEXT_FILL, align="center", spacing=fmt["lineSpacing"],
-            stroke_width=stroke, stroke_fill=_OUTLINE_STROKE_FILL,
+            (x - text_layout["offset_x"], y - text_layout["offset_y"]), wrapped,
+            font=font, fill=pal["outline_text"], align="center",
+            spacing=fmt["lineSpacing"],
+            stroke_width=stroke, stroke_fill=pal["outline_stroke"],
         )
     elif style == "box":
         draw.rounded_rectangle(
-            [x - box_pad, y - box_pad, x + layout["width"] + box_pad,
-             y + layout["height"] + box_pad],
+            [x - box_pad, y - box_pad, x + text_layout["width"] + box_pad,
+             y + text_layout["height"] + box_pad],
             radius=box_pad + fmt["radiusExtra"], fill=box_fill,
         )
         draw.multiline_text(
-            (x - layout["offset_x"], y - layout["offset_y"]), wrapped, font=font,
-            fill=_BOX_TEXT_FILL, align="center", spacing=fmt["lineSpacing"],
+            (x - text_layout["offset_x"], y - text_layout["offset_y"]), wrapped,
+            font=font, fill=box_text_fill, align="center", spacing=fmt["lineSpacing"],
         )
-    else:  # plain — teks putih + drop shadow halus
+    else:  # plain — teks + drop shadow halus
         off = _PLAIN_SHADOW_OFFSET
         draw.multiline_text(
-            (x - layout["offset_x"] + off, y - layout["offset_y"] + off), wrapped,
-            font=font, fill=_PLAIN_SHADOW_FILL, align="center", spacing=fmt["lineSpacing"],
+            (x - text_layout["offset_x"] + off, y - text_layout["offset_y"] + off),
+            wrapped, font=font, fill=pal["plain_shadow"], align="center",
+            spacing=fmt["lineSpacing"],
         )
         draw.multiline_text(
-            (x - layout["offset_x"], y - layout["offset_y"]), wrapped, font=font,
-            fill=_PLAIN_TEXT_FILL, align="center", spacing=fmt["lineSpacing"],
+            (x - text_layout["offset_x"], y - text_layout["offset_y"]), wrapped,
+            font=font, fill=pal["plain_text"], align="center", spacing=fmt["lineSpacing"],
         )
 
     return Image.alpha_composite(img, overlay).convert("RGB")
@@ -402,7 +479,13 @@ def _upload(local: str, presigned_url: str, content_type: str) -> None:
 
 
 def _run_pipeline(req: dict, tmpdir: str) -> dict:
-    """Render semua slide. Throw bila gagal (dipetakan caller ke retryable)."""
+    """Render semua slide. Throw bila gagal (dipetakan caller ke retryable).
+
+    req.get("exportFormat"):
+      "jpeg" (default) — upload tiap slide ke uploadUrl masing-masing (IG/FB)
+      "pdf"            — satukan semua slide jadi SATU file PDF (LinkedIn
+                         document post, RFC §8). uploadUrl pertama dipakai.
+    """
     from PIL import Image
 
     fmt_name = req.get("format") or "portrait4_5"
@@ -415,11 +498,13 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
     box_opacity = min(255, max(0, int(req.get("boxOpacity") or 235)))
     title_family = req.get("titleFontFamily") or "Fredoka"
     content_family = req.get("contentFontFamily") or "Fredoka"
+    export_format = (req.get("exportFormat") or "jpeg").lower()
 
     slides = req.get("slides") or []
     if not slides:
         raise RuntimeError("tidak ada slide untuk di-render")
 
+    rendered_pages: list[Image.Image] = []
     results = []
     for slide in slides:
         bg_url = slide.get("backgroundUrl")
@@ -435,18 +520,41 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
             bg = _solid_gradient((fmt["w"], fmt["h"]), bg_stops)
             rendered = _render_slide(bg, slide, fmt, style, box_opacity,
                                      title_family, content_family)
+        rendered_pages.append(rendered)
 
         out = f"{tmpdir}/slide_{slide.get('urutan', 0)}.jpg"
         rendered.save(out, "JPEG", quality=_JPG_QUALITY)
-        upload_url = slide.get("uploadUrl")
-        if upload_url:
-            _upload(out, upload_url, "image/jpeg")
+        if export_format == "jpeg":
+            upload_url = slide.get("uploadUrl")
+            if upload_url:
+                _upload(out, upload_url, "image/jpeg")
         results.append({
             "urutan": slide.get("urutan", 0),
             "width": rendered.width,
             "height": rendered.height,
             "sizeBytes": Path(out).stat().st_size,
         })
+
+    # Export PDF (LinkedIn document post) — satu file, tiap halaman satu slide.
+    # Pillow simpan PDF multi-halaman via save_all + append_images.
+    if export_format == "pdf":
+        pdf_path = f"{tmpdir}/carousel.pdf"
+        first, rest = rendered_pages[0], rendered_pages[1:]
+        first.save(pdf_path, "PDF", save_all=True, append_images=rest,
+                   resolution=150.0)
+        # uploadUrl pertama adalah target PDF tunggal (kontrak adapter fase 3)
+        pdf_upload = slides[0].get("uploadUrl")
+        if pdf_upload:
+            _upload(pdf_path, pdf_upload, "application/pdf")
+        return {
+            "slides": results,
+            "pdf": {
+                "sizeBytes": Path(pdf_path).stat().st_size,
+                "pageCount": len(rendered_pages),
+                "width": fmt["w"],
+                "height": fmt["h"],
+            },
+        }
 
     return {"slides": results}
 

@@ -112,11 +112,50 @@ export interface RenderAdapter {
    * Jalankan render. Throw RenderError bila gagal (worker akan retry via BullMQ).
    * onProgress dipanggil adapter dengan nilai 0-100.
    */
-  render(
-    req: RenderRequest,
+  render(req: RenderRequest, onProgress?: (percent: number) => void): Promise<RenderResponse>;
+
+  /**
+   * Slideshow MP4 dari array JPEG — RFC §8 fase 3 (TikTok/YouTube carousel).
+   * Input: slide JPEG yang sudah di-render carousel (ada di R2).
+   * Output: MP4 tunggal + thumbnail, transisi fade antar slide.
+   * Bgm opsional; tidak ada voiceover/whisper (jalur cepat).
+   */
+  slideshow(
+    req: SlideshowRequest,
     onProgress?: (percent: number) => void,
-  ): Promise<RenderResponse>;
+  ): Promise<SlideshowResponse>;
 }
+
+/**
+ * Request slideshow — dipassing worker ke adapter slideshow().
+ *
+ * Slide JPEG adalah output carousel render (sudah ada di R2). Adapter download,
+ * susun xfade chain, upload MP4 + thumbnail balik via presigned URL.
+ */
+export type SlideshowRequest = {
+  /** ID internal (untuk logging, bukan auth) */
+  jobId: string;
+  /** Presigned URL download tiap slide JPEG (urutan tampil) */
+  slideUrls: string[];
+  /** Durasi tampil tiap slide (detik, 0.5–15) */
+  slideDuration: number;
+  /** Presigned URL download BGM opsional (null = video tanpa audio) */
+  bgmUrl: string | null;
+  /** Presigned URL upload MP4 output ke R2 */
+  outputUploadUrl: string;
+  /** Presigned URL upload thumbnail JPEG (opsional; frame pertama output) */
+  thumbnailUploadUrl: string | null;
+};
+
+/** Response slideshow — mirror RenderResponse yang relevan */
+export type SlideshowResponse = {
+  durationSeconds: number;
+  width: number;
+  height: number;
+  sizeBytes: number;
+  /** Jumlah slide yang disusun (untuk audit) */
+  slideCount: number;
+};
 
 /** Error render — dipetakan worker ke kode + retry decision */
 export class RenderError extends Error {

@@ -23,6 +23,19 @@ export type CarouselSlideBackground =
       url: string;
     };
 
+/**
+ * Placement teks dari AI Visual Layout Director (RFC §7, fase 2).
+ * Opsional — bila null, renderer pakai template center (fallback).
+ */
+export type CarouselSlideLayout = {
+  /** Zona vertikal: "top" = 20% atas, "center", "bottom" = 20% bawah */
+  zone: "top" | "center" | "bottom";
+  /** Alignment horizontal */
+  align: "left" | "center" | "right";
+  /** Warna teks: "light" = putih (bg gelap), "dark" = hitam (bg terang) */
+  contrast: "light" | "dark";
+};
+
 /** Satu slide lengkap dengan background + target upload — self-contained */
 export type CarouselRenderSlide = {
   /** Nomor slide, mulai dari 1 (urutan tampil) */
@@ -35,6 +48,8 @@ export type CarouselRenderSlide = {
   background: CarouselSlideBackground;
   /** Presigned URL upload JPEG hasil render slide ini */
   uploadUrl: string;
+  /** Placement dari vision layout director (opsional — fase 2) */
+  layout?: CarouselSlideLayout | null;
 };
 
 /**
@@ -71,6 +86,14 @@ export type CarouselRenderedSlide = {
 /** Response render carousel — semua upload sudah dilakukan adapter ke R2 */
 export type CarouselRenderResponse = {
   slides: CarouselRenderedSlide[];
+  /** Hanya ada saat exportFormat=pdf (RFC §8 fase 3 — LinkedIn document post) */
+  pdf?: {
+    sizeBytes: number;
+    /** Jumlah halaman PDF = jumlah slide */
+    pageCount: number;
+    width: number;
+    height: number;
+  };
 };
 
 /**
@@ -92,6 +115,16 @@ export interface CarouselRenderAdapter {
     req: CarouselRenderRequest,
     onProgress?: (percent: number) => void,
   ): Promise<CarouselRenderResponse>;
+
+  /**
+   * Render carousel sebagai SATU file PDF (RFC §8 fase 3 — LinkedIn document
+   * post). Slide JPEG tetap dirender, lalu disatukan jadi PDF multi-halaman.
+   * Kontrak: uploadUrl slide PERTAMA adalah target PDF tunggal.
+   *
+   * Return null bila app Modal carousel tidak mendukung export PDF —
+   * caller fallback ke slide JPEG terpisah.
+   */
+  renderPdf(req: CarouselRenderRequest): Promise<CarouselRenderResponse>;
 }
 
 /** Error carousel render — dipetakan worker ke kode + retry decision */

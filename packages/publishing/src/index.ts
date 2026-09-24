@@ -2,6 +2,13 @@
 
 export { getAdapter, supportedPlatforms } from "./adapters";
 export {
+  chatCompletion,
+  chatCompletionMultimodal,
+  consumeAiCredits,
+  getAiConfig,
+  type AiConfig,
+} from "./ai";
+export {
   type AccountMetrics,
   type AnalyticsAccount,
   type AnalyticsSyncResult,

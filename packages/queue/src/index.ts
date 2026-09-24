@@ -7,7 +7,7 @@ export {
   enqueueAutoReply,
   runAutoReplyCycle,
 } from "./auto-reply";
-export { markCarouselFailed } from "./carousel-processor";
+export { exportCarouselPdf, markCarouselFailed } from "./carousel-processor";
 export {
   CAROUSEL_RENDER_QUEUE_NAME,
   type CarouselRenderJobData,
@@ -25,6 +25,13 @@ export {
   type PublishJobData,
   queueNameForPlatform,
 } from "./connection";
+export {
+  computeSlideLayouts,
+  type LayoutAlign,
+  type LayoutContrast,
+  type LayoutZone,
+  type SlideLayout,
+} from "./layout-director";
 export { markPostFailed } from "./mark-failed";
 export {
   cancelPublishJob,

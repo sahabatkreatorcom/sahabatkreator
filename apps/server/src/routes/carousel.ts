@@ -25,8 +25,15 @@ import { generateId } from "../lib/id";
 
 export const carouselRoute = new Hono();
 
-/** Default settings — 4:5 feed (BUKAN 9:16 yang ter-crop di feed IG), style box */
-const DEFAULT_SETTINGS: CarouselSettings = {
+/**
+ * Default settings — 4:5 feed (BUKAN 9:16 yang ter-crop di feed IG), style box.
+ *
+ * Tidak dianotasi `CarouselSettings` supaya tipe infer literal cocok dengan
+ * input shape settingsSchema di bawah (zod `.default()` butuh full shape,
+ * field optional di CarouselSettings akan mismatch). Lihat catatan zod v4
+ * di MEMORY.md: default harus full shape eksplisit.
+ */
+const DEFAULT_SETTINGS = {
   style: "box",
   format: "portrait4_5",
   slideCount: 6,
@@ -35,7 +42,8 @@ const DEFAULT_SETTINGS: CarouselSettings = {
   contentFontFamily: "Fredoka",
   backgroundMode: "solid",
   backgroundQuery: "",
-};
+  aiLayout: { enabled: false },
+} satisfies CarouselSettings;
 
 const settingsSchema = z
   .object({
@@ -47,6 +55,13 @@ const settingsSchema = z
     contentFontFamily: z.string().min(1).default(DEFAULT_SETTINGS.contentFontFamily),
     backgroundMode: z.enum(["library", "stock", "solid"]).default(DEFAULT_SETTINGS.backgroundMode),
     backgroundQuery: z.string().max(200).default(DEFAULT_SETTINGS.backgroundQuery),
+    /**
+     * AI Visual Layout Director (fase 2, RFC §7) — toggle opt-in.
+     * Vision model deteksi wajah/objek background, tempatkan teks di negative
+     * space. Berbiaya (1 call multimodal per carousel) → default false.
+     * Model diisi worker dari platformSettings (admin), user tidak pilih model.
+     */
+    aiLayout: z.object({ enabled: z.boolean().default(false) }).default({ enabled: false }),
   })
   .default(DEFAULT_SETTINGS);
 
@@ -250,6 +265,7 @@ carouselRoute.get("/:id", async (c) => {
         title: carouselJobSlide.title,
         body: carouselJobSlide.body,
         stockCredit: carouselJobSlide.stockCredit,
+        layout: carouselJobSlide.layout,
         outputUrl: media.url,
         outputWidth: media.width,
         outputHeight: media.height,
@@ -267,6 +283,7 @@ carouselRoute.get("/:id", async (c) => {
         title: s.title,
         body: s.body,
         stockCredit: s.stockCredit,
+        layout: s.layout,
         url: s.outputUrl,
         width: s.outputWidth,
         height: s.outputHeight,

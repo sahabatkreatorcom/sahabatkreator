@@ -94,6 +94,7 @@ export function CarouselRenderPanel({
   const [contentFont, setContentFont] = useState<string>("Fredoka");
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>("solid");
   const [backgroundQuery, setBackgroundQuery] = useState("");
+  const [aiLayout, setAiLayout] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
 
   const usesBox = style === "box" || style === "box_title_content";
@@ -146,6 +147,7 @@ export function CarouselRenderPanel({
           contentFontFamily: contentFont,
           backgroundMode,
           backgroundQuery,
+          aiLayout: { enabled: aiLayout },
         },
       }),
     onSuccess: (data) => {
@@ -310,6 +312,29 @@ export function CarouselRenderPanel({
             onChange={(e) => setBackgroundQuery(e.target.value)}
           />
         </div>
+      )}
+
+      {backgroundMode !== "solid" && (
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-2.5">
+          <input
+            id="cr-ai-layout"
+            type="checkbox"
+            checked={aiLayout}
+            onChange={(e) => setAiLayout(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-[var(--accent-gold)]"
+          />
+          <span className="space-y-0.5">
+            <span className="flex items-center gap-1 font-medium text-xs">
+              <Sparkles className="h-3 w-3 text-[var(--accent-gold)]" />
+              AI Visual Layout Director
+            </span>
+            <span className="block text-[var(--text-muted)] text-xs">
+              AI melihat background, lalu menempatkan teks di area kosong — menghindari wajah/objek
+              penting. 1 call per carousel (berbiaya kredit AI). Gagal otomatis fallback ke posisi
+              tengah.
+            </span>
+          </span>
+        </label>
       )}
 
       <Button

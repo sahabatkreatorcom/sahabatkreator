@@ -33,6 +33,9 @@ export const AI_CREDIT_COST: Record<string, number> = {
   "alt-text": 1,
   repurpose: 1,
   carousel: 2,
+  // AI Visual Layout Director — 1 call multimodal batch seluruh carousel
+  // (RFC docs/rfc-carousel-render.md §7). Konsumsi di worker (queue package).
+  carousel_layout: 2,
   coach_advice: 3,
   trend_ideas: 3,
 };
