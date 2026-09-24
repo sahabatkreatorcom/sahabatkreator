@@ -64,3 +64,6 @@ meta-scope.md
 .workbuddy-ai/
 __pycache__/
 *.pyc
+
+# Carousel renderer local smoke test output
+apps/render-modal/test-output/

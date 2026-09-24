@@ -10,7 +10,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { mediaTypeEnum, platformEnum, postStatusEnum } from "./enum";
+import { carouselJobStatusEnum, mediaTypeEnum, platformEnum, postStatusEnum } from "./enum";
 import { organization } from "./organization";
 import { socialAccount } from "./social";
 
@@ -122,6 +122,11 @@ export const media = pgTable(
     contentHash: text("content_hash"),
     altText: text("alt_text"),
     folderId: text("folder_id"),
+    // Lineage stock (RFC carousel §4) — attribution untuk caption + filter pool.
+    // 'upload' = milik org sendiri; 'stock_pixabay'/'stock_pexels' = dari adapter.
+    source: text("source"),
+    // Attribution string ("Photo by X on Pixabay") → mengalir ke caption.
+    credit: text("credit"),
     uploadedByUserId: text("uploaded_by_user_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -227,6 +232,101 @@ export const calendarNote = pgTable(
   (table) => [index("calendar_note_organizationId_date_idx").on(table.organizationId, table.date)],
 );
 
+// ---------- Carousel render (RFC docs/rfc-carousel-render.md) ----------
+// Layer visual untuk /ai/carousel: outline teks di-render jadi slide gambar.
+// Pola yang sama dengan video_job: queue worker + claim atomik + Modal render.
+
+/**
+ * Konfigurasi render carousel — poros dari config.py repo referensi, dibuat
+ * per-request (bukan konstanta global). Lihat RFC §4.
+ */
+export type CarouselSettings = {
+  style: "outline" | "box" | "box_title_content" | "plain";
+  format: "portrait" | "portrait4_5" | "square";
+  /** Jumlah slide konten (tidak termasuk cover) — 3-10 */
+  slideCount: number;
+  /** Opasitas box 0-255, hanya untuk style box & box_title_content */
+  boxOpacity: number;
+  /** Key font bundle Modal (mis. "Fredoka", "Cinzel") */
+  titleFontFamily: string;
+  contentFontFamily: string;
+  /**
+   * Mode background:
+   * - library: pilih dari media library sendiri (DEFAULT — konsistensi brand)
+   * - stock:   auto-source via StockImageSource (Pixabay/Pexels, fase 1 Pixabay)
+   * - solid:   gradient warna solid, tanpa foto
+   */
+  backgroundMode: "library" | "stock" | "solid";
+  /** Keyword pencarian stock (backgroundMode=stock) */
+  backgroundQuery: string;
+  /** AI Visual Layout Director (fase 2) — opt-in karena berbiaya */
+  aiLayout?: { enabled: boolean; model: string };
+};
+
+export const DEFAULT_CAROUSEL_SETTINGS: CarouselSettings = {
+  style: "box",
+  format: "portrait4_5",
+  slideCount: 5,
+  boxOpacity: 235,
+  titleFontFamily: "Fredoka",
+  contentFontFamily: "Fredoka",
+  backgroundMode: "library",
+  backgroundQuery: "",
+};
+
+export const carouselJob = pgTable(
+  "carousel_job",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdByUserId: text("created_by_user_id"),
+    topic: text("topic").notNull(),
+    caption: text("caption"),
+    settings: jsonb("settings").$type<CarouselSettings>().notNull(),
+    // Export target — fase 1: instagram saja (RFC §8)
+    targetPlatform: platformEnum("target_platform").notNull().default("instagram"),
+    status: carouselJobStatusEnum("status").notNull().default("queued"),
+    progress: integer("progress").notNull().default(0),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("carousel_job_organizationId_idx").on(table.organizationId)],
+);
+
+export const carouselJobSlide = pgTable(
+  "carousel_job_slide",
+  {
+    id: text("id").primaryKey(),
+    carouselJobId: text("carousel_job_id")
+      .notNull()
+      .references(() => carouselJob.id, { onDelete: "cascade" }),
+    // 0 = cover/judul utama
+    urutan: integer("urutan").notNull(),
+    title: text("title").notNull(),
+    // null untuk cover (cover hanya judul)
+    body: text("body"),
+    // media row background (mode library/stock); null = solid/generated
+    backgroundMediaId: text("background_media_id"),
+    // slide hasil render (media type=image)
+    outputMediaId: text("output_media_id"),
+    // Attribution stock → mengalir ke caption ("Photo by X on Pixabay")
+    stockCredit: text("stock_credit"),
+    // Layout AI (fase 2) — cache-nya di Redis, ini simpanan terakhir
+    layout: jsonb("layout"),
+  },
+  (table) => [
+    index("carousel_job_slide_carouselJobId_idx").on(table.carouselJobId),
+    uniqueIndex("carousel_job_slide_job_urutan_udx").on(table.carouselJobId, table.urutan),
+  ],
+);
+
 export const postGroupRelations = relations(postGroup, ({ one, many }) => ({
   organization: one(organization, {
     fields: [postGroup.organizationId],
@@ -262,6 +362,29 @@ export const postMediaRelations = relations(postMedia, ({ one }) => ({
   }),
   media: one(media, {
     fields: [postMedia.mediaId],
+    references: [media.id],
+  }),
+}));
+
+export const carouselJobRelations = relations(carouselJob, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [carouselJob.organizationId],
+    references: [organization.id],
+  }),
+  slides: many(carouselJobSlide),
+}));
+
+export const carouselJobSlideRelations = relations(carouselJobSlide, ({ one }) => ({
+  carouselJob: one(carouselJob, {
+    fields: [carouselJobSlide.carouselJobId],
+    references: [carouselJob.id],
+  }),
+  backgroundMedia: one(media, {
+    fields: [carouselJobSlide.backgroundMediaId],
+    references: [media.id],
+  }),
+  outputMedia: one(media, {
+    fields: [carouselJobSlide.outputMediaId],
     references: [media.id],
   }),
 }));

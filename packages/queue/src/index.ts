@@ -1,12 +1,21 @@
 // @sahabatkreator/queue — BullMQ publish queue (Redis) dengan fallback DB polling
 export {
   AUTO_REPLY_QUEUE_NAME,
+  type AutoReplyJobData,
   cancelAutoReply,
   createAutoReplyWorker,
   enqueueAutoReply,
-  type AutoReplyJobData,
   runAutoReplyCycle,
 } from "./auto-reply";
+export { markCarouselFailed } from "./carousel-processor";
+export {
+  CAROUSEL_RENDER_QUEUE_NAME,
+  type CarouselRenderJobData,
+  cancelCarouselRenderJob,
+  createCarouselRenderWorker,
+  enqueueCarouselRender,
+  runCarouselRenderCycle,
+} from "./carousel-render";
 export {
   closeQueues,
   getPublishQueue,
@@ -17,11 +26,6 @@ export {
   queueNameForPlatform,
 } from "./connection";
 export { markPostFailed } from "./mark-failed";
-export {
-  type RenderManifest,
-  type RenderManifestEntry,
-  getRenderManifest,
-} from "./render-processor";
 export {
   cancelPublishJob,
   createPublishWorker,
@@ -38,6 +42,18 @@ export {
   runReminderCycle,
   sendPostReminder,
 } from "./reminder";
+export {
+  getRenderManifest,
+  type RenderManifest,
+  type RenderManifestEntry,
+} from "./render-processor";
+export {
+  getStockSource,
+  isStockConfigured,
+  type SourcedBackground,
+  type StockImageResult,
+  type StockImageSource,
+} from "./stock";
 export {
   cancelVideoRenderJob,
   createVideoRenderWorker,

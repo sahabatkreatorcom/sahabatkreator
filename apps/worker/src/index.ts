@@ -23,6 +23,7 @@ import {
   checkAllPlatformHealth,
   recoverStalePosts,
   refreshDueTokens,
+  registerAutoReplyEnqueue,
   runPublishCycle,
   syncDueAccounts,
   syncDueAnalyticsAccounts,
@@ -32,16 +33,17 @@ import {
 import {
   closeQueues,
   createAutoReplyWorker,
+  createCarouselRenderWorker,
   createPublishWorker,
   createReminderWorker,
   createVideoRenderWorker,
   enqueueAutoReply,
   getRedisConnection,
   runAutoReplyCycle,
+  runCarouselRenderCycle,
   runReminderCycle,
   runVideoRenderCycle,
 } from "@sahabatkreator/queue";
-import { registerAutoReplyEnqueue } from "@sahabatkreator/publishing";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
@@ -245,6 +247,9 @@ if (mode === "bullmq") {
   // Processor job "video render" — render via Modal (ffmpeg + whisper).
   // Concurrency 2; resource berat jalan di Modal, bukan server ini.
   createVideoRenderWorker();
+  // Processor job "carousel render" — slide gambar via Modal (Pillow).
+  // Concurrency 4; Pillow ringan, aman berjalan bersama video render.
+  createCarouselRenderWorker();
   // Recovery sweep tetap jalan (job hilang saat Redis flush / worker crash sebelum enqueue poll)
   setInterval(() => {
     recoverStalePosts()
@@ -408,9 +413,7 @@ let videoRendering = false;
 async function runVideoRender(): Promise<void> {
   const r = await runVideoRenderCycle();
   if (r.claimed > 0) {
-    console.log(
-      `[video-render] claimed=${r.claimed} done=${r.done} failed=${r.failed} (fallback)`,
-    );
+    console.log(`[video-render] claimed=${r.claimed} done=${r.done} failed=${r.failed} (fallback)`);
   }
 }
 setInterval(() => {
@@ -424,6 +427,31 @@ setInterval(() => {
 }, VIDEO_RENDER_TICK_MS);
 // Cek pertama 25 detik setelah start (stagger setelah auto-reply startup)
 setTimeout(() => runVideoRender().catch(() => {}), 25_000);
+
+// ---- Carousel Render loop (kedua mode) ----
+// Sama pola video render: BullMQ utama, loop ini safety net + jalur fallback
+// (polling carousel_job.status='queued'). Pillow ringan, interval lebih pendek.
+const CAROUSEL_RENDER_TICK_MS = 20_000;
+let carouselRendering = false;
+async function runCarouselRender(): Promise<void> {
+  const r = await runCarouselRenderCycle();
+  if (r.claimed > 0) {
+    console.log(
+      `[carousel-render] claimed=${r.claimed} done=${r.done} failed=${r.failed} (fallback)`,
+    );
+  }
+}
+setInterval(() => {
+  if (carouselRendering) return;
+  carouselRendering = true;
+  runCarouselRender()
+    .catch((error) => console.error("[carousel-render] cycle error:", error))
+    .finally(() => {
+      carouselRendering = false;
+    });
+}, CAROUSEL_RENDER_TICK_MS);
+// Cek pertama 35 detik setelah start (stagger setelah video render startup)
+setTimeout(() => runCarouselRender().catch(() => {}), 35_000);
 
 // ---- Scheduled Reports loop (kedua mode) ----
 // Tiap jam cek jadwal laporan email due (weekly/monthly, dedupe 20 jam)

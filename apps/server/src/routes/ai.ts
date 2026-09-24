@@ -51,8 +51,7 @@ async function brandVoicePrompt(organizationId: string): Promise<string> {
 
 /** Konteks style per platform untuk prompt AI — detail aturan agar caption disukai algoritma */
 const PLATFORM_STYLE: Record<string, string> = {
-  instagram:
-    `Instagram — ATURAN:
+  instagram: `Instagram — ATURAN:
 - Hook kuat di 2 baris pertama (stop scroll!)
 - Gunakan emoji secukupnya (3-5 per caption, jangan berlebihan)
 - Paragraph singkat, maksimal 2-3 baris per paragraf
@@ -63,8 +62,7 @@ const PLATFORM_STYLE: Record<string, string> = {
 - Hindari: link di caption (letakkan di bio), kata-kata spammy seperti "free", "winner"
 - Gunakan storytelling atau bullet points untuk edukasi`,
 
-  facebook:
-    `Facebook — ATURAN:
+  facebook: `Facebook — ATURAN:
 - Mulai dengan pertanyaan atau pernyataan provokatif
 - Gunakan gaya konversasional, seperti bicara dengan teman
 - Panjang: 40-80 karakter untuk engagement tertinggi, bisa panjang untuk storytelling
@@ -74,8 +72,7 @@ const PLATFORM_STYLE: Record<string, string> = {
 - Hindari: CTA berlebihan, konten terlalu promosi
 - Facebook suka konten yang memicu diskusi dan share`,
 
-  tiktok:
-    `TikTok — ATURAN:
+  tiktok: `TikTok — ATURAN:
 - Hook dalam 1-2 detik pertama (text overlay atau kalimat pembuka kuat)
 - Caption PENDek: 1-3 kalimat, langsung ke inti
 - Gunakan trending sounds/topics bila relevan
@@ -86,8 +83,7 @@ const PLATFORM_STYLE: Record<string, string> = {
 - Hindari: formal language, terlalu banyak emoji, CTA like/share
 - TikTok menghukum konten yang terlihat seperti iklan`,
 
-  youtube:
-    `YouTube — ATURAN:
+  youtube: `YouTube — ATURAN:
 - Judul video: 60-70 karakter, keyword di depan, click-worthy tapi bukan clickbait
 - Deskripsi: paragraf pertama 150-200 karakter (muncul di search), lalu detail
 - Tags: 10-15 keyword relevan
@@ -97,8 +93,7 @@ const PLATFORM_STYLE: Record<string, string> = {
 - Hindari: judul terlalu panjang, tag spam, deskripsi kosong
 - YouTube SEO: gunakan keyword di judul, deskripsi, dan spoken content`,
 
-  linkedin:
-    `LinkedIn — ATURAN:
+  linkedin: `LinkedIn — ATURAN:
 - Hook di 1-2 baris pertama (muncul sebelum "...lihat lainnya")
 - Gunakan storytelling personal atau professional insight
 - 3-5 paragraf pendek, setiap paragraf 1-2 kalimat
@@ -110,8 +105,7 @@ const PLATFORM_STYLE: Record<string, string> = {
 - Hindari: hashtag berlebihan, konten terlalu promosi, emoji berlebihan
 - LinkedIn suka: pelajaran, insight, cerita kegagalan/keberhasilan`,
 
-  linkedin_org:
-    `LinkedIn Company Page — ATURAN:
+  linkedin_org: `LinkedIn Company Page — ATURAN:
 - Sudut pandang brand/perusahaan (bukan personal)
 - Ton profesional tapi approachable
 - Share updates perusahaan, pencapaian, budaya kerja
@@ -120,8 +114,7 @@ const PLATFORM_STYLE: Record<string, string> = {
 - Hashtag: 3-5 (brand + industri)
 - Hindari: terlalu casual, meme, konten tidak profesional`,
 
-  pinterest:
-    `Pinterest — ATURAN:
+  pinterest: `Pinterest — ATURAN:
 - Deskripsi: 100-200 karakter, kaya keyword (search-optimized)
 - Gunakan long-tail keywords (misal: "tips bisnis online untuk pemula")
 - Judul: 100 karakter, keyword utama di depan
@@ -132,8 +125,7 @@ const PLATFORM_STYLE: Record<string, string> = {
 - Hindari: hashtag berlebihan (tidak relevan di Pinterest), CTA like/share
 - Konten vertikal (2:3 ratio) performa lebih baik`,
 
-  threads:
-    `Threads — ATURAN:
+  threads: `Threads — ATURAN:
 - MAKSIMAL 500 karakter (sweet spot: 100-200 karakter)
 - Gaya: ringan, konversasional, seperti Twitter tapi lebih relaxed
 - Bisa pakai emoji tapi jangan berlebihan
@@ -143,8 +135,7 @@ const PLATFORM_STYLE: Record<string, string> = {
 - Hindari: link berlebihan (reach turun), konten terlalu panjang
 - Threads suka: opini, hot takes, behind-the-scenes, humor`,
 
-  x:
-    `X/Twitter — ATURAN:
+  x: `X/Twitter — ATURAN:
 - MAKSIMAL 280 karakter (weet), 25.000 karakter (unverified), 100.000 (verified)
 - Sweet spot: 71-100 karakter (engagement tertinggi)
 - Hook kuat di kalimat pertama
@@ -325,7 +316,10 @@ Kembalikan HANYA teks caption, tanpa penjelasan tambahan, tanpa judul, tanpa for
       // Model tidak ikuti format — jatuhkan hashtag apa pun yang nyasar di
       // body agar tidak dobel dengan field hashtag.
       hashtags = (raw.match(/#[A-Za-z0-9_]+/g) ?? []).map((t) => t.replace(/^#/, ""));
-      caption = raw.replace(/#[A-Za-z0-9_]+/g, "").replace(/[ \t]{2,}/g, " ").trim();
+      caption = raw
+        .replace(/#[A-Za-z0-9_]+/g, "")
+        .replace(/[ \t]{2,}/g, " ")
+        .trim();
     }
 
     return c.json({
@@ -556,70 +550,96 @@ const CAROUSESEL_STYLE_GUIDE: Record<string, string> = {
     "Gaya storytelling: slide 1 = pembuka cerita yang memancing rasa penasaran, slide tengah = alur konflik-menuju-penyelesaian, slide terakhir = pelajaran/CTA reflektif.",
 };
 
+/**
+ * Inti POST /ai/carousel — generate outline (slides + caption) via LLM.
+ *
+ * Di-export supaya route /carousel bisa pakai saat client tidak kirim slide
+ * manual (satu jalur kode, quota AI terpakai di kedua jalur — tidak ada bypass).
+ * Throw HTTPError; caller bertanggung jawab respons HTTP.
+ */
+export async function generateCarouselOutline(opts: {
+  orgId: string;
+  userId: string;
+  topic: string;
+  slideCount: number;
+  style: "edukasi" | "promosi" | "storytelling";
+  platform: (typeof PLATFORMS)[number];
+}): Promise<{ slides: { title: string; body: string }[]; caption: string; designTips: string }> {
+  const config = await getAiConfig();
+  if (!config) {
+    throw new HTTPError(503, "Fitur AI belum dikonfigurasi. Hubungi admin platform.");
+  }
+
+  const limits = await getOrgLimits(opts.orgId);
+  const action = "carousel";
+  await consumeAiCredits(opts.orgId, limits.aiCreditsPerMonth, {
+    userId: opts.userId,
+    action,
+    platform: opts.platform,
+    model: config.model,
+    credits: aiCreditCost(action),
+  });
+
+  const voice = await brandVoicePrompt(opts.orgId);
+  const platformContext =
+    CAROUSEL_PLATFORM_CONTEXT[opts.platform] ?? CAROUSEL_PLATFORM_CONTEXT.instagram;
+  const system = `Kamu adalah desainer konten carousel social media profesional untuk kreator UMKM Indonesia.\n${CAROUSESEL_STYLE_GUIDE[opts.style]}${voice}\n${platformContext}\n\nHasilkan outline carousel dengan TEPAT ${opts.slideCount} slide.\n\nKembalikan HANYA JSON valid (tanpa markdown fence) dengan format:\n{\n  "slides": [\n    { "title": "judul slide singkat (maks 8 kata)", "body": "isi slide 1-3 kalimat padat" }\n  ],\n  "caption": "caption ${opts.platform} lengkap untuk carousel (hook, ringkasan, CTA, hashtag relevan di akhir)",\n  "designTips": "2-3 tips desain singkat dalam satu paragraf (warna, tipografi, komposisi)"\n}\n\nSemua teks dalam Bahasa Indonesia. Jumlah slide di array HARUS tepat ${opts.slideCount}.`;
+
+  const raw = await chatCompletion(config, system, opts.topic, {
+    temperature: 0.8,
+    maxTokens: 1600,
+  });
+
+  // Parse JSON dari response — tahan terhadap markdown code fence
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new HTTPError(502, "AI mengembalikan format tidak valid. Coba lagi.");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
+    throw new HTTPError(502, "AI mengembalikan format tidak valid. Coba lagi.");
+  }
+
+  const result = parsed as {
+    slides?: { title?: unknown; body?: unknown }[];
+    caption?: unknown;
+    designTips?: unknown;
+  };
+  const slides = (result.slides ?? [])
+    .map((s) => ({
+      title: typeof s.title === "string" ? s.title.trim() : "",
+      body: typeof s.body === "string" ? s.body.trim() : "",
+    }))
+    .filter((s) => s.title || s.body);
+
+  if (slides.length === 0) {
+    throw new HTTPError(502, "AI tidak menghasilkan slide yang valid. Coba lagi.");
+  }
+
+  return {
+    slides,
+    caption: typeof result.caption === "string" ? result.caption : "",
+    designTips: typeof result.designTips === "string" ? result.designTips : "",
+  };
+}
+
 aiRoute.post("/carousel", async (c) => {
   try {
     const ctx = await requireOrg(c);
     const input = carouselSchema.parse(await c.req.json());
 
-    const config = await getAiConfig();
-    if (!config) {
-      return c.json({ message: "Fitur AI belum dikonfigurasi. Hubungi admin platform." }, 503);
-    }
-
-    const limits = await getOrgLimits(ctx.organization.id);
-    const action = "carousel";
-    const usage = await consumeAiCredits(ctx.organization.id, limits.aiCreditsPerMonth, {
+    const result = await generateCarouselOutline({
+      orgId: ctx.organization.id,
       userId: ctx.user.id,
-      action,
+      topic: input.topic,
+      slideCount: input.slideCount,
+      style: input.style,
       platform: input.platform,
-      model: config.model,
-      credits: aiCreditCost(action),
     });
 
-    const voice = await brandVoicePrompt(ctx.organization.id);
-    const platformContext =
-      CAROUSEL_PLATFORM_CONTEXT[input.platform] ?? CAROUSEL_PLATFORM_CONTEXT.instagram;
-    const system = `Kamu adalah desainer konten carousel social media profesional untuk kreator UMKM Indonesia.\n${CAROUSESEL_STYLE_GUIDE[input.style]}${voice}\n${platformContext}\n\nHasilkan outline carousel dengan TEPAT ${input.slideCount} slide.\n\nKembalikan HANYA JSON valid (tanpa markdown fence) dengan format:\n{\n  "slides": [\n    { "title": "judul slide singkat (maks 8 kata)", "body": "isi slide 1-3 kalimat padat" }\n  ],\n  "caption": "caption ${input.platform} lengkap untuk carousel (hook, ringkasan, CTA, hashtag relevan di akhir)",\n  "designTips": "2-3 tips desain singkat dalam satu paragraf (warna, tipografi, komposisi)"\n}\n\nSemua teks dalam Bahasa Indonesia. Jumlah slide di array HARUS tepat ${input.slideCount}.`;
-
-    const raw = await chatCompletion(config, system, input.topic, {
-      temperature: 0.8,
-      maxTokens: 1600,
-    });
-
-    // Parse JSON dari response — tahan terhadap markdown code fence
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new HTTPError(502, "AI mengembalikan format tidak valid. Coba lagi.");
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(jsonMatch[0]);
-    } catch {
-      throw new HTTPError(502, "AI mengembalikan format tidak valid. Coba lagi.");
-    }
-
-    const result = parsed as {
-      slides?: { title?: unknown; body?: unknown }[];
-      caption?: unknown;
-      designTips?: unknown;
-    };
-    const slides = (result.slides ?? [])
-      .map((s) => ({
-        title: typeof s.title === "string" ? s.title.trim() : "",
-        body: typeof s.body === "string" ? s.body.trim() : "",
-      }))
-      .filter((s) => s.title || s.body);
-
-    if (slides.length === 0) {
-      throw new HTTPError(502, "AI tidak menghasilkan slide yang valid. Coba lagi.");
-    }
-
-    return c.json({
-      slides,
-      caption: typeof result.caption === "string" ? result.caption : "",
-      designTips: typeof result.designTips === "string" ? result.designTips : "",
-      credits: usage,
-    });
+    return c.json(result);
   } catch (error) {
     return errorResponse(error);
   }

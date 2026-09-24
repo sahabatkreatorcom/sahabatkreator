@@ -30,6 +30,20 @@ export const postStatusEnum = pgEnum("post_status", [
 
 export const mediaTypeEnum = pgEnum("media_type", ["image", "video", "audio"]);
 
+// ---------- Carousel render ----------
+// RFC docs/rfc-carousel-render.md. Job lifecycle sama pola dengan video_job.
+// Style & format (rasio) tidak jadi kolom enum — mereka di dalam settings jsonb
+// (CarouselSettings), karena per-request bisa diubah tanpa schema change.
+export const carouselJobStatusEnum = pgEnum("carousel_job_status", [
+  "queued", // di antrian, belum di-claim worker
+  "sourcing", // cari/download background stock ke R2
+  "rendering", // sedang di-render di Modal
+  "uploading", // output jadi, insert media library
+  "done",
+  "failed",
+  "canceled",
+]);
+
 // ---------- Billing ----------
 export const planTierEnum = pgEnum("plan_tier", ["free", "pro", "business", "enterprise"]);
 

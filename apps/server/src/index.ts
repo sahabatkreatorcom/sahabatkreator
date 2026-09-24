@@ -29,6 +29,11 @@ const WEB_DIST_CANDIDATES = [
   resolve(__dirname, "../../web/dist"),
 ];
 
+import { registerAutoReplyEnqueue } from "@sahabatkreator/publishing";
+// Auto-reply AI: webhook server juga memanggil processAutomation (via dm-sync /
+// engagement-sync), jadi perlu daftarkan enqueue hook agar delayed job masuk queue.
+// Tanpa ini, job tetap jalan via worker fallback polling automation_log.due_at.
+import { enqueueAutoReply } from "@sahabatkreator/queue";
 import { accountsRoute } from "./routes/accounts";
 import { activityRoute } from "./routes/activity";
 import { adminRoute } from "./routes/admin";
@@ -42,6 +47,7 @@ import { automationRoute } from "./routes/automation";
 import { billingRoute } from "./routes/billing";
 import { blogRoute, buildBlogSitemapXml } from "./routes/blog";
 import { calendarRoute } from "./routes/calendar";
+import { carouselRoute } from "./routes/carousel";
 import { coachRoute } from "./routes/coach";
 import { collabsRoute } from "./routes/collabs";
 import { commerceRoute } from "./routes/commerce";
@@ -61,11 +67,10 @@ import { oauthRoute } from "./routes/oauth";
 import { postsRoute } from "./routes/posts";
 import { pushRoute } from "./routes/push";
 import { rendersRoute } from "./routes/renders";
-import { reportRoute } from "./routes/report";
 import { replizRoute } from "./routes/repliz";
+import { reportRoute } from "./routes/report";
 import { sebRoute } from "./routes/seb";
 import { soundRoute } from "./routes/sound";
-import { videoRoute } from "./routes/video";
 import { statusRoute } from "./routes/status";
 import { statusPublicRoute } from "./routes/status-public";
 import { strategyRoute } from "./routes/strategy";
@@ -73,14 +78,10 @@ import { teamRoute } from "./routes/team";
 import { threadsRoute } from "./routes/threads";
 import { trendsRoute } from "./routes/trends";
 import { userRoute } from "./routes/user";
+import { videoRoute } from "./routes/video";
 import { webhookRoute } from "./routes/webhook";
 import { platformWebhookRoute } from "./routes/webhook-platform";
 
-// Auto-reply AI: webhook server juga memanggil processAutomation (via dm-sync /
-// engagement-sync), jadi perlu daftarkan enqueue hook agar delayed job masuk queue.
-// Tanpa ini, job tetap jalan via worker fallback polling automation_log.due_at.
-import { enqueueAutoReply } from "@sahabatkreator/queue";
-import { registerAutoReplyEnqueue } from "@sahabatkreator/publishing";
 registerAutoReplyEnqueue(enqueueAutoReply);
 
 const app = new Hono();
@@ -134,6 +135,7 @@ api.route("/user", userRoute);
 api.route("/activity", activityRoute);
 api.route("/posts", postsRoute);
 api.route("/calendar", calendarRoute);
+api.route("/carousel", carouselRoute);
 api.route("/media", mediaRoute);
 api.route("/accounts", accountsRoute);
 api.route("/accounts", collabsRoute);

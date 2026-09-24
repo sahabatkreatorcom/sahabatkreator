@@ -89,6 +89,14 @@ export const env = createEnv({
     // Kosong = fitur video render nonaktif (route 503, worker skip queue).
     MODAL_TOKEN: z.string().optional(),
     MODAL_RENDER_URL: z.url().optional(),
+    // Modal.com — app terpisah untuk carousel (Pillow saja, image ringan).
+    // Secret MODAL_TOKEN dipakai bersama. Kosong = fitur carousel nonaktif.
+    // RFC docs/rfc-carousel-render.md §9.
+    MODAL_CAROUSEL_URL: z.url().optional(),
+    // Pixabay API — sumber stock background carousel (RFC §6).
+    // Komersial OK tanpa attribution, tapi WAJIB download ke R2 (no hotlink).
+    // Kosong = mode background stock nonaktif (library/solid tetap jalan).
+    PIXABAY_KEY: z.string().optional(),
     // Lainnya
     CRON_SECRET: z.string().optional(),
     // AES-256-GCM key (base64 32-byte) untuk enkripsi kredensial platform.
