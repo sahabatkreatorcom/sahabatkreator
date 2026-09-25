@@ -16,10 +16,11 @@ import {
   organization,
   videoJob,
   videoJobClip,
+  videoJobSegment,
   type RenderSettings,
 } from "@sahabatkreator/db/schema";
 import { getRenderAdapter, RenderError } from "@sahabatkreator/render";
-import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import {
   GetObjectCommand,
   PutObjectCommand,
@@ -83,6 +84,10 @@ async function claimJob(
         eq(videoJob.id, id),
         // Accept "queued" (normal) OR "rendering" (retry — status dari attempt sebelumnya)
         or(eq(videoJob.status, "queued"), eq(videoJob.status, "rendering")),
+        // Jangan claim job analisis auto_clip (di antrian sk_auto_clip).
+        // Tanpa guard ini, fallback loop di sini bisa mengambil job analisis
+        // dan merender source utuh sebagai video biasa.
+        ne(videoJob.mode, "auto_clip"),
       ),
     )
     .returning({
@@ -262,6 +267,14 @@ export async function processVideoRenderJob(
     // publishedToGallery di job sudah cukup; publish/unpublish adalah
     // operasi murni DB di route gallery.
 
+    // Bila job ini hasil fan-out auto-clip (ada video_job_segment yang
+    // menunjuk ke sini), tandai kandidatnya rendered — lifecycle kandidat
+    // pending → selected → rendering → rendered (RFC auto-clip §6 langkah 6).
+    await db
+      .update(videoJobSegment)
+      .set({ status: "rendered" })
+      .where(eq(videoJobSegment.renderVideoJobId, videoJobId));
+
     return { ok: true, outputMediaId: outputId };
   } catch (error) {
     const renderErr =
@@ -393,7 +406,7 @@ export async function processVideoRenderDueJobs(): Promise<{
   const rows = await db
     .select({ id: videoJob.id })
     .from(videoJob)
-    .where(eq(videoJob.status, "queued"))
+    .where(and(eq(videoJob.status, "queued"), ne(videoJob.mode, "auto_clip")))
     .limit(5);
 
   let done = 0;

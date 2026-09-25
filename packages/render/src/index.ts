@@ -15,6 +15,14 @@ export {
   type CarouselRenderSlide,
   type CarouselSlideBackground,
 } from "./carousel-types";
+export { ModalClipperAdapter } from "./clipper";
+export {
+  type ClipperAdapter,
+  ClipperError,
+  type ClipperFailure,
+  type ClipperIngestRequest,
+  type ClipperIngestResponse,
+} from "./clipper-types";
 export { ModalRenderAdapter } from "./modal";
 export {
   type RenderAdapter,
@@ -28,11 +36,14 @@ export {
 import { env } from "@sahabatkreator/env/server";
 import { ModalCarouselAdapter } from "./carousel";
 import type { CarouselRenderAdapter } from "./carousel-types";
+import { ModalClipperAdapter } from "./clipper";
+import type { ClipperAdapter } from "./clipper-types";
 import { ModalRenderAdapter } from "./modal";
 import type { RenderAdapter } from "./types";
 
 let cached: ModalRenderAdapter | null | undefined;
 let carouselCached: ModalCarouselAdapter | null | undefined;
+let clipperCached: ModalClipperAdapter | null | undefined;
 
 /**
  * Adapter render aktif, atau null bila belum dikonfigurasi.
@@ -74,4 +85,30 @@ export function getCarouselAdapter(): CarouselRenderAdapter | null {
 /** true bila fitur carousel render aktif (untuk health check + UI gating) */
 export function isCarouselConfigured(): boolean {
   return Boolean(env.MODAL_TOKEN && env.MODAL_CAROUSEL_URL);
+}
+
+/**
+ * Adapter clipper ingest aktif, atau null bila belum dikonfigurasi.
+ *
+ * App Modal terpisah `sahabatkreator-clipper` — AKUN KEDUA (RFC auto-clip §4):
+ * isolasi quota concurrency Starter 100 container, supaya transkripsi clipper
+ * tidak kelaparkan job render slideshow customer. Token pakai
+ * MODAL_CLIPPER_TOKEN bila ada, fallback MODAL_TOKEN (bila satu akun cukup).
+ * Kosong = fitur auto-clip nonaktif (route 503, worker skip queue).
+ */
+export function getClipperAdapter(): ClipperAdapter | null {
+  if (clipperCached !== undefined) return clipperCached;
+  const token = env.MODAL_CLIPPER_TOKEN || env.MODAL_TOKEN;
+  if (!token || !env.MODAL_CLIPPER_URL) {
+    clipperCached = null;
+    return null;
+  }
+  clipperCached = new ModalClipperAdapter();
+  return clipperCached;
+}
+
+/** true bila fitur auto-clip aktif (untuk health check + UI gating) */
+export function isClipperConfigured(): boolean {
+  const token = env.MODAL_CLIPPER_TOKEN || env.MODAL_TOKEN;
+  return Boolean(token && env.MODAL_CLIPPER_URL);
 }

@@ -32,6 +32,7 @@ import {
 } from "@sahabatkreator/publishing";
 import {
   closeQueues,
+  createAutoClipWorker,
   createAutoReplyWorker,
   createCarouselRenderWorker,
   createPublishWorker,
@@ -39,6 +40,7 @@ import {
   createVideoRenderWorker,
   enqueueAutoReply,
   getRedisConnection,
+  runAutoClipCycle,
   runAutoReplyCycle,
   runCarouselRenderCycle,
   runReminderCycle,
@@ -250,6 +252,10 @@ if (mode === "bullmq") {
   // Processor job "carousel render" — slide gambar via Modal (Pillow).
   // Concurrency 4; Pillow ringan, aman berjalan bersama video render.
   createCarouselRenderWorker();
+  // Processor job "auto-clip" — analisis long-form → kandidat klip (Modal
+  // clipper di akun kedua + OpenRouter). Tidak render video di sini; render
+  // baru jalan setelah user pilih kandidat (fan-out ke video render queue).
+  createAutoClipWorker();
   // Recovery sweep tetap jalan (job hilang saat Redis flush / worker crash sebelum enqueue poll)
   setInterval(() => {
     recoverStalePosts()
@@ -452,6 +458,31 @@ setInterval(() => {
 }, CAROUSEL_RENDER_TICK_MS);
 // Cek pertama 35 detik setelah start (stagger setelah video render startup)
 setTimeout(() => runCarouselRender().catch(() => {}), 35_000);
+
+// ---- Auto-Clip loop (kedua mode) ----
+// Sama pola render lain: BullMQ utama (createAutoClipWorker), loop ini safety
+// net + satu-satunya jalur fallback (polling video_job status='queued' AND
+// mode='auto_clip'). Filter mode di processor mencegah job render biasa
+// ikut diambil, dan sebaliknya.
+const AUTO_CLIP_TICK_MS = 30_000;
+let autoClipping = false;
+async function runAutoClip(): Promise<void> {
+  const r = await runAutoClipCycle();
+  if (r.claimed > 0) {
+    console.log(`[auto-clip] claimed=${r.claimed} done=${r.done} failed=${r.failed} (fallback)`);
+  }
+}
+setInterval(() => {
+  if (autoClipping) return;
+  autoClipping = true;
+  runAutoClip()
+    .catch((error) => console.error("[auto-clip] cycle error:", error))
+    .finally(() => {
+      autoClipping = false;
+    });
+}, AUTO_CLIP_TICK_MS);
+// Cek pertama 45 detik setelah start (stagger setelah carousel startup)
+setTimeout(() => runAutoClip().catch(() => {}), 45_000);
 
 // ---- Scheduled Reports loop (kedua mode) ----
 // Tiap jam cek jadwal laporan email due (weekly/monthly, dedupe 20 jam)

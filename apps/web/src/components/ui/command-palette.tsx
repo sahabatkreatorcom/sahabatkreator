@@ -24,6 +24,7 @@ import {
   Plus,
   Radar,
   RefreshCcw,
+  Scissors,
   Search,
   Settings,
   Sparkles,
@@ -169,6 +170,14 @@ const NAVIGATION_COMMANDS: PaletteCommand[] = [
     icon: Clapperboard,
     group: "Navigasi",
     run: (n) => n("/renders"),
+  },
+  {
+    id: "nav-auto-clip",
+    label: "Auto-Clip",
+    keywords: ["potong", "klip", "clip", "podcast", "shorts", "reels"],
+    icon: Scissors,
+    group: "Navigasi",
+    run: (n) => n("/auto-clip"),
   },
   {
     id: "nav-products",

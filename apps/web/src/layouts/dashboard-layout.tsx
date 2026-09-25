@@ -22,6 +22,7 @@ import {
   Plus,
   Radar,
   RefreshCcw,
+  Scissors,
   Search,
   Settings,
   ShieldCheck,
@@ -95,6 +96,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { to: "/media", label: "Media", icon: ImageIcon },
       { to: "/video", label: "Render Video", icon: Wand2 },
+      { to: "/auto-clip", label: "Auto-Clip", icon: Scissors },
       { to: "/renders", label: "Video Renders", icon: Clapperboard },
       { to: "/sound", label: "Sound / BGM", icon: Music },
       { to: "/products", label: "Katalog Produk", icon: Package },

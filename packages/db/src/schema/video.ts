@@ -10,10 +10,11 @@
 // sudah 3.5g/3.0cpu). Worker hanya orkestrasi: claim job → HTTP ke Modal →
 // output balik ke R2. Lihat RFC §11.
 import { relations } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, doublePrecision, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { media } from "./content";
 import { audioTrack } from "./sound";
 import { organization } from "./organization";
+import { videoJobModeEnum, videoJobSegmentStatusEnum } from "./enum";
 
 /** Status job render (mengikuti alur worker) */
 export type VideoJobStatus =
@@ -121,6 +122,46 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
 };
 
 /**
+ * Konfigurasi analisis auto-clip — disimpan di video_job.clipSettings.
+ * Hanya dipakai mode "auto_clip"; null di mode lain.
+ *
+ * Ide userDirection + outputLanguage dari yt-short-clipper (RFC §1.1).
+ */
+export type AutoClipSettings = {
+  /** Jumlah kandidat klip yang diminta dari AI (default 8) */
+  targetClipCount: number;
+  /** Durasi minimum kandidat, detik (default 58) */
+  minDurationSec: number;
+  /** Durasi maksimum kandidat, detik (default 120) */
+  maxDurationSec: number;
+  /** Rasio output render anak */
+  orientation: "portrait" | "landscape" | "square";
+  /** Bahasa output title/hook. Default "id". */
+  outputLanguage: string;
+  /**
+   * Arah bebas dari user (opsional): "cari bahasan harga", "skip intro",
+   * "yang konfliknya doang", atau rentang eksplisit "2:00-2:50".
+   * Rentang eksplisit DIKECUALIKAN dari filter durasi (di-render child job
+   * apa adanya) dan temperatur prompt diturunkan. RFC §1.1 + §6.
+   */
+  userDirection?: string;
+  /** Auto-caption pakai Whisper untuk render anak (default on) */
+  captionEnabled: boolean;
+};
+
+export const DEFAULT_AUTO_CLIP_SETTINGS: AutoClipSettings = {
+  targetClipCount: 8,
+  minDurationSec: 58,
+  maxDurationSec: 120,
+  orientation: "portrait",
+  outputLanguage: "id",
+  captionEnabled: true,
+};
+
+/** Source tier URL input — RFC §2. T3 (platform scraping) DITAHAN TOTAL. */
+export type UrlSourceTier = "t1" | "t2";
+
+/**
  * Clip tambahan untuk mode montage. baseVideoMediaId selalu jadi clip pertama
  * (NOT NULL —jamin ada minimal 1 bahan); clip di tabel ini menyusul dengan
  * urutan array. Saat montage non-aktif, tabel ini kosong untuk job itu.
@@ -169,6 +210,19 @@ export const videoJob = pgTable(
     bgmAudioTrackId: text("bgm_audio_track_id").references(() => audioTrack.id, {
       onDelete: "set null",
     }),
+    /**
+     * Mode job (RFC docs/rfc-auto-clip.md §5). Default "single" menjaga job
+     * lama apa adanya — kolom nullable secara teknis tapi NOT NULL default.
+     */
+    mode: videoJobModeEnum("mode").notNull().default("single"),
+    /**
+     * Sumber URL bila input via paste-link (mode auto_clip, tier T1/T2).
+     * Null di input upload biasa dan di mode lain. T3 DITAHAN TOTAL (RFC §2).
+     */
+    urlSource: text("url_source"),
+    urlSourceTier: text("url_source_tier").$type<UrlSourceTier>(),
+    // Konfigurasi analisis auto_clip. Null di mode single/montage.
+    clipSettings: jsonb("clip_settings").$type<AutoClipSettings>(),
     // Konfigurasi render lengkap
     settings: jsonb("settings").$type<RenderSettings>().notNull(),
     // Output: row media hasil render (terisi setelah upload R2 selesai)
@@ -213,6 +267,54 @@ export const videoJobClipRelations = relations(videoJobClip, ({ one }) => ({
   }),
 }));
 
+/**
+ * Kandidat klip hasil analisis auto-clip. 1 job mode auto_clip = N baris,
+ * urut by viral_score desc (kolom `order`). Setelah user pilih → fan-out ke
+ * job render mode "single" biasa (link balik renderVideoJobId), supaya
+ * invariant "1 job = 1 output" tetap utuh dan queue/progress/UI render terpakai.
+ *
+ * RFC docs/rfc-auto-clip.md §5. FK ke media + video_job dijaga (bukan jsonb
+ * id array) supaya cleanup tidak ninggalin id mati.
+ */
+export const videoJobSegment = pgTable(
+  "video_job_segment",
+  {
+    id: text("id").primaryKey(),
+    videoJobId: text("video_job_id")
+      .notNull()
+      .references(() => videoJob.id, { onDelete: "cascade" }),
+    // Posisi di urutan hasil AI (0 = viral_score tertinggi)
+    order: integer("order").notNull(),
+    // Rentang potong di source video (detik)
+    startSec: doublePrecision("start_sec").notNull(),
+    endSec: doublePrecision("end_sec").notNull(),
+    // Judul/saran AI untuk klip ini
+    title: text("title").notNull(),
+    // Skor viralitas 1-100 dari AI (merah = tinggi, konvensi pasar ID)
+    viralScore: integer("viral_score").notNull(),
+    // Teks hook on-screen suggested (opsional)
+    hookText: text("hook_text"),
+    // Potongan yang dipertahankan dalam klip (segment trimming, fase 3);
+    // null = klip utuh [startSec, endSec]
+    keepSegments: jsonb("keep_segments").$type<{ start: number; end: number }[]>(),
+    // Penanda rentang eksplisit dari userDirection (RFC §1.1) — dikecualikan
+    // dari filter min/max durasi. Null = klip biasa pilihan AI.
+    explicitRange: boolean("explicit_range"),
+    status: videoJobSegmentStatusEnum("status").notNull().default("pending"),
+    // Job render anak hasil fan-out. Null sampai user select. SET NULL saat
+    // render job dihapus — kandidat tetap ada, link-nya saja yang lepas.
+    renderVideoJobId: text("render_video_job_id").references(() => videoJob.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("video_job_segment_videoJobId_idx").on(table.videoJobId),
+    index("video_job_segment_status_idx").on(table.status),
+    uniqueIndex("video_job_segment_job_order_udx").on(table.videoJobId, table.order),
+  ],
+);
+
 export const videoJobRelations = relations(videoJob, ({ one, many }) => ({
   organization: one(organization, {
     fields: [videoJob.organizationId],
@@ -238,4 +340,20 @@ export const videoJobRelations = relations(videoJob, ({ one, many }) => ({
     references: [audioTrack.id],
   }),
   clips: many(videoJobClip),
+  // Kandidat auto-clip (mode auto_clip). Kosong di mode lain.
+  segments: many(videoJobSegment),
+}));
+
+export const videoJobSegmentRelations = relations(videoJobSegment, ({ one }) => ({
+  videoJob: one(videoJob, {
+    fields: [videoJobSegment.videoJobId],
+    references: [videoJob.id],
+  }),
+  // Job render anak (self-reference ke video_job — tidak FK, agar render job
+  // bisa selesai/dihapus tanpa cascade membunuh kandidat). Di-set oleh worker.
+  renderJob: one(videoJob, {
+    fields: [videoJobSegment.renderVideoJobId],
+    references: [videoJob.id],
+    relationName: "videoJobSegment_renderJob",
+  }),
 }));

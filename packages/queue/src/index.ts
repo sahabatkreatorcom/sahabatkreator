@@ -1,5 +1,19 @@
 // @sahabatkreator/queue — BullMQ publish queue (Redis) dengan fallback DB polling
 export {
+  AUTO_CLIP_QUEUE_NAME,
+  type AutoClipJobData,
+  cancelAutoClipJob,
+  createAutoClipWorker,
+  enqueueAutoClip,
+  runAutoClipCycle,
+} from "./auto-clip";
+export {
+  fanOutSelectedSegments,
+  markAutoClipFailed,
+  parseExplicitRanges,
+  processAutoClipDueJobs,
+} from "./auto-clip-processor";
+export {
   AUTO_REPLY_QUEUE_NAME,
   type AutoReplyJobData,
   cancelAutoReply,

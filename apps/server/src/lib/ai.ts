@@ -38,6 +38,9 @@ export const AI_CREDIT_COST: Record<string, number> = {
   carousel_layout: 2,
   coach_advice: 3,
   trend_ideas: 3,
+  // Auto-clip analysis — 1 call text-only per job (queue package, RFC
+  // docs/rfc-auto-clip.md §6). Sinkron dengan publishing/ai.ts.
+  auto_clip_analysis: 3,
 };
 
 /** Ambil biaya kredit untuk action (default 1) */

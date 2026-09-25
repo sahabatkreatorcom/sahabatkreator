@@ -102,6 +102,9 @@ const MediaPage = lazy(() =>
 const VideoRenderPage = lazy(() =>
   import("./pages/dashboard/video").then((m) => ({ default: m.VideoRenderPage })),
 );
+const AutoClipPage = lazy(() =>
+  import("./pages/dashboard/auto-clip").then((m) => ({ default: m.AutoClipPage })),
+);
 const RendersPage = lazy(() =>
   import("./pages/dashboard/renders").then((m) => ({ default: m.RendersPage })),
 );
@@ -327,6 +330,7 @@ export const router = createBrowserRouter([
           { path: "/generator/carousel", element: withFallback(<CarouselGeneratorPage />) },
           { path: "/media", element: withFallback(<MediaPage />) },
           { path: "/video", element: withFallback(<VideoRenderPage />) },
+          { path: "/auto-clip", element: withFallback(<AutoClipPage />) },
           { path: "/renders", element: withFallback(<RendersPage />) },
           { path: "/sound", element: withFallback(<SoundPage />) },
           { path: "/engagement", element: withFallback(<EngagementPage />) },

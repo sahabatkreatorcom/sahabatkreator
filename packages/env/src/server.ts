@@ -93,6 +93,14 @@ export const env = createEnv({
     // Secret MODAL_TOKEN dipakai bersama. Kosong = fitur carousel nonaktif.
     // RFC docs/rfc-carousel-render.md §9.
     MODAL_CAROUSEL_URL: z.url().optional(),
+    // Modal.com — app ketiga sahabatkreator-clipper (auto-clip ingest:
+    // ffmpeg + faster-whisper). RFC docs/rfc-auto-clip.md §4 + §7.
+    // AKUN MODAL KEDUA (isolasi quota concurrency, RFC §7.1): token sendiri,
+    // fallback ke MODAL_TOKEN bila satu akun cukup. Jangan masukkan ke repo —
+    // tulis MODAL_CLIPPER_TOKEN= tanpa spasi (emptyStringAsUndefined).
+    // Kosong = fitur auto-clip nonaktif (route 503, worker skip queue).
+    MODAL_CLIPPER_URL: z.url().optional(),
+    MODAL_CLIPPER_TOKEN: z.string().optional(),
     // Pixabay API — sumber stock background carousel (RFC §6).
     // Komersial OK tanpa attribution, tapi WAJIB download ke R2 (no hotlink).
     // Kosong = mode background stock nonaktif (library/solid tetap jalan).

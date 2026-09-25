@@ -44,6 +44,26 @@ export const carouselJobStatusEnum = pgEnum("carousel_job_status", [
   "canceled",
 ]);
 
+// ---------- Auto-clip (RFC docs/rfc-auto-clip.md) ----------
+// Mode job render. Default "single" menjaga job lama apa adanya. "auto_clip"
+// = 1 job analisis → N kandidat di video_job_segment → user pilih → fan-out ke
+// job render biasa (invariant 1 job = 1 output tetap).
+export const videoJobModeEnum = pgEnum("video_job_mode", [
+  "single", // 1 base video → 1 output (default, perilaku lama)
+  "montage", // base + N clip → 1 output (video_job_clip)
+  "auto_clip", // long-form → N kandidat (video_job_segment) → fan-out
+]);
+
+// Status kandidat klip (video_job_segment). Job analisis sendiri pakai
+// VideoJobStatus (queued→done), baris ini hanya tracking seleksi user.
+export const videoJobSegmentStatusEnum = pgEnum("video_job_segment_status", [
+  "pending", // baru di-insert dari hasil AI, belum dipilih user
+  "selected", // user centang → siap di-fan-out ke render job
+  "rendering", // render job anak sudah di-enqueue sedang jalan
+  "rendered", // render job anak done, output ada di outputMediaId
+  "skipped", // user skip / gagal
+]);
+
 // ---------- Billing ----------
 export const planTierEnum = pgEnum("plan_tier", ["free", "pro", "business", "enterprise"]);
 
