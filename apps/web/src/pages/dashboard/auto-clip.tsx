@@ -12,6 +12,7 @@
 // saat ada job aktif (POST 202 + fire-and-forget, frontend polling).
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Check,
   CheckCircle2,
   Clock,
   Film,
@@ -30,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/modal";
 import { ApiError, api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -131,6 +133,8 @@ export function AutoClipPage() {
   // job yang sedang dilihat kandidatnya (null = tampilan form + riwayat)
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Preview video source di form (pola /media: modal <video> controls)
+  const [previewing, setPreviewing] = useState<MediaItem | null>(null);
 
   const { data: mediaData } = useQuery({
     queryKey: ["media"],
@@ -609,56 +613,86 @@ export function AutoClipPage() {
               />
             ) : (
               <div className="space-y-2">
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {videos.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => setBaseVideoId(v.id)}
-                      className={cn(
-                        "group relative aspect-video overflow-hidden rounded-[var(--radius-md)] border bg-[var(--bg-tertiary)] transition",
-                        baseVideoId === v.id
-                          ? "border-[var(--accent-gold)] ring-2 ring-[var(--accent-gold)]"
-                          : "border-[var(--border)] hover:border-[var(--border-secondary)]",
-                      )}
-                    >
-                      {v.thumbnailUrl ? (
-                        <img
-                          src={v.thumbnailUrl}
-                          alt={v.name ?? "video"}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center">
-                          <Film className="h-5 w-5 text-[var(--text-muted)]" />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {videos.map((v) => {
+                    const selected = baseVideoId === v.id;
+                    return (
+                      <div
+                        key={v.id}
+                        className={cn(
+                          "card group overflow-hidden p-0 transition",
+                          selected && "ring-2 ring-[var(--accent-gold)]",
+                        )}
+                      >
+                        <div className="relative aspect-square bg-[var(--bg-tertiary)]">
+                          {v.thumbnailUrl ? (
+                            <img
+                              src={v.thumbnailUrl}
+                              alt={v.name ?? "video"}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : v.url ? (
+                            <video
+                              src={v.url}
+                              muted
+                              playsInline
+                              preload="metadata"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center">
+                              <Film className="h-8 w-8 text-[var(--text-muted)]" />
+                            </div>
+                          )}
+
+                          {/* Klik kartu = pilih video ini */}
+                          <button
+                            type="button"
+                            onClick={() => setBaseVideoId(v.id)}
+                            className="absolute inset-0 h-full w-full cursor-pointer"
+                            aria-pressed={selected}
+                            aria-label={selected ? `Batal pilih ${v.name}` : `Pilih ${v.name}`}
+                          />
+
+                          {/* Aksi hover: putar preview full (pola /media) */}
+                          {v.url && (
+                            <div className="absolute inset-x-0 top-0 hidden justify-end p-2 group-hover:flex">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewing(v)}
+                                className="rounded-full bg-[var(--bg-secondary)] p-1.5 text-[var(--text-primary)] shadow"
+                                aria-label={`Pratinjau ${v.name}`}
+                                title="Putar preview"
+                              >
+                                <Play className="h-3.5 w-3.5 fill-current" />
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Checkbox terpilih (kiri atas) */}
+                          <span
+                            className={cn(
+                              "pointer-events-none absolute top-2 left-2 flex h-6 w-6 items-center justify-center rounded-md border-2 shadow",
+                              selected
+                                ? "border-[var(--accent-gold)] bg-[var(--accent-gold)] text-white"
+                                : "border-white/80 bg-black/30 text-transparent",
+                            )}
+                          >
+                            <Check className="h-4 w-4" />
+                          </span>
                         </div>
-                      )}
-                      {/* Hover preview — putar frame saat mouse di atas (muted).
-                          Klik tetap memilih video. */}
-                      {v.url && (
-                        <video
-                          src={v.url}
-                          muted
-                          playsInline
-                          preload="none"
-                          className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity group-hover:opacity-100"
-                          onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.pause();
-                            e.currentTarget.currentTime = 0;
-                          }}
-                        />
-                      )}
-                      <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1.5 py-0.5 text-left text-[10px] text-white">
-                        {v.name}
-                      </span>
-                      {v.url && (
-                        <span className="absolute top-1 right-1 rounded bg-black/60 p-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                          <Play className="h-3 w-3 fill-white text-white" />
-                        </span>
-                      )}
-                    </button>
-                  ))}
+                        <div className="p-3">
+                          <p className="truncate font-medium text-xs" title={v.name ?? ""}>
+                            {v.name}
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
+                            {v.durationSeconds ? fmtDuration(v.durationSeconds) : "video"}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -761,6 +795,33 @@ export function AutoClipPage() {
           </p>
         </div>
       </div>
+
+      {/* Preview video source — pola /media: modal <video> controls + autoPlay */}
+      {previewing && (
+        <Modal
+          open
+          onClose={() => setPreviewing(null)}
+          title={previewing.name ?? "video"}
+          description={
+            previewing.durationSeconds
+              ? `${fmtDuration(previewing.durationSeconds)} · video`
+              : "video"
+          }
+          size="xl"
+        >
+          <div className="flex justify-center">
+            {/* biome-ignore lint/a11y/useMediaCaption: video sumber milik user, track caption opsional */}
+            <video
+              key={previewing.id}
+              src={previewing.url}
+              controls
+              autoPlay
+              playsInline
+              className="max-h-[60vh] w-auto rounded-[var(--radius-md)]"
+            />
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
