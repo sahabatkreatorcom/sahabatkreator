@@ -801,6 +801,12 @@ export async function recoverStalePosts(): Promise<number> {
 let lastBackfillSignature = "";
 
 /**
+ * Outcome backfill terakhir per post — dipakai untuk log hanya saat berubah,
+ * supaya terlihat apa yang TikTok balikkan tanpa spam tiap 60 detik.
+ */
+const lastBackfillOutcome = new Map<string, string>();
+
+/**
  * Backfill id + link post TikTok yang belum tersedia saat publish.
  * TikTok tidak mengembalikan publicly_available_post_id & share_url sampai post
  * public dan lolos moderasi (client belum audit → bisa tertunda beberapa menit/jam).
@@ -867,11 +873,35 @@ export async function backfillTikTokPostUrls(limit = 10): Promise<number> {
         handle: row.platformPostId,
         accountHandle: account.username,
       });
-      if (status.status !== "published") continue;
+
+      if (status.status !== "published") {
+        // Gagal / masih diproses — log sekali saja, jangan tiap siklus.
+        const outcome = status.status === "failed" ? `failed:${status.code}` : "processing";
+        if (lastBackfillOutcome.get(row.id) !== outcome) {
+          lastBackfillOutcome.set(row.id, outcome);
+          console.log(
+            `[publishing] Backfill TikTok ${row.id}: ${status.status}` +
+              (status.status === "failed"
+                ? ` ${status.code}${status.message ? ` — ${String(status.message).slice(0, 140)}` : ""}`
+                : ""),
+          );
+        }
+        continue;
+      }
 
       const url = status.platformPostUrl ?? null;
       const hasNewId = Boolean(status.platformPostId) && status.platformPostId !== row.platformPostId;
-      if (!url && !hasNewId) continue;
+      if (!url && !hasNewId) {
+        const outcome = "published|no-url|same-id";
+        if (lastBackfillOutcome.get(row.id) !== outcome) {
+          lastBackfillOutcome.set(row.id, outcome);
+          console.log(
+            `[publishing] Backfill TikTok ${row.id}: PUBLISH_COMPLETE tapi share_url kosong dan ` +
+              `publicaly_available_post_id belum ada (post belum public / belum lolos moderasi)`,
+          );
+        }
+        continue;
+      }
 
       await db
         .update(post)
