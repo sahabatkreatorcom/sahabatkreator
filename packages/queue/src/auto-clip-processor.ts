@@ -842,6 +842,10 @@ export async function fanOutSelectedSegments(videoJobId: string): Promise<{ enqu
       ...baseSettings,
       // Orientasi output dari clipSettings (bisa beda dari source 16:9)
       orientation: clipSettings.orientation,
+      // false WAJIB: auto-clip tidak punya voiceover, output = audio asli
+      // source. true → sk_render.py strip audio (-an) → klip bisu. Dipaksa
+      // di sini juga menutup job lama yang settings-nya sudah terlanjur true.
+      removeOriginalAudio: false,
       // Potong segmen ini dari source — sk_render.py sudah dukung trim.
       videoProcessing: {
         ...(baseSettings.videoProcessing ?? {}),

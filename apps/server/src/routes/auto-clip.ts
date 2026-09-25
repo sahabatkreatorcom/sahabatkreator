@@ -68,7 +68,9 @@ const clipSettingsSchema = z
 /** Default settings render dasar untuk job anak (zod v4: .default butuh full shape) */
 const RENDER_BASE_DEFAULTS = {
   resolution: "1080p" as const,
-  removeOriginalAudio: true,
+  // false: auto-clip TIDAK punya voiceover — output klip = potongan source
+  // dengan audio aslinya. true akan strip audio (sk_render.py: -an) → bisu.
+  removeOriginalAudio: false,
   bgmVolume: 0.3,
 };
 
@@ -84,7 +86,7 @@ const createSchema = z
     renderSettings: z
       .object({
         resolution: z.enum(["720p", "1080p"]).default("1080p"),
-        removeOriginalAudio: z.boolean().default(true),
+        removeOriginalAudio: z.boolean().default(false),
         bgmVolume: z.number().min(0).max(1).default(0.3),
       })
       .default(RENDER_BASE_DEFAULTS),
