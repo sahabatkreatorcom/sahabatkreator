@@ -184,23 +184,77 @@ def _whisper(model_size: str):
     return _WHISPER_CACHE[model_size]
 
 
-def _segments_to_srt(segments) -> str:
+def _caption_chunks(segments, max_words: int = 7, max_dur: float = 5.0,
+                    gap_split: float = 0.8) -> list:
+    """Pecah segmen whisper jadi potongan tampilan pendek (satu baris caption).
+
+    Satu segmen whisper bisa ~30 detik / puluhan kata → satu Dialogue/SRT
+    raksasa yang menutupi layar dan tidak terbaca. Tiap chunk jadi satu cue:
+    maks max_words kata, maks max_dur detik, atau pecah saat jeda bicara
+    > gap_split detik. Teks & timing diambil dari word timestamp (seg.text
+    faster-whisper kadang keluar tanpa spasi; batas segmen sering meleset).
+    """
+    chunks: list = []
+    for seg in segments or []:
+        seg_start = max(0.0, float(getattr(seg, "start", 0) or 0))
+        seg_end = float(getattr(seg, "end", 0) or 0)
+        if seg_end <= seg_start:
+            continue
+        raw_text = (getattr(seg, "text", "") or "").strip()
+        if not raw_text:
+            continue
+        words: list = []
+        for w in getattr(seg, "words", None) or []:
+            word = (w.word or "").strip()
+            if not word:
+                continue
+            w_start = max(0.0, float(getattr(w, "start", 0) or 0))
+            w_end = max(w_start, float(getattr(w, "end", 0) or 0))
+            words.append({"text": word, "start": w_start, "end": w_end})
+        if not words:
+            # Fallback tanpa word timestamp: teks utuh satu chunk.
+            chunks.append({
+                "start": seg_start,
+                "end": max(seg_end, seg_start + 0.3),
+                "text": raw_text,
+                "words": [],
+            })
+            continue
+        cur: list = []
+        for w in words:
+            if cur:
+                gap = w["start"] - cur[-1]["end"]
+                span = w["end"] - cur[0]["start"]
+                if len(cur) >= max_words or span >= max_dur or gap > gap_split:
+                    chunks.append(_make_chunk(cur))
+                    cur = []
+            cur.append(w)
+        if cur:
+            chunks.append(_make_chunk(cur))
+    return chunks
+
+
+def _make_chunk(words: list) -> dict:
+    start = words[0]["start"]
+    return {
+        "start": start,
+        # minimal tampil 0.3s — kata tunggal di akhir tidak berkedip hilang
+        "end": max(words[-1]["end"], start + 0.3),
+        "text": " ".join(w["text"] for w in words),
+        "words": words,
+    }
+
+
+def _chunks_to_srt(chunks) -> str:
     lines = []
     n = 0
-    for seg in segments:
-        text = (seg.text or "").strip()
+    for c in chunks:
+        text = c["text"].strip()
         if not text:
             continue
-        # Rekonstruksi dari words bila seg.text tidak punya spasi
-        # (terjadi saat word_timestamps=True di beberapa model)
-        if " " not in text:
-            words = getattr(seg, "words", None) or []
-            word_list = [w.word.strip() for w in words if (w.word or "").strip()]
-            if word_list:
-                text = " ".join(word_list)
         n += 1
         lines.append(str(n))
-        lines.append(f"{_fmt(seg.start)} --> {_fmt(seg.end)}")
+        lines.append(f"{_fmt(c['start'])} --> {_fmt(c['end'])}")
         lines.append(text)
         lines.append("")
     return "\n".join(lines)
@@ -629,70 +683,88 @@ def _run_pipeline(req: dict, tmpdir: str) -> dict:
         )
     )
     if cap.get("enabled") and caption_src:
-        model = _whisper(cap.get("model", "base"))
-        lang = None if cap.get("language") == "auto" else cap.get("language", "id")
-        # word_timestamps True hanya kalau karaoke dipakai — hemat CPU & memori
-        segments, info = model.transcribe(
-            caption_src, language=lang, beam_size=5, vad_filter=True,
-            word_timestamps=bool(cap.get("wordHighlight")),
-        )
-        # materialize generator — SRT dan ASS keduanya iterate segments
-        segments = list(segments)
-        detected_lang = getattr(info, "language", None)
-
-        # SRT selalu dibuat (di-upload untuk transcript terbuka), tapi burn
-        # memakai ASS saat wordHighlight agar ada highlight per-kata.
-        srt_path = f"{tmpdir}/caption.srt"
-        Path(srt_path).write_text(_segments_to_srt(segments), encoding="utf-8")
-
-        if req.get("srtUploadUrl"):
-            _upload(srt_path, req["srtUploadUrl"], "application/x-subrip")
-
-        burned = f"{tmpdir}/burned.mp4"
-        # Scale font berdasarkan video height — user set fontSize untuk 1080p
-        # (height=1080), kita scale proporsional. Reference: height=1080 → 1x.
-        ref_height = 1080
-        scale = target[1] / ref_height
-        scaled_font = max(12, int(cap.get("fontSize", 24) * scale))
-        if cap.get("wordHighlight"):
-            ass_path = f"{tmpdir}/caption.ass"
-            Path(ass_path).write_text(
-                _segments_to_ass(segments, cap, target, scaled_font), encoding="utf-8"
+        try:
+            model = _whisper(cap.get("model", "base"))
+            lang = None if cap.get("language") == "auto" else cap.get("language", "id")
+            # word_timestamps SELALU True — chunking & rekonstruksi spasi caption
+            # bergantung pada word timestamp (seg.text faster-whisper kadang
+            # keluar tanpa spasi sama sekali).
+            segments, info = model.transcribe(
+                caption_src, language=lang, beam_size=5, vad_filter=True,
+                word_timestamps=True,
             )
-            # ASS bawa style sendiri — jangan pakai force_style
-            _ffmpeg([
-                "-i", current, "-vf", f"subtitles={ass_path}",
-                "-c:v", "libx264", "-preset", "medium", "-crf", "23",
-                "-c:a", "copy", burned,
-            ])
-        else:
-            # posisi vertikal subtitle (force_style butuh Alignment numpad ASS)
-            pos_y = {"bottom": 0.85, "top": 0.15, "center": 0.5}.get(
-                cap.get("position", "bottom"), 0.85
-            )
-            align = _ASS_ALIGN.get(cap.get("position", "bottom"), 2)
-            if align == 5:
-                margin = 0
-            elif align == 8:
-                margin = int(pos_y * target[1])
+            # materialize generator — SRT dan ASS keduanya iterate segments
+            segments = list(segments)
+            detected_lang = getattr(info, "language", None)
+            # Pecah segmen panjang (bisa ~30s) jadi baris pendek ≤7 kata —
+            # satu Dialogue raksasa menutupi layar dan tidak terbaca.
+            chunks = _caption_chunks(segments)
+
+            # SRT selalu dibuat (di-upload untuk transcript terbuka), tapi burn
+            # memakai ASS saat wordHighlight agar ada highlight per-kata.
+            srt_path = f"{tmpdir}/caption.srt"
+            Path(srt_path).write_text(_chunks_to_srt(chunks), encoding="utf-8")
+
+            burned = f"{tmpdir}/burned.mp4"
+            # Scale font berdasarkan video height — user set fontSize untuk 1080p
+            # (height=1080), kita scale proporsional. Reference: height=1080 → 1x.
+            ref_height = 1080
+            scale = target[1] / ref_height
+            scaled_font = max(12, int(cap.get("fontSize", 24) * scale))
+            if cap.get("wordHighlight"):
+                ass_path = f"{tmpdir}/caption.ass"
+                Path(ass_path).write_text(
+                    _chunks_to_ass(chunks, cap, target, scaled_font), encoding="utf-8"
+                )
+                # ASS bawa style sendiri — jangan pakai force_style
+                _ffmpeg([
+                    "-i", current, "-vf", f"subtitles={ass_path}",
+                    "-c:v", "libx264", "-preset", "medium", "-crf", "23",
+                    "-c:a", "copy", burned,
+                ])
             else:
-                margin = int((1 - pos_y) * target[1])
-            # force_style berisi koma — WAJIB dibungkus quote tunggal. Tanpa itu
-            # filtergraph parser belah koma sebagai pemisah filter → "No such
-            # filter: 'PrimaryColour'" (nilai ASS style jadi filter sendiri).
-            # Quote di dalam graphparser melindungi koma & karakter khusus.
-            style = (
-                f"FontSize={scaled_font},"
-                f"PrimaryColour={_ass_color(cap.get('fontColor', 'white'))},"
-                f"Alignment={align},MarginV={margin}"
-            )
-            _ffmpeg([
-                "-i", current, "-vf",
-                f"subtitles={srt_path}:force_style='{style}'",
-                "-c:v", "libx264", "-preset", "medium", "-crf", "23",
-                "-c:a", "copy", burned,
-            ])
-        current = burned
+                # posisi vertikal subtitle (force_style butuh Alignment numpad ASS)
+                pos_y = {"bottom": 0.85, "top": 0.15, "center": 0.5}.get(
+                    cap.get("position", "bottom"), 0.85
+                )
+                align = _ASS_ALIGN.get(cap.get("position", "bottom"), 2)
+                if align == 5:
+                    margin = 0
+                elif align == 8:
+                    margin = int(pos_y * target[1])
+                else:
+                    margin = int((1 - pos_y) * target[1])
+                # force_style berisi koma — WAJIB dibungkus quote tunggal. Tanpa itu
+                # filtergraph parser belah koma sebagai pemisah filter → "No such
+                # filter: 'PrimaryColour'" (nilai ASS style jadi filter sendiri).
+                # Quote di dalam graphparser melindungi koma & karakter khusus.
+                style = (
+                    f"FontSize={scaled_font},"
+                    f"PrimaryColour={_ass_color(cap.get('fontColor', 'white'))},"
+                    f"Alignment={align},MarginV={margin}"
+                )
+                _ffmpeg([
+                    "-i", current, "-vf",
+                    f"subtitles={srt_path}:force_style='{style}'",
+                    "-c:v", "libx264", "-preset", "medium", "-crf", "23",
+                    "-c:a", "copy", burned,
+                ])
+            current = burned
+        except Exception:
+            # Caption = layer kosmetik. Gagal transcribe/burn (whisper error,
+            # ASS invalid, ffmpeg gagal) TIDAK boleh mematikan job render —
+            # output tetap jadi tanpa caption + log lengkap untuk debugging.
+            import traceback
+
+            print("[WARN] caption stage gagal — lanjut render tanpa caption:")
+            traceback.print_exc()
+        # SRT tetap di-upload (transcript terbuka) selama transkripsi berhasil,
+        # walau burn gagal.
+        if srt_path and req.get("srtUploadUrl"):
+            try:
+                _upload(srt_path, req["srtUploadUrl"], "application/x-subrip")
+            except Exception as exc:
+                print(f"[WARN] upload SRT gagal: {exc}")
 
     # --- headline stage ---
     # Headline overlay: teks besar di atas video (hook). drawtext butuh font
@@ -788,7 +860,7 @@ def _esc_ass(text: str) -> str:
     return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}").replace("\n", " ")
 
 
-def _segments_to_ass(segments, cap: dict, target: tuple[int, int], scaled_font: int = 24) -> str:
+def _chunks_to_ass(chunks, cap: dict, target: tuple[int, int], scaled_font: int = 24) -> str:
     """ASS karaoke per-kata (\\k) — kata aktif menyala saat diucapkan.
 
     Catatan semantik (diverifikasi terhadap ffmpeg+libass): kata AKTIF dan
@@ -797,8 +869,10 @@ def _segments_to_ass(segments, cap: dict, target: tuple[int, int], scaled_font: 
     = warna base — kebalik dari intuisi. Efek visual: tiap kata menyala
     saat diucapkan dan tetap menyala (klasik karaoke).
 
-    word_timestamps wajib True saat transcribe (dilakukan caller saat
-    wordHighlight aktif).
+    Input: chunks dari _caption_chunks (bukan segmen mentah) — satu Dialogue
+    per baris pendek, durasi \\k = jarak ke kata berikutnya (jeda ikut
+    terhitung) supaya highlight sinkron ucapan tanpa drift. Spasi antar kata
+    satu spasi biasa — pemisah lama " {\\k0} " mencetak DUA spasi.
     """
     font_size = scaled_font
     align = _ASS_ALIGN.get(cap.get("position", "bottom"), 2)
@@ -835,28 +909,31 @@ def _segments_to_ass(segments, cap: dict, target: tuple[int, int], scaled_font: 
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, Effect, Text",
     ]
-    for seg in segments:
-        words = [w for w in (getattr(seg, "words", None) or []) if (w.word or "").strip()]
+    for c in chunks:
+        words = c["words"]
         if not words:
-            # Fallback: teks segment utuh sebagai satu suku
-            text = _esc_ass((seg.text or "").strip())
-            if text:
-                dur = max(1, int((seg.end - seg.start) * 100))
-                lines.append(
-                    f"Dialogue: 0,{_fmt_ass(seg.start)},{_fmt_ass(seg.end)},"
-                    f"Default,,0,0,0,{{\\k{dur}}}{text}"
-                )
+            # Fallback: teks chunk utuh sebagai satu suku
+            text = _esc_ass(c["text"])
+            if not text:
+                continue
+            dur = max(1, int(round((c["end"] - c["start"]) * 100)))
+            lines.append(
+                f"Dialogue: 0,{_fmt_ass(c['start'])},{_fmt_ass(c['end'])},"
+                f"Default,,0,0,0,{{\\k{dur}}}{text}"
+            )
             continue
         parts = []
-        for w in words:
-            dur = max(1, int(round((w.end - w.start) * 100)))
-            word_text = w.word.strip()
-            # Tambah spasi antar kata (w.word dari faster-whisper tidak punya spasi)
-            if parts:
-                parts.append(f" {{\\k0}} ")
-            parts.append(f"{{\\k{dur}}}{_esc_ass(word_text)}")
+        for i, w in enumerate(words):
+            # durasi \k = jarak ke kata berikutnya; teleskopinya persis sama
+            # dengan durasi Dialogue (start chunk = kata pertama) → karaoke
+            # clock 1:1 dengan ucapan.
+            nxt = words[i + 1]["start"] if i + 1 < len(words) else c["end"]
+            dur = max(1, int(round((nxt - w["start"]) * 100)))
+            if i:
+                parts.append(" ")
+            parts.append(f"{{\\k{dur}}}{_esc_ass(w['text'])}")
         lines.append(
-            f"Dialogue: 0,{_fmt_ass(seg.start)},{_fmt_ass(seg.end)},"
+            f"Dialogue: 0,{_fmt_ass(c['start'])},{_fmt_ass(c['end'])},"
             f"Default,,0,0,0,{''.join(parts)}"
         )
     return "\n".join(lines) + "\n"

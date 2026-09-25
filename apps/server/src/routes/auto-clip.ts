@@ -251,6 +251,12 @@ autoClipRoute.post("/", async (c) => {
       caption: {
         ...DEFAULT_RENDER_SETTINGS.caption,
         enabled: clipSettings.captionEnabled,
+        // Klip ditranskripsi ulang dari audio hasil trim — pakai deteksi
+        // bahasa otomatis + small (sinkron dengan analisis ingest). Default
+        // render "id"+base menghasilkan teks rusak pada sumber non-indonesia
+        // atau berisik.
+        language: "auto",
+        model: "small",
       },
     };
 

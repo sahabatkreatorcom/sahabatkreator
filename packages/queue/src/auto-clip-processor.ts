@@ -855,6 +855,12 @@ export async function fanOutSelectedSegments(videoJobId: string): Promise<{ enqu
       caption: {
         ...baseSettings.caption,
         enabled: clipSettings.captionEnabled,
+        // Dipaksa (sama seperti removeOriginalAudio): klip ditranskripsi ulang
+        // dari audio hasil trim, deteksi bahasa otomatis + small agar sinkron
+        // dengan analisis. Job lama yang settings-nya masih "id"+base sering
+        // menghasilkan caption rusak pada sumber non-indonesia/berisik.
+        language: "auto",
+        model: "small",
       },
     };
 
