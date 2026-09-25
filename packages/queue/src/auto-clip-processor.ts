@@ -224,9 +224,12 @@ function buildAnalysisPrompt(opts: {
     "TUGAS UTAMA:",
     `- Carikan ${s.targetClipCount} momen paling menarik, paling kuat, dan paling berpotensi viral untuk dijadikan klip pendek.`,
     "- Urutkan klip berdasarkan viral_score tertinggi (paling berpotensi viral) ke terendah.",
+    `- Durasi total video source: ${Math.round(opts.durationSeconds)} detik.`,
     "",
     "ATURAN PEMILIHAN KLIP:",
-    `- Durasi klip ${s.minDurationSec}-${s.maxDurationSec} detik (rentang eksplisit dari user dikecualikan — lihat di bawah).`,
+    opts.durationSeconds < s.minDurationSec
+      ? `- Video source hanya ${Math.round(opts.durationSeconds)} detik (lebih pendek dari durasi minimum ${s.minDurationSec} detik) — buat klip SEKELUARnya dari seluruh video atau momen terpanjang yang ada, jangan paksa durasi minimum.`
+      : `- Durasi klip ${s.minDurationSec}-${s.maxDurationSec} detik (rentang eksplisit dari user dikecualikan — lihat di bawah).`,
     "- Pilih bagian yang punya emosi, konflik, kejutan, insight, opini kuat, pelajaran praktis, atau punchline jelas.",
     "- Utamakan bagian yang tetap menarik walau ditonton tanpa konteks video penuh.",
     "- Hindari klip yang isinya terlalu mirip satu sama lain.",
@@ -334,6 +337,11 @@ function parseAnalysisResponse(
   }
   if (!Array.isArray(parsed) || !parsed.length) return null;
 
+  // Panjang source valid? Probe Modal bisa gagal → NaN/0; clamp kandidat di
+  // bawah wajib pakai nilai finite supaya tidak tercemar NaN.
+  const sourceDur =
+    Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : null;
+
   const candidates: ClipCandidate[] = [];
   for (const item of parsed) {
     const c = item as Record<string, unknown>;
@@ -363,7 +371,7 @@ function parseAnalysisResponse(
 
     candidates.push({
       start: Math.max(0, start),
-      end: Math.min(durationSeconds, end),
+      end: sourceDur !== null ? Math.min(sourceDur, end) : end,
       title: title || "Klip tanpa judul",
       viralScore,
       hookText: hookText || null,
@@ -388,12 +396,36 @@ function parseAnalysisResponse(
   }
 
   // Filter durasi (kecuali explicitRange) + validasi batas source.
-  const filtered = candidates.filter((c) => {
+  //
+  // Source lebih pendek dari minDurationSec user (mis. video 30s vs min 58s):
+  // syarat durasi MUSTAHIL terpenuhi (dur kandidat selalu ≤ panjang source),
+  // jadi jangan bunuh semua kandidat → lewati syarat min, cap max ke source.
+  const sourceTooShort = sourceDur !== null && sourceDur < settings.minDurationSec;
+  const effMinDuration = sourceTooShort ? 1 : settings.minDurationSec;
+  const effMaxDuration =
+    sourceDur !== null ? Math.min(settings.maxDurationSec, sourceDur) : settings.maxDurationSec;
+  let filtered = candidates.filter((c) => {
     const dur = c.end - c.start;
     if (dur < 1) return false;
     if (c.explicitRange) return true; // rentang user, apa adanya
-    return dur >= settings.minDurationSec && dur <= settings.maxDurationSec;
+    return dur >= effMinDuration && dur <= effMaxDuration;
   });
+
+  // Safety net terakhir: filter durasi mengosongkan SEMUA kandidat padahal
+  // parse berhasil (mis. source == min tapi model memecah jadi segmen lebih
+  // pendek) → pakai hasil parse apa adanya. Kegagalan durasi bukan kegagalan
+  // AI; job harus tetap sukses dengan catatan di log.
+  if (!filtered.length) {
+    const usable = candidates.filter((c) => c.end - c.start >= 1);
+    if (usable.length) {
+      console.warn(
+        `[auto-clip] filter durasi mengosongkan ${candidates.length} kandidat ` +
+          `(min ${settings.minDurationSec}s/max ${settings.maxDurationSec}s, source ` +
+          `${sourceDur ?? "?"}s) — fallback tanpa filter durasi`,
+      );
+      filtered = usable;
+    }
+  }
 
   // Rentang eksplisit yang TIDAK dikembalikan model → sintesis sendiri
   // (jaminan: arahan user selalu muncul di daftar kandidat, walau model
@@ -404,8 +436,8 @@ function parseAnalysisResponse(
     );
     if (!covered) {
       filtered.push({
-        start: Math.max(0, Math.min(r.start, durationSeconds)),
-        end: Math.max(0, Math.min(r.end, durationSeconds)),
+        start: Math.max(0, sourceDur !== null ? Math.min(r.start, sourceDur) : r.start),
+        end: Math.max(0, sourceDur !== null ? Math.min(r.end, sourceDur) : r.end),
         title: `Rentang ${formatClock(r.start)}-${formatClock(r.end)}`,
         viralScore: 80, // netral: user yang minta, bukan skor AI
         hookText: null,

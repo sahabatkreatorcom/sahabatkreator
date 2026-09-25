@@ -220,6 +220,19 @@ autoClipRoute.post("/", async (c) => {
         return c.json({ message: "Media yang dipilih harus berupa video" }, 400);
       }
       baseVideoMediaId = existing.id;
+
+      // Validasi durasi dinamis — minDurationSec > panjang video mustahil
+      // dipenuhi (mis. video 30s, min 58s). Tolak awal dengan pesan jelas
+      // alih-alih job gagal 2-8 menit kemudian (ai_bad_response). URL source
+      // tidak dicek di sini: panjangnya baru diketahui setelah ingest.
+      if (existing.durationSeconds && clipSettings.minDurationSec > existing.durationSeconds) {
+        return c.json(
+          {
+            message: `Video hanya ${Math.floor(existing.durationSeconds / 60)}:${String(Math.round(existing.durationSeconds % 60)).padStart(2, "0")} — durasi minimum klip (${clipSettings.minDurationSec}s) melebihi panjang source. Turunkan durasi minimum.`,
+          },
+          400,
+        );
+      }
     } else {
       // unreachable — zod refine sudah jaga
       return c.json({ message: "Wajib isi sourceUrl atau baseVideoMediaId" }, 400);

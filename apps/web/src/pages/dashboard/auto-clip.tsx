@@ -142,6 +142,29 @@ export function AutoClipPage() {
   });
   const videos = (mediaData?.items ?? []).filter((m) => m.type === "video");
 
+  // Durasi dinamis: minDurationSec > panjang source mustahil dipenuhi
+  // (dicegah 400 di POST; sini bikin UX-nya jelas sebelum submit).
+  const selectedVideo = videos.find((v) => v.id === baseVideoId) ?? null;
+  const sourceDurationSec = selectedVideo?.durationSeconds ?? null;
+  const durationTooShort =
+    inputMode === "library" &&
+    sourceDurationSec !== null &&
+    sourceDurationSec > 0 &&
+    minDuration > sourceDurationSec;
+
+  /** Pilih video + auto-clamp durasi klip ke panjang video. */
+  const pickVideo = (v: MediaItem) => {
+    setBaseVideoId(v.id);
+    if (v.durationSeconds && v.durationSeconds > 0 && minDuration > v.durationSeconds) {
+      const clamped = Math.max(5, Math.floor(v.durationSeconds));
+      setMinDuration(clamped);
+      setMaxDuration((m) => Math.max(m, clamped));
+      toast.info(
+        `Video ${fmtDuration(v.durationSeconds)} — durasi minimum disesuaikan ke ${clamped} detik`,
+      );
+    }
+  };
+
   const {
     data: jobsData,
     isLoading: jobsLoading,
@@ -646,10 +669,10 @@ export function AutoClipPage() {
                             </div>
                           )}
 
-                          {/* Klik kartu = pilih video ini */}
+                          {/* Klik kartu = pilih video ini (+ auto-clamp durasi) */}
                           <button
                             type="button"
-                            onClick={() => setBaseVideoId(v.id)}
+                            onClick={() => pickVideo(v)}
                             className="absolute inset-0 h-full w-full cursor-pointer"
                             aria-pressed={selected}
                             aria-label={selected ? `Batal pilih ${v.name}` : `Pilih ${v.name}`}
@@ -743,6 +766,14 @@ export function AutoClipPage() {
             </div>
           </div>
 
+          {durationTooShort && (
+            <p className="text-red-600 text-xs">
+              Video source hanya {fmtDuration(sourceDurationSec ?? 0)} — durasi minimum ({" "}
+              {minDuration} dtk) melebihi panjang video. Turunkan durasi minimum atau pilih video
+              lain.
+            </p>
+          )}
+
           <div className="space-y-1">
             <Label className="text-xs">Bahasa output title/hook</Label>
             <Select value={outputLanguage} onChange={(e) => setOutputLanguage(e.target.value)}>
@@ -778,7 +809,8 @@ export function AutoClipPage() {
             className="w-full"
             disabled={
               createMutation.isPending ||
-              (inputMode === "library" ? !baseVideoId : !sourceUrl.trim())
+              (inputMode === "library" ? !baseVideoId : !sourceUrl.trim()) ||
+              durationTooShort
             }
             onClick={() => createMutation.mutate()}
           >
