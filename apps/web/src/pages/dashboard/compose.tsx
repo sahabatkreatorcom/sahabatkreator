@@ -25,7 +25,6 @@ import { PlatformSettingsPanel } from "@/components/compose/platform-settings-pa
 import { PredictScoreBadge } from "@/components/compose/predict-score-badge";
 import { ProductPicker } from "@/components/compose/product-picker";
 import { StrategyAssetsPanel } from "@/components/compose/strategy-assets-panel";
-import { TikTokConsent } from "@/components/compose/tiktok-consent";
 import { UtmPanel } from "@/components/compose/utm-panel";
 import { ValidationPanel } from "@/components/compose/validation-panel";
 import { VariationsAiPanel } from "@/components/compose/variations-ai-panel";
@@ -95,10 +94,6 @@ export function ComposePage() {
   const hasPreviewContent =
     selectedAccounts.length > 0 && (content.trim() !== "" || selectedMedia.length > 0);
 
-  // Akun TikTok terpilih — untuk deklarasi persetujuan & pengaturan khusus
-  const tiktokAccountIds = selectedAccounts.filter(
-    (id) => accounts.find((a) => a.id === id)?.platform === "tiktok",
-  );
   const hasVideoMedia = selectedMedia.some((m) => m.mimeType.startsWith("video/"));
 
   return (
@@ -466,15 +461,6 @@ export function ComposePage() {
               />
             </div>
           </details>
-
-          {/* Deklarasi persetujuan TikTok — wajib sebelum tombol publish */}
-          <TikTokConsent
-            accountIds={tiktokAccountIds}
-            settings={platformSettings}
-            onChange={(accountId, next) =>
-              setPlatformSettings((prev) => ({ ...prev, [accountId]: next }))
-            }
-          />
 
           <SubmitBar
             mode={scheduleMode}

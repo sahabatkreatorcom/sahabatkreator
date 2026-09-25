@@ -38,7 +38,7 @@ export function TikTokConsent({
       : null;
 
   return (
-    <div className="card p-4">
+    <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-light)] p-3">
       <div className="mb-2 flex items-center gap-2 text-xs font-semibold">
         <Scale className="h-3.5 w-3.5 text-[var(--text-muted)]" />
         Pernyataan sebelum posting ke TikTok

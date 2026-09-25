@@ -14,6 +14,7 @@ import { api } from "@/lib/api";
 import { PLATFORMS } from "@/lib/platforms";
 import { cn } from "@/lib/utils";
 import type { SettingsState } from "./compose-types";
+import { TikTokConsent } from "./tiktok-consent";
 import { TikTokSettings } from "./tiktok-settings";
 
 /** Picker lokasi Threads — cari via /threads/locations (scope threads_location_tagging) */
@@ -139,6 +140,7 @@ export function PlatformSettingsPanel({
   const [open, setOpen] = useState<string | null>(null);
 
   const selected = accounts.filter((a) => selectedAccountIds.includes(a.id));
+  const tiktokAccountIds = selected.filter((a) => a.platform === "tiktok").map((a) => a.id);
 
   if (selected.length === 0) return null;
 
@@ -518,6 +520,10 @@ export function PlatformSettingsPanel({
           );
         })}
       </div>
+
+      {/* Deklarasi persetujuan TikTok — selalu tampil walau accordion tertutup,
+          agar user bisa centang sebelum tombol publish (syarat audit). */}
+      <TikTokConsent accountIds={tiktokAccountIds} settings={settings} onChange={onChange} />
     </div>
   );
 }
