@@ -7,6 +7,8 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** Kode error aplikasi dari body (mis. tiktok_spam_risk_too_many_posts) */
+    public code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -36,10 +38,16 @@ async function request<T>(path: string, init?: RequestInit & { json?: unknown })
   if (!res.ok) {
     let message = `Request gagal (${res.status})`;
     let retryAfter: number | undefined;
+    let code: string | undefined;
     try {
-      const body = (await res.json()) as { message?: string; retryAfter?: number };
+      const body = (await res.json()) as {
+        message?: string;
+        retryAfter?: number;
+        code?: string;
+      };
       if (body.message) message = body.message;
       if (typeof body.retryAfter === "number") retryAfter = body.retryAfter;
+      if (typeof body.code === "string") code = body.code;
     } catch {
       // biarkan default message
     }
@@ -54,7 +62,7 @@ async function request<T>(path: string, init?: RequestInit & { json?: unknown })
       window.dispatchEvent(new CustomEvent("sk-ratelimited", { detail: { retryAfter } }));
     }
 
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, code);
   }
 
   if (res.status === 204) return undefined as T;

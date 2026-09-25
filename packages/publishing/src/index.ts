@@ -206,5 +206,11 @@ export {
   type ThreadsPost,
   type ThreadsProfile,
 } from "./threads-advanced";
+export {
+  fetchTikTokCreatorInfo,
+  TIKTOK_CREATOR_BLOCKED_CODES,
+  TIKTOK_DEFAULT_MAX_DURATION_SEC,
+  type TikTokCreatorInfo,
+} from "./tiktok-creator-info";
 export { countNeedsReconnect, refreshDueTokens, type TokenRefreshResult } from "./token-refresh";
 export * from "./types";

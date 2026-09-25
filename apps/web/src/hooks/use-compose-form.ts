@@ -20,10 +20,15 @@ import {
 } from "@/components/compose/platform-settings-panel";
 import { validatePost } from "@/components/compose/validation-panel";
 import { useComposeDraft } from "@/hooks/use-compose-draft";
+import { useTikTokCreatorInfo } from "@/hooks/use-tiktok-creator-info";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { meQueryOptions } from "@/layouts/require-auth";
 import { api } from "@/lib/api";
-import { generateVideoThumbnail } from "@/lib/media-thumbnail";
+import {
+  generateVideoThumbnail,
+  probeVideoFileDuration,
+  probeVideoUrlDuration,
+} from "@/lib/media-thumbnail";
 
 // ---- Tipe Web App Launch Handler (file_handlers PWA) — belum ada di lib.dom ----
 declare global {
@@ -70,6 +75,30 @@ function parseTags(s: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Normalisasi settings TikTok dari draft/penyimpanan lama.
+ * Key lama `tiktokDisable*` (default: interaksi aktif) dipetakan ke
+ * `tiktokAllow*` (baru — Content Sharing Guidelines: tak satu pun tercentang
+ * default). Tanpa ini, draft lama kehilangan arti setelah pergantian key.
+ */
+function normalizeSettingsState(raw: Record<string, unknown>): SettingsState {
+  const s: Record<string, unknown> = { firstComment: "", ...raw };
+  const pairs = [
+    ["tiktokDisableComment", "tiktokAllowComment"],
+    ["tiktokDisableDuet", "tiktokAllowDuet"],
+    ["tiktokDisableStitch", "tiktokAllowStitch"],
+  ] as const;
+  for (const [legacy, next] of pairs) {
+    if (s[legacy] !== undefined) {
+      s[next] = s[legacy] !== true;
+      delete s[legacy];
+    }
+  }
+  // Legacy privacy bertipe sempit → jadikan string biasa
+  if (typeof s.tiktokPrivacy !== "string") delete s.tiktokPrivacy;
+  return s as SettingsState;
+}
+
 export function useComposeForm() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -112,6 +141,30 @@ export function useComposeForm() {
   const selectedMedia = mediaIds
     .map((id) => mediaItems.find((m) => m.id === id))
     .filter((m): m is MediaItem => m !== undefined);
+
+  // Durasi video media lama (kolom durationSeconds null) → di-probe sekali via
+  // element video. Dibutuhkan validasi durasi TikTok (max_video_post_duration_sec).
+  // null = sudah dicoba tapi gagal (jangan diulang tiap render).
+  const probedMediaIdsRef = useRef<Set<string>>(new Set());
+  const [probedDurations, setProbedDurations] = useState<Record<string, number | null>>({});
+  useEffect(() => {
+    for (const media of selectedMedia) {
+      if (!media.mimeType.startsWith("video/")) continue;
+      if (media.durationSeconds != null && media.durationSeconds > 0) continue;
+      if (probedMediaIdsRef.current.has(media.id)) continue;
+      probedMediaIdsRef.current.add(media.id);
+      void probeVideoUrlDuration(media.url).then((sec) => {
+        setProbedDurations((prev) => ({ ...prev, [media.id]: sec }));
+      });
+    }
+  }, [selectedMedia]);
+
+  // Media + durasi hasil probe — dipakai validasi compose
+  const mediaWithDurations = selectedMedia.map((m) =>
+    m.durationSeconds == null || m.durationSeconds <= 0
+      ? { ...m, durationSeconds: probedDurations[m.id] ?? null }
+      : m,
+  );
 
   // Pre-select akun dari query param (sekali, agar draft restore tidak menimpa)
   const preselect = params.get("account");
@@ -176,7 +229,15 @@ export function useComposeForm() {
     }
     if (restoredDraft.productIds.length > 0) setProductIds(restoredDraft.productIds);
     if (Object.keys(restoredDraft.platformSettings).length > 0) {
-      setPlatformSettings(restoredDraft.platformSettings);
+      // Draft lama memakai key `tiktokDisable*` → petakan ke `tiktokAllow*`
+      setPlatformSettings(
+        Object.fromEntries(
+          Object.entries(restoredDraft.platformSettings).map(([id, s]) => [
+            id,
+            normalizeSettingsState(s as unknown as Record<string, unknown>),
+          ]),
+        ),
+      );
     }
     // Sound track hanya id yang tersimpan — SoundPicker me-render ulang
     // judul dari server via id (meta minimal cukup untuk submit)
@@ -217,9 +278,15 @@ export function useComposeForm() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      // Thumbnail video client-side (frame ~10%) — null bila gagal decode
-      const thumbnail = await generateVideoThumbnail(file);
+      // Thumbnail video client-side (frame ~10%) + durasi (utk validasi TikTok)
+      const [thumbnail, durationSeconds] = await Promise.all([
+        generateVideoThumbnail(file),
+        probeVideoFileDuration(file),
+      ]);
       if (thumbnail) formData.append("thumbnail", thumbnail, "thumbnail.jpg");
+      if (durationSeconds != null) {
+        formData.append("durationSeconds", String(Math.round(durationSeconds)));
+      }
       return api.upload<{ media: MediaItem }>("/media/upload", formData);
     },
     onSuccess: (data) => {
@@ -313,6 +380,11 @@ export function useComposeForm() {
   }
 
   async function submitPost() {
+    // Tombol sudah disabled saat ada error, tapi Ctrl+Enter & race tetap dicek di sini
+    if (hasValidationErrorsRef.current) {
+      toast.error("Perbaiki error validasi sebelum publish");
+      return;
+    }
     if (selectedAccounts.length === 0) {
       toast.error("Pilih minimal satu akun social media");
       return;
@@ -452,6 +524,12 @@ export function useComposeForm() {
   // Akun yang dipilih (objek penuh) — untuk preview & validasi
   const selectedAccountObjects = accounts.filter((a) => selectedAccounts.includes(a.id));
 
+  // creator_info TikTok per akun terpilih — wajib utk verifikasi privacy & durasi.
+  // Di-cache react-query (5 menit) sehingga aman dipanggil tiap render.
+  const tiktokCreator = useTikTokCreatorInfo(
+    selectedAccountObjects.filter((a) => a.platform === "tiktok").map((a) => a.id),
+  );
+
   // Validasi client-side — error memblokir tombol publish
   const validationIssues = validatePost({
     content,
@@ -463,9 +541,10 @@ export function useComposeForm() {
       platform: a.platform,
       username: a.username,
     })),
-    media: selectedMedia,
+    media: mediaWithDurations,
     scheduledAt: scheduleMode === "schedule" ? scheduledAt : null,
     scheduleMode,
+    tiktokCreator,
   });
   const hasValidationErrors = validationIssues.some((issue) => issue.severity === "error");
 
@@ -532,6 +611,8 @@ export function useComposeForm() {
     accounts,
     aiPlatform,
     selectedAccountObjects,
+    // creator info TikTok (nickname, opsi privacy, batas durasi) per akun
+    tiktokCreator,
     // mutasi
     createPost,
     uploadMedia,

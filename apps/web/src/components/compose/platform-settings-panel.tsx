@@ -9,40 +9,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { TikTokCreatorInfoState } from "@/hooks/use-tiktok-creator-info";
 import { api } from "@/lib/api";
 import { PLATFORMS } from "@/lib/platforms";
 import { cn } from "@/lib/utils";
-
-type SettingsState = {
-  firstComment: string;
-  // Instagram/Facebook post type: feed (default) atau story (STORIES, 1 media, tanpa caption)
-  postType?: "feed" | "story";
-  // TikTok
-  tiktokPrivacy?: "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "SELF_ONLY";
-  tiktokDisableComment?: boolean;
-  tiktokDisableDuet?: boolean;
-  tiktokDisableStitch?: boolean;
-  // Label konten AI (AIGC) — wajib aktif bila konten dibuat/diedit AI secara signifikan
-  tiktokIsAigc?: boolean;
-  // YouTube
-  youtubeTitle?: string;
-  youtubePrivacy?: "public" | "unlisted" | "private";
-  youtubeCategory?: string;
-  youtubeMadeForKids?: boolean;
-  /** Disclosure konten sintetis/AI di YouTube */
-  youtubeSyntheticMedia?: boolean;
-  // Pinterest
-  pinterestLink?: string;
-  // Facebook
-  facebookLink?: string;
-  /** Page Mentions — id Halaman Facebook yang disebut di post (`@[page-id]`) */
-  facebookMentions?: string[];
-  // Threads: cross-post post ini ke Instagram Story
-  threadsShareToIg?: boolean;
-  /** Threads: tag lokasi (location_id) saat publish */
-  threadsLocationId?: string;
-  threadsLocationName?: string;
-};
+import type { SettingsState } from "./compose-types";
+import { TikTokSettings } from "./tiktok-settings";
 
 /** Picker lokasi Threads — cari via /threads/locations (scope threads_location_tagging) */
 function ThreadsLocationPicker({
@@ -152,11 +124,17 @@ export function PlatformSettingsPanel({
   selectedAccountIds,
   settings,
   onChange,
+  hasVideoMedia = false,
+  tiktokCreator,
 }: {
   accounts: AccountLite[];
   selectedAccountIds: string[];
   settings: Record<string, SettingsState>;
   onChange: (accountId: string, next: SettingsState) => void;
+  /** Ada video terpilih — TikTok butuh ini (post video vs post foto) */
+  hasVideoMedia?: boolean;
+  /** creator_info TikTok per akun — nickname ditampilkan di header akun */
+  tiktokCreator?: Record<string, TikTokCreatorInfoState | undefined>;
 }) {
   const [open, setOpen] = useState<string | null>(null);
 
@@ -186,6 +164,11 @@ export function PlatformSettingsPanel({
           const isThreads = account.platform === "threads";
           const isInstagram =
             account.platform === "instagram" || account.platform === "instagram_standalone";
+          // Nickname akun TikTok dari creator_info — wajib tampil agar user
+          // tahu konten akan diposting ke akun yang mana (guideline #1a).
+          const creatorState = isTikTok ? tiktokCreator?.[account.id] : undefined;
+          const creatorNickname =
+            creatorState?.status === "ready" ? creatorState.info.creatorNickname?.trim() : "";
 
           return (
             <div
@@ -204,6 +187,14 @@ export function PlatformSettingsPanel({
                     style={{ backgroundColor: cfg?.color ?? "var(--text-muted)" }}
                   />
                   {cfg?.label ?? account.platform} · @{account.username}
+                  {creatorNickname && (
+                    <span
+                      className="max-w-[160px] truncate font-normal text-[var(--text-muted)]"
+                      title="Akun tujuan post TikTok (dari creator_info)"
+                    >
+                      → {creatorNickname}
+                    </span>
+                  )}
                   {s.firstComment.trim() !== "" && (
                     <span
                       className="text-[10px] text-[var(--accent-gold)]"
@@ -287,66 +278,14 @@ export function PlatformSettingsPanel({
                     </p>
                   )}
 
-                  {/* TikTok privacy */}
+                  {/* TikTok — komponen terpisah (syarat audit Content Posting API) */}
                   {isTikTok && (
-                    <>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Siapa yang bisa menonton</Label>
-                        <select
-                          value={s.tiktokPrivacy ?? "PUBLIC_TO_EVERYONE"}
-                          onChange={(e) =>
-                            onChange(account.id, {
-                              ...s,
-                              tiktokPrivacy: e.target.value as SettingsState["tiktokPrivacy"],
-                            })
-                          }
-                          className="h-8 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-2 text-xs"
-                        >
-                          <option value="PUBLIC_TO_EVERYONE">Semua orang</option>
-                          <option value="MUTUAL_FOLLOW_FRIENDS">Teman yang saling follow</option>
-                          <option value="SELF_ONLY">Hanya saya</option>
-                        </select>
-                      </div>
-                      {(
-                        [
-                          ["tiktokDisableComment", "Nonaktifkan komentar"],
-                          ["tiktokDisableDuet", "Nonaktifkan Duet"],
-                          ["tiktokDisableStitch", "Nonaktifkan Stitch"],
-                        ] as const
-                      ).map(([key, label]) => (
-                        <label
-                          key={key}
-                          className="flex items-center gap-2 text-[var(--text-secondary)] text-xs"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={s[key] ?? false}
-                            onChange={(e) =>
-                              onChange(account.id, { ...s, [key]: e.target.checked })
-                            }
-                            className="accent-[var(--accent-gold)]"
-                          />
-                          {label}
-                        </label>
-                      ))}
-                      <label className="flex items-start gap-2 text-[var(--text-secondary)] text-xs">
-                        <input
-                          type="checkbox"
-                          checked={s.tiktokIsAigc ?? false}
-                          onChange={(e) =>
-                            onChange(account.id, { ...s, tiktokIsAigc: e.target.checked })
-                          }
-                          className="mt-0.5 accent-[var(--accent-gold)]"
-                        />
-                        <span>
-                          Konten dibuat/diedit AI (label AIGC)
-                          <span className="block text-[11px] text-[var(--text-muted)]">
-                            Wajib diaktifkan bila konten realistis dibuat atau diedit AI secara
-                            signifikan — sesuai kebijakan pelabelan TikTok.
-                          </span>
-                        </span>
-                      </label>
-                    </>
+                    <TikTokSettings
+                      accountId={account.id}
+                      value={s}
+                      onChange={(next) => onChange(account.id, next)}
+                      hasVideo={hasVideoMedia}
+                    />
                   )}
 
                   {/* YouTube */}
@@ -597,11 +536,22 @@ export function buildPlatformSettings(
   }
 
   if (platform === "tiktok") {
+    // privacy TANPA default — wajib dipilih user (dicek validasi sebelum publish)
     if (s.tiktokPrivacy) settings.privacy = s.tiktokPrivacy;
-    if (s.tiktokDisableComment) settings.disableComment = true;
-    if (s.tiktokDisableDuet) settings.disableDuet = true;
-    if (s.tiktokDisableStitch) settings.disableStitch = true;
+    // Flag interaksi SELALU ikut terkirim (false bila tak dicentang) — Content
+    // Sharing Guidelines: "none should be checked by default".
+    settings.allowComment = s.tiktokAllowComment === true;
+    settings.allowDuet = s.tiktokAllowDuet === true;
+    settings.allowStitch = s.tiktokAllowStitch === true;
     if (s.tiktokIsAigc) settings.isAigc = true;
+    if (s.tiktokTitle?.trim()) settings.title = s.tiktokTitle.trim().slice(0, 90);
+    // Disclosure konten komersial — hanya dikirim bila toggle aktif
+    if (s.tiktokDisclosure) {
+      settings.disclosure = true;
+      if (s.tiktokBrandOrganic) settings.brandOrganic = true;
+      if (s.tiktokBrandContent) settings.brandContent = true;
+    }
+    if (s.tiktokMusicConsent) settings.musicConsent = true;
   }
   if (platform === "youtube") {
     if (s.youtubeTitle?.trim()) settings.title = s.youtubeTitle.trim();

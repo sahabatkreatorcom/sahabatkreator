@@ -47,8 +47,7 @@ export async function generateVideoThumbnail(file: File): Promise<Blob | null> {
   }
 }
 
-/** Promise event sekali dengan timeout — reject saat lewat batas waktu */
-function waitForEvent(el: HTMLVideoElement, event: string, timeoutMs: number): Promise<void> {
+/** Promise event sekali dengan timeout — reject saat lewat batas waktu */function waitForEvent(el: HTMLVideoElement, event: string, timeoutMs: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       cleanup();
@@ -70,4 +69,48 @@ function waitForEvent(el: HTMLVideoElement, event: string, timeoutMs: number): P
     el.addEventListener(event, onDone, { once: true });
     el.addEventListener("error", onError, { once: true });
   });
+}
+
+/**
+ * Baca durasi video dari File (detik) — dipakai saat upload agar kolom
+ * media.durationSeconds terisi dan validasi durasi TikTok bisa berjalan.
+ * Return null bila bukan video / gagal decode.
+ */
+export async function probeVideoFileDuration(file: File): Promise<number | null> {
+  if (!file.type.startsWith("video/")) return null;
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    return await probeVideoElementDuration(objectUrl);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+/**
+ * Baca durasi video dari URL publik — fallback untuk media lama yang
+ * durationSeconds-nya masih null (mis. video yang di-upload sebelum fitur ini).
+ */
+export async function probeVideoUrlDuration(src: string): Promise<number | null> {
+  try {
+    return await probeVideoElementDuration(src);
+  } catch {
+    return null;
+  }
+}
+
+async function probeVideoElementDuration(src: string): Promise<number | null> {
+  const video = document.createElement("video");
+  video.muted = true;
+  video.preload = "metadata";
+  video.src = src;
+  try {
+    await waitForEvent(video, "loadedmetadata", 10_000);
+    const duration = video.duration;
+    return Number.isFinite(duration) && duration > 0 ? duration : null;
+  } catch {
+    return null;
+  } finally {
+    video.removeAttribute("src");
+    video.load();
+  }
 }

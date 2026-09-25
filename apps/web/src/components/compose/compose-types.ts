@@ -1,5 +1,51 @@
 // Tipe bersama untuk halaman Compose & sub-komponennya
 
+/**
+ * Pengaturan khusus per akun (state panel Pengaturan Platform).
+ * Diserialisasi oleh buildPlatformSettings() → kolom jsonb post.platform_settings.
+ */
+export type SettingsState = {
+  firstComment: string;
+  // Instagram/Facebook post type: feed (default) atau story (STORIES, 1 media, tanpa caption)
+  postType?: "feed" | "story";
+  // TikTok — privacy TANPA default (wajib dipilih user; opsi dari creator_info)
+  tiktokPrivacy?: string;
+  // Toggle "Izinkan …" — SEMUA default false sesuai Content Sharing Guidelines
+  tiktokAllowComment?: boolean;
+  tiktokAllowDuet?: boolean;
+  tiktokAllowStitch?: boolean;
+  // Label konten AI (AIGC) — wajib aktif bila konten dibuat/diedit AI secara signifikan
+  tiktokIsAigc?: boolean;
+  /** Judul post foto TikTok (maks 90) — post video memakai caption sebagai title */
+  tiktokTitle?: string;
+  /** Disclosure konten komersial (toggle utama, default OFF) */
+  tiktokDisclosure?: boolean;
+  /** "Merek saya sendiri" → brand_organic_toggle (label: Promotional content) */
+  tiktokBrandOrganic?: boolean;
+  /** "Branded content" → brand_content_toggle (label: Paid partnership) */
+  tiktokBrandContent?: boolean;
+  /** Deklarasi Music Usage Confirmation sebelum publish (wajib utk akun TikTok) */
+  tiktokMusicConsent?: boolean;
+  // YouTube
+  youtubeTitle?: string;
+  youtubePrivacy?: "public" | "unlisted" | "private";
+  youtubeCategory?: string;
+  youtubeMadeForKids?: boolean;
+  /** Disclosure konten sintetis/AI di YouTube */
+  youtubeSyntheticMedia?: boolean;
+  // Pinterest
+  pinterestLink?: string;
+  // Facebook
+  facebookLink?: string;
+  /** Page Mentions — id Halaman Facebook yang disebut di post (`@[page-id]`) */
+  facebookMentions?: string[];
+  // Threads: cross-post post ini ke Instagram Story
+  threadsShareToIg?: boolean;
+  /** Threads: tag lokasi (location_id) saat publish */
+  threadsLocationId?: string;
+  threadsLocationName?: string;
+};
+
 export type Account = {
   id: string;
   platform: string;

@@ -4,8 +4,10 @@
 import { AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, ListChecks } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import type { TikTokCreatorInfoState } from "@/hooks/use-tiktok-creator-info";
 import { PLATFORMS } from "@/lib/platforms";
 import { cn } from "@/lib/utils";
+import { validateTikTokPost } from "./validation-tiktok";
 
 /** Akun yang dipilih di compose (subset field yang dipakai validasi) */
 export type ValidationAccount = {
@@ -48,12 +50,27 @@ export type ValidatePostInput = {
   scheduledAt: string | null;
   /** Mode publish: now / schedule / draft */
   scheduleMode: "now" | "schedule" | "draft";
+  /**
+   * Hasil creator_info/query per akun TikTok (accountId → state).
+   * Wajib untuk publish TikTok (Content Sharing Guidelines #1) — tanpa ini
+   * opsi privacy & batas durasi tidak bisa diverifikasi.
+   */
+  tiktokCreator?: Record<string, TikTokCreatorInfoState | undefined>;
 };
 
 export type ValidationPlatformSettings = {
   postType?: "feed" | "story" | "reels";
   youtubeTitle?: string;
+  // TikTok — nama key sama dengan SettingsState di compose-types
   tiktokPrivacy?: string;
+  tiktokAllowComment?: boolean;
+  tiktokAllowDuet?: boolean;
+  tiktokAllowStitch?: boolean;
+  tiktokDisclosure?: boolean;
+  tiktokBrandOrganic?: boolean;
+  tiktokBrandContent?: boolean;
+  tiktokMusicConsent?: boolean;
+  tiktokTitle?: string;
 };
 
 /** Batas caption per platform (karakter) — hardcode tabel aturan */
@@ -76,8 +93,6 @@ const CAPTION_LIMITS: Record<string, number> = {
 const YOUTUBE_TITLE_LIMIT = 100;
 /** Batas panjang deskripsi video YouTube */
 const YOUTUBE_DESCRIPTION_LIMIT = 5000;
-/** Durasi maksimum video TikTok (detik) */
-const TIKTOK_MAX_DURATION_SECONDS = 60;
 /** Batas hashtag Instagram */
 const INSTAGRAM_MAX_HASHTAGS = 30;
 /** Batas media carousel Instagram */
@@ -139,7 +154,6 @@ export function validatePost(input: ValidatePostInput): ValidationIssue[] {
   // --- Validasi per platform (akun terpilih) ---
   const hashtagCount = countHashtags(input.hashtags);
   const videoMedia = input.media.filter((m) => m.mimeType.startsWith("video/"));
-  const imageMedia = input.media.filter((m) => m.mimeType.startsWith("image/"));
 
   for (const account of input.accounts) {
     const platform = account.platform;
@@ -196,27 +210,15 @@ export function validatePost(input: ValidatePostInput): ValidationIssue[] {
     }
 
     if (platform === "tiktok") {
-      // Photo post TikTok hanya mendukung JPEG/WebP — PNG/GIF ditolak
-      // platform dengan file_format_check_failed (gagal asinkron setelah submit).
-      for (const image of imageMedia) {
-        if (image.mimeType !== "image/jpeg" && image.mimeType !== "image/webp") {
-          issues.push({
-            severity: "error",
-            platform: "tiktok",
-            message: `TikTok hanya mendukung foto JPEG/WebP — ada foto berformat ${image.mimeType}. Buka editor gambar atau gunakan resize untuk mengonversinya ke JPEG.`,
-          });
-        }
-      }
-      // Durasi video maks 60 detik — cek bila durasi tersedia di objek media
-      for (const video of videoMedia) {
-        if (video.durationSeconds != null && video.durationSeconds > TIKTOK_MAX_DURATION_SECONDS) {
-          issues.push({
-            severity: "warning",
-            platform: "tiktok",
-            message: `Durasi video ${video.durationSeconds} detik melebihi 60 detik — post bisa dipotong otomatis oleh TikTok.`,
-          });
-        }
-      }
+      issues.push(
+        ...validateTikTokPost({
+          account,
+          settings,
+          media: input.media,
+          creator: input.tiktokCreator?.[account.id],
+          scheduleMode: input.scheduleMode,
+        }),
+      );
     }
 
     if (platform === "youtube") {

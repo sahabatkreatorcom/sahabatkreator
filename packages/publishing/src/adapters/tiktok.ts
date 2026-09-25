@@ -23,6 +23,65 @@ type TikTokInitResponse = {
   error?: { code?: string; message?: string; log_id?: string };
 };
 
+/**
+ * Privasi post — TANPA default. Content Sharing Guidelines mewajibkan user
+ * memilih privacy status secara manual; opsinya harus dari creator_info/query.
+ */
+function resolvePrivacyLevel(s: Record<string, unknown>): string {
+  const raw = s.privacy ?? s.privacyLevel;
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (!value) {
+    throw new PublishError(
+      "tiktok_privacy_required",
+      "Status privasi TikTok belum dipilih — pilih di panel Pengaturan Platform sebelum publish.",
+      false,
+    );
+  }
+  return value;
+}
+
+/**
+ * Interaksi (comment/duet/stitch) → flag disable_* TikTok.
+ * Jalur baru memakai key `allow*` yang SELALU dikirim buildPlatformSettings:
+ * "none checked by default" → tanpa centang berarti interaksi dimatikan.
+ * Draft/post lama hanya punya `disable*` → dipakai apa adanya (default: diizinkan).
+ */
+function resolveInteractions(s: Record<string, unknown>): {
+  disable_comment: boolean;
+  disable_duet: boolean;
+  disable_stitch: boolean;
+} {
+  const hasNewKeys = "allowComment" in s || "allowDuet" in s || "allowStitch" in s;
+  const flag = (allowKey: string, legacyKey: string): boolean => {
+    if (hasNewKeys) return s[allowKey] !== true;
+    return s[legacyKey] === true;
+  };
+  return {
+    disable_comment: flag("allowComment", "disableComment"),
+    disable_duet: flag("allowDuet", "disableDuet"),
+    disable_stitch: flag("allowStitch", "disableStitch"),
+  };
+}
+
+/** Disclosure konten komersial — hanya true bila user memilih opsi tsb */
+function resolveBrandFlags(s: Record<string, unknown>): {
+  brand_content_toggle: boolean;
+  brand_organic_toggle: boolean;
+} {
+  return {
+    brand_content_toggle: s.brandContent === true,
+    brand_organic_toggle: s.brandOrganic === true,
+  };
+}
+
+/** Judul post foto (≤90) — fallback ke awal caption bila tidak diisi */
+function resolvePhotoTitle(s: Record<string, unknown>, caption: string): string {
+  const raw = s.title;
+  const title = typeof raw === "string" ? raw.trim() : "";
+  return (title || caption).slice(0, 90);
+}
+
+
 async function publishTikTok(input: PublishInput): Promise<PublishResult> {
   const caption = composeCaption(input.content, input.hashtags);
   const videos = input.media.filter((m) => m.type === "video");
@@ -63,10 +122,10 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
     }
 
     // privacy_level wajib & harus cocok privacy_level_options akun (riset: beda per akun)
-    // UI compose mengirim key `privacy` — dukung juga `privacyLevel` (nama asli API)
-    const privacyLevel = String(
-      input.platformSettings.privacy ?? input.platformSettings.privacyLevel ?? "PUBLIC_TO_EVERYONE",
-    );
+    // Tanpa default — UI compose wajib memilih (guideline: no default value)
+    const privacyLevel = resolvePrivacyLevel(input.platformSettings);
+    const interactions = resolveInteractions(input.platformSettings);
+    const brandFlags = resolveBrandFlags(input.platformSettings);
     const res = await httpRequest<TikTokInitResponse>(`${TIKTOK_PUBLISH_URL}/video/init/`, {
       method: "POST",
       headers: {
@@ -79,10 +138,9 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
           privacy_level: privacyLevel,
           // Label AI-generated (riset: is_aigc mandatory utk konten AI)
           is_aigc: input.platformSettings.isAigc === true,
-          disable_comment: input.platformSettings.disableComment === true,
-          disable_duet: input.platformSettings.disableDuet === true,
-          disable_stitch: input.platformSettings.disableStitch === true,
-          brand_content_toggle: input.platformSettings.brandContent === true,
+          ...interactions,
+          // Disclosure konten komersial (label Promotional/Paid partnership)
+          ...brandFlags,
         },
         source_info: {
           source: "PULL_FROM_URL",
@@ -131,14 +189,15 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
     },
     body: JSON.stringify({
       post_info: {
-        title: caption.slice(0, 90),
+        title: resolvePhotoTitle(input.platformSettings, caption),
         description: caption.slice(0, 4000),
-        privacy_level: String(
-          input.platformSettings.privacy ??
-            input.platformSettings.privacyLevel ??
-            "PUBLIC_TO_EVERYONE",
-        ),
+        privacy_level: resolvePrivacyLevel(input.platformSettings),
         is_aigc: input.platformSettings.isAigc === true,
+        // Duet/Stitch tidak berlaku utk foto — hanya komentar yang dikirim
+        disable_comment: resolveInteractions(input.platformSettings).disable_comment,
+        // Docs menandai field ini utk Direct Post — kirim eksplisit agar jelas
+        auto_add_music: false,
+        ...resolveBrandFlags(input.platformSettings),
       },
       source_info: {
         source: "PULL_FROM_URL",

@@ -484,6 +484,11 @@ mediaRoute.post("/upload", async (c) => {
     }
 
     const altText = formData.get("altText");
+    // Durasi video (detik) dihitung client-side saat upload — dipakai validasi
+    // batas durasi TikTok (max_video_post_duration_sec).
+    const durationRaw = Number(formData.get("durationSeconds") ?? 0);
+    const durationSeconds =
+      Number.isFinite(durationRaw) && durationRaw > 0 ? Math.round(durationRaw) : null;
     let buffer = Buffer.from(await file.arrayBuffer());
 
     // Validasi isi file (magic bytes) vs content-type yang diklaim client —
@@ -543,6 +548,7 @@ mediaRoute.post("/upload", async (c) => {
       thumbnailUrl,
       mimeType,
       sizeBytes: buffer.byteLength,
+      durationSeconds: mimeType.startsWith("video/") ? durationSeconds : null,
       altText: typeof altText === "string" ? altText : null,
       uploadedByUserId: ctx.user.id,
     });
