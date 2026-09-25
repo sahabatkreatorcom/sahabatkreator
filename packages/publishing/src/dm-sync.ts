@@ -636,11 +636,36 @@ type LinkedInConversation = {
 };
 
 /**
+ * Tandai akun LinkedIn di metadata: endpoint Conversations tidak tersedia untuk
+ * app ini (produk Messaging/Community belum aktif). Dipakai agar siklus berikutnya
+ * tidak memanggil endpoint yang sama dan membanjiri log dengan error yang sama.
+ */
+async function markLinkedInDmUnsupported(accountId: string): Promise<void> {
+  try {
+    const [row] = await db
+      .select({ metadata: socialAccount.metadata })
+      .from(socialAccount)
+      .where(eq(socialAccount.id, accountId))
+      .limit(1);
+    const metadata = row?.metadata ?? {};
+    if (metadata.liDmUnsupported === true) return;
+    await db
+      .update(socialAccount)
+      .set({ metadata: { ...metadata, liDmUnsupported: true } })
+      .where(eq(socialAccount.id, accountId));
+  } catch {
+    // penanda gagal bukan error fungsional — sync tetap lanjut
+  }
+}
+
+/**
  * Sync DM LinkedIn via Messaging API v2.
  * Endpoint: GET /v2/conversations + GET /v2/messages?conversationUrn={urn}
  *
  * Scope yang dibutuhkan: r_member_social + w_member_social (atau messaging product).
  * Bila scope tidak tersedia, LinkedIn mengembalikan 403/401 — di-skip gracefully.
+ * Bila produk Conversations tidak aktif, LinkedIn mengembalikan 404
+ * RESOURCE_NOT_FOUND — ditandai di metadata (liDmUnsupported) lalu di-skip.
  *
  * Note: linkedin_org (Community Management API) tidak mendukung reading DMs.
  * Hanya linkedin (personal) yang bisa sync DM.
@@ -659,6 +684,11 @@ async function syncLinkedInDMs(ctx: {
 
   // LinkedIn org accounts cannot read DMs via Community Management API
   if (account.platform === "linkedin_org") {
+    return { platform: account.platform, newItems: 0 };
+  }
+  // Produk Conversations/Messaging belum aktif untuk app ini (sudah pernah 404) —
+  // jangan panggil endpoint lagi, tidak ada gunanya.
+  if (account.metadata?.liDmUnsupported === true) {
     return { platform: account.platform, newItems: 0 };
   }
 
@@ -684,8 +714,11 @@ async function syncLinkedInDMs(ctx: {
 
   if (!convRes.ok) {
     const body = await convRes.text().catch(() => "");
-    // 403/401 = scope messaging belum di-grant — skip tanpa error
-    if (convRes.status === 403 || convRes.status === 401) {
+    // 403/401 = scope messaging belum di-grant; 404/405 = endpoint Conversations
+    // tidak tersedia untuk app ini (produk Messaging belum aktif). Bukan error
+    // fungsional → tandai di metadata supaya tidak dipanggil lagi tiap siklus.
+    if ([401, 403, 404, 405].includes(convRes.status)) {
+      await markLinkedInDmUnsupported(account.id);
       return { platform: account.platform, newItems: 0 };
     }
     return {
@@ -796,6 +829,10 @@ export async function syncDueDMAccounts(
     .limit(maxAccounts * 2);
 
   const due = accounts
+    // Endpoint DM tidak tersedia untuk app ini (mis. LinkedIn tanpa produk
+    // Messaging, ditandai liDmUnsupported) — tidak dianggap due supaya tidak ada
+    // panggilan API sia-sia dan tidak ada log error yang sama tiap siklus.
+    .filter((a) => a.metadata?.liDmUnsupported !== true)
     .filter((a) => !a.lastDmSyncedAt || a.lastDmSyncedAt < since)
     .slice(0, maxAccounts);
 
