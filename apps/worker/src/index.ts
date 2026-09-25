@@ -146,8 +146,13 @@ async function runDMSync(): Promise<void> {
 async function runCycle(): Promise<string> {
   try {
     const result = await runPublishCycle();
-    const line = `claimed=${result.claimed} published=${result.published} processing=${result.processing} failed=${result.failed} polled(p=${result.polled.published},f=${result.polled.failed}) recovered=${result.recovered}`;
-    if (result.claimed > 0 || result.polled.published > 0 || result.recovered > 0) {
+    const line = `claimed=${result.claimed} published=${result.published} processing=${result.processing} failed=${result.failed} polled(p=${result.polled.published},f=${result.polled.failed}) recovered=${result.recovered} backfilled_urls=${result.backfilled}`;
+    if (
+      result.claimed > 0 ||
+      result.polled.published > 0 ||
+      result.recovered > 0 ||
+      result.backfilled > 0
+    ) {
       console.log(`[worker-fallback] ${line}`);
     }
     return line;

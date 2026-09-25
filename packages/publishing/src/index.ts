@@ -55,6 +55,7 @@ export {
   slotLabel,
 } from "./optimal-times";
 export {
+  backfillTikTokPostUrls,
   claimDuePosts,
   claimPostById,
   executePublish,

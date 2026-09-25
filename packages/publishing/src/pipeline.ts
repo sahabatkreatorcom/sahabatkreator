@@ -10,7 +10,7 @@ import {
   postMedia,
   socialAccount,
 } from "@sahabatkreator/db/schema";
-import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, like, sql } from "drizzle-orm";
 import { getAdapter } from "./adapters";
 import { decrypt } from "./crypto";
 import { sendReply } from "./reply";
@@ -798,6 +798,89 @@ export async function recoverStalePosts(): Promise<number> {
 }
 
 /**
+ * Backfill id + link post TikTok yang belum tersedia saat publish.
+ * TikTok tidak mengembalikan publicly_available_post_id & share_url sampai post
+ * public dan lolos moderasi (client belum audit → bisa tertunda beberapa menit/jam).
+ * Karena publish_id disimpan sebagai platform_postId, kita bisa status/fetch ulang
+ * untuk mengambil video id + share_url asli begitu tersedia.
+ */
+export async function backfillTikTokPostUrls(limit = 10): Promise<number> {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const rows = await db
+    .select({
+      id: post.id,
+      platformPostId: post.platformPostId,
+      socialAccountId: post.socialAccountId,
+    })
+    .from(post)
+    .where(
+      and(
+        eq(post.platform, "tiktok"),
+        eq(post.status, "published"),
+        isNull(post.platformPostUrl),
+        // platform_post_id masih berupa publish_id (mengandung "~"), bukan video id
+        like(post.platformPostId, "%~%"),
+        gt(post.publishedAt, since),
+      ),
+    )
+    .orderBy(desc(post.publishedAt))
+    .limit(limit);
+
+  if (rows.length === 0) return 0;
+
+  const adapter = getAdapter("tiktok");
+  if (!adapter?.checkStatus) return 0;
+
+  let backfilled = 0;
+  for (const row of rows) {
+    try {
+      if (!row.platformPostId || !row.socialAccountId) continue;
+      const [account] = await db
+        .select({
+          accessTokenEnc: socialAccount.accessTokenEnc,
+          platformAccountId: socialAccount.platformAccountId,
+          username: socialAccount.username,
+        })
+        .from(socialAccount)
+        .where(eq(socialAccount.id, row.socialAccountId))
+        .limit(1);
+      const accessToken = decryptToken(account?.accessTokenEnc ?? null);
+      if (!accessToken || !account) continue;
+
+      const status = await adapter.checkStatus({
+        accessToken,
+        platformAccountId: account.platformAccountId,
+        handle: row.platformPostId,
+        accountHandle: account.username,
+      });
+      if (status.status !== "published") continue;
+
+      const url = status.platformPostUrl ?? null;
+      const hasNewId = Boolean(status.platformPostId) && status.platformPostId !== row.platformPostId;
+      if (!url && !hasNewId) continue;
+
+      await db
+        .update(post)
+        .set({
+          ...(hasNewId ? { platformPostId: status.platformPostId } : {}),
+          ...(url ? { platformPostUrl: url } : {}),
+        })
+        .where(eq(post.id, row.id));
+      if (url) {
+        backfilled++;
+        console.log(`[publishing] Backfill URL TikTok ${row.id} → ${url}`);
+      }
+    } catch (error) {
+      console.error(
+        `[publishing] Backfill URL TikTok ${row.id} gagal:`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+  return backfilled;
+}
+
+/**
  * Entry point worker fallback: satu siklus penuh.
  * return ringkasan untuk logging.
  */
@@ -808,6 +891,7 @@ export async function runPublishCycle(): Promise<{
   failed: number;
   polled: { published: number; failed: number; processing: number };
   recovered: number;
+  backfilled: number;
 }> {
   const postIds = await claimDuePosts(10);
 
@@ -823,6 +907,7 @@ export async function runPublishCycle(): Promise<{
 
   const polled = await pollInFlightPosts(20);
   const recovered = await recoverStalePosts();
+  const backfilled = await backfillTikTokPostUrls(10);
 
   return {
     claimed: postIds.length,
@@ -831,5 +916,6 @@ export async function runPublishCycle(): Promise<{
     failed,
     polled,
     recovered,
+    backfilled,
   };
 }
