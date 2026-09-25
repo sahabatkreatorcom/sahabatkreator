@@ -17,6 +17,7 @@ import {
   Film,
   Link2,
   Loader2,
+  Play,
   Scissors,
   Sparkles,
   Trash2,
@@ -607,18 +608,59 @@ export function AutoClipPage() {
                 description="Upload video panjang di halaman Media, atau gunakan URL langsung."
               />
             ) : (
-              <Select
-                value={baseVideoId ?? ""}
-                onChange={(e) => setBaseVideoId(e.target.value || null)}
-              >
-                <option value="">— Pilih video —</option>
-                {videos.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}
-                    {v.durationSeconds ? ` (${fmtDuration(v.durationSeconds)})` : ""}
-                  </option>
-                ))}
-              </Select>
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {videos.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setBaseVideoId(v.id)}
+                      className={cn(
+                        "group relative aspect-video overflow-hidden rounded-[var(--radius-md)] border bg-[var(--bg-tertiary)] transition",
+                        baseVideoId === v.id
+                          ? "border-[var(--accent-gold)] ring-2 ring-[var(--accent-gold)]"
+                          : "border-[var(--border)] hover:border-[var(--border-secondary)]",
+                      )}
+                    >
+                      {v.thumbnailUrl ? (
+                        <img
+                          src={v.thumbnailUrl}
+                          alt={v.name ?? "video"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <Film className="h-5 w-5 text-[var(--text-muted)]" />
+                        </div>
+                      )}
+                      {/* Hover preview — putar frame saat mouse di atas (muted).
+                          Klik tetap memilih video. */}
+                      {v.url && (
+                        <video
+                          src={v.url}
+                          muted
+                          playsInline
+                          preload="none"
+                          className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity group-hover:opacity-100"
+                          onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.pause();
+                            e.currentTarget.currentTime = 0;
+                          }}
+                        />
+                      )}
+                      <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1.5 py-0.5 text-left text-[10px] text-white">
+                        {v.name}
+                      </span>
+                      {v.url && (
+                        <span className="absolute top-1 right-1 rounded bg-black/60 p-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                          <Play className="h-3 w-3 fill-white text-white" />
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
