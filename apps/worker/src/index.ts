@@ -20,6 +20,7 @@ import {
   markReportSent,
 } from "@sahabatkreator/db";
 import {
+  backfillTikTokPostUrls,
   checkAllPlatformHealth,
   recoverStalePosts,
   refreshDueTokens,
@@ -167,9 +168,10 @@ app.post("/run", async (c) => {
   const rejected = requireCronSecret(c);
   if (rejected) return rejected;
   if (mode === "bullmq") {
-    // Mode BullMQ: jalankan recovery sweep saja (job processing dikerjakan processor)
+    // Mode BullMQ: recovery sweep + backfill URL TikTok (runPublishCycle tidak jalan)
     const recovered = await recoverStalePosts();
-    return c.json({ ok: true, mode, recovered });
+    const backfilled = await backfillTikTokPostUrls(10);
+    return c.json({ ok: true, mode, recovered, backfilled });
   }
   const result = await runCycle();
   return c.json({ ok: true, mode, result });
@@ -265,6 +267,14 @@ if (mode === "bullmq") {
   setInterval(() => {
     recoverStalePosts()
       .then((n) => n > 0 && console.log(`[worker] Recovery: ${n} post stale ditandai failed`))
+      .catch(() => undefined);
+  }, 60_000);
+  // Backfill URL TikTok — runPublishCycle tidak dipanggil di mode BullMQ, jadi
+  // jalankan siklusnya sendiri. TikTok baru memberi video id + share_url setelah
+  // post public & lolos moderasi, jadi URL sering belum ada saat publish selesai.
+  setInterval(() => {
+    backfillTikTokPostUrls(10)
+      .then((n) => n > 0 && console.log(`[worker] Backfill: ${n} link TikTok terisi`))
       .catch(() => undefined);
   }, 60_000);
 } else {

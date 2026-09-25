@@ -797,6 +797,9 @@ export async function recoverStalePosts(): Promise<number> {
   return stale.length;
 }
 
+/** Signature daftar antrian backfill terakhir — untuk log sekali, bukan tiap tick */
+let lastBackfillSignature = "";
+
 /**
  * Backfill id + link post TikTok yang belum tersedia saat publish.
  * TikTok tidak mengembalikan publicly_available_post_id & share_url sampai post
@@ -825,6 +828,17 @@ export async function backfillTikTokPostUrls(limit = 10): Promise<number> {
     )
     .orderBy(desc(post.publishedAt))
     .limit(limit);
+
+  // Log sekali saat daftar antrian berubah — supaya terlihat job jalan tanpa spam.
+  const signature = rows.map((r) => r.id).join(",");
+  if (signature !== lastBackfillSignature) {
+    lastBackfillSignature = signature;
+    console.log(
+      rows.length > 0
+        ? `[publishing] Backfill URL TikTok: ${rows.length} post menunggu link dari TikTok`
+        : `[publishing] Backfill URL TikTok: antrian kosong`,
+    );
+  }
 
   if (rows.length === 0) return 0;
 
