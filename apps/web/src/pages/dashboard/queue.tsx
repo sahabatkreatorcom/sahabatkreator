@@ -386,7 +386,7 @@ export function QueuePage() {
 
                   {/* Aksi */}
                   <div className="flex shrink-0 items-center gap-1.5">
-                    {status === "published" && (
+                    {status === "published" && shareUrl && (
                       <Button
                         size="sm"
                         variant="outline"
