@@ -670,11 +670,17 @@ export async function processAutoClipJob(
       reportProgress(75);
       const raw = await chatCompletion(config, system, user, {
         temperature,
-        maxTokens: 2500,
+        // Transkrip panjang + N kandidat + keep_segments → output JSON besar.
+        // 2500 sering terpotong tengah JSON (finish_reason=length) → parse
+        // gagal → ai_bad_response. Naikkan agar struktur JSON lengkap.
+        maxTokens: 4096,
       });
 
       candidates = parseAnalysisResponse(raw, clipSettings, ingest.durationSeconds, ranges);
       if (!candidates?.length) {
+        // Log raw response untuk debugging — Modal log cuma 1 hari (RFC §7.1),
+        // tidak ada cara lain lihat output model saat ini.
+        console.error(`[auto-clip] ai_bad_response raw (job ${videoJobId}):`, raw.slice(0, 2000));
         throw new ClipperError(
           "AI tidak mengembalikan kandidat valid (JSON tidak terparse / kosong)",
           "ai_bad_response",
