@@ -24,7 +24,9 @@ Desain & keputusan: [docs/rfc-public-api.md](../../docs/rfc-public-api.md) §7.
 1. **API key** — buat di aplikasi: **Settings → API → Buat key**.
    Token ditampilkan **sekali saja**; simpan langsung.
 2. **Plan yang mendukung** — `api_access` (Pro ke atas). Endpoint tulis butuh
-   `api_write` (Bisnis ke atas). Lihat [docs/pricing.md](../../docs/pricing.md) §6.
+   `api_write` (Bisnis ke atas). Definisi paket ada di
+   `packages/db/scripts/seed.ts`; label & key fitur di
+   `apps/web/src/lib/feature-catalog.ts`.
 3. **Bun** terpasang (repo ini memakai Bun; `node` juga bisa bila SDK-nya
    tersedia).
 

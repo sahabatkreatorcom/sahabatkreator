@@ -836,8 +836,9 @@ bun run db:seed      # idempotent — upsert paket default
 ```
 
 Setelah seed, verifikasi di `/admin/plans`: Pro punya `api_access`, Bisnis
-punya `api_access` + `api_write`, Enterprise punya ketiganya. Lihat
-[docs/pricing.md](pricing.md) §6.
+punya `api_access` + `api_write`, Enterprise punya ketiganya. Definisi paket ada
+di `packages/db/scripts/seed.ts`; label & key fitur di
+`apps/web/src/lib/feature-catalog.ts`.
 
 ### 11.4 Verifikasi
 
@@ -1005,7 +1006,7 @@ limit berbentuk JSON-RPC `-32000` saat tercapai, bukan `{message}` biasa.
 - [ ] Staging deploy + noindex terverifikasi
 - [ ] Setelah semua: submit sitemap ke Google Search Console
 - [ ] Kredensial platform diisi via Admin Panel → Kredensial Platform
-- [ ] Pengajuan API social platform mengikuti [docs/app-review-checklist.md](app-review-checklist.md)
+- [ ] Pengajuan akses API social platform (Meta / TikTok / LinkedIn / dll.) sudah diajukan & disetujui
 - [x] (Bila fitur render aktif) Modal function terdeploy + `MODAL_TOKEN`/`MODAL_RENDER_URL` terisi, `/video` jawab `renderEnabled: true` (§8)
 - [ ] (Bila fitur carousel aktif) app `sahabatkreator-carousel` terdeploy + `MODAL_CAROUSEL_URL` terisi, `/carousel` jawab `carouselEnabled: true` (§9); `PIXABAY_KEY` untuk mode stock (opsional)
 - [ ] (Bila fitur auto-clip aktif) app `sahabatkreator-clipper` terdeploy ke **akun Modal kedua** + `MODAL_CLIPPER_URL`/`MODAL_CLIPPER_TOKEN` terisi, `/auto-clip` jawab `clipperEnabled: true` (§10); `OPENROUTER_API_KEY` wajib untuk analysis
@@ -1029,13 +1030,11 @@ limit berbentuk JSON-RPC `-32000` saat tercapai, bukan `{message}` biasa.
 | [sahabatkreator.conf](../sahabatkreator.conf) | NGINX host-level + Cloudflare real IP + noindex staging |
 | [.env.prod.example](../.env.prod.example) | Template env produksi |
 | [.env.staging.example](../.env.staging.example) | Template env staging |
-| [docs/app-review-checklist.md](app-review-checklist.md) | Pengajuan akses API social platform |
 | [docs/rfc-video-render.md](rfc-video-render.md) | RFC fitur render (arsitektur, kenapa di luar server, biaya) |
 | [docs/rfc-carousel-render.md](rfc-carousel-render.md) | RFC fitur carousel render (fase, stock sourcing, export multi-platform) |
 | [docs/rfc-auto-clip.md](rfc-auto-clip.md) | RFC fitur auto-clip (seleksi momen, tiering URL T1/T2, alasan akun Modal kedua) |
 | [docs/rfc-public-api.md](rfc-public-api.md) | RFC Public API v1, API key, webhook keluar & server MCP (scope, signing, pool quota) |
 | [docs/mcp-remote.md](mcp-remote.md) | Pakai MCP remote `POST /mcp` dari agen AI (setup klien, rate limit, batasan) |
 | [docs/api-public-quickstart.md](api-public-quickstart.md) | Panduan cepat pemakaian `/v1` (auth, endpoint, webhook, verifikasi signature) |
-| [docs/pricing.md](pricing.md) | Struktur harga, limit paket, pool quota & kredit render/AI |
 | [apps/mcp/README.md](../apps/mcp/README.md) | Server MCP **stdio** — dijalankan di mesin pengguna (bukan di server) |
 | [apps/render-modal/README.md](../apps/render-modal/README.md) | Deploy Modal function (ffmpeg + Whisper) |

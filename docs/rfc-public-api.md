@@ -3,7 +3,7 @@
 Status: **diimplementasikan** (belum di-commit; migrasi `0007`–`0009` belum
 di-push ke staging/produksi)
 Tanggal: 26–27 Sep 2026
-Prasyarat: `docs/pricing.md` §6 & §9, `docs/deployment.md` §11
+Prasyarat: `docs/deployment.md` §11
 
 Fitur ini membuka Sahabat Kreator untuk integrasi eksternal — Zapier, Make,
 dashboard klien, dan agen AI lewat MCP — tanpa membuka satu pun endpoint
@@ -605,5 +605,5 @@ sebelumnya job Modal bisa dienqueue tanpa batas.
 | MCP — HTTP (`POST /mcp`) | `apps/server/src/routes/mcp.ts` |
 | OpenAPI | `packages/api/src/public-api/`, `scripts/public-api.json` |
 | UI | `apps/web/src/components/settings/{api-key,webhook}-settings.tsx` |
-| Harga & fitur | `docs/pricing.md`, `apps/web/src/lib/feature-catalog.ts` |
+| Harga & fitur | `apps/web/src/lib/feature-catalog.ts` (key), `packages/db/scripts/seed.ts` (paket) |
 | Panduan klien MCP | `apps/mcp/README.md`, `docs/mcp-remote.md` |

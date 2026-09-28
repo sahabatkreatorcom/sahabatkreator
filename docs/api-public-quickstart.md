@@ -232,8 +232,9 @@ lewat UI. Ringkasnya:
 | `auto-clip` | 5 (render) + 5 per klip yang dirender |
 
 Endpoint **baca** (`GET`) tidak memotong kredit. `GET /v1/trends` juga gratis
-(hanya meneruskan data tren eksternal). Tarif lengkap:
-[docs/pricing.md](pricing.md) §4–§5.
+(hanya meneruskan data tren eksternal). Tarif kredit render/AI per paket
+didefinisikan di `packages/db/scripts/seed.ts` dan bisa dilihat di
+**Admin Panel → Plans**.
 
 ---
 
