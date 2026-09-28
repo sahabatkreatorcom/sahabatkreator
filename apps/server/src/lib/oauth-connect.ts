@@ -1,0 +1,272 @@
+// Helper OAuth connect — pending seleksi entitas (Page Meta / profil LinkedIn) + upsert social account
+// Digunakan oleh route oauth.ts (callback) dan accounts.ts (picker entitas)
+
+import { db } from "@sahabatkreator/db";
+import { type PendingPageData, socialAccount } from "@sahabatkreator/db/schema";
+import { and, eq } from "drizzle-orm";
+import { decrypt, encrypt } from "./crypto";
+import { generateId } from "./id";
+
+/** TTL pending seleksi — 10 menit (kenapa: berisi token, jangan tinggal lama) */
+export const OAUTH_PENDING_TTL_MS = 10 * 60 * 1000;
+
+/** Bentuk mentah Page Meta dari fetchPlatformProfile / Graph API */
+export type RawMetaPage = {
+  id: string;
+  name: string;
+  access_token: string;
+  picture?: { data?: { url?: string } };
+  instagram_business_account?: {
+    id: string;
+    username?: string;
+    profile_picture_url?: string;
+  };
+};
+
+/** Company LinkedIn tempat user ADMIN (dari fetchPlatformProfile extra.organizations) */
+export type RawLinkedInOrganization = {
+  id: string;
+  name: string;
+  vanityName?: string | null;
+};
+
+/**
+ * Bangun data pending terenkripsi dari daftar Page Meta.
+ * Setiap page token dienkripsi AES-256-GCM at-rest.
+ */
+export function buildPendingPages(platform: "instagram" | "facebook", pages: RawMetaPage[]) {
+  const pagesData: PendingPageData[] = pages.map((p) => ({
+    pageId: p.id,
+    pageName: p.name,
+    pageAccessTokenEnc: encrypt(p.access_token),
+    igUserId: p.instagram_business_account?.id ?? null,
+    igUsername: p.instagram_business_account?.username ?? null,
+    // Instagram: avatar profil IG; Facebook: foto Page
+    avatarUrl: p.instagram_business_account?.profile_picture_url ?? p.picture?.data?.url ?? null,
+  }));
+  return {
+    id: generateId("oauthpend"),
+    platform,
+    pagesData: JSON.stringify(pagesData),
+    expiresAt: new Date(Date.now() + OAUTH_PENDING_TTL_MS),
+  };
+}
+
+/**
+ * Bangun data pending LinkedIn (multi-company, note.md #15).
+ * Opsi = profil pribadi (bila ada) + setiap company tempat user ADMIN.
+ * `person` kosong untuk platform `linkedin_org` (app Community Management API
+ * tanpa `openid` → tidak ada profil person, hanya halaman company).
+ * LinkedIn tidak punya token per-company (semua pakai token user-level) —
+ * token/refresh/expiry/scope disalin ke tiap entitas supaya select() seragam.
+ */
+export function buildPendingLinkedIn(params: {
+  person?: { sub: string; name: string };
+  organizations: RawLinkedInOrganization[];
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: Date | null;
+  scopes: string[];
+  platform?: "linkedin" | "linkedin_org";
+}) {
+  const {
+    person,
+    organizations,
+    accessToken,
+    refreshToken,
+    expiresAt,
+    scopes,
+    platform = "linkedin",
+  } = params;
+  const shared = {
+    pageAccessTokenEnc: encrypt(accessToken),
+    refreshTokenEnc: refreshToken ? encrypt(refreshToken) : null,
+    tokenExpiresAt: expiresAt ? expiresAt.toISOString() : null,
+    scopes,
+  };
+  const pagesData: PendingPageData[] = [
+    ...(person
+      ? [
+          {
+            pageId: `urn:li:person:${person.sub}`,
+            pageName: person.name,
+            igUserId: null,
+            igUsername: null,
+            ...shared,
+          },
+        ]
+      : []),
+    ...organizations.map((org) => ({
+      pageId: `urn:li:organization:${org.id}`,
+      pageName: org.name,
+      igUserId: null,
+      igUsername: null,
+      ...shared,
+    })),
+  ];
+  return {
+    id: generateId("oauthpend"),
+    platform,
+    pagesData: JSON.stringify(pagesData),
+    expiresAt: new Date(Date.now() + OAUTH_PENDING_TTL_MS),
+  };
+}
+
+/**
+ * Bangun data pending Pinterest — entitas = board (publish butuh board_id
+ * sebagai platformAccountId). Token user-level sama untuk semua board.
+ */
+export function buildPendingPinterest(params: {
+  username: string;
+  avatarUrl?: string | null;
+  boards: Array<{ id: string; name: string; privacy?: string }>;
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: Date | null;
+  scopes: string[];
+}) {
+  const { username, avatarUrl, boards, accessToken, refreshToken, expiresAt, scopes } = params;
+  const pagesData: PendingPageData[] = boards.map((board) => ({
+    pageId: board.id,
+    pageName: board.name,
+    pageAccessTokenEnc: encrypt(accessToken),
+    igUserId: null,
+    igUsername: username, // username Pinterest (sama utk semua board)
+    avatarUrl: avatarUrl ?? null, // foto profil akun Pinterest (sama utk semua board)
+    refreshTokenEnc: refreshToken ? encrypt(refreshToken) : null,
+    tokenExpiresAt: expiresAt ? expiresAt.toISOString() : null,
+    scopes,
+  }));
+  return {
+    id: generateId("oauthpend"),
+    platform: "pinterest" as const,
+    pagesData: JSON.stringify(pagesData),
+    expiresAt: new Date(Date.now() + OAUTH_PENDING_TTL_MS),
+  };
+}
+
+/**
+ * Upsert social account dari entitas terpilih.
+ * - instagram: pakai IG business account id sebagai platformAccountId (publish via IG Graph),
+ *   simpan pageId + pageAccessToken di metadata (pola sama dengan fetchPlatformProfile)
+ * - facebook: pakai page id, page access token langsung sebagai access token
+ * - linkedin: pakai URN owner (urn:li:person:{sub} | urn:li:organization:{id}),
+ *   access token = token user-level (LinkedIn tidak punya token per-company)
+ * - linkedin_org: sama seperti linkedin, tapi HANYA entitas organization
+ *   (app Community Management API tanpa `openid` → tidak ada person)
+ * - pinterest: pakai board id (publish butuh board_id), token user-level + RT rotating
+ *
+ * Return { account, existing } — existing=true bila re-connect (update token).
+ */
+export async function upsertSocialAccount(params: {
+  organizationId: string;
+  userId: string;
+  platform: "instagram" | "facebook" | "youtube" | "linkedin" | "linkedin_org" | "pinterest";
+  page: PendingPageData;
+  /** User access token fallback (dipakai facebook bila page token tak ada) */
+  userAccessToken: string;
+  tokenExpiresAt: Date | null;
+  scopes: string[];
+}) {
+  const { organizationId, platform, page, userAccessToken, tokenExpiresAt, scopes } = params;
+
+  let platformAccountId: string;
+  let username: string;
+  let accessTokenEnc: string;
+  let metadata: Record<string, unknown>;
+  let effectiveExpiresAt: Date | null;
+  let effectiveScopes: string[];
+  let refreshTokenEnc: string | null = null;
+
+  if (platform === "linkedin" || platform === "linkedin_org") {
+    platformAccountId = page.pageId; // URN lengkap person/organization
+    username = page.pageName;
+    accessTokenEnc = page.pageAccessTokenEnc; // token user-level (terenkripsi)
+    metadata = {
+      ownerType:
+        platform === "linkedin_org" || page.pageId.startsWith("urn:li:organization:")
+          ? "organization"
+          : "person",
+    };
+    effectiveExpiresAt = page.tokenExpiresAt ? new Date(page.tokenExpiresAt) : null;
+    effectiveScopes = page.scopes ?? scopes;
+    refreshTokenEnc = page.refreshTokenEnc ?? null;
+  } else if (platform === "pinterest") {
+    platformAccountId = page.pageId; // board_id — target publish pin
+    username = page.igUsername ?? page.pageName; // username akun Pinterest
+    accessTokenEnc = page.pageAccessTokenEnc; // token user-level (terenkripsi)
+    metadata = { boardId: page.pageId, boardName: page.pageName };
+    effectiveExpiresAt = page.tokenExpiresAt ? new Date(page.tokenExpiresAt) : null;
+    effectiveScopes = page.scopes ?? scopes;
+    refreshTokenEnc = page.refreshTokenEnc ?? null; // RT rotating — persist setiap connect
+  } else {
+    const isInstagram = platform === "instagram";
+    platformAccountId = isInstagram ? (page.igUserId ?? page.pageId) : page.pageId;
+    username = isInstagram ? (page.igUsername ?? page.pageName) : page.pageName;
+    accessTokenEnc = page.pageAccessTokenEnc; // sudah terenkripsi
+    metadata = {
+      pageId: page.pageId,
+      // PLAINTEXT — konsumer (engagement-sync, dm-sync, reply, posts-sync)
+      // memakai langsung sebagai access_token Graph. Pola sama jalur single-Page
+      // (metadata = profile.extra, pageAccessToken plaintext).
+      pageAccessToken: decrypt(page.pageAccessTokenEnc),
+    };
+    if (!isInstagram) metadata.userAccessToken = encrypt(userAccessToken);
+    effectiveExpiresAt = tokenExpiresAt; // page token long-lived; expiry diurus worker token-refresh
+    effectiveScopes = scopes;
+  }
+
+  const [existing] = await db
+    .select({ id: socialAccount.id, organizationId: socialAccount.organizationId })
+    .from(socialAccount)
+    .where(
+      and(
+        eq(socialAccount.platform, platform),
+        eq(socialAccount.platformAccountId, platformAccountId),
+      ),
+    )
+    .limit(1);
+
+  if (existing) {
+    if (existing.organizationId !== organizationId) {
+      return { conflict: true as const };
+    }
+    await db
+      .update(socialAccount)
+      .set({
+        username,
+        displayName: page.pageName,
+        avatarUrl: page.avatarUrl ?? null,
+        accessTokenEnc,
+        ...(refreshTokenEnc ? { refreshTokenEnc } : {}),
+        tokenExpiresAt: effectiveExpiresAt,
+        scopes: effectiveScopes,
+        isConnected: true,
+        needsReconnect: false,
+        lastError: null,
+        metadata,
+        lastSyncedAt: new Date(),
+      })
+      .where(eq(socialAccount.id, existing.id));
+    return { conflict: false as const, existing: true as const };
+  }
+
+  const id = generateId("socacc");
+  await db.insert(socialAccount).values({
+    id,
+    organizationId,
+    platform,
+    platformAccountId,
+    username,
+    displayName: page.pageName,
+    avatarUrl: page.avatarUrl ?? null,
+    accessTokenEnc,
+    refreshTokenEnc,
+    tokenExpiresAt: effectiveExpiresAt,
+    scopes: effectiveScopes,
+    isConnected: true,
+    metadata,
+    lastSyncedAt: new Date(),
+  });
+  return { conflict: false as const, existing: false as const };
+}

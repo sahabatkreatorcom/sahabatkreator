@@ -1,0 +1,1 @@
+Split code jika terlalu panjang

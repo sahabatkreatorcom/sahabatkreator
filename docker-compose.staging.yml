@@ -1,0 +1,130 @@
+# ============================================================================
+# Sahabat Kreator — STAGING (app.sahabatkreator.com)
+#
+#   DB: Neon Serverless Postgres (DATABASE_URL di .env.staging — staging
+#       memakai Neon; PRODUKSI memakai container postgres sendiri, lihat
+#       docker-compose.prod.yml). Redis tetap container.
+#   App di 127.0.0.1:3002 (toeflynk memakai 3000; prod memakai 3001).
+#   Reverse proxy: NGINX host-level (/etc/nginx/conf.d/sahabatkreator.conf)
+#   dengan SSL Cloudflare Origin — bukan container NGINX.
+#
+#   ⚠️  STAGING = NOINDEX berlapis:
+#       1. Build arg INDEXABLE kosong  → vite build guard menulis robots.txt
+#          "Disallow: /", menghapus sitemap.xml, dan menyuntik meta noindex.
+#       2. seo.ts runtime deteksi hostname → canonical tetap sahabatkreator.com.
+#       3. Middleware Hono → header X-Robots-Tag: noindex.
+#       4. NGINX host → add_header X-Robots-Tag "noindex, nofollow" always.
+#
+#   SITE_URL build arg TETAP https://sahabatkreator.com (canonical mengarah ke
+#   produksi) agar staging tidak membuat canonical palsu di SERP.
+#
+# Project name eksplisit — WAJIB berbeda dengan produksi.
+#
+# Pertama kali:
+#   cp .env.staging.example .env.staging   # lalu isi nilainya
+#   docker compose -f docker-compose.staging.yml up -d --build
+# ============================================================================
+
+name: sahabatkreator-staging
+
+x-app-build: &app-build
+  context: .
+  dockerfile: Dockerfile
+  args:
+    SERVER_URL: https://app.sahabatkreator.com
+    # Canonical TETAP domain produksi — jangan diganti ke app.*
+    SITE_URL: https://sahabatkreator.com
+    # Kosong → staging SEO guard aktif saat build web (noindex total).
+    INDEXABLE: ""
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: sahabatkreator-staging-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_staging_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    # Tanpa password & tanpa mapping port host — hanya jaringan internal.
+
+  migrate:
+    build: *app-build
+    image: sahabatkreator-app:staging
+    restart: "no"
+    env_file: .env.staging
+    working_dir: /app
+    # Sinkronisasi skema + seed idempoten pada DB staging (Neon terpisah).
+    command:
+      [
+        "sh",
+        "-c",
+        "cd /app/packages/db && bunx drizzle-kit push --force && bun scripts/seed.ts",
+      ]
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  app:
+    build: *app-build
+    image: sahabatkreator-app:staging
+    container_name: sahabatkreator-staging-app
+    restart: unless-stopped
+    env_file: .env.staging
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+    # Resource limits staging — lebih kecil dari prod.
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 0.75
+    ports:
+      - "127.0.0.1:3002:3000" # nginx host proxy ke sini (app.sahabatkreator.com)
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "await fetch('http://127.0.0.1:3000/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    build: *app-build
+    image: sahabatkreator-app:staging
+    container_name: sahabatkreator-staging-worker
+    restart: unless-stopped
+    working_dir: /app/apps/worker
+    # Worker jalan langsung dari source (bun run TS) — tanpa step build terpisah.
+    command: ["bun", "run", "src/index.ts"]
+    env_file: .env.staging
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: 0.75
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      app:
+        condition: service_healthy
+
+volumes:
+  redis_staging_data:

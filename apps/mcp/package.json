@@ -1,0 +1,21 @@
+{
+  "name": "@sahabatkreator/mcp",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@sahabatkreator/api": "workspace:*",
+    "@sahabatkreator/env": "workspace:*",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@sahabatkreator/config": "workspace:*",
+    "typescript": "^6.0.3"
+  }
+}

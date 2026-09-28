@@ -1,0 +1,649 @@
+// Halaman Akun Sosmed — hubungkan / putuskan akun social media
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  CalendarDays,
+  Check,
+  Copy,
+  ExternalLink,
+  Info,
+  Link2,
+  Loader2,
+  Plus,
+  RefreshCw,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
+import { toast } from "sonner";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/modal";
+import { PageLoader } from "@/components/ui/spinner";
+import { meQueryOptions } from "@/layouts/require-auth";
+import { api } from "@/lib/api";
+import { formatDate } from "@/lib/format";
+import { PLATFORMS } from "@/lib/platforms";
+import { queryKeys } from "../../lib/query-keys";
+import { AccountInfoModal, BridgeStats, PagePickerModal } from "./accounts-modals";
+import { type Account, tokenExpiryStatus } from "./accounts-types";
+
+export function AccountsPage() {
+  const queryClient = useQueryClient();
+  const [manualModal, setManualModal] = useState(false);
+  const [manualUsername, setManualUsername] = useState("");
+  const [blueskyModal, setBlueskyModal] = useState(false);
+  const [blueskyHandle, setBlueskyHandle] = useState("");
+  const [blueskyPassword, setBlueskyPassword] = useState("");
+  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [platformDialogOpen, setPlatformDialogOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [reconnectingId, setReconnectingId] = useState<string | null>(null);
+  const [infoAccount, setInfoAccount] = useState<Account | null>(null);
+
+  // Nama organisasi aktif (untuk label sinkronisasi)
+  const { data: me } = useQuery(meQueryOptions);
+  const orgName = me?.organization?.name;
+
+  // Banner hasil OAuth callback (redirect dari server)
+  // + deteksi ?pending= → buka modal picker Page Meta
+  const pendingId = searchParams.get("pending");
+  const [pendingModalOpen, setPendingModalOpen] = useState(false);
+
+  useEffect(() => {
+    const success = searchParams.get("connect_success");
+    const error = searchParams.get("connect_error");
+    if (success) {
+      toast.success(
+        `Akun ${PLATFORMS[success as keyof typeof PLATFORMS]?.label ?? success} berhasil dihubungkan`,
+      );
+      setSearchParams({}, { replace: true });
+    } else if (error) {
+      toast.error(decodeURIComponent(error));
+      setSearchParams({}, { replace: true });
+    } else if (searchParams.get("pending")) {
+      setPendingModalOpen(true);
+    }
+  }, [searchParams, setSearchParams]);
+
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.accounts,
+    queryFn: () => api.get<{ accounts: Account[] }>("/accounts"),
+  });
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.accounts });
+
+  // Filter platform (local — daftar di-derive dari akun + konfig PLATFORMS)
+  const [platformFilter, setPlatformFilter] = useState<string>("all");
+  const allAccounts = data?.accounts ?? [];
+  const platformOptions = [
+    { key: "all", label: "Semua platform" },
+    ...Object.keys(PLATFORMS)
+      .filter((p) => allAccounts.some((a) => a.platform === p))
+      .map((p) => ({ key: p, label: PLATFORMS[p as keyof typeof PLATFORMS].label })),
+  ];
+  const accounts =
+    platformFilter === "all"
+      ? allAccounts
+      : allAccounts.filter((a) => a.platform === platformFilter);
+
+  async function startConnect(platform: string) {
+    setPlatformDialogOpen(false);
+    if (platform === "bluesky") {
+      setBlueskyModal(true);
+      return;
+    }
+    setConnectingPlatform(platform);
+    try {
+      const { authorizeUrl } = await api.get<{ authorizeUrl: string }>(`/oauth/${platform}/start`);
+      window.location.href = authorizeUrl;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal memulai koneksi");
+      setConnectingPlatform(null);
+    }
+  }
+
+  const connectManual = useMutation({
+    mutationFn: () =>
+      api.post<{ account: Account }>("/accounts/connect-manual", {
+        platform: "manual",
+        username: manualUsername,
+      }),
+    onSuccess: () => {
+      invalidate();
+      setManualModal(false);
+      setManualUsername("");
+      toast.success("Akun ditambahkan");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const connectBluesky = useMutation({
+    mutationFn: () =>
+      api.post<{ handle: string }>("/oauth/bluesky/connect", {
+        handle: blueskyHandle,
+        appPassword: blueskyPassword,
+      }),
+    onSuccess: (data) => {
+      invalidate();
+      setBlueskyModal(false);
+      setBlueskyHandle("");
+      setBlueskyPassword("");
+      toast.success(`Bluesky @${data.handle} terhubung`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const disconnect = useMutation({
+    mutationFn: (id: string) => api.delete(`/accounts/${id}`),
+    onSuccess: () => {
+      invalidate();
+      toast.success("Akun diputuskan");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const reconnect = useMutation({
+    mutationFn: (platform: string) => api.get<{ authorizeUrl: string }>(`/oauth/${platform}/start`),
+    onSuccess: (data) => {
+      window.location.href = data.authorizeUrl;
+    },
+    onError: (e: Error) => {
+      toast.error(e.message);
+      setReconnectingId(null);
+    },
+  });
+
+  function copyUsername(username: string, id: string) {
+    navigator.clipboard.writeText(`@${username}`);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  if (isLoading) return <PageLoader />;
+
+  const platformEntries = Object.entries(PLATFORMS).filter(([key]) => key !== "manual");
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-bold text-2xl">Akun Social Media</h1>
+          <p className="mt-1 text-[var(--text-secondary)] text-sm">
+            Hubungkan akun Anda untuk mulai posting dan memantau performa
+          </p>
+        </div>
+        <Button onClick={() => setPlatformDialogOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Hubungkan Akun
+        </Button>
+      </div>
+
+      {/* Filter platform */}
+      {allAccounts.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[var(--text-muted)] text-xs">Filter:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {platformOptions.map((opt) => {
+              const active = platformFilter === opt.key;
+              const cfg = opt.key !== "all" ? PLATFORMS[opt.key as keyof typeof PLATFORMS] : null;
+              const Icon = cfg?.icon;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setPlatformFilter(opt.key)}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                    active
+                      ? "border-[var(--accent-gold)] bg-[var(--accent-gold-light)] font-medium text-[var(--text-primary)]"
+                      : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent-gold)] hover:bg-[var(--bg-tertiary)]"
+                  }`}
+                >
+                  {Icon && (
+                    <Icon className="h-3.5 w-3.5" style={cfg ? { color: cfg.color } : undefined} />
+                  )}
+                  {opt.label}
+                  <span className="text-[var(--text-muted)]">
+                    {opt.key === "all"
+                      ? allAccounts.length
+                      : allAccounts.filter((a) => a.platform === opt.key).length}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Akun terhubung */}
+      {accounts.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {accounts.map((account) => {
+            const cfg = PLATFORMS[account.platform as keyof typeof PLATFORMS];
+            const Icon = cfg?.icon;
+            const needsReconnection =
+              !account.isConnected || !!account.lastError || account.needsReconnect;
+            // Hanya tampilkan warning jika TIDAK punya refresh token (karena jika punya, system auto-refresh)
+            const expiry =
+              !needsReconnection && !account.hasRefreshToken
+                ? tokenExpiryStatus(account.tokenExpiresAt)
+                : null;
+            const cardHighlight = needsReconnection
+              ? "border-orange-300 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-950/20"
+              : expiry?.variant === "danger"
+                ? "border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20"
+                : expiry?.variant === "warning"
+                  ? "border-yellow-300 bg-yellow-50/40 dark:border-yellow-700 dark:bg-yellow-950/20"
+                  : "";
+
+            return (
+              <div key={account.id} className={`card flex flex-col p-5 ${cardHighlight}`}>
+                {/* Top: Avatar user (fallback icon platform) + name + status badge, info button */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {account.avatarUrl ? (
+                      <Avatar
+                        src={account.avatarUrl}
+                        alt={account.displayName ?? account.username}
+                        name={account.displayName ?? account.username}
+                        size="lg"
+                        className="ring-2"
+                        style={
+                          cfg
+                            ? {
+                                boxShadow: `0 0 0 2px ${cfg.color}33, 0 0 0 1px ${cfg.color}`,
+                              }
+                            : undefined
+                        }
+                      />
+                    ) : (
+                      Icon && (
+                        <div
+                          className="flex h-10 w-10 items-center justify-center rounded-full"
+                          style={{ backgroundColor: `${cfg.color}1a` }}
+                        >
+                          <Icon className="h-5 w-5" style={{ color: cfg.color }} />
+                        </div>
+                      )
+                    )}
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{cfg?.label ?? account.platform}</span>
+                      {needsReconnection ? (
+                        <Badge variant="warning">Needs reconnection</Badge>
+                      ) : (
+                        <Badge variant="success">connected</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setInfoAccount(account)}
+                    className="rounded-full p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                    title="Informasi akun"
+                  >
+                    <Info className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Reconnection warning */}
+                {needsReconnection && (
+                  <div className="mt-3 flex items-center gap-1.5 text-orange-600 text-sm dark:text-orange-400">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>Perlu dihubungkan ulang</span>
+                  </div>
+                )}
+
+                {/* Token expiry warning */}
+                {!needsReconnection && expiry && (
+                  <div
+                    className={`mt-3 flex items-center gap-1.5 text-sm ${
+                      expiry.variant === "danger"
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-yellow-600 dark:text-yellow-400"
+                    }`}
+                  >
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>{expiry.label} — segera reconnect</span>
+                  </div>
+                )}
+
+                {/* Username + copy */}
+                <div className="mt-4">
+                  {/* Statistik ringan dari Repliz (post/komentar/DM terkini).
+                      Hanya untuk akun bridge; fetch on-demand, cache 5 menit. */}
+                  {account.isBridge && account.isConnected && (
+                    <BridgeStats accountId={account.id} />
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium text-[var(--text-primary)] text-sm">
+                      @{account.username}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => copyUsername(account.username, account.id)}
+                      className="rounded p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                      title="Salin username"
+                    >
+                      {copiedId === account.id ? (
+                        <Check className="h-3.5 w-3.5 text-[var(--success)]" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5 text-[var(--text-muted)] text-xs">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    <span>Terhubung {formatDate(account.createdAt, "medium")}</span>
+                  </div>
+                </div>
+
+                {/* Last sync */}
+                {account.lastSyncedAt && (
+                  <div className="mt-3 flex items-center gap-2 text-[var(--text-muted)] text-xs">
+                    <RefreshCw className="h-3 w-3" />
+                    <span>
+                      Terakhir sinkron {formatDate(account.lastSyncedAt, "medium")}
+                      {orgName ? ` oleh ${orgName}` : ""}
+                    </span>
+                  </div>
+                )}
+
+                {/* Error message */}
+                {account.lastError && !needsReconnection && (
+                  <p className="mt-2 text-red-500 text-xs">{account.lastError}</p>
+                )}
+
+                {/* Actions */}
+                <div className="mt-auto pt-4">
+                  {needsReconnection || expiry ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          className={`flex-1 ${
+                            expiry?.variant === "danger"
+                              ? "bg-red-500 text-white hover:bg-red-600"
+                              : expiry?.variant === "warning"
+                                ? "bg-yellow-500 text-white hover:bg-yellow-600"
+                                : "bg-orange-500 hover:bg-orange-600"
+                          }`}
+                          onClick={() => {
+                            setReconnectingId(account.id);
+                            reconnect.mutate(account.platform);
+                          }}
+                          disabled={reconnect.isPending}
+                        >
+                          {reconnect.isPending && reconnectingId === account.id && (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          )}
+                          Reconnect
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => disconnect.mutate(account.id)}
+                          disabled={disconnect.isPending}
+                        >
+                          Disconnect
+                        </Button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReconnectingId(account.id);
+                          reconnect.mutate(account.platform);
+                        }}
+                        className="flex w-full items-center justify-center gap-1.5 text-[var(--text-secondary)] text-xs hover:text-[var(--text-primary)]"
+                        disabled={reconnect.isPending}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        {reconnect.isPending && reconnectingId === account.id
+                          ? "Loading..."
+                          : "Reconnect link"}
+                      </button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => disconnect.mutate(account.id)}
+                      disabled={disconnect.isPending}
+                    >
+                      Disconnect
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Empty state — filter aktif tapi tidak ada akun untuk platform tsb */}
+      {allAccounts.length > 0 && accounts.length === 0 && (
+        <EmptyState
+          icon={<Link2 className="h-6 w-6" />}
+          title="Tidak ada akun untuk platform ini"
+          description={`Belum ada akun ${
+            platformOptions.find((o) => o.key === platformFilter)?.label ?? ""
+          } yang terhubung.`}
+        />
+      )}
+
+      {/* Empty state — belum ada akun sama sekali */}
+      {allAccounts.length === 0 && (
+        <EmptyState
+          icon={<Link2 className="h-6 w-6" />}
+          title="Belum ada akun terhubung"
+          description="Hubungkan akun social media Anda untuk memulai."
+        />
+      )}
+
+      {/* Dialog Pilih Platform */}
+      {platformDialogOpen && (
+        <Modal
+          open
+          onClose={() => setPlatformDialogOpen(false)}
+          title="Hubungkan Akun"
+          description="Pilih platform yang ingin Anda hubungkan"
+          size="lg"
+        >
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {platformEntries.map(([key, cfg]) => {
+              const Icon = cfg.icon;
+              const connected = accounts.some((a) => a.platform === key && a.isConnected);
+              const connecting = connectingPlatform === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => startConnect(key)}
+                  disabled={connecting}
+                  className={`flex items-center gap-3 rounded-[var(--radius-lg)] border p-4 text-left transition-colors ${
+                    connecting
+                      ? "border-[var(--accent-gold)] opacity-70"
+                      : "border-[var(--border)] hover:border-[var(--accent-gold)] hover:bg-[var(--bg-tertiary)]"
+                  }`}
+                >
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                    style={{ backgroundColor: `${cfg.color}1a` }}
+                  >
+                    <Icon className="h-5 w-5" style={{ color: cfg.color }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm">{cfg.label}</p>
+                    <p className="text-[var(--text-muted)] text-xs">
+                      {connecting ? "Membuka..." : connected ? "Sudah terhubung" : "Hubungkan"}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Hint multi-channel YouTube (note.md #14): satu koneksi = satu channel;
+              channel lain = connect ulang & pilih akun Google channel tsb. */}
+          {accounts.some((a) => a.platform === "youtube") && (
+            <p className="text-[var(--text-muted)] text-xs">
+              Tips YouTube: satu koneksi = satu channel. Untuk mengelola channel lain, hubungkan
+              YouTube lagi — saat layar login Google, pilih akun channel yang dituju.
+            </p>
+          )}
+
+          {/* Akun manual */}
+          <div className="mt-4 rounded-[var(--radius-lg)] border border-[var(--border)] border-dashed p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-medium text-sm">Akun Manual (Reminder)</p>
+                <p className="text-[var(--text-secondary)] text-xs">
+                  Tambahkan akun sebagai pengingat posting manual
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPlatformDialogOpen(false);
+                  setManualModal(true);
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Tambah Manual
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal akun manual */}
+      {manualModal && (
+        <Modal open onClose={() => setManualModal(false)} title="Tambah Akun Manual">
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              connectManual.mutate();
+            }}
+          >
+            <div>
+              <label className="mb-2 block font-medium text-sm" htmlFor="manual-username">
+                Username
+              </label>
+              <Input
+                id="manual-username"
+                placeholder="mis. akun.instagramku"
+                value={manualUsername}
+                onChange={(e) => setManualUsername(e.target.value)}
+                required
+                maxLength={100}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setManualModal(false)}>
+                Batal
+              </Button>
+              <Button type="submit" disabled={connectManual.isPending || !manualUsername.trim()}>
+                {connectManual.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Tambah
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal Bluesky app password */}
+      {blueskyModal && (
+        <Modal open onClose={() => setBlueskyModal(false)} title="Hubungkan Bluesky">
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              connectBluesky.mutate();
+            }}
+          >
+            <div>
+              <Label htmlFor="bluesky-handle">Handle</Label>
+              <Input
+                id="bluesky-handle"
+                placeholder="mis. kreatorku.bsky.social"
+                value={blueskyHandle}
+                onChange={(e) => setBlueskyHandle(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="bluesky-password">App Password</Label>
+              <Input
+                id="bluesky-password"
+                type="password"
+                placeholder="Buat di Settings → App passwords (bukan password utama)"
+                value={blueskyPassword}
+                onChange={(e) => setBlueskyPassword(e.target.value)}
+                required
+              />
+            </div>
+            <p className="text-[var(--text-muted)] text-xs">
+              Gunakan App Password dari pengaturan keamanan Bluesky — bukan password akun Anda.
+              Dapat dihapus kapan saja dari sisi Bluesky.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setBlueskyModal(false)}>
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  connectBluesky.isPending || !blueskyHandle.trim() || !blueskyPassword.trim()
+                }
+              >
+                {connectBluesky.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Hubungkan
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {/* Modal detail informasi akun */}
+      {infoAccount && (
+        <AccountInfoModal
+          account={infoAccount}
+          orgName={orgName}
+          onClose={() => setInfoAccount(null)}
+        />
+      )}
+
+      {/* Modal picker Page Meta (hasil OAuth multi-Page) */}
+      {pendingModalOpen && pendingId && (
+        <PagePickerModal
+          pendingId={pendingId}
+          onClose={() => {
+            setPendingModalOpen(false);
+            setSearchParams({}, { replace: true });
+          }}
+          onConnected={() => {
+            setPendingModalOpen(false);
+            setSearchParams({}, { replace: true });
+            invalidate();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Statistik ringan akun bridge Repliz (jumlah post terjadwal, komentar masuk,
+ * DM belum dibaca). Di-fetch on-demand saat kartu ditampilkan dan di-cache
+ * 5 menit — analytics Repliz tidak boleh disimpan ke DB (lihat catatan
+ * Pinterest sandbox di MEMORY.md, aturan yang sama berlaku untuk semua
+ * statistik bridge on-demand).
+ */

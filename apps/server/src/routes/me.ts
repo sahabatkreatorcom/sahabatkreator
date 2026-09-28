@@ -1,0 +1,83 @@
+// API Me — session user + organizations + limits untuk shell web
+
+import { db } from "@sahabatkreator/db";
+import {
+  member,
+  organization,
+  platformSettings,
+  user as userTable,
+} from "@sahabatkreator/db/schema";
+import { eq } from "drizzle-orm";
+import { Hono } from "hono";
+import { errorResponse, getAuthContext } from "../lib/auth-guard";
+import { getOrgLimits } from "../lib/billing";
+
+export const meRoute = new Hono();
+
+/** GET /me — user + org aktif + daftar org (untuk org switcher) + limits */
+meRoute.get("/", async (c) => {
+  try {
+    // Flag registrasi terbuka (admin settings) — dikirim utk guest & authed
+    // agar halaman /register bisa menyembunyikan form saat ditutup.
+    const [settings] = await db
+      .select({ registrationEnabled: platformSettings.registrationEnabled })
+      .from(platformSettings)
+      .where(eq(platformSettings.id, "singleton"));
+    const registrationEnabled = settings?.registrationEnabled ?? true;
+
+    const ctx = await getAuthContext(c);
+    // Guest → 200 + authenticated:false (bukan 401) — halaman login/register
+    // memanggil /me untuk cek session; 401 menimbulkan error console yang
+    // tampak seperti bug padahal kondisi normal.
+    if (!ctx)
+      return c.json({
+        authenticated: false,
+        user: null,
+        organization: null,
+        organizations: [],
+        limits: null,
+        registrationEnabled,
+      });
+
+    // Ambil flag 2FA terbaru dari tabel user
+    const [userRow] = await db
+      .select({ twoFactorEnabled: userTable.twoFactorEnabled })
+      .from(userTable)
+      .where(eq(userTable.id, ctx.user.id))
+      .limit(1);
+
+    // Daftar semua org tempat user jadi member (untuk org switcher)
+    const memberships = await db
+      .select({
+        id: organization.id,
+        name: organization.name,
+        slug: organization.slug,
+        logo: organization.logo,
+        role: member.role,
+      })
+      .from(member)
+      .innerJoin(organization, eq(member.organizationId, organization.id))
+      .where(eq(member.userId, ctx.user.id));
+
+    const limits = ctx.organization ? await getOrgLimits(ctx.organization.id) : null;
+
+    return c.json({
+      authenticated: true,
+      user: {
+        id: ctx.user.id,
+        name: ctx.user.name,
+        email: ctx.user.email,
+        emailVerified: ctx.user.emailVerified,
+        image: ctx.user.image,
+        role: ctx.user.role,
+        twoFactorEnabled: userRow?.twoFactorEnabled ?? false,
+      },
+      organization: ctx.organization,
+      organizations: memberships,
+      limits,
+      registrationEnabled,
+    });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});

@@ -1,0 +1,35 @@
+# ============================================================================
+# Normalisasi line ending.
+#
+# Repo ini di-deploy ke Linux (Docker + shell script cron di server). Tanpa
+# file ini, `core.autocrlf=true` di Windows menulis CRLF ke working copy,
+# sehingga `deploy/*.sh` gagal di server dengan:
+#     bash: ./backup-postgres.sh: /bin/bash^M: bad interpreter
+# Pakai LF di mana-mana — semua tooling repo (biome, vite, bun) sudah LF.
+# ============================================================================
+* text=auto eol=lf
+
+# Shell script WAJIB LF — dijalankan langsung di server Linux.
+*.sh text eol=lf
+
+# Lockfile: biarkan LF supaya diff tetap deterministik antar-OS.
+bun.lock text eol=lf
+
+# Biner — jangan pernah dinormalisasi / di-diff sebagai teks.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.avif binary
+*.ico  binary
+*.svg  text eol=lf
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.mp4  binary
+*.mov  binary
+*.mp3  binary
+*.wav  binary
+*.pdf  binary

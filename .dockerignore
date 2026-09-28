@@ -1,0 +1,40 @@
+# Context Docker build = root monorepo. Jangan ikutkan yang berikut agar
+# image bersih dan secret tidak ikut ter-bake:
+
+# Dependencies & cache
+node_modules
+**/node_modules
+.turbo
+.cache
+
+# Build outputs (dibangun ulang di dalam container)
+dist
+**/dist
+apps/server/web-dist
+coverage
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.crt
+*.key
+*.pem
+
+# Catatan pribadi
+catatan.md
+
+# Deployment config milik server (disalin manual, lihat docs/deployment.md)
+deploy/.env.prod
+deploy/.env.staging
+
+# IDE & OS
+.git
+.vscode
+.idea
+.DS_Store
+*.log
+
+# Tauri
+apps/web/src-tauri/target
+apps/web/src-tauri/gen

@@ -1,0 +1,9 @@
+{
+  "extends": "@sahabatkreator/config/tsconfig.base.json",
+  // Root tsconfig BUKAN build target — dipakai editor & tooling untuk resolve
+  // seluruh repo. Tanpa noEmit, `tsc`/`turbo check-types` dari root memuntahkan
+  // file .js di samping tiap source (sudah terjadi: 420 artefak, 27 Sep 2026).
+  "compilerOptions": {
+    "noEmit": true
+  }
+}

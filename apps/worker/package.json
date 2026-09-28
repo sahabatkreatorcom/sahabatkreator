@@ -1,0 +1,26 @@
+{
+  "name": "worker",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@sahabatkreator/auth": "workspace:*",
+    "@sahabatkreator/db": "workspace:*",
+    "@sahabatkreator/env": "workspace:*",
+    "@sahabatkreator/publishing": "workspace:*",
+    "@sahabatkreator/queue": "workspace:*",
+    "bullmq": "^6.3.4",
+    "drizzle-orm": "^0.45.2",
+    "hono": "catalog:",
+    "ioredis": "^5.4.1"
+  },
+  "devDependencies": {
+    "@sahabatkreator/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript": "^6.0.3"
+  }
+}

@@ -1,0 +1,91 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build outputs
+dist
+build
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env*.local
+# Env deploy (dipakai docker-compose.prod.yml / .staging.yml) — template .example tetap ikut commit
+.env.prod
+.env.staging
+
+# IDEs and editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Turbo
+.turbo
+
+# Better Fullstack
+.alchemy
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+*.tgz
+.cache
+tmp
+temp
+# Script sekali-pakai (smoke test / verifikasi manual). Pola "tmp"/"temp" di atas
+# hanya menangkap file yang namanya PERSIS itu — bukan file ber-prefix seperti
+# tmp-e2e-webhook.ts. Tambahkan prefix di sini supaya tidak ikut ter-commit.
+tmp-*.ts
+tmp-*.tsx
+tmp-*.js
+tmp-*.mjs
+tmp-*.cjs
+# Artefak preview OpenAPI di root repo. Spec kanonik yang di-commit dan
+# diverifikasi `openapi:verify` adalah packages/api/scripts/public-api.json.
+/public-api-preview.json
+/public-api-report.txt
+# TLS certificate & private key (Cloudflare Origin CA dll.) — jangan pernah masuk repo
+*.key
+*.crt
+*.pem
+# Better Fullstack recovery snapshots
+.bts/recovery
+# docs/ mayoritas catatan pribadi (RFC desain, analisis bisnis, harga) — TIDAK
+# di-commit. Hanya dokumen operasional yang ikut repo. Polanya WAJIB `docs/*` +
+# negasi: git TIDAK bisa re-include sebuah file bila direktori induknya
+# di-ignore secara utuh (`docs/`), jadi `!docs/x.md` saja tidak akan bekerja.
+docs/*
+!docs/deployment.md
+!docs/mcp-remote.md
+!docs/api-public-quickstart.md
+!docs/rfc-public-api.md
+meta-scope.md
+# Artefak tool AI lokal (worktree) — bukan bagian kode produk.
+.kilo/
+# Catatan internal sesi AI (strategi, analisis bisnis) — tidak untuk repo.
+# Path ini juga dicek pre-commit; jangan commit apa pun di dalamnya.
+.workbuddy-ai/
+__pycache__/
+*.pyc
+
+# Carousel renderer local smoke test output
+apps/render-modal/test-output/

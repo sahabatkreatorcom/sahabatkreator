@@ -1,0 +1,1 @@
+ALTER TABLE "video_job" ADD COLUMN "published_to_gallery" boolean DEFAULT false NOT NULL;

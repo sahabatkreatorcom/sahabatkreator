@@ -1,0 +1,180 @@
+# ============================================================================
+# Sahabat Kreator — PRODUKSI (sahabatkreator.com)
+#
+#   DB: PostgreSQL 17 CONTAINER (service "postgres" — data persisten di volume
+#       postgres_data, hanya jaringan internal Docker). STAGING memakai Neon;
+#       produksi self-hosted di server ini.
+#   Redis tetap container untuk BullMQ.
+#   App di 127.0.0.1:3001 (toeflynk memakai 3000; staging memakai 3002).
+#   Reverse proxy: NGINX host-level (/etc/nginx/conf.d/sahabatkreator.conf)
+#   dengan SSL Cloudflare Origin — bukan container NGINX.
+#
+# Project name eksplisit — WAJIB berbeda dengan staging agar container
+# kedua environment tidak saling menimpa saat `up -d`.
+#
+# ⚠️ POSTGRES_PASSWORD di-interpolate dari .env.prod → WAJIB --env-file.
+#
+# Pertama kali:
+#   cp .env.prod.example .env.prod   # lalu isi nilainya
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+#
+# Urutan service: postgres & redis sehat → migrate (db:push + seed, jalan
+#   sekali) → app & worker.
+#
+# DATABASE_URL TIDAK diambil dari .env.prod — di-set otomatis oleh compose
+# (environment meng-override env_file) mengarah ke container postgres.
+#
+# ⚠️ JANGAN pakai postgres:18 — drizzle-kit 0.31 tidak kompatibel dengan PG18
+#     (PG18 memindahkan NOT NULL ke pg_constraint → push salah deteksi diff /
+#     crash saat introspeksi). Turunkan ke 17 sampai drizzle-kit 1.0 stabil.
+# ============================================================================
+
+name: sahabatkreator
+
+x-app-build: &app-build
+  context: .
+  dockerfile: Dockerfile
+  args:
+    SERVER_URL: https://sahabatkreator.com
+    SITE_URL: https://sahabatkreator.com
+    # "true" HANYA produksi → build web indexable (robots + sitemap + meta index)
+    INDEXABLE: "true"
+    # GA4 Measurement ID produksi — tracking hanya di domain produksi.
+    GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID}
+
+# Koneksi DB internal (di-merge ke environment tiap service app).
+# POSTGRES_PASSWORD di-interpolate dari --env-file .env.prod.
+x-db-env: &db-env
+  DATABASE_URL: postgresql://sahabatkreator:${POSTGRES_PASSWORD:?Isi POSTGRES_PASSWORD di .env.prod}@postgres:5432/sahabatkreator
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: sahabatkreator-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sahabatkreator
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Isi POSTGRES_PASSWORD di .env.prod}
+      POSTGRES_DB: sahabatkreator
+    volumes:
+      # Mount di parent /var/lib/postgresql — aman untuk major upgrade
+      # minor/patch (17.x) tanpa mengubah volume path.
+      - postgres_data:/var/lib/postgresql
+    # shm default 64mb terlalu kecil untuk query analitik — naikkan.
+    shm_size: 256mb
+    # Resource limits — server juga menjalankan aplikasi lain.
+    mem_limit: 1g
+    memswap_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sahabatkreator -d sahabatkreator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # Tanpa password mapping port host — hanya jaringan internal Docker.
+    # Akses maintenance (backup/pg_dump) via `docker exec`.
+
+  redis:
+    image: redis:7-alpine
+    container_name: sahabatkreator-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    # Tanpa password & tanpa mapping port host — hanya jaringan internal.
+
+  migrate:
+    build: *app-build
+    image: sahabatkreator-app:prod
+    restart: "no"
+    env_file: .env.prod
+    environment:
+      <<: *db-env
+    working_dir: /app
+    # Sinkronisasi skema (drizzle-kit push --force) + seed idempoten (plan,
+    # kategori blog, artikel blog yang sudah terindeks Google).
+    command:
+      [
+        "sh",
+        "-c",
+        "cd /app/packages/db && bunx drizzle-kit push --force && bun scripts/seed.ts",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  app:
+    build: *app-build
+    image: sahabatkreator-app:prod
+    container_name: sahabatkreator-app
+    restart: unless-stopped
+    env_file: .env.prod
+    environment:
+      <<: *db-env
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+    # Resource limits — cegah 1 container memakan seluruh RAM host
+    # (server juga menjalankan aplikasi lain di port 3000 & staging).
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 1.5
+    ports:
+      - "127.0.0.1:3001:3000" # nginx host proxy ke sini (sahabatkreator.com)
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "await fetch('http://127.0.0.1:3000/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    build: *app-build
+    image: sahabatkreator-app:prod
+    container_name: sahabatkreator-worker
+    restart: unless-stopped
+    working_dir: /app/apps/worker
+    # Worker jalan langsung dari source (bun run TS) — tanpa step build terpisah.
+    command: ["bun", "run", "src/index.ts"]
+    env_file: .env.prod
+    environment:
+      <<: *db-env
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+    # Worker memproses video/gambar — beri ruang lebih dari app.
+    mem_limit: 1.5g
+    memswap_limit: 1.5g
+    cpus: 1.5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      app:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:

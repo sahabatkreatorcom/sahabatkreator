@@ -1,0 +1,6598 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "sahabatkreator API (codegen)",
+    "version": "0.1.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "responses": {
+          "200": {
+            "description": "Service health",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/private": {
+      "get": {
+        "tags": [
+          "Example"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private user data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivateDataResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ping": {
+      "get": {
+        "summary": "Cek koneksi & token",
+        "description": "Satu-satunya endpoint tanpa scope. Membuktikan key valid, plan layak memakai /v1, dan mengembalikan identitas organisasi + scope key.",
+        "tags": [
+          "System"
+        ],
+        "x-required-scopes": [],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Key valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts": {
+      "get": {
+        "summary": "Daftar akun sosial",
+        "description": "Semua akun sosial milik organisasi (termasuk status koneksi).",
+        "tags": [
+          "Accounts"
+        ],
+        "x-required-scopes": [
+          "accounts:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Daftar akun.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/{id}/statistic": {
+      "get": {
+        "summary": "Statistik akun (bridge)",
+        "description": "Statistik real-time satu akun via bridge Repliz. Akun non-bridge membalas 400/503.",
+        "tags": [
+          "Accounts"
+        ],
+        "x-required-scopes": [
+          "accounts:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID akun"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Statistik akun.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountStatisticResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/posts": {
+      "get": {
+        "summary": "Daftar post",
+        "description": "Daftar grup post (draft, terjadwal, sudah tayang) milik organisasi.",
+        "tags": [
+          "Posts"
+        ],
+        "x-required-scopes": [
+          "posts:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter YYYY-MM-DD"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter YYYY-MM-DD"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter status post"
+          },
+          {
+            "name": "includeExternal",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Sertakan post eksternal"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar post.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostsListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Buat post",
+        "description": "Membuat grup post baru. Bila `scheduledAt` diisi, menjadwalkannya (butuh fitur scheduled_posts).",
+        "tags": [
+          "Posts"
+        ],
+        "x-required-scopes": [
+          "posts:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Grup post dibuat.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatePostResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/posts/{id}": {
+      "get": {
+        "summary": "Detail post",
+        "description": "",
+        "tags": [
+          "Posts"
+        ],
+        "x-required-scopes": [
+          "posts:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID grup post"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail grup post + post items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Hapus post",
+        "description": "",
+        "tags": [
+          "Posts"
+        ],
+        "x-required-scopes": [
+          "posts:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID grup post"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Post dihapus.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/posts/{id}/publish": {
+      "post": {
+        "summary": "Publish segera",
+        "description": "Mem- enqueue publish untuk post yang bisa dipublish. Membalas `{ok,queued}` bila masuk queue, atau `{ok,published,processing,failed}` bila dikerjakan inline.",
+        "tags": [
+          "Posts"
+        ],
+        "x-required-scopes": [
+          "posts:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID grup post"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hasil publish.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PublishQueuedResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublishInlineResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/posts/{id}/retry": {
+      "post": {
+        "summary": "Ulang publish post gagal",
+        "description": "Hanya untuk post berstatus failed yang punya schedule bridge.",
+        "tags": [
+          "Posts"
+        ],
+        "x-required-scopes": [
+          "posts:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID grup post"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Retry dijalankan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Bridge Repliz belum dikonfigurasi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/analytics/overview": {
+      "get": {
+        "summary": "Ringkasan performa",
+        "description": "Pakai `from`+`to` (YYYY-MM-DD) atau `days` (default 30). Mode from/to mengembalikan `comparison`.",
+        "tags": [
+          "Analytics"
+        ],
+        "x-required-scopes": [
+          "analytics:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "description": "YYYY-MM-DD"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "description": "YYYY-MM-DD"
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 30,
+              "minimum": 1,
+              "maximum": 365
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ringkasan + totals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsOverviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/analytics/timeseries": {
+      "get": {
+        "summary": "Deret waktu engagement",
+        "description": "",
+        "tags": [
+          "Analytics"
+        ],
+        "x-required-scopes": [
+          "analytics:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 30,
+              "minimum": 1,
+              "maximum": 365
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Series harian.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsTimeseriesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/analytics/top-posts": {
+      "get": {
+        "summary": "Post teratas",
+        "description": "",
+        "tags": [
+          "Analytics"
+        ],
+        "x-required-scopes": [
+          "analytics:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "platform",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Post teratas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsTopPostsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reports/summary": {
+      "get": {
+        "summary": "Ringkasan laporan",
+        "description": "Ringkasan periode (default 30 hari terakhir).",
+        "tags": [
+          "Reports"
+        ],
+        "x-required-scopes": [
+          "reports:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "description": "YYYY-MM-DD"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "description": "YYYY-MM-DD"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ringkasan laporan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportSummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/media": {
+      "get": {
+        "summary": "Daftar media",
+        "description": "Item media library (maks 200).",
+        "tags": [
+          "Media"
+        ],
+        "x-required-scopes": [
+          "media:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "folderId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar media.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/media/import": {
+      "post": {
+        "summary": "Import media dari URL",
+        "description": "Mengunduh file dari URL publik ke media library organisasi.",
+        "tags": [
+          "Media"
+        ],
+        "x-required-scopes": [
+          "media:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportMediaRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Media diimpor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportMediaResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage R2 belum dikonfigurasi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/renders/manifest": {
+      "get": {
+        "summary": "Manifest render",
+        "description": "Daftar hasil render video organisasi (maks 200).",
+        "tags": [
+          "Renders"
+        ],
+        "x-required-scopes": [
+          "renders:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Manifest render.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderManifestResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/automation": {
+      "get": {
+        "summary": "Daftar aturan automation",
+        "description": "Butuh fitur plan `automation`.",
+        "tags": [
+          "Automation"
+        ],
+        "x-required-scopes": [
+          "automation:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Aturan + akun yang terhubung.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Buat aturan automation",
+        "description": "",
+        "tags": [
+          "Automation"
+        ],
+        "x-required-scopes": [
+          "automation:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationRuleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Aturan dibuat.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRuleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/automation/{id}": {
+      "patch": {
+        "summary": "Ubah aturan automation",
+        "description": "Semua field opsional (patch).",
+        "tags": [
+          "Automation"
+        ],
+        "x-required-scopes": [
+          "automation:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID aturan"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationRuleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aturan diubah.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRuleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Hapus aturan automation",
+        "description": "",
+        "tags": [
+          "Automation"
+        ],
+        "x-required-scopes": [
+          "automation:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID aturan"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aturan dihapus.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/carousel": {
+      "post": {
+        "summary": "Buat job carousel",
+        "description": "Membuat job render carousel asinkron. Poll `GET /v1/carousel/{id}` untuk status.",
+        "tags": [
+          "Renders"
+        ],
+        "x-required-scopes": [
+          "renders:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCarouselRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job dibuat dan diantrikan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateCarouselResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Fitur carousel belum dikonfigurasi (MODAL_TOKEN/MODAL_CAROUSEL_URL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/carousel/{id}": {
+      "get": {
+        "summary": "Status job carousel",
+        "description": "Polling status job + slide yang sudah ter-render.",
+        "tags": [
+          "Renders"
+        ],
+        "x-required-scopes": [
+          "renders:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID job"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarouselJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/video": {
+      "post": {
+        "summary": "Buat job video",
+        "description": "Merakit video dari base video + clip + voiceover + caption. Poll `GET /v1/video/{id}`.",
+        "tags": [
+          "Renders"
+        ],
+        "x-required-scopes": [
+          "renders:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVideoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job dibuat.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateVideoResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Fitur render video belum dikonfigurasi (MODAL_TOKEN/MODAL_RENDER_URL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/video/{id}": {
+      "get": {
+        "summary": "Status job video",
+        "description": "",
+        "tags": [
+          "Renders"
+        ],
+        "x-required-scopes": [
+          "renders:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID job"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auto-clip": {
+      "post": {
+        "summary": "Buat job auto-clip",
+        "description": "Mendeteksi momen viral dari video sumber. Pakai `sourceUrl` atau `baseVideoMediaId`. Pilih kandidat lewat `POST /v1/auto-clip/{id}/select`.",
+        "tags": [
+          "Renders"
+        ],
+        "x-required-scopes": [
+          "renders:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAutoClipRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job dibuat + rentang terdeteksi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateAutoClipResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Fitur auto-clip belum dikonfigurasi (MODAL_CLIPPER_URL/TOKEN).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auto-clip/{id}": {
+      "get": {
+        "summary": "Status job auto-clip",
+        "description": "",
+        "tags": [
+          "Renders"
+        ],
+        "x-required-scopes": [
+          "renders:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID job"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status job + kandidat segmen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoClipJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auto-clip/{id}/select": {
+      "post": {
+        "summary": "Pilih kandidat auto-clip",
+        "description": "Memilih segmen yang akan dirender. Fan-out: `renderJobIds[]` berisi job render video.",
+        "tags": [
+          "Renders"
+        ],
+        "x-required-scopes": [
+          "renders:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID job"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectAutoClipRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Segmen dipilih, job render dibuat.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelectAutoClipResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Analisis belum selesai / kandidat sudah dirender.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ai/usage": {
+      "get": {
+        "summary": "Pemakaian kredit AI",
+        "description": "Kredit AI organisasi bulan berjalan.",
+        "tags": [
+          "AI"
+        ],
+        "x-required-scopes": [
+          "ai:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Pemakaian kredit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiUsageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ai/caption": {
+      "post": {
+        "summary": "Generate caption",
+        "description": "Membuat caption + hashtag. Mengonsumsi kredit AI.",
+        "tags": [
+          "AI"
+        ],
+        "x-required-scopes": [
+          "ai:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaptionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Caption + hashtag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Fitur AI belum dikonfigurasi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ai/hashtag": {
+      "post": {
+        "summary": "Generate hashtag",
+        "description": "Membuat hashtag dari prompt. Mengonsumsi kredit AI.",
+        "tags": [
+          "AI"
+        ],
+        "x-required-scopes": [
+          "ai:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HashtagRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Daftar hashtag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HashtagResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Fitur AI belum dikonfigurasi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ai/rewrite": {
+      "post": {
+        "summary": "Tulis ulang teks",
+        "description": "Menulis ulang teks sesuai gaya. Mengonsumsi kredit AI.",
+        "tags": [
+          "AI"
+        ],
+        "x-required-scopes": [
+          "ai:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RewriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Teks hasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RewriteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Fitur AI belum dikonfigurasi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ai/repurpose": {
+      "post": {
+        "summary": "Reuse konten lintas platform",
+        "description": "Mengubah konten untuk platform lain. Mengonsumsi kredit AI.",
+        "tags": [
+          "AI"
+        ],
+        "x-required-scopes": [
+          "ai:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepurposeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Konten hasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepurposeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Fitur AI belum dikonfigurasi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/trends": {
+      "get": {
+        "summary": "Tren harian",
+        "description": "Tren Google Indonesia (tidak mengonsumsi kredit AI).",
+        "tags": [
+          "Trends"
+        ],
+        "x-required-scopes": [
+          "ai:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 40
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar tren.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrendsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/trends/ideas": {
+      "post": {
+        "summary": "Ide konten dari tren",
+        "description": "Membuat ide konten dari satu tren. Mengonsumsi kredit AI.",
+        "tags": [
+          "Trends"
+        ],
+        "x-required-scopes": [
+          "ai:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrendIdeasRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ide konten.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrendIdeasResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "AI mengembalikan format yang tidak bisa dibaca.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Fitur AI belum dikonfigurasi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        }
+      },
+      "PrivateDataResponse": {
+        "type": "object",
+        "required": [
+          "message",
+          "user"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "user": {
+            "type": "object",
+            "required": [
+              "id",
+              "email",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "UnauthorizedResponse": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "ErrorWithIssues": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "message"
+              ]
+            }
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "DateRangeQuery": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "example": "2026-01-01"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "example": "2026-01-31"
+          }
+        }
+      },
+      "PaginationQuery": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50
+          }
+        }
+      },
+      "PingResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "organization": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "slug"
+            ]
+          },
+          "key": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "prefix": {
+                "type": "string",
+                "example": "sk_live_ab12"
+              },
+              "scopes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "prefix",
+              "scopes"
+            ]
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "ok",
+          "organization",
+          "key",
+          "serverTime"
+        ]
+      },
+      "AccountsResponse": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountItem"
+            }
+          }
+        },
+        "required": [
+          "accounts"
+        ]
+      },
+      "AccountItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "platformAccountId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isConnected": {
+            "type": "boolean"
+          },
+          "needsReconnect": {
+            "type": "boolean"
+          },
+          "lastSyncedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "lastError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tokenExpiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "hasRefreshToken": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isBridge": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "platform",
+          "platformAccountId",
+          "username",
+          "displayName",
+          "avatarUrl",
+          "isConnected",
+          "needsReconnect",
+          "lastSyncedAt",
+          "lastError",
+          "tokenExpiresAt",
+          "hasRefreshToken",
+          "createdAt",
+          "isBridge"
+        ]
+      },
+      "AccountStatisticResponse": {
+        "type": "object",
+        "properties": {
+          "statistic": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "followers": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "posts": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "engagement": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "followers",
+              "posts",
+              "engagement"
+            ],
+            "description": "Statistik real-time dari bridge Repliz. null bila belum pernah disinkronkan."
+          },
+          "unsupported": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "statistic"
+        ]
+      },
+      "PostsListResponse": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostGroupItem"
+            }
+          },
+          "page": {
+            "type": "number"
+          },
+          "perPage": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "groups",
+          "page",
+          "perPage"
+        ]
+      },
+      "PostGroupItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scheduledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "reminderAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isExternal": {
+            "type": "boolean"
+          },
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostItem"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "content",
+          "scheduledAt",
+          "reminderAt",
+          "timezone",
+          "createdAt",
+          "updatedAt",
+          "posts"
+        ]
+      },
+      "PostItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "postGroupId": {
+            "type": "string"
+          },
+          "socialAccountId": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "scheduled",
+              "publishing",
+              "published",
+              "failed"
+            ]
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platformPostId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platformPostUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "errorMessage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hashtags": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "firstComment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isBridge": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "postGroupId",
+          "socialAccountId",
+          "platform",
+          "status",
+          "content",
+          "platformPostId",
+          "platformPostUrl",
+          "publishedAt",
+          "errorCode",
+          "errorMessage",
+          "hashtags",
+          "firstComment",
+          "username",
+          "displayName",
+          "avatarUrl",
+          "isBridge"
+        ]
+      },
+      "PostDetailResponse": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "$ref": "#/components/schemas/PostGroupItem"
+          },
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostItem"
+            }
+          }
+        },
+        "required": [
+          "group",
+          "posts"
+        ]
+      },
+      "CreatePostRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "default": ""
+          },
+          "scheduledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "timezone": {
+            "type": "string",
+            "default": "Asia/Jakarta"
+          },
+          "audioTrackId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "productIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreatePostItem"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "CreatePostItem": {
+        "type": "object",
+        "properties": {
+          "socialAccountId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "content": {
+            "type": "string"
+          },
+          "hashtags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "firstComment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platformSettings": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "mediaIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        },
+        "required": [
+          "socialAccountId"
+        ]
+      },
+      "CreatePostResponse": {
+        "type": "object",
+        "properties": {
+          "postGroupId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "postGroupId"
+        ]
+      },
+      "PublishQueuedResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "queued": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ok",
+          "queued"
+        ]
+      },
+      "PublishInlineResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "published": {
+            "type": "number"
+          },
+          "processing": {
+            "type": "number"
+          },
+          "failed": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ok",
+          "published",
+          "processing",
+          "failed"
+        ]
+      },
+      "RetryResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "DeleteResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "AnalyticsTotals": {
+        "type": "object",
+        "properties": {
+          "followers": {
+            "type": "number"
+          },
+          "likes": {
+            "type": "number"
+          },
+          "comments": {
+            "type": "number"
+          },
+          "shares": {
+            "type": "number"
+          },
+          "views": {
+            "type": "number"
+          },
+          "impressions": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "followers",
+          "likes",
+          "comments",
+          "shares",
+          "views",
+          "impressions"
+        ]
+      },
+      "AnalyticsAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "followers": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "platform",
+          "username",
+          "displayName",
+          "avatarUrl",
+          "followers"
+        ]
+      },
+      "AnalyticsOverviewResponse": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "to"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "days": {
+                    "type": "number"
+                  },
+                  "since": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "days",
+                  "since"
+                ]
+              }
+            ]
+          },
+          "totals": {
+            "$ref": "#/components/schemas/AnalyticsTotals"
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsAccount"
+            }
+          },
+          "comparison": {
+            "type": "object",
+            "properties": {
+              "previous": {
+                "$ref": "#/components/schemas/AnalyticsTotals"
+              },
+              "deltas": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "followers": {
+                    "type": "number"
+                  },
+                  "likes": {
+                    "type": "number"
+                  },
+                  "comments": {
+                    "type": "number"
+                  },
+                  "shares": {
+                    "type": "number"
+                  },
+                  "views": {
+                    "type": "number"
+                  },
+                  "impressions": {
+                    "type": "number"
+                  }
+                }
+              }
+            },
+            "required": [
+              "previous",
+              "deltas"
+            ]
+          }
+        },
+        "required": [
+          "range",
+          "totals",
+          "accounts"
+        ]
+      },
+      "AnalyticsTimeseriesResponse": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "likes": {
+                  "type": "number"
+                },
+                "comments": {
+                  "type": "number"
+                },
+                "shares": {
+                  "type": "number"
+                },
+                "views": {
+                  "type": "number"
+                },
+                "impressions": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "date",
+                "likes",
+                "comments",
+                "shares",
+                "views",
+                "impressions"
+              ]
+            }
+          }
+        },
+        "required": [
+          "days",
+          "series"
+        ]
+      },
+      "AnalyticsTopPost": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platformPostUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platformPostId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isBridge": {
+            "type": "boolean"
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "likes": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "comments": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "shares": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "saves": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "views": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "impressions": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "reach": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "engagement": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "engagementRate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "media": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "video",
+                  "image"
+                ]
+              },
+              "videoUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "url",
+              "type",
+              "videoUrl"
+            ]
+          }
+        },
+        "required": [
+          "postId",
+          "platform",
+          "content",
+          "platformPostUrl",
+          "platformPostId",
+          "isBridge",
+          "publishedAt",
+          "username",
+          "displayName",
+          "avatarUrl",
+          "likes",
+          "comments",
+          "shares",
+          "saves",
+          "views",
+          "impressions",
+          "reach",
+          "engagement",
+          "engagementRate",
+          "media"
+        ]
+      },
+      "AnalyticsTopPostsResponse": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsTopPost"
+            }
+          }
+        },
+        "required": [
+          "posts"
+        ]
+      },
+      "ReportSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "report": {
+            "type": "object",
+            "properties": {
+              "organizationName": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "postsPublished": {
+                "type": "number"
+              },
+              "totalEngagement": {
+                "type": "number"
+              },
+              "totalImpressions": {
+                "type": "number"
+              },
+              "totalReach": {
+                "type": "number"
+              },
+              "accounts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "username": {
+                      "type": "string"
+                    },
+                    "platform": {
+                      "type": "string"
+                    },
+                    "followersStart": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "followersEnd": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "username",
+                    "platform",
+                    "followersStart",
+                    "followersEnd"
+                  ]
+                }
+              },
+              "topPosts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "string"
+                    },
+                    "platform": {
+                      "type": "string"
+                    },
+                    "likes": {
+                      "type": "number"
+                    },
+                    "comments": {
+                      "type": "number"
+                    },
+                    "shares": {
+                      "type": "number"
+                    },
+                    "saves": {
+                      "type": "number"
+                    },
+                    "engagement": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "content",
+                    "platform",
+                    "likes",
+                    "comments",
+                    "shares",
+                    "saves",
+                    "engagement"
+                  ]
+                }
+              },
+              "goals": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "metric": {
+                      "type": "string"
+                    },
+                    "currentValue": {
+                      "type": "number"
+                    },
+                    "targetValue": {
+                      "type": "number"
+                    },
+                    "progressPercent": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "metric",
+                    "currentValue",
+                    "targetValue",
+                    "progressPercent"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "organizationName",
+              "from",
+              "to",
+              "postsPublished",
+              "totalEngagement",
+              "totalImpressions",
+              "totalReach",
+              "accounts",
+              "topPosts",
+              "goals"
+            ]
+          }
+        },
+        "required": [
+          "report"
+        ]
+      },
+      "MediaItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "audio"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "width": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "height": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "url",
+          "sizeBytes",
+          "width",
+          "height",
+          "folderId",
+          "createdAt"
+        ]
+      },
+      "MediaListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaItem"
+            }
+          },
+          "storageConfigured": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "storageConfigured"
+        ]
+      },
+      "ImportMediaRequest": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "format": "uri"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "folderId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "ImportMediaResponse": {
+        "type": "object",
+        "properties": {
+          "media": {
+            "$ref": "#/components/schemas/MediaItem"
+          }
+        },
+        "required": [
+          "media"
+        ]
+      },
+      "RenderManifestItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "orientation": {
+            "type": "string",
+            "enum": [
+              "landscape",
+              "portrait",
+              "square"
+            ]
+          },
+          "videoUrl": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "number"
+          },
+          "durationSeconds": {
+            "type": "number"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "commitSha": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "renderedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "project",
+          "title",
+          "orientation",
+          "videoUrl",
+          "sizeBytes",
+          "durationSeconds",
+          "width",
+          "height",
+          "commitSha",
+          "branch",
+          "renderedAt"
+        ]
+      },
+      "RenderManifestResponse": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "enum": [
+              1
+            ]
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "renders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RenderManifestItem"
+            }
+          }
+        },
+        "required": [
+          "version",
+          "generatedAt",
+          "renders"
+        ]
+      },
+      "AutomationRuleRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "dm",
+              "comment"
+            ]
+          },
+          "socialAccountId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "triggers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "action": {
+            "$ref": "#/components/schemas/AutomationAction"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "source",
+          "triggers",
+          "action"
+        ]
+      },
+      "AutomationAction": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AutomationReplyAction"
+          },
+          {
+            "$ref": "#/components/schemas/AutomationAiReplyAction"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "reply": "#/components/schemas/AutomationReplyAction",
+            "ai_reply": "#/components/schemas/AutomationAiReplyAction"
+          }
+        }
+      },
+      "AutomationReplyAction": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "reply"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ]
+      },
+      "AutomationAiReplyAction": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "ai_reply"
+            ]
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "ramah",
+              "profesional",
+              "lucu"
+            ],
+            "default": "ramah"
+          },
+          "delayMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 30,
+            "default": 2
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "AutomationRuleResponse": {
+        "type": "object",
+        "properties": {
+          "rule": {
+            "$ref": "#/components/schemas/AutomationRuleRecord"
+          }
+        },
+        "required": [
+          "rule"
+        ]
+      },
+      "AutomationRuleRecord": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AutomationRuleRequest"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "organizationId": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "organizationId",
+              "createdAt",
+              "updatedAt"
+            ]
+          }
+        ]
+      },
+      "AutomationListResponse": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationRuleRecord"
+            }
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "platform": {
+                  "type": "string"
+                },
+                "username": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "platform",
+                "username"
+              ]
+            }
+          }
+        },
+        "required": [
+          "rules",
+          "accounts"
+        ]
+      },
+      "CreateCarouselRequest": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 300
+          },
+          "slides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CarouselSlide"
+            },
+            "minItems": 1,
+            "maxItems": 11
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 3000
+          },
+          "settings": {
+            "$ref": "#/components/schemas/CarouselSettings"
+          }
+        },
+        "required": [
+          "topic",
+          "settings"
+        ]
+      },
+      "CarouselSlide": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "backgroundMediaId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "CarouselSettings": {
+        "type": "object",
+        "properties": {
+          "style": {
+            "type": "string",
+            "enum": [
+              "outline",
+              "box",
+              "box_title_content",
+              "plain"
+            ],
+            "default": "box"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "portrait",
+              "portrait4_5",
+              "square"
+            ],
+            "default": "portrait4_5"
+          },
+          "slideCount": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 10,
+            "default": 6
+          },
+          "boxOpacity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "default": 235
+          },
+          "titleFontFamily": {
+            "type": "string",
+            "default": "Fredoka"
+          },
+          "contentFontFamily": {
+            "type": "string",
+            "default": "Fredoka"
+          },
+          "backgroundMode": {
+            "type": "string",
+            "enum": [
+              "library",
+              "stock",
+              "solid"
+            ],
+            "default": "solid"
+          },
+          "backgroundQuery": {
+            "type": "string",
+            "maxLength": 200,
+            "default": ""
+          },
+          "aiLayout": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": false
+              }
+            }
+          }
+        }
+      },
+      "CreateCarouselResponse": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued"
+            ]
+          },
+          "slideCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "jobId",
+          "status",
+          "slideCount"
+        ]
+      },
+      "CarouselJobResponse": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "progress": {
+                "type": "number"
+              },
+              "settings": {},
+              "caption": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "errorCode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "errorMessage": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "topic",
+              "status",
+              "progress",
+              "caption",
+              "errorCode",
+              "errorMessage",
+              "createdAt",
+              "updatedAt"
+            ]
+          },
+          "slides": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "urutan": {
+                  "type": "number"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "stockCredit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "layout": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "width": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "height": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "sizeBytes": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "urutan",
+                "title",
+                "body",
+                "stockCredit",
+                "layout",
+                "url",
+                "width",
+                "height",
+                "sizeBytes"
+              ]
+            }
+          }
+        },
+        "required": [
+          "job",
+          "slides"
+        ]
+      },
+      "CreateVideoRequest": {
+        "type": "object",
+        "properties": {
+          "baseVideoMediaId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "clipMediaIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "voiceoverMediaId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bgmAudioTrackId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publishToGallery": {
+            "type": "boolean",
+            "default": false
+          },
+          "settings": {
+            "$ref": "#/components/schemas/VideoSettings"
+          }
+        },
+        "required": [
+          "baseVideoMediaId",
+          "settings"
+        ]
+      },
+      "VideoSettings": {
+        "type": "object",
+        "properties": {
+          "orientation": {
+            "type": "string",
+            "enum": [
+              "portrait",
+              "landscape",
+              "square"
+            ],
+            "default": "portrait"
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "720p",
+              "1080p"
+            ],
+            "default": "1080p"
+          },
+          "removeOriginalAudio": {
+            "type": "boolean",
+            "default": true
+          },
+          "voiceVolume": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 1
+          },
+          "bgmVolume": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.3
+          },
+          "montage": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "minSegmentSeconds": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 30,
+                "default": 2
+              },
+              "maxSegmentSeconds": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 60,
+                "default": 5
+              }
+            }
+          },
+          "caption": {
+            "$ref": "#/components/schemas/VideoCaptionSettings"
+          },
+          "headline": {
+            "$ref": "#/components/schemas/VideoHeadlineSettings"
+          }
+        }
+      },
+      "VideoCaptionSettings": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "id",
+              "en",
+              "auto"
+            ],
+            "default": "id"
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "tiny",
+              "base",
+              "small",
+              "medium"
+            ],
+            "default": "base"
+          },
+          "fontSize": {
+            "type": "integer",
+            "minimum": 12,
+            "maximum": 72,
+            "default": 24
+          },
+          "fontColor": {
+            "type": "string",
+            "default": "white"
+          },
+          "position": {
+            "type": "string",
+            "enum": [
+              "bottom",
+              "top",
+              "center"
+            ],
+            "default": "bottom"
+          },
+          "wordHighlight": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "VideoHeadlineSettings": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "fontSize": {
+            "type": "integer",
+            "minimum": 16,
+            "maximum": 120,
+            "default": 48
+          },
+          "fontColor": {
+            "type": "string",
+            "default": "white"
+          },
+          "positionY": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.1
+          }
+        }
+      },
+      "CreateVideoResponse": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "progress": {
+                "type": "number"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "progress",
+              "createdAt"
+            ]
+          }
+        },
+        "required": [
+          "job"
+        ]
+      },
+      "VideoJobResponse": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "progress": {
+                "type": "number"
+              },
+              "settings": {},
+              "errorCode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "errorMessage": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "outputMediaId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "srtStorageKey": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "progress",
+              "errorCode",
+              "errorMessage",
+              "outputMediaId",
+              "srtStorageKey",
+              "createdAt",
+              "updatedAt"
+            ]
+          }
+        },
+        "required": [
+          "job"
+        ]
+      },
+      "CreateAutoClipRequest": {
+        "type": "object",
+        "properties": {
+          "sourceUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "format": "uri"
+          },
+          "sourceTier": {
+            "type": "string",
+            "enum": [
+              "t1",
+              "t2"
+            ],
+            "default": "t1"
+          },
+          "baseVideoMediaId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clipSettings": {
+            "type": "object",
+            "properties": {
+              "targetClipCount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 20
+              },
+              "minDurationSec": {
+                "type": "number",
+                "minimum": 5,
+                "maximum": 600
+              },
+              "maxDurationSec": {
+                "type": "number",
+                "minimum": 10,
+                "maximum": 1800
+              },
+              "orientation": {
+                "type": "string",
+                "enum": [
+                  "portrait",
+                  "landscape",
+                  "square"
+                ]
+              },
+              "outputLanguage": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 20
+              },
+              "userDirection": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 1000
+              },
+              "captionEnabled": {
+                "type": "boolean"
+              }
+            }
+          },
+          "renderSettings": {
+            "type": "object",
+            "properties": {
+              "resolution": {
+                "type": "string",
+                "enum": [
+                  "720p",
+                  "1080p"
+                ],
+                "default": "1080p"
+              },
+              "removeOriginalAudio": {
+                "type": "boolean",
+                "default": false
+              },
+              "bgmVolume": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.3
+              }
+            }
+          }
+        },
+        "required": [
+          "clipSettings"
+        ]
+      },
+      "CreateAutoClipResponse": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "progress": {
+                "type": "number"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "progress",
+              "createdAt"
+            ]
+          },
+          "detectedRanges": {}
+        },
+        "required": [
+          "job"
+        ]
+      },
+      "AutoClipJobResponse": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "progress": {
+                "type": "number"
+              },
+              "clipSettings": {},
+              "urlSource": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "urlSourceTier": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "srtStorageKey": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "errorCode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "errorMessage": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "baseVideoName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "baseVideoThumbnailUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "baseVideoDuration": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "progress",
+              "urlSource",
+              "urlSourceTier",
+              "srtStorageKey",
+              "errorCode",
+              "errorMessage",
+              "createdAt",
+              "updatedAt",
+              "baseVideoName",
+              "baseVideoThumbnailUrl",
+              "baseVideoDuration"
+            ]
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "number"
+                },
+                "startSec": {
+                  "type": "number"
+                },
+                "endSec": {
+                  "type": "number"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "viralScore": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "hookText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "explicitRange": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string"
+                },
+                "renderVideoJobId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "renderStatus": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "renderProgress": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "outputMediaId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "order",
+                "startSec",
+                "endSec",
+                "title",
+                "viralScore",
+                "hookText",
+                "explicitRange",
+                "status",
+                "renderVideoJobId",
+                "renderStatus",
+                "renderProgress",
+                "outputMediaId"
+              ]
+            }
+          }
+        },
+        "required": [
+          "job",
+          "segments"
+        ]
+      },
+      "SelectAutoClipRequest": {
+        "type": "object",
+        "properties": {
+          "segmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "maxItems": 20
+          }
+        },
+        "required": [
+          "segmentIds"
+        ]
+      },
+      "SelectAutoClipResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "enqueuedCount": {
+            "type": "number"
+          },
+          "renderJobIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "enqueuedCount",
+          "renderJobIds"
+        ]
+      },
+      "AiUsageResponse": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "used": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "period": {
+            "type": "string",
+            "example": "2026-09"
+          }
+        },
+        "required": [
+          "configured",
+          "used",
+          "limit",
+          "period"
+        ]
+      },
+      "CaptionRequest": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "instagram",
+              "facebook",
+              "tiktok",
+              "youtube",
+              "linkedin",
+              "linkedin_org",
+              "pinterest",
+              "threads",
+              "x"
+            ]
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "santai",
+              "profesional",
+              "lucu",
+              "inspiratif",
+              "promosi"
+            ],
+            "default": "santai"
+          },
+          "includeHashtags": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "prompt",
+          "platform"
+        ]
+      },
+      "CaptionResponse": {
+        "type": "object",
+        "properties": {
+          "caption": {
+            "type": "string"
+          },
+          "hashtags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "credits": {
+            "$ref": "#/components/schemas/AiCredits"
+          }
+        },
+        "required": [
+          "caption",
+          "hashtags",
+          "credits"
+        ]
+      },
+      "AiCredits": {
+        "type": "object",
+        "properties": {
+          "used": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "remaining": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "used",
+          "limit",
+          "remaining"
+        ]
+      },
+      "HashtagRequest": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 300
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "instagram",
+              "facebook",
+              "tiktok",
+              "youtube",
+              "linkedin",
+              "linkedin_org",
+              "pinterest",
+              "threads",
+              "x"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 30,
+            "default": 10
+          }
+        },
+        "required": [
+          "prompt",
+          "platform"
+        ]
+      },
+      "HashtagResponse": {
+        "type": "object",
+        "properties": {
+          "hashtags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "credits": {
+            "$ref": "#/components/schemas/AiCredits"
+          }
+        },
+        "required": [
+          "hashtags",
+          "credits"
+        ]
+      },
+      "RewriteRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 3000
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "instagram",
+              "facebook",
+              "tiktok",
+              "youtube",
+              "linkedin",
+              "linkedin_org",
+              "pinterest",
+              "threads",
+              "x"
+            ]
+          },
+          "style": {
+            "type": "string",
+            "enum": [
+              "lebih-santai",
+              "lebih-formal",
+              "lebih-pendek",
+              "lebih-panjang",
+              "hook-kuat",
+              "seo"
+            ],
+            "default": "lebih-santai"
+          }
+        },
+        "required": [
+          "text",
+          "platform"
+        ]
+      },
+      "RewriteResponse": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "credits": {
+            "$ref": "#/components/schemas/AiCredits"
+          }
+        },
+        "required": [
+          "text",
+          "credits"
+        ]
+      },
+      "RepurposeRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 6000
+          },
+          "targetPlatform": {
+            "type": "string",
+            "enum": [
+              "instagram",
+              "facebook",
+              "tiktok",
+              "youtube",
+              "linkedin",
+              "linkedin_org",
+              "pinterest",
+              "threads",
+              "x"
+            ]
+          },
+          "tone": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "content",
+          "targetPlatform"
+        ]
+      },
+      "RepurposeResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "credits": {
+            "$ref": "#/components/schemas/AiCredits"
+          }
+        },
+        "required": [
+          "content",
+          "credits"
+        ]
+      },
+      "TrendsResponse": {
+        "type": "object",
+        "properties": {
+          "trends": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "approxTraffic": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "title"
+              ]
+            }
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "available": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "trends",
+          "fetchedAt",
+          "available"
+        ]
+      },
+      "TrendIdeasRequest": {
+        "type": "object",
+        "properties": {
+          "trend": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "instagram",
+              "facebook",
+              "tiktok",
+              "youtube",
+              "linkedin",
+              "pinterest",
+              "threads",
+              "x"
+            ]
+          },
+          "niche": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "trend",
+          "platform"
+        ]
+      },
+      "TrendIdeasResponse": {
+        "type": "object",
+        "properties": {
+          "ideas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "angle": {
+                  "type": "string"
+                },
+                "caption": {
+                  "type": "string"
+                },
+                "hashtags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "title",
+                "angle",
+                "caption",
+                "hashtags"
+              ]
+            }
+          },
+          "credits": {
+            "$ref": "#/components/schemas/AiCredits"
+          }
+        },
+        "required": [
+          "ideas",
+          "credits"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "apiKeyAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key format `sk_live_<32 karakter>`. Dibuat di Settings → API. Bisa juga dikirim via header `X-API-Key`."
+      }
+    }
+  }
+}
