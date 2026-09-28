@@ -1038,6 +1038,7 @@ limit berbentuk JSON-RPC `-32000` saat tercapai, bukan `{message}` biasa.
 | [docs/rfc-carousel-render.md](rfc-carousel-render.md) | RFC fitur carousel render (fase, stock sourcing, export multi-platform) |
 | [docs/rfc-auto-clip.md](rfc-auto-clip.md) | RFC fitur auto-clip (seleksi momen, tiering URL T1/T2, alasan akun Modal kedua) |
 | [docs/rfc-public-api.md](rfc-public-api.md) | RFC Public API v1, API key, webhook keluar & server MCP (scope, signing, pool quota) |
+| [docs/rfc-oauth-connect.md](rfc-oauth-connect.md) | RFC connect akun sosial via API — bridge gaya Repliz (proxy callback, `accounts:write`, allowlist redirect) |
 | [docs/mcp-remote.md](mcp-remote.md) | Pakai MCP remote `POST /mcp` dari agen AI (setup klien, rate limit, batasan) |
 | [docs/api-public-quickstart.md](api-public-quickstart.md) | Panduan cepat pemakaian `/v1` (auth, endpoint, webhook, verifikasi signature) |
 | [apps/mcp/README.md](../apps/mcp/README.md) | Server MCP **stdio** — dijalankan di mesin pengguna (bukan di server) |

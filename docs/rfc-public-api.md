@@ -400,6 +400,9 @@ supaya klien MCP bisa mem-parse kegagalannya.
 
 ### 7.5 Yang belum ada
 
+- **Connect akun sosial via API** (bridge gaya Repliz) — rancangan terpisah di
+  `docs/rfc-oauth-connect.md`. Sengaja **tidak** memakai OAuth 2.1: developer memakai API key
+  + scope `accounts:write`, sama seperti Repliz memakai Basic Auth.
 - **OAuth 2.1** (§13). Klien yang bisa mengirim header sendiri (Claude Code,
   Cursor, Windsurf, Claude Desktop config, ChatGPT Responses API) cukup dengan
   bearer API key. Yang menuntut OAuth adalah permukaan directory/UI: ChatGPT
