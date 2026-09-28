@@ -26,7 +26,12 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { buildToolRequest, type McpToolDef, visibleTools } from "@sahabatkreator/api/mcp/tools";
+import {
+  buildToolRequest,
+  type McpToolDef,
+  toolAnnotations,
+  visibleTools,
+} from "@sahabatkreator/api/mcp/tools";
 import type { Context, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -190,7 +195,16 @@ async function handleMcp(c: Context): Promise<Response> {
 
     server.registerTool(
       tool.name,
-      { description: tool.description, inputSchema: schema.shape },
+      {
+        // `title` ditulis dua kali dengan sengaja: spec MCP mendefinisikannya di
+        // level Tool DAN di dalam annotations, dengan urutan presedensi
+        // `title` → `annotations.title` → `name`. Klien yang hanya membaca
+        // `annotations` (mis. sebagian reviewer direktori) tetap mendapat label.
+        title: tool.title,
+        description: tool.description,
+        inputSchema: schema.shape,
+        annotations: toolAnnotations(tool),
+      },
       async (args) => {
         try {
           const result = await callTool(c, tool, args as Record<string, unknown>);

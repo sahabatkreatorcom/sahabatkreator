@@ -151,6 +151,12 @@ curl -s https://sahabatkreator.com/mcp \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_posts","arguments":{"perPage":5}}}'
 ```
 
+Respons langkah 2 menyertakan `title` + `annotations` per tool
+(`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`). Klien
+memakainya untuk keputusan izin — tool dengan `readOnlyHint: true` boleh
+dipanggil tanpa konfirmasi — dan direktori Connector Claude menuntut field ini
+ada.
+
 ---
 
 ## 6. Troubleshooting

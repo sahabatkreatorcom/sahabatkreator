@@ -170,6 +170,46 @@ describe("handshake", () => {
     expect(names).not.toContain("analytics_overview");
   });
 
+  it("tools/list menyertakan anotasi (syarat direktori Connector)", async () => {
+    const res = await post(rpc("tools/list", {}, 9));
+    const body = (await res.json()) as {
+      result?: {
+        tools?: {
+          name: string;
+          title?: string;
+          annotations?: {
+            title?: string;
+            readOnlyHint?: boolean;
+            destructiveHint?: boolean;
+            idempotentHint?: boolean;
+            openWorldHint?: boolean;
+          };
+        }[];
+      };
+    };
+    const tools = body.result?.tools ?? [];
+    const byName = new Map(tools.map((t) => [t.name, t]));
+
+    // Tool baca: readOnly + idempotent, tidak destruktif.
+    const ping = byName.get("ping");
+    expect(ping?.annotations?.readOnlyHint).toBe(true);
+    expect(ping?.annotations?.idempotentHint).toBe(true);
+    expect(ping?.annotations?.destructiveHint).toBe(false);
+
+    // Tool tulis (ai:write ada di token ini): bukan read-only, tapi juga tidak
+    // destruktif — ia hanya menghasilkan konten.
+    const caption = byName.get("ai_caption");
+    expect(caption?.annotations?.readOnlyHint).toBe(false);
+    expect(caption?.annotations?.destructiveHint).toBe(false);
+    expect(caption?.annotations?.openWorldHint).toBe(true);
+
+    // Setiap tool yang muncul wajib punya title — tanpa itu review direktori gagal.
+    for (const t of tools) {
+      expect(t.title, `tool ${t.name} tanpa title`).toBeTruthy();
+      expect(t.annotations?.title, `tool ${t.name} tanpa annotations.title`).toBeTruthy();
+    }
+  });
+
   it("token read-only tidak pernah melihat tool tulis", async () => {
     scopes = ["posts:read"];
     const res = await post(rpc("tools/list", {}, 3));

@@ -879,7 +879,11 @@ curl -s -o /dev/null -w '%{http_code} allow=%header{allow}\n' \
 `GET /v1/ping` mengembalikan `organization`, `key.scopes`, dan `serverTime` —
 cara tercepat membuktikan token valid sekaligus melihat scope yang dimilikinya.
 Daftar tool yang muncul di langkah 6 **ditentukan oleh scope key** — key
-read-only tidak akan melihat tool tulis. Panduan klien lengkap:
+read-only tidak akan melihat tool tulis. Setiap tool di respons itu juga membawa
+`title` dan `annotations` (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
+`openWorldHint`): inilah yang dibaca klien untuk memutuskan apakah tool boleh
+dipanggil tanpa konfirmasi, sekaligus syarat direktori Connector Claude
+(RFC §7.3). Panduan klien lengkap:
 [docs/mcp-remote.md](mcp-remote.md).
 
 ### 11.5 Operasional

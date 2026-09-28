@@ -369,7 +369,23 @@ pencabutan key tetap berlaku seketika karena token diverifikasi ulang — tidak
 ada cache verifikasi yang bisa basi. Harganya: `verifyApiKey` berjalan dua kali
 per tool call (§11).
 
-### 7.3 Rate limit
+### 7.3 Anotasi tool
+
+Setiap tool membawa `title` dan anotasi MCP (`readOnlyHint`, `destructiveHint`,
+`idempotentHint`, `openWorldHint`). Klien memakainya untuk memutuskan apakah
+sebuah tool boleh dipanggil tanpa konfirmasi pengguna, dan direktori Connector
+Claude mensyaratkannya ada — tool tanpa anotasi gagal review.
+
+Anotasi **diturunkan, bukan ditulis manual**: `toolAnnotations()` di
+`packages/api/src/mcp/tools.ts` menghitungnya dari `scope` + `method`, sehingga
+anotasi tidak pernah berbeda dari perilaku tool yang sebenarnya. Katalog saat
+ini: 12 tool baca (`readOnlyHint` + `idempotentHint`), 2 tool tulis
+(`ai_caption`, `ai_hashtag` — keduanya generator, jadi tidak destruktif), dan 3
+tool `openWorldHint` (kedua generator AI + `trends`, yang datanya diambil dari
+Google Trends). Menambahkan tool `DELETE`/`PATCH` otomatis menandainya
+destruktif.
+
+### 7.4 Rate limit
 
 | Permukaan | Batas | Ditagih oleh |
 |---|---|---|
@@ -382,7 +398,7 @@ batas efektif jadi separuh dari yang dijanjikan dokumentasi. 429 dari limiter
 envelope dibentuk sebagai JSON-RPC (`-32000`), bukan `{message}` seperti REST,
 supaya klien MCP bisa mem-parse kegagalannya.
 
-### 7.4 Yang belum ada
+### 7.5 Yang belum ada
 
 - **OAuth 2.1** (§13). Klien yang bisa mengirim header sendiri (Claude Code,
   Cursor, Windsurf, Claude Desktop config, ChatGPT Responses API) cukup dengan

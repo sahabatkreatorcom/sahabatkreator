@@ -136,10 +136,11 @@ baru, periksa keanggotaan org pembuat key.
 ## 5. Menambah tool baru
 
 1. Tambahkan entri di array `MCP_TOOLS`
-   (**`packages/api/src/mcp/tools.ts`** — bukan di app ini) — `name`,
+   (**`packages/api/src/mcp/tools.ts`** — bukan di app ini) — `name`, `title`,
    `description`, `scope`, `method`, `path`, dan `params` (zod). Satu file itu
    dipakai bersama transport stdio dan HTTP, jadi perubahan di sini langsung
-   berlaku di keduanya.
+   berlaku di keduanya. `title` **wajib** (klien memakainya sebagai label tool);
+   set `openWorld: true` bila tool memanggil LLM atau mengambil data dari web.
 2. **Endpoint-nya harus sudah ada di allowlist `/v1`**
    (`apps/server/src/routes/v1/index.ts`). Tool tidak bisa memanggil path yang
    tidak diekspos.
@@ -153,3 +154,10 @@ baru, periksa keanggotaan org pembuat key.
 
 Scope di definisi tool dipakai untuk dua hal: menyembunyikan tool dari klien
 saat token tidak punya scope itu, dan gagal cepat sebelum request dikirim.
+
+Anotasi MCP (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`,
+`openWorldHint`) **tidak ditulis manual per tool** — `toolAnnotations()`
+menurunkannya dari `scope` dan `method`, supaya anotasi tidak pernah berbeda
+dari perilaku tool yang sebenarnya. Klien memakai anotasi untuk memutuskan
+apakah sebuah tool boleh dipanggil tanpa konfirmasi pengguna, dan direktori
+Connector Claude mensyaratkannya ada — tool tanpa anotasi akan gagal review.

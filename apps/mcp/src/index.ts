@@ -20,6 +20,7 @@ import {
   buildToolRequest,
   MCP_TOOLS,
   type McpToolDef,
+  toolAnnotations,
   visibleTools,
 } from "@sahabatkreator/api/mcp/tools";
 import { z } from "zod";
@@ -92,7 +93,15 @@ async function main() {
 
     server.registerTool(
       tool.name,
-      { description: tool.description, inputSchema: schema.shape },
+      {
+        // `title` sengaja ada di dua tempat (level Tool + annotations) — spec
+        // MCP memberi presedensi `title` → `annotations.title` → `name`, jadi
+        // klien yang hanya membaca salah satunya tetap dapat label yang benar.
+        title: tool.title,
+        description: tool.description,
+        inputSchema: schema.shape,
+        annotations: toolAnnotations(tool),
+      },
       async (args) => {
         try {
           const result = await callV1(tool, args as Record<string, unknown>, scopes);

@@ -11,6 +11,7 @@ import {
   buildToolRequest,
   MCP_TOOLS,
   type McpToolDef,
+  toolAnnotations,
   visibleTools,
 } from "./tools";
 
@@ -85,6 +86,7 @@ describe("buildToolRequest — pemetaan argumen ke request /v1", () => {
     // ketika nanti ada POST /v1/posts/{id}/something.
     const synthetic: McpToolDef = {
       name: "synthetic",
+      title: "Sintetis",
       description: "POST dengan segmen dinamis",
       scope: "",
       method: "POST",
@@ -100,6 +102,7 @@ describe("buildToolRequest — pemetaan argumen ke request /v1", () => {
   it("DELETE tidak mengirim body", () => {
     const synthetic: McpToolDef = {
       name: "synthetic-delete",
+      title: "Sintetis Hapus",
       description: "hapus",
       scope: "posts:write",
       method: "DELETE",
@@ -160,6 +163,14 @@ describe("invarian MCP_TOOLS", () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
+  it("judul tool unik dan tidak kosong", () => {
+    const titles = MCP_TOOLS.map((t) => t.title);
+    for (const [i, title] of titles.entries()) {
+      expect(title.trim(), `tool ${MCP_TOOLS[i]?.name}`).not.toBe("");
+    }
+    expect(new Set(titles).size).toBe(titles.length);
+  });
+
   it("scope berformat <resource>:read|write atau kosong", () => {
     for (const t of MCP_TOOLS) {
       expect(t.scope, `tool ${t.name}`).toMatch(/^$|^[a-z]+:(read|write)$/);
@@ -185,5 +196,68 @@ describe("invarian MCP_TOOLS", () => {
     const schema = z.object(tool("ai_caption").params ?? {});
     expect(schema.safeParse({ prompt: "halo", platform: "myspace" }).success).toBe(false);
     expect(schema.safeParse({ prompt: "halo", platform: "instagram" }).success).toBe(true);
+  });
+});
+
+// Anotasi MCP bukan hiasan: klien memakainya untuk memutuskan apakah sebuah
+// tool boleh dipanggil tanpa konfirmasi, dan direktori Connector Claude
+// mensyaratkannya ada. Yang dijaga di sini adalah konsistensi antara anotasi
+// dan perilaku tool yang sebenarnya (yang terbaca dari scope & method).
+describe("toolAnnotations — anotasi MCP dari perilaku tool", () => {
+  it("title diteruskan apa adanya dari tabel", () => {
+    for (const t of MCP_TOOLS) {
+      expect(toolAnnotations(t).title, `tool ${t.name}`).toBe(t.title);
+    }
+  });
+
+  it("tool baca ditandai readOnly, tool tulis tidak", () => {
+    for (const t of MCP_TOOLS) {
+      const expected = t.scope === "" || t.scope.endsWith(":read");
+      expect(toolAnnotations(t).readOnlyHint, `tool ${t.name}`).toBe(expected);
+    }
+  });
+
+  it("katalog saat ini tepat 12 tool baca dan 2 tool tulis", () => {
+    const readOnly = MCP_TOOLS.filter((t) => toolAnnotations(t).readOnlyHint);
+    const write = MCP_TOOLS.filter((t) => !toolAnnotations(t).readOnlyHint);
+    expect(readOnly).toHaveLength(12);
+    expect(write.map((t) => t.name).sort()).toEqual(["ai_caption", "ai_hashtag"]);
+  });
+
+  it("tidak ada tool destruktif (satu-satunya tool tulis adalah generator AI)", () => {
+    for (const t of MCP_TOOLS) {
+      expect(toolAnnotations(t).destructiveHint, `tool ${t.name}`).toBe(false);
+    }
+  });
+
+  it("idempotentHint mengikuti readOnlyHint", () => {
+    for (const t of MCP_TOOLS) {
+      const a = toolAnnotations(t);
+      expect(a.idempotentHint, `tool ${t.name}`).toBe(a.readOnlyHint);
+    }
+  });
+
+  it("hanya tool yang menyentuh dunia luar yang openWorld", () => {
+    const open = MCP_TOOLS.filter((t) => toolAnnotations(t).openWorldHint)
+      .map((t) => t.name)
+      .sort();
+    expect(open).toEqual(["ai_caption", "ai_hashtag", "trends"]);
+  });
+
+  it("tool DELETE ditandai destruktif — aturan untuk tool masa depan", () => {
+    const del: McpToolDef = {
+      name: "synthetic-delete-annot",
+      title: "Hapus",
+      description: "hapus",
+      scope: "posts:write",
+      method: "DELETE",
+      path: "/v1/posts/{id}",
+      params: { id: z.string() },
+    };
+    const a = toolAnnotations(del);
+    expect(a.readOnlyHint).toBe(false);
+    expect(a.destructiveHint).toBe(true);
+    // Tool tulis tidak idempotent — mengikuti readOnlyHint=false.
+    expect(a.idempotentHint).toBe(false);
   });
 });
