@@ -171,7 +171,8 @@ export function AccountInfoModal({
 
 /**
  * Modal pilih entitas — muncul saat OAuth mengembalikan > 1 entitas
- * (Page Meta multi-Page / profil LinkedIn / halaman company LinkedIn).
+ * (Page Meta multi-Page / profil LinkedIn / halaman company LinkedIn /
+ * board Pinterest / channel YouTube).
  * Sumber: ?pending=<id> (data tersimpan server-side 10 menit).
  */
 export function PagePickerModal({
@@ -220,6 +221,10 @@ export function PagePickerModal({
   const isLinkedInOrgFlow = data?.platform === "linkedin_org";
   const isLinkedInAnyFlow = isLinkedInFlow || isLinkedInOrgFlow;
   const isPinterestFlow = data?.platform === "pinterest";
+  // youtube = channel dalam satu akun Google (termasuk brand account).
+  // Ikon brand dari PLATFORMS (lucide v1 tidak punya ikon brand).
+  const isYouTubeFlow = data?.platform === "youtube";
+  const YouTubeIcon = PLATFORMS.youtube.icon;
 
   const title = isLinkedInOrgFlow
     ? "Pilih Halaman Company LinkedIn"
@@ -229,14 +234,18 @@ export function PagePickerModal({
         ? "Pilih Halaman Instagram"
         : isPinterestFlow
           ? "Pilih Board Pinterest"
-          : "Pilih Halaman Facebook";
+          : isYouTubeFlow
+            ? "Pilih Channel YouTube"
+            : "Pilih Halaman Facebook";
   const description = isLinkedInOrgFlow
     ? "Pilih halaman company yang akan dihubungkan — hanya halaman tempat Anda ADMIN yang tampil"
     : isLinkedInFlow
       ? "Pilih profil pribadi yang akan dihubungkan"
       : isPinterestFlow
         ? "Pilih board tujuan publish Pin — setiap board menjadi satu akun terhubung"
-        : "Akun Meta Anda mengelola beberapa halaman — pilih satu untuk dihubungkan";
+        : isYouTubeFlow
+          ? "Akun Google Anda memiliki beberapa channel — pilih satu untuk dihubungkan"
+          : "Akun Meta Anda mengelola beberapa halaman — pilih satu untuk dihubungkan";
 
   return (
     <Modal open onClose={onClose} title={title} description={description} size="lg">
@@ -280,6 +289,8 @@ export function PagePickerModal({
                       )
                     ) : isPinterestFlow ? (
                       <Pin className="h-5 w-5 text-[var(--text-secondary)]" />
+                    ) : isYouTubeFlow ? (
+                      <YouTubeIcon className="h-5 w-5 text-[var(--text-secondary)]" />
                     ) : page.hasInstagram ? (
                       <AtSign className="h-5 w-5 text-[var(--text-secondary)]" />
                     ) : (
@@ -295,9 +306,11 @@ export function PagePickerModal({
                           : "Halaman company"
                         : isPinterestFlow
                           ? `Board — @${page.igUsername ?? "pinterest"}`
-                          : page.hasInstagram
-                            ? `IG: @${page.igUsername ?? "bisnis"}`
-                            : "Tanpa Instagram Business"}
+                          : isYouTubeFlow
+                            ? "Channel YouTube"
+                            : page.hasInstagram
+                              ? `IG: @${page.igUsername ?? "bisnis"}`
+                              : "Tanpa Instagram Business"}
                     </p>
                   </div>
                   {selected && <Check className="h-4 w-4 shrink-0 text-[var(--accent-gold)]" />}

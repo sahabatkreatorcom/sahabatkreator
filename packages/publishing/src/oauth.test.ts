@@ -7,11 +7,13 @@ import {
   GRAPH_IG_REFRESH_URL,
   GRAPH_THREADS_EXCHANGE_LONG_LIVED_URL,
   GRAPH_THREADS_REFRESH_URL,
+  YOUTUBE_API_URL,
 } from "./config";
 import { buildAuthorizeUrl, exchangeCodeForToken, refreshAccessToken } from "./oauth/authorize";
 import { isOAuthPlatformSupported, OAUTH_CONFIGS } from "./oauth/platform-configs";
+import { fetchPlatformProfile } from "./oauth/profile";
 import { parseExtraScopes, parseGrantedScopes, requestedScopes } from "./oauth/scopes";
-import type { AppCredential, OAuthPlatform } from "./oauth/types";
+import type { AppCredential, OAuthPlatform, TokenResult } from "./oauth/types";
 import { PublishError } from "./types";
 
 const CRED: AppCredential = {
@@ -333,6 +335,67 @@ describe("refreshAccessToken", () => {
   it("bluesky → oauth_not_supported permanent", async () => {
     await expect(refreshAccessToken("bluesky", CRED, "x")).rejects.toMatchObject({
       code: "oauth_not_supported",
+      retryable: false,
+    });
+  });
+});
+
+describe("fetchPlatformProfile — channel YouTube", () => {
+  const TOKEN: TokenResult = { accessToken: "at-yt", scopes: ["s1"] };
+
+  it("kembalikan SEMUA channel di extra.channels; channel pertama tetap identitas akun", async () => {
+    queue(
+      json({
+        items: [
+          {
+            id: "UC-1",
+            snippet: {
+              title: "Channel Satu",
+              thumbnails: { default: { url: "https://img/1.jpg" } },
+            },
+          },
+          { id: "UC-2", snippet: { title: "Channel Dua" } },
+        ],
+      }),
+    );
+
+    const profile = await fetchPlatformProfile("youtube", TOKEN);
+
+    // Request benar: /channels?part=snippet&mine=true + Bearer token
+    const { url, init } = callAt(0);
+    const u = new URL(url);
+    expect(`${u.origin}${u.pathname}`).toBe(`${YOUTUBE_API_URL}/channels`);
+    expect(u.searchParams.get("mine")).toBe("true");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer at-yt");
+
+    // Backward compatible: channel pertama tetap jadi identitas akun
+    expect(profile.platformAccountId).toBe("UC-1");
+    expect(profile.username).toBe("Channel Satu");
+    expect(profile.avatarUrl).toBe("https://img/1.jpg");
+
+    // Regresi bug lama: dulu items[0] dipakai & sisanya dibuang diam-diam —
+    // sekarang semua channel tersedia untuk picker.
+    expect(profile.extra?.channels).toEqual([
+      { id: "UC-1", title: "Channel Satu", thumbnailUrl: "https://img/1.jpg" },
+      { id: "UC-2", title: "Channel Dua", thumbnailUrl: null },
+    ]);
+  });
+
+  it("item tanpa id dibuang; title kosong fallback ke id", async () => {
+    queue(json({ items: [{ snippet: { title: "Tanpa ID" } }, { id: "UC-9" }] }));
+
+    const profile = await fetchPlatformProfile("youtube", TOKEN);
+
+    expect(profile.platformAccountId).toBe("UC-9");
+    expect(profile.username).toBe("UC-9"); // snippet.title kosong → fallback id
+    expect(profile.extra?.channels).toEqual([{ id: "UC-9", title: "UC-9", thumbnailUrl: null }]);
+  });
+
+  it("tanpa channel → oauth_no_channel (permanent)", async () => {
+    queue(json({ items: [] }));
+
+    await expect(fetchPlatformProfile("youtube", TOKEN)).rejects.toMatchObject({
+      code: "oauth_no_channel",
       retryable: false,
     });
   });

@@ -19,8 +19,10 @@ import {
   buildPendingLinkedIn,
   buildPendingPages,
   buildPendingPinterest,
+  buildPendingYouTube,
   type RawLinkedInOrganization,
   type RawMetaPage,
+  type RawYouTubeChannel,
 } from "../../lib/oauth-connect";
 import { getAppCredential } from "./credentials";
 
@@ -163,6 +165,33 @@ export async function handleCallback(c: Context): Promise<Response> {
         expiresAt: pending.expiresAt,
       });
       return c.redirect(`${env.WEB_URL}/accounts?pending=${encodeURIComponent(pending.id)}`);
+    }
+
+    // YouTube multi-channel: `channels?mine=true` mengembalikan semua channel
+    // milik akun Google (termasuk brand account). Satu token = satu akun Google,
+    // jadi >1 channel wajib dipilih user — tanpa ini user diam-diam tersambung
+    // ke channel pertama. Channel tunggal → lanjut auto-connect di bawah
+    // (metadata = profile.extra, pola sama dengan Page Meta jalur tunggal).
+    if (platform === "youtube") {
+      const channels = (profile.extra?.channels ?? []) as RawYouTubeChannel[];
+      if (channels.length > 1) {
+        const pending = buildPendingYouTube({
+          channels,
+          accessToken: token.accessToken,
+          refreshToken: token.refreshToken,
+          expiresAt: token.expiresAt,
+          scopes: token.scopes,
+        });
+        await db.insert(oauthPendingSelection).values({
+          id: pending.id,
+          userId: stateRow.userId,
+          organizationId: stateRow.organizationId,
+          platform: "youtube",
+          pagesData: pending.pagesData,
+          expiresAt: pending.expiresAt,
+        });
+        return c.redirect(`${env.WEB_URL}/accounts?pending=${encodeURIComponent(pending.id)}`);
+      }
     }
 
     // Upsert social_account (unique: platform + platformAccountId)

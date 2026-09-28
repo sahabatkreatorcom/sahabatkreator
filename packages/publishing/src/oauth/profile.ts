@@ -257,29 +257,42 @@ export async function fetchPlatformProfile(
     }
 
     case "youtube": {
-      const res = await httpRequest<{
-        items?: Array<{
-          id?: string;
-          snippet?: { title?: string; thumbnails?: { default?: { url?: string } } };
-        }>;
-      }>(`${YOUTUBE_API_URL}/channels`, {
+      // `mine=true` mengembalikan SEMUA channel milik akun Google (termasuk brand
+      // account). Ambil semuanya lalu serahkan keputusan ke caller: 1 channel →
+      // connect langsung, >1 → picker (callback.ts). Dulu hanya items[0] yang
+      // diambil, jadi user multi-channel diam-diam tersambung ke channel pertama.
+      type ChannelItem = {
+        id?: string;
+        snippet?: { title?: string; thumbnails?: { default?: { url?: string } } };
+      };
+      const res = await httpRequest<{ items?: ChannelItem[] }>(`${YOUTUBE_API_URL}/channels`, {
         query: { part: "snippet", mine: "true" },
         headers: { Authorization: `Bearer ${at}` },
       });
       if (!res.ok)
         throw new PublishError("oauth_profile_failed", "Gagal mengambil channel YouTube", false);
-      const channel = (await res.json()).items?.[0];
-      if (!channel?.id)
+      const channels = ((await res.json()).items ?? [])
+        .filter((ch): ch is ChannelItem & { id: string } => Boolean(ch.id))
+        .map((ch) => ({
+          id: ch.id,
+          title: ch.snippet?.title ?? ch.id,
+          thumbnailUrl: ch.snippet?.thumbnails?.default?.url ?? null,
+        }));
+      const first = channels[0];
+      if (!first)
         throw new PublishError(
           "oauth_no_channel",
           "Tidak ada channel YouTube pada akun ini",
           false,
         );
       return {
-        platformAccountId: channel.id,
-        username: channel.snippet?.title ?? channel.id,
-        displayName: channel.snippet?.title ?? null,
-        avatarUrl: channel.snippet?.thumbnails?.default?.url ?? null,
+        platformAccountId: first.id,
+        username: first.title,
+        displayName: first.title,
+        avatarUrl: first.thumbnailUrl,
+        // channels[] dipakai picker; channel pertama tetap jadi platformAccountId
+        // supaya akun 1-channel (mayoritas) tidak berubah perilakunya.
+        extra: { channels },
       };
     }
 

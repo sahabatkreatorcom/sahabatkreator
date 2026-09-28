@@ -129,8 +129,9 @@ export const OAUTH_CONFIGS: Record<OAuthPlatform, OAuthConfig> = {
     extraAuthorizeParams: {
       access_type: "offline", // wajib untuk refresh token
       // select_account: paksa account chooser — user bisa memilih akun Google lain
-      // saat connect YouTube ke-2 dst. (YouTube API tidak mendukung pilih channel via API;
-      // satu koneksi = satu channel — multi-channel = connect ulang dengan akun Google beda)
+      // saat connect YouTube ke-2 dst. Satu connect = satu AKUN Google; channel di
+      // dalamnya (termasuk brand account) dipilih lewat picker native
+      // (channels?mine=true → callback.ts → /accounts?pending=...).
       prompt: "select_account consent",
       include_granted_scopes: "true",
     },

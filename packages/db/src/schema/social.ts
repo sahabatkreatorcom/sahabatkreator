@@ -8,14 +8,15 @@ import { organization } from "./organization";
 /**
  * Data entitas pilihan untuk picker multi-entity — disimpan terenkripsi di oauthPendingSelection.
  * Meta (FB/IG): entitas = Page; LinkedIn: entitas = profil pribadi / company;
- * Pinterest: entitas = board (platformAccountId = board_id tujuan publish).
+ * Pinterest: entitas = board (platformAccountId = board_id tujuan publish);
+ * YouTube: entitas = channel (platformAccountId = channelId tujuan upload).
  */
 export type PendingPageData = {
-  /** ID entitas (Page ID Facebook / URN LinkedIn / board ID Pinterest) */
+  /** ID entitas (Page ID Facebook / URN LinkedIn / board ID Pinterest / channel ID YouTube) */
   pageId: string;
-  /** Nama entitas (Page / profil / company / board) */
+  /** Nama entitas (Page / profil / company / board / channel) */
   pageName: string;
-  /** Token entitas (sudah terenkripsi AES-256-GCM). LinkedIn/Pinterest: token user-level (sama untuk semua entitas) */
+  /** Token entitas (sudah terenkripsi AES-256-GCM). LinkedIn/Pinterest/YouTube: token user-level (sama untuk semua entitas) */
   pageAccessTokenEnc: string;
   /** IG business account id (null bila Page tidak punya IG bisnis) */
   igUserId: string | null;
@@ -23,11 +24,11 @@ export type PendingPageData = {
   igUsername: string | null;
   /** Avatar entitas — profil IG (jalur instagram) atau foto Page (null bila tidak ada) */
   avatarUrl?: string | null;
-  /** LinkedIn saja: refresh token user-level (terenkripsi) */
+  /** LinkedIn & YouTube saja: refresh token user-level (terenkripsi) */
   refreshTokenEnc?: string | null;
-  /** LinkedIn saja: expiry token user-level (ISO string) */
+  /** LinkedIn & YouTube saja: expiry token user-level (ISO string) */
   tokenExpiresAt?: string | null;
-  /** LinkedIn saja: scope yang di-grant */
+  /** LinkedIn & YouTube saja: scope yang di-grant */
   scopes?: string[] | null;
   /** Flow bridge Repliz: page token = token Repliz, select → connect via bridge (bukan simpan token) */
   replizBridge?: boolean;
@@ -117,9 +118,9 @@ export const oauthState = pgTable(
   ],
 );
 
-// Pending seleksi Page Meta (FB/IG) — hasil OAuth dengan > 1 Page, user harus
-// memilih Page mana yang dihubungkan (lihat halaman /accounts?pending=...)
-// pagesData = JSON terenkripsi dari array PendingPageData (berisi page token!)
+// Pending seleksi entitas multi-entity — hasil OAuth dengan > 1 entitas, user
+// harus memilih mana yang dihubungkan (lihat halaman /accounts?pending=...)
+// pagesData = JSON terenkripsi dari array PendingPageData (berisi token!)
 export const oauthPendingSelection = pgTable(
   "oauth_pending_selection",
   {
@@ -127,11 +128,11 @@ export const oauthPendingSelection = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    // Org asal flow OAuth — akun akan dihubungkan ke org ini saat Page dipilih
+    // Org asal flow OAuth — akun akan dihubungkan ke org ini saat entitas dipilih
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
-    // Platform yang memicu flow (instagram | facebook | linkedin)
+    // Platform yang memicu flow (instagram | facebook | linkedin | linkedin_org | pinterest | youtube)
     platform: platformEnum("platform").notNull(),
     // JSON [{ pageId, pageName, pageAccessTokenEnc, igUserId, igUsername }] — dienkripsi at-rest
     pagesData: text("pages_data").notNull(),

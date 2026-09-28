@@ -30,6 +30,13 @@ export type RawLinkedInOrganization = {
   vanityName?: string | null;
 };
 
+/** Channel YouTube milik akun Google (dari fetchPlatformProfile extra.channels) */
+export type RawYouTubeChannel = {
+  id: string;
+  title: string;
+  thumbnailUrl?: string | null;
+};
+
 /**
  * Bangun data pending terenkripsi dari daftar Page Meta.
  * Setiap page token dienkripsi AES-256-GCM at-rest.
@@ -146,6 +153,42 @@ export function buildPendingPinterest(params: {
 }
 
 /**
+ * Bangun data pending YouTube — entitas = channel (publish target = channel
+ * yang diautentikasi oleh token). Token Google bersifat user-level: satu token
+ * (plus refresh token, karena `access_type=offline`) berlaku untuk semua channel
+ * akun itu → disalin ke tiap entitas, pola sama dengan LinkedIn.
+ */
+export function buildPendingYouTube(params: {
+  channels: RawYouTubeChannel[];
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: Date | null;
+  scopes: string[];
+}) {
+  const { channels, accessToken, refreshToken, expiresAt, scopes } = params;
+  const accessTokenEnc = encrypt(accessToken);
+  const refreshTokenEnc = refreshToken ? encrypt(refreshToken) : null;
+  const tokenExpiresAt = expiresAt ? expiresAt.toISOString() : null;
+  const pagesData: PendingPageData[] = channels.map((ch) => ({
+    pageId: ch.id, // channelId — dipakai sebagai platformAccountId saat select
+    pageName: ch.title,
+    pageAccessTokenEnc: accessTokenEnc,
+    igUserId: null,
+    igUsername: null,
+    avatarUrl: ch.thumbnailUrl ?? null,
+    refreshTokenEnc,
+    tokenExpiresAt,
+    scopes,
+  }));
+  return {
+    id: generateId("oauthpend"),
+    platform: "youtube" as const,
+    pagesData: JSON.stringify(pagesData),
+    expiresAt: new Date(Date.now() + OAUTH_PENDING_TTL_MS),
+  };
+}
+
+/**
  * Upsert social account dari entitas terpilih.
  * - instagram: pakai IG business account id sebagai platformAccountId (publish via IG Graph),
  *   simpan pageId + pageAccessToken di metadata (pola sama dengan fetchPlatformProfile)
@@ -155,6 +198,8 @@ export function buildPendingPinterest(params: {
  * - linkedin_org: sama seperti linkedin, tapi HANYA entitas organization
  *   (app Community Management API tanpa `openid` → tidak ada person)
  * - pinterest: pakai board id (publish butuh board_id), token user-level + RT rotating
+ * - youtube: pakai channel id (target upload videos.insert), token user-level
+ *   Google + refresh token (access_type=offline) — token sama untuk semua channel
  *
  * Return { account, existing } — existing=true bila re-connect (update token).
  */
@@ -199,6 +244,14 @@ export async function upsertSocialAccount(params: {
     effectiveExpiresAt = page.tokenExpiresAt ? new Date(page.tokenExpiresAt) : null;
     effectiveScopes = page.scopes ?? scopes;
     refreshTokenEnc = page.refreshTokenEnc ?? null; // RT rotating — persist setiap connect
+  } else if (platform === "youtube") {
+    platformAccountId = page.pageId; // channelId — target upload videos.insert
+    username = page.pageName; // judul channel
+    accessTokenEnc = page.pageAccessTokenEnc; // token user-level Google (terenkripsi)
+    metadata = { channelId: page.pageId, channelTitle: page.pageName };
+    effectiveExpiresAt = page.tokenExpiresAt ? new Date(page.tokenExpiresAt) : null;
+    effectiveScopes = page.scopes ?? scopes;
+    refreshTokenEnc = page.refreshTokenEnc ?? null; // offline → refresh token ada
   } else {
     const isInstagram = platform === "instagram";
     platformAccountId = isInstagram ? (page.igUserId ?? page.pageId) : page.pageId;
