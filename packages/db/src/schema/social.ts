@@ -97,6 +97,32 @@ export const platformCredential = pgTable(
   (table) => [uniqueIndex("platform_credential_platform_uidx").on(table.platform)],
 );
 
+// Aplikasi developer pihak ketiga (Public API) — pemilik allowlist redirect.
+// Dipisah dari api_key karena satu app logis bisa punya BEBERAPA key (rotasi),
+// sementara allowlist redirect adalah properti APP, bukan properti key.
+// Lihat docs/rfc-oauth-connect.md §6.1.
+export const developerApp = pgTable(
+  "developer_app",
+  {
+    id: text("id").primaryKey(), // sk_devapp_xxx
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // Allowlist redirect URI — dicocokkan PERSIS (skema + host + path + port).
+    // SENGAJA tanpa wildcard/prefix match: "https://app.dev" sebagai prefix akan
+    // meloloskan "https://app.dev.evil.com" (open redirect).
+    allowedRedirectUris: jsonb("allowed_redirect_uris").$type<string[]>().notNull().default([]),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("developer_app_organizationId_idx").on(table.organizationId)],
+);
+
 // State OAuth connect — CSRF protection + bind user/org (sekali pakai, TTL 10 menit)
 export const oauthState = pgTable(
   "oauth_state",
@@ -109,6 +135,16 @@ export const oauthState = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     userId: text("user_id").notNull(),
+    // Jalur API (RFC connect akun): app developer pemilik flow.
+    // NULL = flow dari UI Sahabat Kreator (jalur lama, tidak berubah).
+    // Cascade: app dihapus saat flow masih jalan → state ikut hilang, flow batal
+    // dengan pesan "state tidak valid" (perilaku yang benar, bukan state yatim).
+    developerAppId: text("developer_app_id").references(() => developerApp.id, {
+      onDelete: "cascade",
+    }),
+    // Tujuan akhir setelah callback SK (hanya jalur API). Nilainya WAJIB sudah
+    // lolos allowlist developerApp.allowedRedirectUris sebelum baris ini ditulis.
+    redirectUri: text("redirect_uri"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     expiresAt: timestamp("expires_at").notNull(),
   },

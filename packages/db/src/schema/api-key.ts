@@ -13,10 +13,14 @@
 import { index, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { organization } from "./organization";
+import { developerApp } from "./social";
 
 /** Scope per resource group: `<resource>:read` / `<resource>:write`. */
 export type ApiKeyScope =
   | "accounts:read"
+  // Connect akun sosial lewat API (bridge gaya Repliz) — RFC rfc-oauth-connect.md.
+  // Scope baru, jadi key lama tidak terpengaruh (aditif).
+  | "accounts:write"
   | "analytics:read"
   | "ai:read"
   | "ai:write"
@@ -35,6 +39,7 @@ export type ApiKeyScope =
 /** Seluruh scope yang bisa diminta saat membuat key. */
 export const API_KEY_SCOPES: ApiKeyScope[] = [
   "accounts:read",
+  "accounts:write",
   "analytics:read",
   "ai:read",
   "ai:write",
@@ -63,6 +68,12 @@ export const apiKey = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
+    // App developer pemilik key (jalur API connect akun, RFC rfc-oauth-connect.md).
+    // NULL = key biasa buatan Settings → API. Cascade: app dihapus → key-nya ikut
+    // mati (tidak ada key yang menggantung tanpa pemilik allowlist redirect).
+    developerAppId: text("developer_app_id").references(() => developerApp.id, {
+      onDelete: "cascade",
+    }),
     // Pembuat (untuk audit & resolusi role). Cascade: akun dihapus → key ikut
     // hilang, sejalan dengan alur penghapusan data wajib (UU PDP).
     createdBy: text("created_by")
