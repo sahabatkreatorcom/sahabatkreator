@@ -1,7 +1,7 @@
 // Schema domain API KEY — token creator untuk Public API (/v1).
 //
 // Token dikirim klien eksternal (curl, SDK, Zapier, MCP) sebagai
-// `Authorization: Bearer sk_live_...`. Yang disimpan di DB hanyalah SHA-256
+// `Authorization: Bearer sk_api_...`. Yang disimpan di DB hanyalah SHA-256
 // dari token (tokenHash) + prefix pendek untuk tampilan/diagnosis — plaintext
 // hanya dikembalikan SATU KALI saat pembuatan, sama seperti pola
 // report_share.token (link sekali-lihat).
@@ -81,7 +81,7 @@ export const apiKey = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     // Label bebas ("Zapier", "Dashboard Klien X") — bukan secret
     name: text("name").notNull(),
-    // Prefix tampilan "sk_live_ab12" — cukup untuk dikenali di UI/log tanpa
+    // Prefix tampilan "sk_api_ab12" — cukup untuk dikenali di UI/log tanpa
     // membocorkan token
     tokenPrefix: text("token_prefix").notNull(),
     // SHA-256(token, "hex") — unik global, satu-satunya salinan token di DB

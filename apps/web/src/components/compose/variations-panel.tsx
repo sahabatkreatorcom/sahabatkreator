@@ -89,7 +89,10 @@ export function VariationsPanel({
     activeTab && selected.some((a) => a.id === activeTab)
       ? activeTab
       : (withVariation[0]?.id ?? selected[0]?.id);
-  const activeAccount = selected.find((a) => a.id === currentTab)!;
+  // `?? selected[0]` + guard: `selected` dijamin non-kosong (early return di atas),
+  // jadi fallback ini hanya untuk memenuhi tipe — tanpa non-null assertion.
+  const activeAccount = selected.find((a) => a.id === currentTab) ?? selected[0];
+  if (!activeAccount) return null;
   const activeCfg = PLATFORMS[activeAccount.platform as keyof typeof PLATFORMS];
   const activeValue = variations[activeAccount.id] ?? "";
   const activeTags = hashtagVariations[activeAccount.id] ?? "";

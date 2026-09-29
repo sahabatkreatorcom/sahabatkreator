@@ -163,7 +163,9 @@ export async function importCsvPosts(
   let imported = 0;
 
   for (let i = 1; i < rows.length; i++) {
-    const parsed = toRow(header, rows[i]!);
+    const row = rows[i];
+    if (!row) continue;
+    const parsed = toRow(header, row);
     const errors: string[] = [];
     const rowResult: CsvRowResult = {
       row: i,

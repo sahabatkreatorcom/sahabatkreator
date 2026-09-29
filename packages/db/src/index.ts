@@ -19,6 +19,7 @@ const pool = new pg.Pool({
 export const db = drizzle(pool, { schema });
 
 export { decrypt, encrypt } from "./crypto";
+export { FEATURE_KEYS, type FeatureKey, isFeatureKey } from "./feature-keys";
 export { type NewNotification, notifyOrganization, notifyUser } from "./notify";
 export {
   ALL_PERMISSION_CODES,

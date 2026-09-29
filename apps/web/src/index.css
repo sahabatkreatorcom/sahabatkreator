@@ -124,14 +124,6 @@
   --destructive-foreground: #ffffff;
 }
 
-[data-theme="dark"] .text-gradient {
-  color: var(--accent-gold);
-}
-
-[data-theme="dark"] .bg-gradient {
-  background-color: var(--accent-gold);
-}
-
 /* Base */
 * {
   box-sizing: border-box;
@@ -223,6 +215,17 @@ body {
 
 .bg-gradient {
   background-color: var(--brand-navy);
+}
+
+/* Override dark: sengaja diletakkan SETELAH aturan dasar di atas — specificity-nya
+ * lebih tinggi ([data-theme] + .class), jadi hasil cascade sama saja; urutan ini
+ * yang membuat lint `noDescendingSpecificity` tenang (naik, bukan turun). */
+[data-theme="dark"] .text-gradient {
+  color: var(--accent-gold);
+}
+
+[data-theme="dark"] .bg-gradient {
+  background-color: var(--accent-gold);
 }
 
 .card {

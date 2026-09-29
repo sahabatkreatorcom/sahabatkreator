@@ -1,4 +1,5 @@
 // Logic perbandingan paket — dipakai halaman /harga (tabel desktop + kartu mobile).
+import type { FeatureKey } from "@sahabatkreator/db";
 import { FEATURE_CATALOG, featureLabel } from "@/lib/feature-catalog";
 import { formatCurrencyIdr, formatNumber } from "@/lib/format";
 
@@ -72,9 +73,36 @@ export const CREDIT_ROWS: Row[] = [
   },
 ];
 
-/** Baris fitur — pakai features plan bulanan tier (plan tahunan hanya beda harga). */
-export function featureRows(featureSource: Plan[]): Row[] {
-  return FEATURE_CATALOG.map((f) => ({
+/**
+ * Key katalog yang dimiliki SEMUA paket → tidak membedakan paket apa pun, jadi
+ * dirender di kartu "Semua paket dapat" di atas tabel, bukan sebagai baris
+ * perbandingan.
+ *
+ * MENGAPA dihitung dari data plan, bukan daftar hard-code: admin bisa mengubah
+ * `plan.features` kapan saja di /admin/plans. Kalau daftarnya statis, tabel dan
+ * kartu bisa saling bertentangan (fitur tampil di kartu "semua paket dapat"
+ * padahal ada paket yang tidak memilikinya). Dengan cara ini baris berpindah
+ * kartu otomatis.
+ *
+ * Mengembalikan [] untuk input kosong — penting supaya `every()` pada array
+ * kosong (yang selalu true) tidak membuat SEMUA fitur diklaim milik semua paket
+ * saat data plan belum termuat.
+ */
+export function sharedFeatureKeys(featureSource: Plan[]): FeatureKey[] {
+  if (featureSource.length === 0) return [];
+  return FEATURE_CATALOG.filter((f) =>
+    featureSource.every((p) => (p.features ?? []).includes(f.key)),
+  ).map((f) => f.key);
+}
+
+/**
+ * Baris fitur — pakai features plan bulanan tier (plan tahunan hanya beda harga).
+ * `exclude` membuang baris yang sudah tampil di kartu "Semua paket dapat"
+ * (lihat `sharedFeatureKeys`) agar tidak muncul dua kali di halaman yang sama.
+ */
+export function featureRows(featureSource: Plan[], exclude: FeatureKey[] = []): Row[] {
+  const skip = new Set<string>(exclude);
+  return FEATURE_CATALOG.filter((f) => !skip.has(f.key)).map((f) => ({
     label: featureLabel(f.key),
     cells: (plans: Plan[]) =>
       plans.map((p, i) =>
@@ -117,4 +145,32 @@ export function ctaFor(tier: string): { label: string; to: string } {
   if (tier === "enterprise") return { label: "Hubungi Kami", to: "/kontak" };
   if (tier === "free") return { label: "Mulai Gratis", to: "/register" };
   return { label: `Pilih ${TIER_LABEL[tier] ?? tier}`, to: "/register" };
+}
+
+/**
+ * Label badge pada toggle interval tahunan di /harga.
+ *
+ * TIDAK boleh hard-code "Hemat 2 bulan": harga plan editable admin, dan badge
+ * yang menyesatkan lebih buruk daripada tidak ada. null = jangan tampilkan
+ * badge sama sekali (tidak ada tier tahunan yang benar-benar lebih murah).
+ * Bulan gratis dihitung per tier; jika bulat & seragam → "Hemat N bulan",
+ * jika berbeda antar tier → "Hemat hingga N bulan", jika tidak bulat →
+ * label generik tanpa angka.
+ */
+export function annualToggleLabel(tiers: { plan: Plan; monthly: Plan }[]): string | null {
+  let anySavings = false;
+  let maxMonths = 0;
+  for (const { plan, monthly } of tiers) {
+    if (!annualSavings(plan, monthly)) continue;
+    anySavings = true;
+    if (monthly.priceIdr > 0) {
+      const months = (monthly.priceIdr * 12 - plan.priceIdr) / monthly.priceIdr;
+      if (plan.billingIntervalMonths === 12 && Number.isInteger(months)) {
+        maxMonths = Math.max(maxMonths, months);
+      }
+    }
+  }
+  if (!anySavings) return null;
+  if (maxMonths <= 0) return "Hemat dengan paket tahunan";
+  return maxMonths === 1 ? "Hemat 1 bulan" : `Hemat hingga ${maxMonths} bulan`;
 }

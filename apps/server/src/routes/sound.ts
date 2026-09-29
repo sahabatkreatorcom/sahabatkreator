@@ -8,7 +8,7 @@
 
 import { db } from "@sahabatkreator/db";
 import { audioTrack } from "@sahabatkreator/db/schema";
-import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { and, desc, eq, isNull, or, type SQL } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { errorResponse, requireOrg } from "../lib/auth-guard";
@@ -42,14 +42,18 @@ soundRoute.get("/", async (c) => {
     const featuredOnly = c.req.query("featured") === "true";
     const q = c.req.query("q");
 
-    const conditions = [
-      featuredOnly
-        ? eq(audioTrack.isFeatured, true)
-        : or(
-            eq(audioTrack.organizationId, ctx.organization.id),
-            isNull(audioTrack.organizationId),
-          )!,
-    ];
+    const conditions: SQL[] = [];
+    if (featuredOnly) {
+      conditions.push(eq(audioTrack.isFeatured, true));
+    } else {
+      // `or()` bisa `undefined` → diperiksa, bukan di-assert `!` (assert akan
+      // menyisipkan `undefined` ke `and(...)` dan merusak query).
+      const visibility = or(
+        eq(audioTrack.organizationId, ctx.organization.id),
+        isNull(audioTrack.organizationId),
+      );
+      if (visibility) conditions.push(visibility);
+    }
 
     const rows = await db
       .select()

@@ -40,7 +40,7 @@ export const platformSettings = pgTable("platform_settings", {
     .default(false),
   collabAutoAcceptInvites: boolean("collab_auto_accept_invites").notNull().default(false),
   collabInviteMessage: text("collab_invite_message"),
-  // Konfigurasi pembayaran (Sumopod Pay) — adaptasi stripe-config reference.
+  // Konfigurasi pembayaran (Sumopod Pay).
   // Secret dienkripsi; resolve: DB (admin) → fallback env.
   sumopodApiBaseUrl: text("sumopod_api_base_url"),
   sumopodApiKeyEnc: text("sumopod_api_key_enc"),

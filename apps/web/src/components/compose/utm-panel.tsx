@@ -102,9 +102,10 @@ export function UtmPanel({
       toast.error("Lengkapi URL, source, medium, dan campaign");
       return;
     }
-    if (captionUrls.length > 0 && effectiveBase === captionUrls[0]) {
+    const firstCaptionUrl = captionUrls[0];
+    if (firstCaptionUrl && effectiveBase === firstCaptionUrl) {
       // Ganti URL pertama di caption dengan versi ber-UTM
-      const newContent = applyUtmToCaption(content, captionUrls[0]!, utmUrl);
+      const newContent = applyUtmToCaption(content, firstCaptionUrl, utmUrl);
       onApplyContent(newContent);
       toast.success("Link UTM diterapkan ke caption");
     } else {
@@ -183,7 +184,10 @@ export function UtmPanel({
         {captionUrls.length > 0 && !baseUrl && (
           <button
             type="button"
-            onClick={() => setBaseUrl(captionUrls[0]!)}
+            onClick={() => {
+              const first = captionUrls[0];
+              if (first) setBaseUrl(first);
+            }}
             className="text-left text-[var(--accent-gold)] text-xs hover:underline"
           >
             Pakai URL dari caption: {captionUrls[0]}

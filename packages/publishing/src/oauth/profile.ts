@@ -115,14 +115,14 @@ export async function fetchPlatformProfile(
         );
       }
       const page = pages.find((p) => p.instagram_business_account);
-      if (!page) {
+      if (!page?.instagram_business_account) {
         throw new PublishError(
           "oauth_no_ig_account",
           "Tidak ada Page Facebook dengan Instagram Business terhubung. Hubungkan akun IG (Business/Creator) ke Page dulu di pengaturan Instagram → Linked accounts.",
           false,
         );
       }
-      const igba = page.instagram_business_account!;
+      const igba = page.instagram_business_account;
       // Page access token: lebih tahan lama, scope page penuh
       return {
         platformAccountId: igba.id,
@@ -184,7 +184,8 @@ export async function fetchPlatformProfile(
           false,
         );
       const pages = (await res.json()).data ?? [];
-      if (pages.length === 0) {
+      const page = pages[0];
+      if (!page) {
         // Penyebab terumum /me/accounts kosong: salah pilih akun di account
         // chooser, atau Page tak terlihat app di mode development.
         throw new PublishError(
@@ -193,7 +194,6 @@ export async function fetchPlatformProfile(
           false,
         );
       }
-      const page = pages[0]!;
       return {
         platformAccountId: page.id,
         username: page.name,
@@ -416,7 +416,8 @@ export async function fetchPlatformProfile(
       // entitas = halaman company tempat user ADMIN (organizationAcls).
       // `strict` → error HTTP di-throw dengan pesan jelas, bukan picker kosong.
       const organizations = await fetchLinkedInAdminOrganizations(at, { strict: true });
-      if (organizations.length === 0) {
+      const primary = organizations[0];
+      if (!primary) {
         throw new PublishError(
           "oauth_no_organization",
           "Tidak ada halaman company LinkedIn yang bisa dihubungkan. Pastikan Anda berperan ADMIN di halaman company tersebut.",
@@ -425,7 +426,6 @@ export async function fetchPlatformProfile(
       }
       // Identitas profil tidak dipakai flow ini — callback selalu mengarahkan user
       // ke picker (profile.extra.organizations). Nilai di bawah hanya placeholder.
-      const primary = organizations[0]!;
       return {
         platformAccountId: `urn:li:organization:${primary.id}`,
         username: primary.name,

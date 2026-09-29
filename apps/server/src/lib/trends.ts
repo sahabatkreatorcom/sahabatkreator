@@ -78,7 +78,8 @@ function parseTrendingRss(xml: string): TrendItem[] {
       const newsRe = /<ht:news_item>([\s\S]*?)<\/ht:news_item>/g;
       for (const nm of item.matchAll(newsRe)) {
         if (articles.length >= 3) break;
-        const block = nm[1]!;
+        const block = nm[1];
+        if (!block) continue;
         const nTitle = tagText(block, "ht:news_item_title") ?? tagText(block, "news_item_title");
         const nUrl = tagText(block, "ht:news_item_url") ?? tagText(block, "news_item_url");
         const nSource = tagText(block, "ht:news_item_source") ?? tagText(block, "news_item_source");
@@ -110,9 +111,8 @@ export async function fetchDailyTrendsID(limit = 20): Promise<TrendItem[]> {
         redirect: "follow",
         signal: AbortSignal.timeout(8_000),
       });
-      const setCookies =
-        home.headers.getSetCookie?.() ??
-        (home.headers.get("set-cookie") ? [home.headers.get("set-cookie")!] : []);
+      const singleCookie = home.headers.get("set-cookie");
+      const setCookies = home.headers.getSetCookie?.() ?? (singleCookie ? [singleCookie] : []);
       for (const sc of setCookies) {
         const pair = sc.split(";")[0];
         if (pair && !cookies.includes(pair)) cookies.push(pair);

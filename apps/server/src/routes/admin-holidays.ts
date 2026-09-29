@@ -216,7 +216,8 @@ adminHolidaysRoute.post("/holidays/import", async (c) => {
     let imported = 0;
 
     for (let i = 1; i < rows.length; i++) {
-      const cells = rows[i]!;
+      const cells = rows[i];
+      if (!cells) continue;
       const get = (name: string): string => {
         const idx = col(name);
         return idx >= 0 ? (cells[idx] ?? "").trim() : "";

@@ -133,7 +133,7 @@ Urutan mount disengaja dan dikomentari: `logger` → `bodyLimit 110MB` → `secu
 - **`rate-limit.ts`** — fixed window in-memory, diakui sendiri hanya untuk single instance. Preset: global 100/60s, AI 10/60s, public API 60/60s per key.
 - **`ssrf.ts`** (112) — scheme allowlist, DNS resolve `all: true` (tolak jika **ada** record private), handle IPv4-mapped IPv6, loopback, link-local, ULA.
 - **`crypto.ts`** — AES-256-GCM, format envelope `v1.iv.ciphertext.tag`, validasi panjang key — versi memungkinkan rotasi key di masa depan.
-- **`api-key.ts`** — `sk_live_<32 base64url>`, hanya hash SHA-256 di DB, `timingSafeEqual`, cek revocation/expiry/banned, **dan membership live** (key mati saat creator keluar org). `touchLastUsedAt` di-throttle 1 write/menit.
+- **`api-key.ts`** — `sk_api_<32 base64url>`, hanya hash SHA-256 di DB, `timingSafeEqual`, cek revocation/expiry/banned, **dan membership live** (key mati saat creator keluar org). `touchLastUsedAt` di-throttle 1 write/menit.
 - **`public-api.ts`** — chain `verifyApiKey → publicApiRateLimit → publicApiPlanGate → requireScope`; scope `api_webhook` hanya Enterprise.
 - **`billing.ts`** — pool quota; `consumeRenderCredits` (video=10, carousel=5, auto-clip=5).
 - **`r2.ts`** — layout key `<orgId>/<yyyy>/<mm>/<id>.<ext>`, presigned upload/download, lazy singleton.

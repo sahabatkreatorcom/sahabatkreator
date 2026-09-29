@@ -1,82 +1,156 @@
+import type { FeatureKey } from "@sahabatkreator/db";
 import { useQuery } from "@tanstack/react-query";
+import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
   CalendarDays,
   Check,
+  FileText,
   Image,
   MessageCircle,
+  Plug,
   Radar,
-  ShieldCheck,
+  Share2,
   Sparkles,
   Users,
   Video,
+  Workflow,
   Zap,
 } from "lucide-react";
 import { Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { FEATURE_CATALOG, GLOBAL_FEATURES } from "@/lib/feature-catalog";
 import { PLATFORMS } from "@/lib/platforms";
 import { useSeo } from "@/lib/seo";
 import { queryKeys } from "../../lib/query-keys";
 import { ctaFor, type Plan, priceLabel, priceSuffix, TIER_LABEL } from "./pricing-shared";
 
-const FEATURES = [
-  {
+/**
+ * Fitur yang dipromosikan sebagai kartu utama di landing.
+ *
+ * Key HARUS ada di katalog fitur (FeatureKey) atau GLOBAL_FEATURES — `satisfies`
+ * membuat key asing jadi error `tsc`, jadi landing tidak bisa menyebut fitur
+ * yang tidak ada di aplikasi (kebalikan dari grid hard-code yang dulu drift:
+ * automation, laporan, dan Public API sudah ada tapi tidak pernah dipromosikan).
+ */
+const CARD_KEYS = [
+  "multi_platform",
+  "scheduling",
+  "ai_caption",
+  "video_render",
+  "analytics",
+  "engagement_inbox",
+  "automation",
+  "listening",
+  "reports_export",
+  "team",
+  "media_library",
+  "api_access",
+] as const satisfies readonly (FeatureKey | "video_render" | "holiday_ideas" | "qris_payment")[];
+
+type CardKey = (typeof CARD_KEYS)[number];
+
+const CARD_CONTENT: Record<CardKey, { icon: LucideIcon; title: string; description: string }> = {
+  multi_platform: {
+    icon: Share2,
+    title: "Publish Multi-Platform",
+    description:
+      "Hubungkan Instagram, Facebook, Threads, TikTok, YouTube, Pinterest, LinkedIn, Bluesky, dan Google Business. Satu komposer untuk semuanya.",
+  },
+  scheduling: {
     icon: CalendarDays,
     title: "Kalender & Penjadwalan",
     description:
-      "Rencanakan konten dengan kalender visual. Jadwalkan posting sekali, tayang otomatis di semua platform.",
+      "Rencanakan konten dengan kalender visual. Jadwalkan posting sekali, tayang otomatis — lengkap dengan antrian dan retry otomatis.",
   },
-  {
+  ai_caption: {
     icon: Sparkles,
-    title: "AI Caption & Coach",
+    title: "AI Caption, Hashtag & Coach",
     description:
-      "Buat caption, hashtag, dan saran strategi konten dengan AI. Ide segar setiap hari, siap posting.",
+      "Generate dan rewrite caption plus hashtag dengan AI. Coach AI mingguan menganalisa performa dan memberi saran strategi konten.",
   },
-  {
+  video_render: {
+    icon: Video,
+    title: "Auto-clip & Render Video",
+    description:
+      "Ubah video panjang jadi klip pendek siap posting — momen terbaik dipotong otomatis, dibatasi kredit render bulanan.",
+  },
+  analytics: {
     icon: BarChart3,
     title: "Analitik Terpadu",
     description:
-      "Pantau performa lintas platform dalam satu dashboard. Followers, engagement, reach — semua terdata.",
+      "Reach, engagement, followers, dan waktu posting optimal lintas akun dalam satu dashboard — dibandingkan dengan periode sebelumnya.",
   },
-  {
-    icon: Video,
-    title: "Video & Carousel AI",
-    description:
-      "Ubah video panjang jadi klip pendek viral, atau susun carousel menarik — otomatis dengan AI.",
-  },
-  {
+  engagement_inbox: {
     icon: MessageCircle,
     title: "Inbox Engagement",
     description:
       "Balas komentar, mention, DM, dan review dari satu inbox. Tidak ada interaksi yang terlewat.",
   },
-  {
-    icon: Radar,
-    title: "Listening & Kompetitor",
-    description: "Pantau sebutan brand, tren industri, dan pergerakan kompetitor secara real-time.",
+  automation: {
+    icon: Workflow,
+    title: "Automation Rules",
+    description:
+      "Auto-reply dan auto-like berdasarkan trigger yang Anda tentukan — interaksi masuk tertangani sesuai aturan Anda.",
   },
-  {
+  listening: {
+    icon: Radar,
+    title: "Social Listening & Kompetitor",
+    description:
+      "Pantau kata kunci, sebutan brand, dan pergerakan akun kompetitor. Ketahui tren sebelum melewatinya.",
+  },
+  reports_export: {
+    icon: FileText,
+    title: "Laporan CSV & PDF",
+    description:
+      "Export laporan performa ke CSV atau PDF, plus jadwal email laporan otomatis untuk klien atau tim.",
+  },
+  team: {
     icon: Users,
     title: "Kolaborasi Tim",
     description:
-      "Undang anggota tim dengan role dan permission yang jelas. Audit setiap perubahan konten.",
+      "Undang anggota tim dengan role dan permission yang jelas. Setiap perubahan konten tercatat.",
   },
-  {
+  media_library: {
     icon: Image,
     title: "Pustaka Media",
     description:
-      "Simpan semua aset visual di satu tempat. Upload sekali, pakai di semua postingan.",
+      "Simpan semua aset visual di satu tempat dengan folder dan alt text. Upload sekali, pakai di semua postingan.",
   },
-  {
-    icon: ShieldCheck,
-    title: "Keamanan Berlapis",
-    description: "2FA, enkripsi token, dan audit log. Data akun sosmed Anda aman bersama kami.",
+  api_access: {
+    icon: Plug,
+    title: "Public API, Webhook & MCP",
+    description:
+      "Buat dan jadwalkan konten lewat API, terima notifikasi event lewat webhook, atau hubungkan AI assistant Anda via MCP.",
   },
+};
+
+const FEATURES = CARD_KEYS.map((key) => ({ key, ...CARD_CONTENT[key] }));
+
+/**
+ * Sisa fitur katalog + global yang tidak jadi kartu utama — DITURUNKAN
+ * otomatis (bukan daftar manual) supaya fitur baru di katalog langsung
+ * muncul di landing tanpa edit tambahan, dan fitur yang dihapus katalog
+ * otomatis hilang dari landing juga.
+ */
+const CARD_KEY_SET = new Set<string>(CARD_KEYS);
+const EXTRA_FEATURES: string[] = [
+  ...FEATURE_CATALOG.filter((f) => !CARD_KEY_SET.has(f.key)).map((f) => f.label),
+  ...GLOBAL_FEATURES.filter((g) => !CARD_KEY_SET.has(g.key)).map((g) => g.label),
+  // Bukan fitur tergerbang, tapi janji keamanan platform tetap disebut.
+  "Keamanan 2FA & audit log",
 ];
 
 const PLATFORM_LIST = Object.entries(PLATFORMS).filter(([key]) => key !== "manual");
+
+// Hitung platform UNIK — varian koneksi ("Instagram (Akun Bisnis)",
+// "LinkedIn (Halaman Company)") tetap dihitung satu platform yang sama,
+// jadi klaim jumlah di hero tidak bisa lebih dari platform yang benar-benar ada.
+const PLATFORM_COUNT = new Set(
+  PLATFORM_LIST.map(([, config]) => config.label.replace(/\s*\(.*\)\s*$/, "")),
+).size;
 
 export function LandingPage() {
   const { data: plansData, isLoading: plansLoading } = useQuery({
@@ -145,7 +219,7 @@ export function LandingPage() {
           {/* Platform badges */}
           <div className="mt-12">
             <p className="mb-4 font-medium text-[var(--text-muted)] text-sm">
-              Mendukung 10+ platform
+              Mendukung {PLATFORM_COUNT} platform sosial media
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               {PLATFORM_LIST.map(([key, config]) => {
@@ -188,6 +262,26 @@ export function LandingPage() {
               </div>
             ))}
           </div>
+
+          {/* Sisa fitur (diturunkan otomatis dari katalog — lihat EXTRA_FEATURES). */}
+          {EXTRA_FEATURES.length > 0 && (
+            <div className="mt-10 rounded-[var(--radius-lg)] border border-[var(--border)] p-6">
+              <p className="text-center font-medium text-[var(--text-secondary)] text-sm">
+                Dan masih ada lagi:
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+                {EXTRA_FEATURES.map((label) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-secondary)] px-3.5 py-1.5 text-[var(--text-secondary)] text-sm"
+                  >
+                    <Check className="h-3.5 w-3.5 text-[var(--accent-gold)]" aria-hidden />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

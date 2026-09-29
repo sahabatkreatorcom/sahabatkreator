@@ -60,7 +60,10 @@ export async function handleRefresh(c: Context): Promise<Response> {
       .update(socialAccount)
       .set({
         accessTokenEnc: encrypt(token.accessToken),
-        refreshTokenEnc: encrypt(token.refreshToken!),
+        // `exchangeRefresh` mengembalikan RT baru (platform rotating seperti
+        // Pinterest) atau RT lama; fallback ke `refreshToken` plaintext yang
+        // sudah dijamin ada di atas, supaya tidak perlu non-null assertion.
+        refreshTokenEnc: encrypt(token.refreshToken ?? refreshToken),
         tokenExpiresAt: token.expiresAt ?? null,
         lastSyncedAt: new Date(),
         lastError: null,

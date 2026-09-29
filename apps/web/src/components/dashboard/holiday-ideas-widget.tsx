@@ -36,9 +36,11 @@ export function HolidayIdeasWidget() {
   });
 
   const holidays = data?.holidays ?? [];
-  if (holidays.length === 0) return null;
 
-  const detail = selected ?? holidays[0]!;
+  // Satu guard menggantikan cek `holidays.length === 0` + `holidays[0]!`:
+  // kalau tidak ada holiday (dan belum ada pilihan), tidak ada yang dirender.
+  const detail = selected ?? holidays[0];
+  if (!detail) return null;
 
   return (
     <div className="card p-6">

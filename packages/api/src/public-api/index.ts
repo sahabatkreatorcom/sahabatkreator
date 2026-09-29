@@ -7,6 +7,7 @@
 import { extendZodWithOpenApi, OpenApiGeneratorV31 } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
 import { publicApiRegistry } from "./common";
+import { buildConnectPaths } from "./paths-connect";
 import { buildPhase3Paths } from "./paths-phase3";
 import { buildPublicApiPaths } from "./paths-read";
 import { registerPublicApiSchemas } from "./register";
@@ -30,7 +31,7 @@ export function createPublicApiDocument() {
       version: "1.0.0",
       description:
         "API publik untuk integrasi eksternal (Zapier, Make, MCP, dashboard klien). " +
-        "Autentikasi: `Authorization: Bearer sk_live_...` atau `X-API-Key: sk_live_...`. " +
+        "Autentikasi: `Authorization: Bearer sk_api_...` atau `X-API-Key: sk_api_...`. " +
         "Rate limit 60 permintaan/menit per key. Endpoint tulis butuh plan Business+ (api_write).",
     },
     servers: [
@@ -58,6 +59,7 @@ export function createPublicApiDocument() {
     paths: {
       ...buildPublicApiPaths(),
       ...buildPhase3Paths(),
+      ...buildConnectPaths(),
     },
     components: {
       ...components,
@@ -66,7 +68,7 @@ export function createPublicApiDocument() {
           type: "http",
           scheme: "bearer",
           description:
-            "API key format `sk_live_<32 karakter>`. Dibuat di Settings → API. " +
+            "API key format `sk_api_<32 karakter>`. Dibuat di Settings → API. " +
             "Bisa juga dikirim via header `X-API-Key`.",
         },
       },

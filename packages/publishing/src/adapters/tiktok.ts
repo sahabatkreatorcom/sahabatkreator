@@ -95,9 +95,11 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
     );
   }
 
-  if (videos.length > 0) {
+  // `if (video)` menggantikan `if (videos.length > 0)` — ekuivalen (video = videos[0])
+  // tapi sekaligus menyempitkan tipe sehingga tidak perlu `videos[0]!`.
+  const video = videos[0];
+  if (video) {
     // ---- Direct Post video via PULL_FROM_URL ----
-    const video = videos[0]!;
     if (videos.length > 1) {
       throw new PublishError(
         "tiktok_single_video",

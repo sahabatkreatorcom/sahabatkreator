@@ -94,12 +94,28 @@ export function startOfWeek(d: Date): Date {
   return start;
 }
 
-/** Jam HH:mm lokal */
-export function formatTimeId(iso: string): string {
+/** Pecah key tanggal "YYYY-MM-DD" → [tahun, bulan, tanggal]; null bila formatnya
+ * salah. Dipakai aksi drag-drop reschedule supaya input cacat tidak diam-diam
+ * menjadi `new Date(NaN, ...)` (Invalid Date) seperti pada `.split("-").map(Number)`. */
+export function parseDateKey(dateKey: string): [number, number, number] | null {
+  const m = dateKey.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const y = m?.[1];
+  const mo = m?.[2];
+  const d = m?.[3];
+  if (!y || !mo || !d) return null;
+  return [Number(y), Number(mo), Number(d)];
+}
+
+/** Jam HH:mm lokal. Nullish/tanggal invalid → "—" supaya pemanggil (day-view,
+ * week-view) tidak perlu non-null assertion saat merender post tanpa jadwal. */
+export function formatTimeId(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(iso));
+  }).format(date);
 }
 
 /** Group items by tanggal YYYY-MM-DD (dari scheduledAt post atau date note).

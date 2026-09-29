@@ -3,7 +3,7 @@
   "info": {
     "title": "Sahabat Kreator Public API",
     "version": "1.0.0",
-    "description": "API publik untuk integrasi eksternal (Zapier, Make, MCP, dashboard klien). Autentikasi: `Authorization: Bearer sk_live_...` atau `X-API-Key: sk_live_...`. Rate limit 60 permintaan/menit per key. Endpoint tulis butuh plan Business+ (api_write)."
+    "description": "API publik untuk integrasi eksternal (Zapier, Make, MCP, dashboard klien). Autentikasi: `Authorization: Bearer sk_api_...` atau `X-API-Key: sk_api_...`. Rate limit 60 permintaan/menit per key. Endpoint tulis butuh plan Business+ (api_write)."
   },
   "servers": [
     {
@@ -3639,6 +3639,610 @@
           }
         }
       }
+    },
+    "/v1/accounts/{platform}/authorize": {
+      "get": {
+        "summary": "Mulai OAuth untuk menghubungkan akun",
+        "description": "Mengembalikan URL otorisasi platform. Setelah pengguna menyetujui, kami mengalihkan browser ke `redirect` Anda dengan `code` + `state` (atau `error` bila ditolak), lalu Anda menukarkan `code` lewat `POST /v1/accounts/{platform}/connect`.\n\nButuh plan Business+ (`api_write`) dan API key yang terikat ke developer app.",
+        "tags": [
+          "Accounts"
+        ],
+        "x-required-scopes": [
+          "accounts:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Platform tujuan, mis. `instagram`, `facebook`, `tiktok`, `youtube`, `linkedin`."
+          },
+          {
+            "name": "redirect",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Redirect URI milik Anda. WAJIB sudah terdaftar di allowlist developer app dan dicocokkan PERSIS (tanpa wildcard, tanpa prefix match). Harus `https` — `http` hanya untuk localhost. Tidak boleh mengandung fragment (`#`) karena akan menelan `code` yang kami tambahkan."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "URL otorisasi platform.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorizeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API key tidak terikat developer app yang aktif — tidak ada allowlist redirect yang bisa dipercaya.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/{platform}/connect": {
+      "post": {
+        "summary": "Tukar code menjadi akun terhubung",
+        "description": "Menukar `code` yang Anda terima di redirect URI. Bila platform perlu pemilihan aset (Page Facebook, board Pinterest, channel YouTube, halaman LinkedIn), responsnya berisi `pendingId` + `assets[]`; lanjutkan dengan `GET /v1/accounts/pending/{id}` dan `POST /v1/accounts/pending/{id}/select`.\n\nDaftar platform yang butuh pemilihan adalah detail internal kami dan berubah setiap kali akses API platform disetujui — karena itu tidak ada status 400 khusus untuk itu.",
+        "tags": [
+          "Accounts"
+        ],
+        "x-required-scopes": [
+          "accounts:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Selesai (`accountId`) atau butuh pemilihan aset (`pendingId` + `assets`). Bercabanglah pada ada/tidaknya `pendingId`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ConnectAccountResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ConnectPendingResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Akun platform ini sudah terhubung di organisasi lain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Sesi pemilihan akun kedaluwarsa — mulai ulang dari `authorize`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/{platform}/exchange": {
+      "post": {
+        "summary": "Tukar code lebih awal (tampilkan picker di depan)",
+        "description": "Perilaku & bentuk responsnya identik dengan `connect` — disediakan untuk alur yang ingin menampilkan pemilihan aset lebih dulu. Pada platform yang tidak butuh pemilihan, responsnya `{ accountId }` dan akun sudah terhubung.\n\n`code` bersifat sekali pakai: panggil `connect` ATAU `exchange`, jangan keduanya.",
+        "tags": [
+          "Accounts"
+        ],
+        "x-required-scopes": [
+          "accounts:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Selesai (`accountId`) atau butuh pemilihan aset (`pendingId` + `assets`). Bercabanglah pada ada/tidaknya `pendingId`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ConnectAccountResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ConnectPendingResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Akun platform ini sudah terhubung di organisasi lain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Sesi pemilihan akun kedaluwarsa — mulai ulang dari `authorize`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/pending/{id}": {
+      "get": {
+        "summary": "Daftar aset yang bisa dipilih",
+        "description": "Token aset TIDAK pernah dikirim — hanya id, nama, dan metadata tampilan. Sesi ini berlaku 10 menit dan hanya boleh diselesaikan oleh organisasi pemiliknya.",
+        "tags": [
+          "Accounts"
+        ],
+        "x-required-scopes": [
+          "accounts:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "`pendingId` dari respons connect/exchange."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar aset untuk ditampilkan di picker Anda.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingSelectionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Sesi pemilihan akun kedaluwarsa — mulai ulang dari `authorize`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/pending/{id}/select": {
+      "post": {
+        "summary": "Hubungkan aset terpilih",
+        "description": "Menyelesaikan pemilihan: aset yang dipilih dihubungkan sebagai akun organisasi. Satu `pendingId` = satu aset; untuk memilih aset lain, mulai ulang dari `authorize`.",
+        "tags": [
+          "Accounts"
+        ],
+        "x-required-scopes": [
+          "accounts:write"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "`pendingId` dari respons connect/exchange."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectAssetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Akun terhubung.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelectAssetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Akun platform ini sudah terhubung di organisasi lain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Sesi pemilihan akun kedaluwarsa — mulai ulang dari `authorize`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3717,6 +4321,150 @@
           }
         }
       },
+      "AuthorizeResponse": {
+        "type": "object",
+        "properties": {
+          "authorizeUrl": {
+            "type": "string",
+            "description": "Arahkan browser pengguna ke URL ini untuk memberi izin."
+          }
+        },
+        "required": [
+          "authorizeUrl"
+        ]
+      },
+      "ConnectRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Authorization code dari platform, diterima sebagai parameter `code` di redirect URI Anda. Sekali pakai — panggil `connect` ATAU `exchange`, jangan keduanya."
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "ConnectAccountResponse": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "ID akun yang baru terhubung."
+          }
+        },
+        "required": [
+          "accountId"
+        ]
+      },
+      "ConnectPendingResponse": {
+        "type": "object",
+        "properties": {
+          "pendingId": {
+            "type": "string"
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingAsset"
+            }
+          }
+        },
+        "required": [
+          "pendingId",
+          "assets"
+        ]
+      },
+      "PendingAsset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Kirim kembali sebagai `assetId` ke endpoint select."
+          },
+          "name": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "picture": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasInstagram": {
+            "type": "boolean",
+            "description": "Meta saja: Page punya Instagram Business tertaut. Di alur `instagram`, aset dengan nilai `false` **tidak bisa dipilih**."
+          },
+          "isPersonal": {
+            "type": "boolean",
+            "description": "LinkedIn saja: `true` = profil pribadi, `false` = halaman company."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "username",
+          "picture",
+          "hasInstagram",
+          "isPersonal"
+        ]
+      },
+      "PendingSelectionResponse": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string"
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingAsset"
+            }
+          }
+        },
+        "required": [
+          "platform",
+          "assets"
+        ]
+      },
+      "SelectAssetRequest": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "`id` dari `assets[]`."
+          }
+        },
+        "required": [
+          "assetId"
+        ]
+      },
+      "SelectAssetResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "username"
+        ]
+      },
       "PingResponse": {
         "type": "object",
         "properties": {
@@ -3756,7 +4504,7 @@
               },
               "prefix": {
                 "type": "string",
-                "example": "sk_live_ab12"
+                "example": "sk_api_ab12"
               },
               "scopes": {
                 "type": "array",
@@ -6522,7 +7270,7 @@
       "apiKeyAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "API key format `sk_live_<32 karakter>`. Dibuat di Settings → API. Bisa juga dikirim via header `X-API-Key`."
+        "description": "API key format `sk_api_<32 karakter>`. Dibuat di Settings → API. Bisa juga dikirim via header `X-API-Key`."
       }
     }
   },

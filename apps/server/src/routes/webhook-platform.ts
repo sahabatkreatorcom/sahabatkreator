@@ -135,26 +135,58 @@ function verifySignature(raw: string, signature: string, secret: string): boolea
 }
 
 /**
- * Guard secret webhook platform — FAIL-CLOSED.
- * Jika secret tidak dikonfigurasi (DB & env kosong), payload DITOLAK 503.
+ * Response 503 untuk secret webhook platform yang belum dikonfigurasi — FAIL-CLOSED.
  * Menerima payload tanpa verifikasi membuka pintu spoofing komentar/mention.
+ *
+ * Sengaja berbentuk *factory response*, bukan guard `(secret) => Response | null`:
+ * dipakai sebagai `if (!secret) return webhookSecretMissing(label)` sehingga
+ * TypeScript ikut menyempitkan `secret` ke `string` di baris berikutnya tanpa
+ * non-null assertion.
  */
-function requireWebhookSecret(
-  secret: string | null | undefined,
-  platformLabel: string,
-): Response | null {
-  if (!secret) {
-    console.error(
-      `[webhook] ${platformLabel}: secret belum dikonfigurasi (DB & env kosong) — ` +
-        "payload DITOLAK. Isi kredensial platform di panel admin atau env.",
-    );
-    return Response.json(
-      { message: "Webhook secret platform belum dikonfigurasi" },
-      { status: 503 },
-    );
-  }
-  return null;
+function webhookSecretMissing(platformLabel: string): Response {
+  console.error(
+    `[webhook] ${platformLabel}: secret belum dikonfigurasi (DB & env kosong) — ` +
+      "payload DITOLAK. Isi kredensial platform di panel admin atau env.",
+  );
+  return Response.json({ message: "Webhook secret platform belum dikonfigurasi" }, { status: 503 });
 }
+
+/**
+ * Bentuk longgar payload webhook Meta (IG bisnis / Facebook / Threads share
+ * struktur `entry[].changes[]`). Hanya field yang benar-benar dibaca yang
+ * dideklarasikan — payload platform bisa berubah kapan saja, jadi sisanya
+ * diabaikan alih-alih di-`any` (kehilangan seluruh type-safety).
+ */
+type MetaWebhookValue = {
+  id?: string | number;
+  text?: string;
+  comment_id?: string;
+  username?: string;
+  media_url?: string;
+  created_time?: number;
+  from?: { id?: string | number; username?: string };
+  media?: { id?: string | number };
+};
+
+type MetaWebhookPayload = {
+  entry?: {
+    id?: string | number;
+    changes?: { field?: string; value?: MetaWebhookValue }[];
+  }[];
+};
+
+/** Bentuk longgar payload webhook TikTok — hanya field yang dibaca. */
+type TikTokWebhookPayload = {
+  event?: string;
+  open_id?: string;
+  data?: {
+    open_id?: string;
+    comment_id?: string;
+    video_id?: string;
+    content?: string;
+    create_time?: number;
+  };
+};
 
 /**
  * Proses payload webhook format Meta Graph (IG/FB/Threads share struktur
@@ -162,9 +194,9 @@ function requireWebhookSecret(
  * Returns jumlah item baru, atau null bila payload invalid.
  */
 async function processMetaPayload(raw: string, platformsCsv: string): Promise<number | null> {
-  let payload: any;
+  let payload: MetaWebhookPayload;
   try {
-    payload = JSON.parse(raw);
+    payload = JSON.parse(raw) as MetaWebhookPayload;
   } catch {
     return null;
   }
@@ -178,7 +210,7 @@ async function processMetaPayload(raw: string, platformsCsv: string): Promise<nu
     if (!account) continue;
 
     for (const change of entry?.changes ?? []) {
-      const value = change?.value ?? {};
+      const value: MetaWebhookValue = change?.value ?? {};
       if (change?.field === "comments" && value?.id) {
         // Komentar IG: { id, text, from: {id, username}, media: {id, media_product_type} }
         items.push({
@@ -273,9 +305,8 @@ platformWebhookRoute.post("/webhooks/meta", async (c) => {
   // Signature verification — app secret aplikasi Meta (IG bisnis/FB), fail-closed
   const signature = c.req.header("x-hub-signature-256") ?? "";
   const secret = (await getAppSecret("instagram")) ?? env.META_APP_SECRET;
-  const rejected = requireWebhookSecret(secret, "meta");
-  if (rejected) return rejected;
-  if (!verifySignature(raw, signature, secret!)) {
+  if (!secret) return webhookSecretMissing("meta");
+  if (!verifySignature(raw, signature, secret)) {
     return c.json({ message: "Invalid signature" }, 401);
   }
 
@@ -310,9 +341,8 @@ platformWebhookRoute.post("/webhooks/instagram-standalone", async (c) => {
   // secret aplikasi IG Login, bukan aplikasi Meta.
   const signature = c.req.header("x-hub-signature-256") ?? "";
   const secret = await getAppSecret("instagram_standalone");
-  const rejected = requireWebhookSecret(secret, "instagram-standalone");
-  if (rejected) return rejected;
-  if (!verifySignature(raw, signature, secret!)) {
+  if (!secret) return webhookSecretMissing("instagram-standalone");
+  if (!verifySignature(raw, signature, secret)) {
     return c.json({ message: "Invalid signature" }, 401);
   }
 
@@ -343,9 +373,8 @@ platformWebhookRoute.post("/webhooks/threads", async (c) => {
   // Signature verification — app secret Threads, fail-closed
   const signature = c.req.header("x-hub-signature-256") ?? "";
   const secret = (await getAppSecret("threads")) ?? env.THREADS_APP_SECRET;
-  const rejected = requireWebhookSecret(secret, "threads");
-  if (rejected) return rejected;
-  if (!verifySignature(raw, signature, secret!)) {
+  if (!secret) return webhookSecretMissing("threads");
+  if (!verifySignature(raw, signature, secret)) {
     return c.json({ message: "Invalid signature" }, 401);
   }
 
@@ -365,8 +394,7 @@ platformWebhookRoute.post("/webhooks/tiktok", async (c) => {
   // Fail-closed: secret wajib terkonfigurasi — tanpa verifikasi payload ditolak.
   const signature = c.req.header("x-signature") ?? "";
   const secret = await getAppSecret("tiktok");
-  const rejected = requireWebhookSecret(secret, "tiktok");
-  if (rejected) return rejected;
+  if (!secret) return webhookSecretMissing("tiktok");
 
   // Replay protection: timestamp TikTok wajib segar (selisih ≤ 5 menit).
   // Payload lama yang direplay penyerang (signature valid tapi kadaluarsa)
@@ -385,27 +413,27 @@ platformWebhookRoute.post("/webhooks/tiktok", async (c) => {
     return c.json({ message: "Timestamp webhook tidak valid atau kedaluwarsa" }, 401);
   }
 
-  if (secret) {
-    const composed = createHmac("sha256", secret)
-      .update(raw + secret, "utf8")
-      .digest("hex");
-    if (
-      signature.length !== composed.length ||
-      !timingSafeEqual(Buffer.from(composed, "hex"), Buffer.from(signature, "hex"))
-    ) {
-      return c.json({ message: "Invalid signature" }, 401);
-    }
+  // `secret` dijamin ada di sini (guard fail-closed di atas), jadi tidak perlu
+  // cabang `if (secret)` — verifikasi signature selalu dijalankan.
+  const composed = createHmac("sha256", secret)
+    .update(raw + secret, "utf8")
+    .digest("hex");
+  if (
+    signature.length !== composed.length ||
+    !timingSafeEqual(Buffer.from(composed, "hex"), Buffer.from(signature, "hex"))
+  ) {
+    return c.json({ message: "Invalid signature" }, 401);
   }
 
-  let payload: any;
+  let payload: TikTokWebhookPayload;
   try {
-    payload = JSON.parse(raw);
+    payload = JSON.parse(raw) as TikTokWebhookPayload;
   } catch {
     return c.json({ message: "Invalid JSON" }, 400);
   }
 
   // Event format TikTok: { event: "comment.create", data: { open_id, comment_id, video_id, content, create_time } }
-  const data = payload?.data ?? {};
+  const data: NonNullable<TikTokWebhookPayload["data"]> = payload?.data ?? {};
   const openId = String(data?.open_id ?? payload?.open_id ?? "");
   if (!openId) return c.json({ received: true, ignored: true });
 

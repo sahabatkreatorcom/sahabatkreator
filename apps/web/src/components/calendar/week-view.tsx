@@ -52,10 +52,14 @@ export function WeekView({
     if (!result.destination) return;
     const dest = result.destination.droppableId; // "slot:2026-09-12:14"
     const m = dest.match(/^slot:(\d{4}-\d{2}-\d{2}):(\d{2})$/);
-    if (!m) return;
+    const dateKey = m?.[1];
+    const hour = m?.[2];
+    // Guard pada hasil regex (bukan `m[1]!`): sekaligus menghindari `Number(undefined)`
+    // = NaN yang akan membuat tanggal Invalid bila regex berubah.
+    if (!dateKey || hour === undefined) return;
     const groupId = result.draggableId.replace("post:", "");
     if (!groupId) return;
-    onReschedule(groupId, m[1]!, Number(m[2]));
+    onReschedule(groupId, dateKey, Number(hour));
   }
 
   return (
@@ -195,7 +199,7 @@ export function WeekView({
                                     })}
                                   </div>
                                   <span className="truncate">
-                                    {formatTimeId(g.scheduledAt!)} {g.content || "Konten"}
+                                    {formatTimeId(g.scheduledAt)} {g.content || "Konten"}
                                   </span>
                                 </div>
                               )}

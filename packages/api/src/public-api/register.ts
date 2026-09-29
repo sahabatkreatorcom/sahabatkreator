@@ -8,6 +8,16 @@ import {
   PaginationQuerySchema,
   publicApiRegistry,
 } from "./common";
+import {
+  AuthorizeResponseSchema,
+  ConnectAccountResponseSchema,
+  ConnectPendingResponseSchema,
+  ConnectRequestSchema,
+  PendingAssetSchema,
+  PendingSelectionResponseSchema,
+  SelectAssetRequestSchema,
+  SelectAssetResponseSchema,
+} from "./connect";
 import { PingResponseSchema } from "./ping";
 import {
   AccountItemSchema,
@@ -141,15 +151,35 @@ const SHARED_SCHEMAS = [
   PaginationQuerySchema,
 ];
 
+/**
+ * Schema alur connect akun lewat API (fase 3–4).
+ *
+ * Wajib didaftarkan: path-nya mereferensikan schema ini lewat `$ref`, dan `$ref`
+ * yang tidak terdaftar membuat dokumen OpenAPI tidak valid — Scalar menampilkan
+ * schema kosong dan codegen tipe gagal. Bug yang sama pernah terjadi pada
+ * SHARED_SCHEMAS (lihat komentar di bawah).
+ */
+const CONNECT_SCHEMAS = [
+  AuthorizeResponseSchema,
+  ConnectRequestSchema,
+  ConnectAccountResponseSchema,
+  ConnectPendingResponseSchema,
+  PendingAssetSchema,
+  PendingSelectionResponseSchema,
+  SelectAssetRequestSchema,
+  SelectAssetResponseSchema,
+];
+
 export function registerPublicApiSchemas() {
-  for (const schema of SHARED_SCHEMAS) {
+  for (const schema of [...SHARED_SCHEMAS, ...CONNECT_SCHEMAS]) {
     const meta = zodToOpenAPIRegistry.get(schema as never) as
       | { _internal?: { refId?: string } }
       | undefined;
     const name = meta?._internal?.refId;
     if (!name) {
       throw new Error(
-        "[public-api] SHARED_SCHEMAS berisi schema tanpa nama .openapi() — kembali ke common.ts.",
+        "[public-api] SHARED_SCHEMAS/CONNECT_SCHEMAS berisi schema tanpa nama .openapi() — " +
+          "beri nama eksplisit di berkas skemanya.",
       );
     }
     publicApiRegistry.register(name, schema);

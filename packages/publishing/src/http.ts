@@ -213,12 +213,23 @@ export async function httpUpload(
   }
 }
 
+/** Bentuk longgar body error platform — hanya field yang dibaca yang dideklarasikan. */
+type PlatformErrorBody = {
+  error?: {
+    message?: string;
+    code?: string | number;
+    errors?: { message?: string }[];
+  };
+  error_description?: string;
+  message?: string;
+};
+
 /** Ekstrak pesan error dari berbagai format response platform (Meta/Threads/TikTok/YouTube/LinkedIn) */
 export async function extractErrorMessage(res: HttpResponse): Promise<string> {
   const text = await res.text().catch(() => "");
   if (!text) return `HTTP ${res.status}`;
   try {
-    const data = JSON.parse(text) as Record<string, any>;
+    const data = JSON.parse(text) as PlatformErrorBody;
     // Meta: { error: { message, code, error_subcode } } — sertakan code utk trace ke support platform
     if (data.error?.message) {
       return `[${data.error.code ?? res.status}] ${data.error.message}`;

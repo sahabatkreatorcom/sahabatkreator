@@ -6,17 +6,37 @@ import {
   type PendingPageData,
   socialAccount,
 } from "@sahabatkreator/db/schema";
+import type { OAuthPlatform } from "@sahabatkreator/publishing";
 import { and, eq, isNotNull } from "drizzle-orm";
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
 import { fireActivity } from "../lib/activity-log";
 import { errorResponse, requireOrg } from "../lib/auth-guard";
-import { checkFeatureGate } from "../lib/billing";
+import { checkFeatureGate, checkPlanFeature } from "../lib/billing";
 import { decrypt } from "../lib/crypto";
+import { assertAllowedRedirect, resolveDeveloperApp } from "../lib/developer-app";
 import { generateId } from "../lib/id";
-import { upsertSocialAccount } from "../lib/oauth-connect";
+import { toPendingAssets, upsertSocialAccount } from "../lib/oauth-connect";
+import { API_FEATURES } from "../lib/public-api";
+import { connectWithCode } from "./oauth/connect";
+import { startOAuthFlow } from "./oauth/start";
 
 export const accountsRoute = new Hono();
+
+/**
+ * Tegakkan gate plan `api_write` untuk endpoint GET di jalur API.
+ *
+ * MENGAPA manual: `publicApiPlanGate` hanya menuntut `API_FEATURES.write` untuk
+ * method non-safe (`SAFE_METHODS` di lib/public-api.ts memuat `GET`), jadi GET
+ * yang secara semantik bagian dari alur tulis akan bocor ke plan Pro. Hanya
+ * berlaku bila request datang lewat API key — jalur UI (sesi) tidak terpengaruh,
+ * karena `c.get("apiKey")` kosong di sana.
+ */
+async function enforceApiWriteGate(c: Context): Promise<void> {
+  const key = c.get("apiKey");
+  if (key) await checkPlanFeature(key.organizationId, API_FEATURES.write);
+}
 
 /** GET /accounts — list akun sosmed org */
 accountsRoute.get("/", async (c) => {
@@ -100,20 +120,125 @@ accountsRoute.post("/connect-manual", async (c) => {
 });
 
 /**
+ * GET /accounts/:platform/authorize?redirect=<uri> — mulai OAuth flow untuk
+ * developer (jalur API connect akun, docs/rfc-oauth-connect.md §5.2).
+ *
+ * HANYA untuk key API yang terikat `developer_app`: tanpa app tidak ada
+ * allowlist redirect, jadi tidak ada tujuan yang bisa dipercaya untuk
+ * mengembalikan `code`.
+ *
+ * MENGAPA gate `api_write` ditegakkan MANUAL di sini: `publicApiPlanGate` hanya
+ * menuntut `api_write` untuk method non-safe (`SAFE_METHODS` di lib/public-api.ts),
+ * sementara endpoint ini GET. Tanpa pemeriksaan eksplisit, connect akun lewat API
+ * akan terbuka untuk plan yang tidak punya `api_write` — bertentangan dengan
+ * maksud §5.2 ("semua endpoint connect terkunci Business/Enterprise").
+ */
+accountsRoute.get("/:platform/authorize", async (c) => {
+  try {
+    const key = c.get("apiKey");
+    if (!key) {
+      return c.json({ message: "Endpoint ini hanya untuk API key." }, 403);
+    }
+    await enforceApiWriteGate(c);
+
+    const app = await resolveDeveloperApp(key.developerAppId, key.organizationId);
+    if (!app) {
+      return c.json({ message: "API key ini belum terhubung ke developer app yang aktif." }, 403);
+    }
+
+    const redirect = c.req.query("redirect");
+    if (!redirect) return c.json({ message: "Parameter redirect wajib diisi." }, 400);
+    const redirectUri = assertAllowedRedirect(app, redirect);
+
+    // State ditandai milik app → callback berhenti jadi proxy (tidak connect).
+    return startOAuthFlow(c, { developerAppId: app.id, redirectUri });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+const connectBodySchema = z.object({ code: z.string().min(1) });
+
+/**
+ * POST /accounts/:platform/connect & /exchange — tukar `code` menjadi akun.
+ *
+ * Respons POLIMORFIK (docs/rfc-oauth-connect.md §4.3):
+ *   { accountId }                   → selesai, akun sudah terhubung
+ *   { pendingId, assets: [...] }    → platform butuh pemilihan aset dulu
+ *
+ * TIDAK ada 400 untuk platform asset-selection: daftar platform yang butuh
+ * picker adalah detail internal yang berubah setiap kali approval platform
+ * turun (native ↔ bridge), jadi tidak boleh bocor ke kontrak publik.
+ *
+ * MENGAPA `connect` dan `exchange` memakai handler yang sama: pada platform
+ * asset-selection, `connect` pun tidak langsung menghubungkan — ia mengembalikan
+ * `pendingId`. Jadi tidak ada perilaku berbeda yang bisa dijanjikan; `exchange`
+ * hanya ada supaya developer yang ingin menampilkan picker lebih awal punya
+ * endpoint yang jelas. `code` tetap sekali pakai di sisi platform: panggil salah
+ * satu, bukan keduanya.
+ */
+async function handleConnectWithCode(c: Context): Promise<Response> {
+  try {
+    const ctx = await requireOrg(c);
+    const platform = c.req.param("platform") as OAuthPlatform;
+    const { code } = connectBodySchema.parse(await c.req.json());
+
+    const result = await connectWithCode({
+      platform,
+      code,
+      organizationId: ctx.organization.id,
+      userId: ctx.user.id,
+    });
+
+    switch (result.kind) {
+      case "connected":
+        return c.json({ accountId: result.accountId });
+      case "pending":
+        return c.json({ pendingId: result.pendingId, assets: result.assets });
+      case "conflict":
+        // Satu akun platform hanya boleh dimiliki satu org supaya publish tidak bentrok.
+        return c.json({ message: "Akun ini sudah terhubung di organisasi lain." }, 409);
+      case "error":
+        return c.json({ message: result.message }, 400);
+    }
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+accountsRoute.post("/:platform/connect", handleConnectWithCode);
+accountsRoute.post("/:platform/exchange", handleConnectWithCode);
+
+/**
  * GET /accounts/pending/:id — daftar entitas hasil OAuth multi-entity (untuk picker UI).
  * Token TIDAK dikirim — hanya id, nama, dan info IG bisnis / tipe profil LinkedIn.
+ *
+ * Dipakai jalur UI *dan* `/v1/accounts/pending/:id`. Karena ini GET (method safe),
+ * `publicApiPlanGate` tidak menuntut `api_write` — jadi gate-nya ditegakkan
+ * manual untuk request ber-API-key.
  */
 accountsRoute.get("/pending/:id", async (c) => {
   try {
     const ctx = await requireOrg(c);
+    await enforceApiWriteGate(c);
     const [row] = await db
       .select()
       .from(oauthPendingSelection)
       .where(eq(oauthPendingSelection.id, c.req.param("id")))
       .limit(1);
-    if (!row || row.userId !== ctx.user.id) {
+    if (!row) {
       return c.json({ message: "Data pemilihan akun tidak ditemukan" }, 404);
     }
+    // Otorisasi berbasis ORGANISASI, bukan user pembuat flow (RFC §11 #1).
+    // Jalur API: "user" = pembuat API key, jadi `row.userId !== ctx.user.id` gagal
+    // begitu key dirotasi atau pembuatnya keluar dari org — alur picker putus.
+    // Cek organisasi juga LEBIH KETAT: user yang menjadi anggota >1 organisasi
+    // tidak lagi bisa membaca pending org lain hanya karena userId-nya sama.
+    if (row.organizationId !== ctx.organization.id) {
+      return c.json({ message: "Pemilihan akun milik organisasi lain" }, 403);
+    }
+    // Urutannya penting: cek organisasi SEBELUM cabang kedaluwarsa, karena cabang
+    // itu MENGHAPUS baris — jangan sampai org lain bisa menghapus pending kita.
     if (row.expiresAt < new Date()) {
       await db.delete(oauthPendingSelection).where(eq(oauthPendingSelection.id, row.id));
       return c.json({ message: "Sesi pemilihan akun kedaluwarsa — hubungkan ulang" }, 410);
@@ -124,19 +249,12 @@ accountsRoute.get("/pending/:id", async (c) => {
     } catch {
       return c.json({ message: "Data pilihan korup — hubungkan ulang" }, 410);
     }
+    // Bentuk aset diproyeksikan oleh `toPendingAssets` — SATU sumber yang sama
+    // dengan `assets[]` di `POST /connect` (RFC §11 #7). Sebelumnya route ini
+    // memetakan sendiri, jadi bentuknya menyimpang dari respons connect.
     return c.json({
       platform: row.platform,
-      pages: pages.map((p) => ({
-        pageId: p.pageId,
-        pageName: p.pageName,
-        hasInstagram: Boolean(p.igUserId),
-        igUsername: p.igUsername,
-        avatarUrl: p.avatarUrl ?? null,
-        // LinkedIn: profil pribadi vs company (deteksi dari prefix URN).
-        // Flow linkedin sudah difilter hanya person, linkedin_org hanya organization
-        // (lihat repliz-callback) — pengecekan URN tetap pertahanan ganda.
-        isPersonal: row.platform === "linkedin" && p.pageId.startsWith("urn:li:person:"),
-      })),
+      assets: toPendingAssets(pages, row.platform),
     });
   } catch (error) {
     return errorResponse(error);
@@ -152,22 +270,30 @@ accountsRoute.post("/pending/:id/select", async (c) => {
     const ctx = await requireOrg(c);
     await checkFeatureGate(ctx.organization.id, "social_accounts");
 
-    const input = z.object({ pageId: z.string().min(1) }).parse(await c.req.json());
+    // `assetId` (bukan `pageId`): asetnya bisa board/channel/profil, bukan hanya
+    // Page — dan nilainya persis `assets[].id` yang dikembalikan `GET /pending/:id`
+    // (RFC §11 #7). Satu kosakata untuk baca dan tulis.
+    const input = z.object({ assetId: z.string().min(1) }).parse(await c.req.json());
 
     const [row] = await db
       .select()
       .from(oauthPendingSelection)
       .where(eq(oauthPendingSelection.id, c.req.param("id")))
       .limit(1);
-    if (!row || row.userId !== ctx.user.id) {
+    if (!row) {
       return c.json({ message: "Data pemilihan akun tidak ditemukan" }, 404);
     }
+    // Otorisasi berbasis ORGANISASI (RFC §11 #1) — lihat catatan di GET /pending/:id.
+    // Kuota TIDAK terpengaruh: `checkFeatureGate` di atas memakai organisasi dari
+    // konteks auth, dan akunnya juga di-insert ke organisasi yang sama, jadi org
+    // yang ditagih selalu org yang sama dengan pemilik pending.
+    if (row.organizationId !== ctx.organization.id) {
+      return c.json({ message: "Pemilihan akun milik organisasi lain" }, 403);
+    }
+    // Cek organisasi SEBELUM cabang kedaluwarsa — cabang itu menghapus baris.
     if (row.expiresAt < new Date()) {
       await db.delete(oauthPendingSelection).where(eq(oauthPendingSelection.id, row.id));
       return c.json({ message: "Sesi pemilihan akun kedaluwarsa — hubungkan ulang" }, 410);
-    }
-    if (row.organizationId !== ctx.organization.id) {
-      return c.json({ message: "Pemilihan akun milik organisasi lain" }, 403);
     }
     if (
       row.platform !== "instagram" &&
@@ -186,7 +312,7 @@ accountsRoute.post("/pending/:id/select", async (c) => {
     } catch {
       return c.json({ message: "Data pilihan korup — hubungkan ulang" }, 410);
     }
-    const page = pages.find((p) => p.pageId === input.pageId);
+    const page = pages.find((p) => p.pageId === input.assetId);
     if (!page) return c.json({ message: "Akun tidak ada dalam daftar" }, 400);
 
     // Instagram flow wajib punya IG business account di Page terpilih

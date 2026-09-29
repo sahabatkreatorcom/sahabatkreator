@@ -1,6 +1,23 @@
 // Core types publishing — kontrak antara pipeline, adapter, dan worker
 // Token TIDAK disimpan di sini (dipass dari caller yang sudah mendekripsi).
 
+/**
+ * Bentuk longgar response token OAuth. Field bervariasi antar platform — TikTok
+ * membungkus semuanya di `data`, `expires_in` kadang dikirim sebagai string, dan
+ * `scope` kadang null. Hanya field yang dibaca yang dideklarasikan.
+ */
+export type OAuthTokenResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number | string;
+  scope?: string | null;
+  data?: {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number | string;
+  };
+};
+
 /** Media terlampir ke post (URL publik dari R2) */
 export type PublishMedia = {
   url: string;

@@ -13,9 +13,7 @@
   "paths": {
     "/health": {
       "get": {
-        "tags": [
-          "System"
-        ],
+        "tags": ["System"],
         "responses": {
           "200": {
             "description": "Service health",
@@ -32,9 +30,7 @@
     },
     "/private": {
       "get": {
-        "tags": [
-          "Example"
-        ],
+        "tags": ["Example"],
         "security": [
           {
             "bearerAuth": []
@@ -68,9 +64,7 @@
       "get": {
         "summary": "Cek koneksi & token",
         "description": "Satu-satunya endpoint tanpa scope. Membuktikan key valid, plan layak memakai /v1, dan mengembalikan identitas organisasi + scope key.",
-        "tags": [
-          "System"
-        ],
+        "tags": ["System"],
         "x-required-scopes": [],
         "security": [
           {
@@ -156,12 +150,8 @@
       "get": {
         "summary": "Daftar akun sosial",
         "description": "Semua akun sosial milik organisasi (termasuk status koneksi).",
-        "tags": [
-          "Accounts"
-        ],
-        "x-required-scopes": [
-          "accounts:read"
-        ],
+        "tags": ["Accounts"],
+        "x-required-scopes": ["accounts:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -246,12 +236,8 @@
       "get": {
         "summary": "Statistik akun (bridge)",
         "description": "Statistik real-time satu akun via bridge Repliz. Akun non-bridge membalas 400/503.",
-        "tags": [
-          "Accounts"
-        ],
-        "x-required-scopes": [
-          "accounts:read"
-        ],
+        "tags": ["Accounts"],
+        "x-required-scopes": ["accounts:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -346,12 +332,8 @@
       "get": {
         "summary": "Daftar post",
         "description": "Daftar grup post (draft, terjadwal, sudah tayang) milik organisasi.",
-        "tags": [
-          "Posts"
-        ],
-        "x-required-scopes": [
-          "posts:read"
-        ],
+        "tags": ["Posts"],
+        "x-required-scopes": ["posts:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -391,9 +373,7 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Sertakan post eksternal"
           },
@@ -494,12 +474,8 @@
       "post": {
         "summary": "Buat post",
         "description": "Membuat grup post baru. Bila `scheduledAt` diisi, menjadwalkannya (butuh fitur scheduled_posts).",
-        "tags": [
-          "Posts"
-        ],
-        "x-required-scopes": [
-          "posts:write"
-        ],
+        "tags": ["Posts"],
+        "x-required-scopes": ["posts:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -594,12 +570,8 @@
       "get": {
         "summary": "Detail post",
         "description": "",
-        "tags": [
-          "Posts"
-        ],
-        "x-required-scopes": [
-          "posts:read"
-        ],
+        "tags": ["Posts"],
+        "x-required-scopes": ["posts:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -692,12 +664,8 @@
       "delete": {
         "summary": "Hapus post",
         "description": "",
-        "tags": [
-          "Posts"
-        ],
-        "x-required-scopes": [
-          "posts:write"
-        ],
+        "tags": ["Posts"],
+        "x-required-scopes": ["posts:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -792,12 +760,8 @@
       "post": {
         "summary": "Publish segera",
         "description": "Mem- enqueue publish untuk post yang bisa dipublish. Membalas `{ok,queued}` bila masuk queue, atau `{ok,published,processing,failed}` bila dikerjakan inline.",
-        "tags": [
-          "Posts"
-        ],
-        "x-required-scopes": [
-          "posts:write"
-        ],
+        "tags": ["Posts"],
+        "x-required-scopes": ["posts:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -899,12 +863,8 @@
       "post": {
         "summary": "Ulang publish post gagal",
         "description": "Hanya untuk post berstatus failed yang punya schedule bridge.",
-        "tags": [
-          "Posts"
-        ],
-        "x-required-scopes": [
-          "posts:write"
-        ],
+        "tags": ["Posts"],
+        "x-required-scopes": ["posts:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -1009,12 +969,8 @@
       "get": {
         "summary": "Ringkasan performa",
         "description": "Pakai `from`+`to` (YYYY-MM-DD) atau `days` (default 30). Mode from/to mengembalikan `comparison`.",
-        "tags": [
-          "Analytics"
-        ],
-        "x-required-scopes": [
-          "analytics:read"
-        ],
+        "tags": ["Analytics"],
+        "x-required-scopes": ["analytics:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -1131,12 +1087,8 @@
       "get": {
         "summary": "Deret waktu engagement",
         "description": "",
-        "tags": [
-          "Analytics"
-        ],
-        "x-required-scopes": [
-          "analytics:read"
-        ],
+        "tags": ["Analytics"],
+        "x-required-scopes": ["analytics:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -1233,12 +1185,8 @@
       "get": {
         "summary": "Post teratas",
         "description": "",
-        "tags": [
-          "Analytics"
-        ],
-        "x-required-scopes": [
-          "analytics:read"
-        ],
+        "tags": ["Analytics"],
+        "x-required-scopes": ["analytics:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -1342,12 +1290,8 @@
       "get": {
         "summary": "Ringkasan laporan",
         "description": "Ringkasan periode (default 30 hari terakhir).",
-        "tags": [
-          "Reports"
-        ],
-        "x-required-scopes": [
-          "reports:read"
-        ],
+        "tags": ["Reports"],
+        "x-required-scopes": ["reports:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -1453,12 +1397,8 @@
       "get": {
         "summary": "Daftar media",
         "description": "Item media library (maks 200).",
-        "tags": [
-          "Media"
-        ],
-        "x-required-scopes": [
-          "media:read"
-        ],
+        "tags": ["Media"],
+        "x-required-scopes": ["media:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -1552,12 +1492,8 @@
       "post": {
         "summary": "Import media dari URL",
         "description": "Mengunduh file dari URL publik ke media library organisasi.",
-        "tags": [
-          "Media"
-        ],
-        "x-required-scopes": [
-          "media:write"
-        ],
+        "tags": ["Media"],
+        "x-required-scopes": ["media:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -1662,12 +1598,8 @@
       "get": {
         "summary": "Manifest render",
         "description": "Daftar hasil render video organisasi (maks 200).",
-        "tags": [
-          "Renders"
-        ],
-        "x-required-scopes": [
-          "renders:read"
-        ],
+        "tags": ["Renders"],
+        "x-required-scopes": ["renders:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -1752,12 +1684,8 @@
       "get": {
         "summary": "Daftar aturan automation",
         "description": "Butuh fitur plan `automation`.",
-        "tags": [
-          "Automation"
-        ],
-        "x-required-scopes": [
-          "automation:read"
-        ],
+        "tags": ["Automation"],
+        "x-required-scopes": ["automation:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -1840,12 +1768,8 @@
       "post": {
         "summary": "Buat aturan automation",
         "description": "",
-        "tags": [
-          "Automation"
-        ],
-        "x-required-scopes": [
-          "automation:write"
-        ],
+        "tags": ["Automation"],
+        "x-required-scopes": ["automation:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -1940,12 +1864,8 @@
       "patch": {
         "summary": "Ubah aturan automation",
         "description": "Semua field opsional (patch).",
-        "tags": [
-          "Automation"
-        ],
-        "x-required-scopes": [
-          "automation:write"
-        ],
+        "tags": ["Automation"],
+        "x-required-scopes": ["automation:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -2048,12 +1968,8 @@
       "delete": {
         "summary": "Hapus aturan automation",
         "description": "",
-        "tags": [
-          "Automation"
-        ],
-        "x-required-scopes": [
-          "automation:write"
-        ],
+        "tags": ["Automation"],
+        "x-required-scopes": ["automation:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -2148,12 +2064,8 @@
       "post": {
         "summary": "Buat job carousel",
         "description": "Membuat job render carousel asinkron. Poll `GET /v1/carousel/{id}` untuk status.",
-        "tags": [
-          "Renders"
-        ],
-        "x-required-scopes": [
-          "renders:write"
-        ],
+        "tags": ["Renders"],
+        "x-required-scopes": ["renders:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -2258,12 +2170,8 @@
       "get": {
         "summary": "Status job carousel",
         "description": "Polling status job + slide yang sudah ter-render.",
-        "tags": [
-          "Renders"
-        ],
-        "x-required-scopes": [
-          "renders:write"
-        ],
+        "tags": ["Renders"],
+        "x-required-scopes": ["renders:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -2358,12 +2266,8 @@
       "post": {
         "summary": "Buat job video",
         "description": "Merakit video dari base video + clip + voiceover + caption. Poll `GET /v1/video/{id}`.",
-        "tags": [
-          "Renders"
-        ],
-        "x-required-scopes": [
-          "renders:write"
-        ],
+        "tags": ["Renders"],
+        "x-required-scopes": ["renders:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -2468,12 +2372,8 @@
       "get": {
         "summary": "Status job video",
         "description": "",
-        "tags": [
-          "Renders"
-        ],
-        "x-required-scopes": [
-          "renders:write"
-        ],
+        "tags": ["Renders"],
+        "x-required-scopes": ["renders:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -2568,12 +2468,8 @@
       "post": {
         "summary": "Buat job auto-clip",
         "description": "Mendeteksi momen viral dari video sumber. Pakai `sourceUrl` atau `baseVideoMediaId`. Pilih kandidat lewat `POST /v1/auto-clip/{id}/select`.",
-        "tags": [
-          "Renders"
-        ],
-        "x-required-scopes": [
-          "renders:write"
-        ],
+        "tags": ["Renders"],
+        "x-required-scopes": ["renders:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -2678,12 +2574,8 @@
       "get": {
         "summary": "Status job auto-clip",
         "description": "",
-        "tags": [
-          "Renders"
-        ],
-        "x-required-scopes": [
-          "renders:write"
-        ],
+        "tags": ["Renders"],
+        "x-required-scopes": ["renders:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -2778,12 +2670,8 @@
       "post": {
         "summary": "Pilih kandidat auto-clip",
         "description": "Memilih segmen yang akan dirender. Fan-out: `renderJobIds[]` berisi job render video.",
-        "tags": [
-          "Renders"
-        ],
-        "x-required-scopes": [
-          "renders:write"
-        ],
+        "tags": ["Renders"],
+        "x-required-scopes": ["renders:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -2898,12 +2786,8 @@
       "get": {
         "summary": "Pemakaian kredit AI",
         "description": "Kredit AI organisasi bulan berjalan.",
-        "tags": [
-          "AI"
-        ],
-        "x-required-scopes": [
-          "ai:read"
-        ],
+        "tags": ["AI"],
+        "x-required-scopes": ["ai:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -2988,12 +2872,8 @@
       "post": {
         "summary": "Generate caption",
         "description": "Membuat caption + hashtag. Mengonsumsi kredit AI.",
-        "tags": [
-          "AI"
-        ],
-        "x-required-scopes": [
-          "ai:write"
-        ],
+        "tags": ["AI"],
+        "x-required-scopes": ["ai:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -3098,12 +2978,8 @@
       "post": {
         "summary": "Generate hashtag",
         "description": "Membuat hashtag dari prompt. Mengonsumsi kredit AI.",
-        "tags": [
-          "AI"
-        ],
-        "x-required-scopes": [
-          "ai:write"
-        ],
+        "tags": ["AI"],
+        "x-required-scopes": ["ai:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -3208,12 +3084,8 @@
       "post": {
         "summary": "Tulis ulang teks",
         "description": "Menulis ulang teks sesuai gaya. Mengonsumsi kredit AI.",
-        "tags": [
-          "AI"
-        ],
-        "x-required-scopes": [
-          "ai:write"
-        ],
+        "tags": ["AI"],
+        "x-required-scopes": ["ai:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -3318,12 +3190,8 @@
       "post": {
         "summary": "Reuse konten lintas platform",
         "description": "Mengubah konten untuk platform lain. Mengonsumsi kredit AI.",
-        "tags": [
-          "AI"
-        ],
-        "x-required-scopes": [
-          "ai:write"
-        ],
+        "tags": ["AI"],
+        "x-required-scopes": ["ai:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -3428,12 +3296,8 @@
       "get": {
         "summary": "Tren harian",
         "description": "Tren Google Indonesia (tidak mengonsumsi kredit AI).",
-        "tags": [
-          "Trends"
-        ],
-        "x-required-scopes": [
-          "ai:read"
-        ],
+        "tags": ["Trends"],
+        "x-required-scopes": ["ai:read"],
         "security": [
           {
             "apiKeyAuth": []
@@ -3530,12 +3394,8 @@
       "post": {
         "summary": "Ide konten dari tren",
         "description": "Membuat ide konten dari satu tren. Mengonsumsi kredit AI.",
-        "tags": [
-          "Trends"
-        ],
-        "x-required-scopes": [
-          "ai:write"
-        ],
+        "tags": ["Trends"],
+        "x-required-scopes": ["ai:write"],
         "security": [
           {
             "apiKeyAuth": []
@@ -3645,41 +3505,614 @@
           }
         }
       }
+    },
+    "/v1/accounts/{platform}/authorize": {
+      "get": {
+        "summary": "Mulai OAuth untuk menghubungkan akun",
+        "description": "Mengembalikan URL otorisasi platform. Setelah pengguna menyetujui, kami mengalihkan browser ke `redirect` Anda dengan `code` + `state` (atau `error` bila ditolak), lalu Anda menukarkan `code` lewat `POST /v1/accounts/{platform}/connect`.\n\nButuh plan Business+ (`api_write`) dan API key yang terikat ke developer app.",
+        "tags": ["Accounts"],
+        "x-required-scopes": ["accounts:write"],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Platform tujuan, mis. `instagram`, `facebook`, `tiktok`, `youtube`, `linkedin`."
+          },
+          {
+            "name": "redirect",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Redirect URI milik Anda. WAJIB sudah terdaftar di allowlist developer app dan dicocokkan PERSIS (tanpa wildcard, tanpa prefix match). Harus `https` — `http` hanya untuk localhost. Tidak boleh mengandung fragment (`#`) karena akan menelan `code` yang kami tambahkan."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "URL otorisasi platform.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorizeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API key tidak terikat developer app yang aktif — tidak ada allowlist redirect yang bisa dipercaya.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/{platform}/connect": {
+      "post": {
+        "summary": "Tukar code menjadi akun terhubung",
+        "description": "Menukar `code` yang Anda terima di redirect URI. Bila platform perlu pemilihan aset (Page Facebook, board Pinterest, channel YouTube, halaman LinkedIn), responsnya berisi `pendingId` + `assets[]`; lanjutkan dengan `GET /v1/accounts/pending/{id}` dan `POST /v1/accounts/pending/{id}/select`.\n\nDaftar platform yang butuh pemilihan adalah detail internal kami dan berubah setiap kali akses API platform disetujui — karena itu tidak ada status 400 khusus untuk itu.",
+        "tags": ["Accounts"],
+        "x-required-scopes": ["accounts:write"],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Selesai (`accountId`) atau butuh pemilihan aset (`pendingId` + `assets`). Bercabanglah pada ada/tidaknya `pendingId`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ConnectAccountResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ConnectPendingResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Akun platform ini sudah terhubung di organisasi lain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Sesi pemilihan akun kedaluwarsa — mulai ulang dari `authorize`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/{platform}/exchange": {
+      "post": {
+        "summary": "Tukar code lebih awal (tampilkan picker di depan)",
+        "description": "Perilaku & bentuk responsnya identik dengan `connect` — disediakan untuk alur yang ingin menampilkan pemilihan aset lebih dulu. Pada platform yang tidak butuh pemilihan, responsnya `{ accountId }` dan akun sudah terhubung.\n\n`code` bersifat sekali pakai: panggil `connect` ATAU `exchange`, jangan keduanya.",
+        "tags": ["Accounts"],
+        "x-required-scopes": ["accounts:write"],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Selesai (`accountId`) atau butuh pemilihan aset (`pendingId` + `assets`). Bercabanglah pada ada/tidaknya `pendingId`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ConnectAccountResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ConnectPendingResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Akun platform ini sudah terhubung di organisasi lain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Sesi pemilihan akun kedaluwarsa — mulai ulang dari `authorize`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/pending/{id}": {
+      "get": {
+        "summary": "Daftar aset yang bisa dipilih",
+        "description": "Token aset TIDAK pernah dikirim — hanya id, nama, dan metadata tampilan. Sesi ini berlaku 10 menit dan hanya boleh diselesaikan oleh organisasi pemiliknya.",
+        "tags": ["Accounts"],
+        "x-required-scopes": ["accounts:write"],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "`pendingId` dari respons connect/exchange."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar aset untuk ditampilkan di picker Anda.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingSelectionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Sesi pemilihan akun kedaluwarsa — mulai ulang dari `authorize`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/pending/{id}/select": {
+      "post": {
+        "summary": "Hubungkan aset terpilih",
+        "description": "Menyelesaikan pemilihan: aset yang dipilih dihubungkan sebagai akun organisasi. Satu `pendingId` = satu aset; untuk memilih aset lain, mulai ulang dari `authorize`.",
+        "tags": ["Accounts"],
+        "x-required-scopes": ["accounts:write"],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "`pendingId` dari respons connect/exchange."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectAssetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Akun terhubung.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelectAssetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Akun platform ini sudah terhubung di organisasi lain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Sesi pemilihan akun kedaluwarsa — mulai ulang dari `authorize`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
       "HealthResponse": {
         "type": "object",
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "ok"
-            ]
+            "enum": ["ok"]
           }
         }
       },
       "PrivateDataResponse": {
         "type": "object",
-        "required": [
-          "message",
-          "user"
-        ],
+        "required": ["message", "user"],
         "properties": {
           "message": {
             "type": "string"
           },
           "user": {
             "type": "object",
-            "required": [
-              "id",
-              "email",
-              "name"
-            ],
+            "required": ["id", "email", "name"],
             "properties": {
               "id": {
                 "type": "string"
@@ -3688,10 +4121,7 @@
                 "type": "string"
               },
               "name": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               }
             }
           }
@@ -3699,9 +4129,7 @@
       },
       "UnauthorizedResponse": {
         "type": "object",
-        "required": [
-          "message"
-        ],
+        "required": ["message"],
         "properties": {
           "message": {
             "type": "string"
@@ -3715,9 +4143,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "message"
-        ]
+        "required": ["message"]
       },
       "ErrorWithIssues": {
         "type": "object",
@@ -3740,16 +4166,11 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "path",
-                "message"
-              ]
+              "required": ["path", "message"]
             }
           }
         },
-        "required": [
-          "message"
-        ]
+        "required": ["message"]
       },
       "DateRangeQuery": {
         "type": "object",
@@ -3782,14 +4203,124 @@
           }
         }
       },
+      "AuthorizeResponse": {
+        "type": "object",
+        "properties": {
+          "authorizeUrl": {
+            "type": "string",
+            "description": "Arahkan browser pengguna ke URL ini untuk memberi izin."
+          }
+        },
+        "required": ["authorizeUrl"]
+      },
+      "ConnectRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Authorization code dari platform, diterima sebagai parameter `code` di redirect URI Anda. Sekali pakai — panggil `connect` ATAU `exchange`, jangan keduanya."
+          }
+        },
+        "required": ["code"]
+      },
+      "ConnectAccountResponse": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "ID akun yang baru terhubung."
+          }
+        },
+        "required": ["accountId"]
+      },
+      "ConnectPendingResponse": {
+        "type": "object",
+        "properties": {
+          "pendingId": {
+            "type": "string"
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingAsset"
+            }
+          }
+        },
+        "required": ["pendingId", "assets"]
+      },
+      "PendingAsset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Kirim kembali sebagai `assetId` ke endpoint select."
+          },
+          "name": {
+            "type": "string"
+          },
+          "username": {
+            "type": ["string", "null"]
+          },
+          "picture": {
+            "type": ["string", "null"]
+          },
+          "hasInstagram": {
+            "type": "boolean",
+            "description": "Meta saja: Page punya Instagram Business tertaut. Di alur `instagram`, aset dengan nilai `false` **tidak bisa dipilih**."
+          },
+          "isPersonal": {
+            "type": "boolean",
+            "description": "LinkedIn saja: `true` = profil pribadi, `false` = halaman company."
+          }
+        },
+        "required": ["id", "name", "username", "picture", "hasInstagram", "isPersonal"]
+      },
+      "PendingSelectionResponse": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string"
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingAsset"
+            }
+          }
+        },
+        "required": ["platform", "assets"]
+      },
+      "SelectAssetRequest": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "`id` dari `assets[]`."
+          }
+        },
+        "required": ["assetId"]
+      },
+      "SelectAssetResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": ["ok", "username"]
+      },
       "PingResponse": {
         "type": "object",
         "properties": {
           "ok": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           },
           "organization": {
             "type": "object",
@@ -3804,11 +4335,7 @@
                 "type": "string"
               }
             },
-            "required": [
-              "id",
-              "name",
-              "slug"
-            ]
+            "required": ["id", "name", "slug"]
           },
           "key": {
             "type": "object",
@@ -3821,7 +4348,7 @@
               },
               "prefix": {
                 "type": "string",
-                "example": "sk_live_ab12"
+                "example": "sk_api_ab12"
               },
               "scopes": {
                 "type": "array",
@@ -3830,24 +4357,14 @@
                 }
               }
             },
-            "required": [
-              "id",
-              "name",
-              "prefix",
-              "scopes"
-            ]
+            "required": ["id", "name", "prefix", "scopes"]
           },
           "serverTime": {
             "type": "string",
             "format": "date-time"
           }
         },
-        "required": [
-          "ok",
-          "organization",
-          "key",
-          "serverTime"
-        ]
+        "required": ["ok", "organization", "key", "serverTime"]
       },
       "AccountsResponse": {
         "type": "object",
@@ -3859,9 +4376,7 @@
             }
           }
         },
-        "required": [
-          "accounts"
-        ]
+        "required": ["accounts"]
       },
       "AccountItem": {
         "type": "object",
@@ -3873,28 +4388,16 @@
             "type": "string"
           },
           "platformAccountId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "username": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "displayName": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "avatarUrl": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "isConnected": {
             "type": "boolean"
@@ -3903,23 +4406,14 @@
             "type": "boolean"
           },
           "lastSyncedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "lastError": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "tokenExpiresAt": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "hasRefreshToken": {
@@ -3954,44 +4448,26 @@
         "type": "object",
         "properties": {
           "statistic": {
-            "type": [
-              "object",
-              "null"
-            ],
+            "type": ["object", "null"],
             "properties": {
               "followers": {
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "type": ["number", "null"]
               },
               "posts": {
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "type": ["number", "null"]
               },
               "engagement": {
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "type": ["number", "null"]
               }
             },
-            "required": [
-              "followers",
-              "posts",
-              "engagement"
-            ],
+            "required": ["followers", "posts", "engagement"],
             "description": "Statistik real-time dari bridge Repliz. null bila belum pernah disinkronkan."
           },
           "unsupported": {
             "type": "boolean"
           }
         },
-        "required": [
-          "statistic"
-        ]
+        "required": ["statistic"]
       },
       "PostsListResponse": {
         "type": "object",
@@ -4009,11 +4485,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "groups",
-          "page",
-          "perPage"
-        ]
+        "required": ["groups", "page", "perPage"]
       },
       "PostGroupItem": {
         "type": "object",
@@ -4022,30 +4494,18 @@
             "type": "string"
           },
           "content": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "scheduledAt": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "reminderAt": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "timezone": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "createdAt": {
             "type": "string",
@@ -4093,83 +4553,44 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "draft",
-              "scheduled",
-              "publishing",
-              "published",
-              "failed"
-            ]
+            "enum": ["draft", "scheduled", "publishing", "published", "failed"]
           },
           "content": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "platformPostId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "platformPostUrl": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "publishedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "errorCode": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "errorMessage": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "hashtags": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": ["array", "null"],
             "items": {
               "type": "string"
             }
           },
           "firstComment": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "username": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "displayName": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "avatarUrl": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "isBridge": {
             "type": "boolean"
@@ -4208,10 +4629,7 @@
             }
           }
         },
-        "required": [
-          "group",
-          "posts"
-        ]
+        "required": ["group", "posts"]
       },
       "CreatePostRequest": {
         "type": "object",
@@ -4221,10 +4639,7 @@
             "default": ""
           },
           "scheduledAt": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "timezone": {
@@ -4232,10 +4647,7 @@
             "default": "Asia/Jakarta"
           },
           "audioTrackId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "productIds": {
             "type": "array",
@@ -4252,9 +4664,7 @@
             "minItems": 1
           }
         },
-        "required": [
-          "items"
-        ]
+        "required": ["items"]
       },
       "CreatePostItem": {
         "type": "object",
@@ -4274,10 +4684,7 @@
             "default": []
           },
           "firstComment": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "platformSettings": {
             "type": "object",
@@ -4291,9 +4698,7 @@
             "default": []
           }
         },
-        "required": [
-          "socialAccountId"
-        ]
+        "required": ["socialAccountId"]
       },
       "CreatePostResponse": {
         "type": "object",
@@ -4302,36 +4707,27 @@
             "type": "string"
           }
         },
-        "required": [
-          "postGroupId"
-        ]
+        "required": ["postGroupId"]
       },
       "PublishQueuedResponse": {
         "type": "object",
         "properties": {
           "ok": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           },
           "queued": {
             "type": "number"
           }
         },
-        "required": [
-          "ok",
-          "queued"
-        ]
+        "required": ["ok", "queued"]
       },
       "PublishInlineResponse": {
         "type": "object",
         "properties": {
           "ok": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           },
           "published": {
             "type": "number"
@@ -4343,40 +4739,27 @@
             "type": "number"
           }
         },
-        "required": [
-          "ok",
-          "published",
-          "processing",
-          "failed"
-        ]
+        "required": ["ok", "published", "processing", "failed"]
       },
       "RetryResponse": {
         "type": "object",
         "properties": {
           "ok": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           }
         },
-        "required": [
-          "ok"
-        ]
+        "required": ["ok"]
       },
       "DeleteResponse": {
         "type": "object",
         "properties": {
           "ok": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           }
         },
-        "required": [
-          "ok"
-        ]
+        "required": ["ok"]
       },
       "AnalyticsTotals": {
         "type": "object",
@@ -4400,14 +4783,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "followers",
-          "likes",
-          "comments",
-          "shares",
-          "views",
-          "impressions"
-        ]
+        "required": ["followers", "likes", "comments", "shares", "views", "impressions"]
       },
       "AnalyticsAccount": {
         "type": "object",
@@ -4419,38 +4795,19 @@
             "type": "string"
           },
           "username": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "displayName": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "avatarUrl": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "followers": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           }
         },
-        "required": [
-          "id",
-          "platform",
-          "username",
-          "displayName",
-          "avatarUrl",
-          "followers"
-        ]
+        "required": ["id", "platform", "username", "displayName", "avatarUrl", "followers"]
       },
       "AnalyticsOverviewResponse": {
         "type": "object",
@@ -4467,10 +4824,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "from",
-                  "to"
-                ]
+                "required": ["from", "to"]
               },
               {
                 "type": "object",
@@ -4482,10 +4836,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "days",
-                  "since"
-                ]
+                "required": ["days", "since"]
               }
             ]
           },
@@ -4505,10 +4856,7 @@
                 "$ref": "#/components/schemas/AnalyticsTotals"
               },
               "deltas": {
-                "type": [
-                  "object",
-                  "null"
-                ],
+                "type": ["object", "null"],
                 "properties": {
                   "followers": {
                     "type": "number"
@@ -4531,17 +4879,10 @@
                 }
               }
             },
-            "required": [
-              "previous",
-              "deltas"
-            ]
+            "required": ["previous", "deltas"]
           }
         },
-        "required": [
-          "range",
-          "totals",
-          "accounts"
-        ]
+        "required": ["range", "totals", "accounts"]
       },
       "AnalyticsTimeseriesResponse": {
         "type": "object",
@@ -4573,21 +4914,11 @@
                   "type": "number"
                 }
               },
-              "required": [
-                "date",
-                "likes",
-                "comments",
-                "shares",
-                "views",
-                "impressions"
-              ]
+              "required": ["date", "likes", "comments", "shares", "views", "impressions"]
             }
           }
         },
-        "required": [
-          "days",
-          "series"
-        ]
+        "required": ["days", "series"]
       },
       "AnalyticsTopPost": {
         "type": "object",
@@ -4599,133 +4930,72 @@
             "type": "string"
           },
           "content": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "platformPostUrl": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "platformPostId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "isBridge": {
             "type": "boolean"
           },
           "publishedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "username": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "displayName": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "avatarUrl": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "likes": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "comments": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "shares": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "saves": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "views": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "impressions": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "reach": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "engagement": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "engagementRate": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "media": {
-            "type": [
-              "object",
-              "null"
-            ],
+            "type": ["object", "null"],
             "properties": {
               "url": {
                 "type": "string"
               },
               "type": {
                 "type": "string",
-                "enum": [
-                  "video",
-                  "image"
-                ]
+                "enum": ["video", "image"]
               },
               "videoUrl": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               }
             },
-            "required": [
-              "url",
-              "type",
-              "videoUrl"
-            ]
+            "required": ["url", "type", "videoUrl"]
           }
         },
         "required": [
@@ -4761,9 +5031,7 @@
             }
           }
         },
-        "required": [
-          "posts"
-        ]
+        "required": ["posts"]
       },
       "ReportSummaryResponse": {
         "type": "object",
@@ -4804,24 +5072,13 @@
                       "type": "string"
                     },
                     "followersStart": {
-                      "type": [
-                        "number",
-                        "null"
-                      ]
+                      "type": ["number", "null"]
                     },
                     "followersEnd": {
-                      "type": [
-                        "number",
-                        "null"
-                      ]
+                      "type": ["number", "null"]
                     }
                   },
-                  "required": [
-                    "username",
-                    "platform",
-                    "followersStart",
-                    "followersEnd"
-                  ]
+                  "required": ["username", "platform", "followersStart", "followersEnd"]
                 }
               },
               "topPosts": {
@@ -4883,13 +5140,7 @@
                       "type": "number"
                     }
                   },
-                  "required": [
-                    "name",
-                    "metric",
-                    "currentValue",
-                    "targetValue",
-                    "progressPercent"
-                  ]
+                  "required": ["name", "metric", "currentValue", "targetValue", "progressPercent"]
                 }
               }
             },
@@ -4907,9 +5158,7 @@
             ]
           }
         },
-        "required": [
-          "report"
-        ]
+        "required": ["report"]
       },
       "MediaItem": {
         "type": "object",
@@ -4922,38 +5171,22 @@
           },
           "type": {
             "type": "string",
-            "enum": [
-              "image",
-              "video",
-              "audio"
-            ]
+            "enum": ["image", "video", "audio"]
           },
           "url": {
             "type": "string"
           },
           "sizeBytes": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "width": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "height": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "folderId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "createdAt": {
             "type": "string",
@@ -4985,10 +5218,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "items",
-          "storageConfigured"
-        ]
+        "required": ["items", "storageConfigured"]
       },
       "ImportMediaRequest": {
         "type": "object",
@@ -5003,15 +5233,10 @@
             "maxLength": 200
           },
           "folderId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           }
         },
-        "required": [
-          "url"
-        ]
+        "required": ["url"]
       },
       "ImportMediaResponse": {
         "type": "object",
@@ -5020,9 +5245,7 @@
             "$ref": "#/components/schemas/MediaItem"
           }
         },
-        "required": [
-          "media"
-        ]
+        "required": ["media"]
       },
       "RenderManifestItem": {
         "type": "object",
@@ -5038,11 +5261,7 @@
           },
           "orientation": {
             "type": "string",
-            "enum": [
-              "landscape",
-              "portrait",
-              "square"
-            ]
+            "enum": ["landscape", "portrait", "square"]
           },
           "videoUrl": {
             "type": "string"
@@ -5090,9 +5309,7 @@
         "properties": {
           "version": {
             "type": "number",
-            "enum": [
-              1
-            ]
+            "enum": [1]
           },
           "generatedAt": {
             "type": "string",
@@ -5105,11 +5322,7 @@
             }
           }
         },
-        "required": [
-          "version",
-          "generatedAt",
-          "renders"
-        ]
+        "required": ["version", "generatedAt", "renders"]
       },
       "AutomationRuleRequest": {
         "type": "object",
@@ -5125,16 +5338,10 @@
           },
           "source": {
             "type": "string",
-            "enum": [
-              "dm",
-              "comment"
-            ]
+            "enum": ["dm", "comment"]
           },
           "socialAccountId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "triggers": {
             "type": "array",
@@ -5153,12 +5360,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "name",
-          "source",
-          "triggers",
-          "action"
-        ]
+        "required": ["name", "source", "triggers", "action"]
       },
       "AutomationAction": {
         "oneOf": [
@@ -5182,9 +5384,7 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": [
-              "reply"
-            ]
+            "enum": ["reply"]
           },
           "message": {
             "type": "string",
@@ -5192,27 +5392,18 @@
             "maxLength": 1000
           }
         },
-        "required": [
-          "type",
-          "message"
-        ]
+        "required": ["type", "message"]
       },
       "AutomationAiReplyAction": {
         "type": "object",
         "properties": {
           "type": {
             "type": "string",
-            "enum": [
-              "ai_reply"
-            ]
+            "enum": ["ai_reply"]
           },
           "tone": {
             "type": "string",
-            "enum": [
-              "ramah",
-              "profesional",
-              "lucu"
-            ],
+            "enum": ["ramah", "profesional", "lucu"],
             "default": "ramah"
           },
           "delayMinutes": {
@@ -5226,9 +5417,7 @@
             "default": false
           }
         },
-        "required": [
-          "type"
-        ]
+        "required": ["type"]
       },
       "AutomationRuleResponse": {
         "type": "object",
@@ -5237,9 +5426,7 @@
             "$ref": "#/components/schemas/AutomationRuleRecord"
           }
         },
-        "required": [
-          "rule"
-        ]
+        "required": ["rule"]
       },
       "AutomationRuleRecord": {
         "allOf": [
@@ -5264,12 +5451,7 @@
                 "format": "date-time"
               }
             },
-            "required": [
-              "id",
-              "organizationId",
-              "createdAt",
-              "updatedAt"
-            ]
+            "required": ["id", "organizationId", "createdAt", "updatedAt"]
           }
         ]
       },
@@ -5297,18 +5479,11 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "id",
-                "platform",
-                "username"
-              ]
+              "required": ["id", "platform", "username"]
             }
           }
         },
-        "required": [
-          "rules",
-          "accounts"
-        ]
+        "required": ["rules", "accounts"]
       },
       "CreateCarouselRequest": {
         "type": "object",
@@ -5334,10 +5509,7 @@
             "$ref": "#/components/schemas/CarouselSettings"
           }
         },
-        "required": [
-          "topic",
-          "settings"
-        ]
+        "required": ["topic", "settings"]
       },
       "CarouselSlide": {
         "type": "object",
@@ -5352,36 +5524,22 @@
             "maxLength": 600
           },
           "backgroundMediaId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           }
         },
-        "required": [
-          "title"
-        ]
+        "required": ["title"]
       },
       "CarouselSettings": {
         "type": "object",
         "properties": {
           "style": {
             "type": "string",
-            "enum": [
-              "outline",
-              "box",
-              "box_title_content",
-              "plain"
-            ],
+            "enum": ["outline", "box", "box_title_content", "plain"],
             "default": "box"
           },
           "format": {
             "type": "string",
-            "enum": [
-              "portrait",
-              "portrait4_5",
-              "square"
-            ],
+            "enum": ["portrait", "portrait4_5", "square"],
             "default": "portrait4_5"
           },
           "slideCount": {
@@ -5406,11 +5564,7 @@
           },
           "backgroundMode": {
             "type": "string",
-            "enum": [
-              "library",
-              "stock",
-              "solid"
-            ],
+            "enum": ["library", "stock", "solid"],
             "default": "solid"
           },
           "backgroundQuery": {
@@ -5437,19 +5591,13 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "queued"
-            ]
+            "enum": ["queued"]
           },
           "slideCount": {
             "type": "number"
           }
         },
-        "required": [
-          "jobId",
-          "status",
-          "slideCount"
-        ]
+        "required": ["jobId", "status", "slideCount"]
       },
       "CarouselJobResponse": {
         "type": "object",
@@ -5471,22 +5619,13 @@
               },
               "settings": {},
               "caption": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "errorCode": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "errorMessage": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "createdAt": {
                 "type": "string",
@@ -5521,46 +5660,25 @@
                   "type": "string"
                 },
                 "body": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "stockCredit": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "layout": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "url": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "width": {
-                  "type": [
-                    "number",
-                    "null"
-                  ]
+                  "type": ["number", "null"]
                 },
                 "height": {
-                  "type": [
-                    "number",
-                    "null"
-                  ]
+                  "type": ["number", "null"]
                 },
                 "sizeBytes": {
-                  "type": [
-                    "number",
-                    "null"
-                  ]
+                  "type": ["number", "null"]
                 }
               },
               "required": [
@@ -5577,10 +5695,7 @@
             }
           }
         },
-        "required": [
-          "job",
-          "slides"
-        ]
+        "required": ["job", "slides"]
       },
       "CreateVideoRequest": {
         "type": "object",
@@ -5596,16 +5711,10 @@
             }
           },
           "voiceoverMediaId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "bgmAudioTrackId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "publishToGallery": {
             "type": "boolean",
@@ -5615,29 +5724,19 @@
             "$ref": "#/components/schemas/VideoSettings"
           }
         },
-        "required": [
-          "baseVideoMediaId",
-          "settings"
-        ]
+        "required": ["baseVideoMediaId", "settings"]
       },
       "VideoSettings": {
         "type": "object",
         "properties": {
           "orientation": {
             "type": "string",
-            "enum": [
-              "portrait",
-              "landscape",
-              "square"
-            ],
+            "enum": ["portrait", "landscape", "square"],
             "default": "portrait"
           },
           "resolution": {
             "type": "string",
-            "enum": [
-              "720p",
-              "1080p"
-            ],
+            "enum": ["720p", "1080p"],
             "default": "1080p"
           },
           "removeOriginalAudio": {
@@ -5657,10 +5756,7 @@
             "default": 0.3
           },
           "montage": {
-            "type": [
-              "object",
-              "null"
-            ],
+            "type": ["object", "null"],
             "properties": {
               "minSegmentSeconds": {
                 "type": "number",
@@ -5693,21 +5789,12 @@
           },
           "language": {
             "type": "string",
-            "enum": [
-              "id",
-              "en",
-              "auto"
-            ],
+            "enum": ["id", "en", "auto"],
             "default": "id"
           },
           "model": {
             "type": "string",
-            "enum": [
-              "tiny",
-              "base",
-              "small",
-              "medium"
-            ],
+            "enum": ["tiny", "base", "small", "medium"],
             "default": "base"
           },
           "fontSize": {
@@ -5722,11 +5809,7 @@
           },
           "position": {
             "type": "string",
-            "enum": [
-              "bottom",
-              "top",
-              "center"
-            ],
+            "enum": ["bottom", "top", "center"],
             "default": "bottom"
           },
           "wordHighlight": {
@@ -5736,10 +5819,7 @@
         }
       },
       "VideoHeadlineSettings": {
-        "type": [
-          "object",
-          "null"
-        ],
+        "type": ["object", "null"],
         "properties": {
           "text": {
             "type": "string",
@@ -5783,17 +5863,10 @@
                 "format": "date-time"
               }
             },
-            "required": [
-              "id",
-              "status",
-              "progress",
-              "createdAt"
-            ]
+            "required": ["id", "status", "progress", "createdAt"]
           }
         },
-        "required": [
-          "job"
-        ]
+        "required": ["job"]
       },
       "VideoJobResponse": {
         "type": "object",
@@ -5812,28 +5885,16 @@
               },
               "settings": {},
               "errorCode": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "errorMessage": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "outputMediaId": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "srtStorageKey": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "createdAt": {
                 "type": "string",
@@ -5857,34 +5918,23 @@
             ]
           }
         },
-        "required": [
-          "job"
-        ]
+        "required": ["job"]
       },
       "CreateAutoClipRequest": {
         "type": "object",
         "properties": {
           "sourceUrl": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "maxLength": 2000,
             "format": "uri"
           },
           "sourceTier": {
             "type": "string",
-            "enum": [
-              "t1",
-              "t2"
-            ],
+            "enum": ["t1", "t2"],
             "default": "t1"
           },
           "baseVideoMediaId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "clipSettings": {
             "type": "object",
@@ -5906,11 +5956,7 @@
               },
               "orientation": {
                 "type": "string",
-                "enum": [
-                  "portrait",
-                  "landscape",
-                  "square"
-                ]
+                "enum": ["portrait", "landscape", "square"]
               },
               "outputLanguage": {
                 "type": "string",
@@ -5918,10 +5964,7 @@
                 "maxLength": 20
               },
               "userDirection": {
-                "type": [
-                  "string",
-                  "null"
-                ],
+                "type": ["string", "null"],
                 "maxLength": 1000
               },
               "captionEnabled": {
@@ -5934,10 +5977,7 @@
             "properties": {
               "resolution": {
                 "type": "string",
-                "enum": [
-                  "720p",
-                  "1080p"
-                ],
+                "enum": ["720p", "1080p"],
                 "default": "1080p"
               },
               "removeOriginalAudio": {
@@ -5953,9 +5993,7 @@
             }
           }
         },
-        "required": [
-          "clipSettings"
-        ]
+        "required": ["clipSettings"]
       },
       "CreateAutoClipResponse": {
         "type": "object",
@@ -5977,18 +6015,11 @@
                 "format": "date-time"
               }
             },
-            "required": [
-              "id",
-              "status",
-              "progress",
-              "createdAt"
-            ]
+            "required": ["id", "status", "progress", "createdAt"]
           },
           "detectedRanges": {}
         },
-        "required": [
-          "job"
-        ]
+        "required": ["job"]
       },
       "AutoClipJobResponse": {
         "type": "object",
@@ -6007,34 +6038,19 @@
               },
               "clipSettings": {},
               "urlSource": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "urlSourceTier": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "srtStorageKey": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "errorCode": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "errorMessage": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "createdAt": {
                 "type": "string",
@@ -6045,22 +6061,13 @@
                 "format": "date-time"
               },
               "baseVideoName": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "baseVideoThumbnailUrl": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "baseVideoDuration": {
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "type": ["number", "null"]
               }
             },
             "required": [
@@ -6100,49 +6107,28 @@
                   "type": "string"
                 },
                 "viralScore": {
-                  "type": [
-                    "number",
-                    "null"
-                  ]
+                  "type": ["number", "null"]
                 },
                 "hookText": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "explicitRange": {
-                  "type": [
-                    "boolean",
-                    "null"
-                  ]
+                  "type": ["boolean", "null"]
                 },
                 "status": {
                   "type": "string"
                 },
                 "renderVideoJobId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "renderStatus": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "renderProgress": {
-                  "type": [
-                    "number",
-                    "null"
-                  ]
+                  "type": ["number", "null"]
                 },
                 "outputMediaId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 }
               },
               "required": [
@@ -6163,10 +6149,7 @@
             }
           }
         },
-        "required": [
-          "job",
-          "segments"
-        ]
+        "required": ["job", "segments"]
       },
       "SelectAutoClipRequest": {
         "type": "object",
@@ -6181,18 +6164,14 @@
             "maxItems": 20
           }
         },
-        "required": [
-          "segmentIds"
-        ]
+        "required": ["segmentIds"]
       },
       "SelectAutoClipResponse": {
         "type": "object",
         "properties": {
           "ok": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           },
           "enqueuedCount": {
             "type": "number"
@@ -6204,11 +6183,7 @@
             }
           }
         },
-        "required": [
-          "ok",
-          "enqueuedCount",
-          "renderJobIds"
-        ]
+        "required": ["ok", "enqueuedCount", "renderJobIds"]
       },
       "AiUsageResponse": {
         "type": "object",
@@ -6227,12 +6202,7 @@
             "example": "2026-09"
           }
         },
-        "required": [
-          "configured",
-          "used",
-          "limit",
-          "period"
-        ]
+        "required": ["configured", "used", "limit", "period"]
       },
       "CaptionRequest": {
         "type": "object",
@@ -6258,13 +6228,7 @@
           },
           "tone": {
             "type": "string",
-            "enum": [
-              "santai",
-              "profesional",
-              "lucu",
-              "inspiratif",
-              "promosi"
-            ],
+            "enum": ["santai", "profesional", "lucu", "inspiratif", "promosi"],
             "default": "santai"
           },
           "includeHashtags": {
@@ -6272,10 +6236,7 @@
             "default": true
           }
         },
-        "required": [
-          "prompt",
-          "platform"
-        ]
+        "required": ["prompt", "platform"]
       },
       "CaptionResponse": {
         "type": "object",
@@ -6293,11 +6254,7 @@
             "$ref": "#/components/schemas/AiCredits"
           }
         },
-        "required": [
-          "caption",
-          "hashtags",
-          "credits"
-        ]
+        "required": ["caption", "hashtags", "credits"]
       },
       "AiCredits": {
         "type": "object",
@@ -6312,11 +6269,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "used",
-          "limit",
-          "remaining"
-        ]
+        "required": ["used", "limit", "remaining"]
       },
       "HashtagRequest": {
         "type": "object",
@@ -6347,10 +6300,7 @@
             "default": 10
           }
         },
-        "required": [
-          "prompt",
-          "platform"
-        ]
+        "required": ["prompt", "platform"]
       },
       "HashtagResponse": {
         "type": "object",
@@ -6365,10 +6315,7 @@
             "$ref": "#/components/schemas/AiCredits"
           }
         },
-        "required": [
-          "hashtags",
-          "credits"
-        ]
+        "required": ["hashtags", "credits"]
       },
       "RewriteRequest": {
         "type": "object",
@@ -6405,10 +6352,7 @@
             "default": "lebih-santai"
           }
         },
-        "required": [
-          "text",
-          "platform"
-        ]
+        "required": ["text", "platform"]
       },
       "RewriteResponse": {
         "type": "object",
@@ -6420,10 +6364,7 @@
             "$ref": "#/components/schemas/AiCredits"
           }
         },
-        "required": [
-          "text",
-          "credits"
-        ]
+        "required": ["text", "credits"]
       },
       "RepurposeRequest": {
         "type": "object",
@@ -6452,10 +6393,7 @@
             "maxLength": 40
           }
         },
-        "required": [
-          "content",
-          "targetPlatform"
-        ]
+        "required": ["content", "targetPlatform"]
       },
       "RepurposeResponse": {
         "type": "object",
@@ -6467,10 +6405,7 @@
             "$ref": "#/components/schemas/AiCredits"
           }
         },
-        "required": [
-          "content",
-          "credits"
-        ]
+        "required": ["content", "credits"]
       },
       "TrendsResponse": {
         "type": "object",
@@ -6484,15 +6419,10 @@
                   "type": "string"
                 },
                 "approxTraffic": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 }
               },
-              "required": [
-                "title"
-              ]
+              "required": ["title"]
             }
           },
           "fetchedAt": {
@@ -6503,11 +6433,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "trends",
-          "fetchedAt",
-          "available"
-        ]
+        "required": ["trends", "fetchedAt", "available"]
       },
       "TrendIdeasRequest": {
         "type": "object",
@@ -6535,10 +6461,7 @@
             "maxLength": 120
           }
         },
-        "required": [
-          "trend",
-          "platform"
-        ]
+        "required": ["trend", "platform"]
       },
       "TrendIdeasResponse": {
         "type": "object",
@@ -6564,22 +6487,14 @@
                   }
                 }
               },
-              "required": [
-                "title",
-                "angle",
-                "caption",
-                "hashtags"
-              ]
+              "required": ["title", "angle", "caption", "hashtags"]
             }
           },
           "credits": {
             "$ref": "#/components/schemas/AiCredits"
           }
         },
-        "required": [
-          "ideas",
-          "credits"
-        ]
+        "required": ["ideas", "credits"]
       }
     },
     "securitySchemes": {
@@ -6591,7 +6506,7 @@
       "apiKeyAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "API key format `sk_live_<32 karakter>`. Dibuat di Settings → API. Bisa juga dikirim via header `X-API-Key`."
+        "description": "API key format `sk_api_<32 karakter>`. Dibuat di Settings → API. Bisa juga dikirim via header `X-API-Key`."
       }
     }
   }

@@ -16,7 +16,7 @@ export const PingResponseSchema = z
     key: z.object({
       id: z.string(),
       name: z.string(),
-      prefix: z.string().openapi({ example: "sk_live_ab12" }),
+      prefix: z.string().openapi({ example: "sk_api_ab12" }),
       scopes: z.array(z.string()),
     }),
     serverTime: z.string().datetime(),

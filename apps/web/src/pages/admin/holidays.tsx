@@ -61,7 +61,11 @@ async function fileToCsv(file: File): Promise<string> {
   const XLSX = await import("xlsx");
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
-  const sheet = wb.Sheets[wb.SheetNames[0]!];
+  // Guard nyata, bukan `wb.SheetNames[0]!` — berkas XLSX tanpa sheet akan
+  // menghasilkan sheet undefined dan `sheet_to_csv` melempar error buram.
+  const firstSheetName = wb.SheetNames[0];
+  const sheet = firstSheetName ? wb.Sheets[firstSheetName] : undefined;
+  if (!sheet) throw new Error("Berkas XLSX tidak punya sheet yang bisa dibaca.");
   return XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
 }
 

@@ -1,7 +1,7 @@
-import { defineConfig } from "vitest/config";
-import react from "@vitejs/plugin-react";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vitest/config";
 
 // __dirname ESM-safe (sama pola dengan vite.config.ts)
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -34,12 +34,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "html", "json-summary"],
       include: ["src/**/*.{ts,tsx}"],
-      exclude: [
-        "src/**/*.d.ts",
-        "src/main.tsx",
-        "src/sw.ts",
-        "src/lib/api-schema.d.ts",
-      ],
+      exclude: ["src/**/*.d.ts", "src/main.tsx", "src/sw.ts", "src/lib/api-schema.d.ts"],
       thresholds: {
         lines: 3,
         functions: 3,

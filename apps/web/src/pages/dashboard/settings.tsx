@@ -23,6 +23,7 @@ import {
 } from "@/components/settings/account-data-sections";
 import { AiUsageHistory } from "@/components/settings/ai-usage-history";
 import { ApiKeySettings } from "@/components/settings/api-key-settings";
+import { DeveloperAppSettings } from "@/components/settings/developer-app-settings";
 import { PushNotificationSettings } from "@/components/settings/push-notification-settings";
 import { WebhookSettings } from "@/components/settings/webhook-settings";
 import { Avatar } from "@/components/ui/avatar";
@@ -472,7 +473,14 @@ export function SettingsPage() {
         </>
       )}
 
-      {tab === "api" && <ApiKeySettings />}
+      {/* Developer Apps DULU: app pemilik allowlist redirect, jadi harus ada
+          sebelum key bisa dibuat dengan scope accounts:write. */}
+      {tab === "api" && (
+        <>
+          <DeveloperAppSettings />
+          <ApiKeySettings />
+        </>
+      )}
 
       {tab === "webhooks" && <WebhookSettings />}
     </div>

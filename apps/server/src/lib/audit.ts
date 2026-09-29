@@ -20,11 +20,7 @@ import { generateId } from "./id";
 
 // Subnet proxy yang boleh menyuplai header forwarded. NGINX host + Cloudflare
 // (CF-Connecting-IP selalu diisi edge dan nilai client header同名 ditimpa).
-const TRUSTED_PROXIES: ReadonlyArray<string> = [
-  "127.0.0.1",
-  "::1",
-  "::ffff:127.0.0.1",
-];
+const TRUSTED_PROXIES: ReadonlyArray<string> = ["127.0.0.1", "::1", "::ffff:127.0.0.1"];
 
 /** True jika request datang langsung dari reverse proxy terpercaya */
 function isTrustedProxy(remoteIp: string | undefined): boolean {

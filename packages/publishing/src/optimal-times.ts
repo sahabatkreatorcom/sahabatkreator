@@ -51,10 +51,13 @@ const HEURISTIC_HOURS: Record<string, number[]> = {
 };
 
 /** Hari prioritas untuk heuristik (0=Minggu): weekday kerja + weekend sore utk entertainment */
-const HEURISTIC_DAYS: Record<string, number[]> = {
+// `as const satisfies` + tuple (bukan `Record<string, number[]>`) meng-encode dua
+// invariant yang dipakai pemanggil: key-nya pasti ada dan array-nya pasti non-kosong.
+// Dengan begitu pembacaan `HEURISTIC_DAYS.x` / `[i]` tidak butuh non-null assertion.
+const HEURISTIC_DAYS = {
   default: [1, 2, 3, 4, 5, 6, 0], // Senin–Jumat lebih dulu
   entertainment: [5, 6, 0, 4, 3, 1, 2], // Jum–Ming lebih dulu
-};
+} as const satisfies Record<string, readonly [number, ...number[]]>;
 const ENTERTAINMENT_PLATFORMS = new Set([
   "tiktok",
   "instagram",
@@ -170,11 +173,13 @@ export async function computeOptimalTimes(
     const hours = HEURISTIC_HOURS[platformKey];
     if (!hours) continue;
     const dayOrder = ENTERTAINMENT_PLATFORMS.has(platformKey)
-      ? HEURISTIC_DAYS.entertainment!
-      : HEURISTIC_DAYS.default!;
+      ? HEURISTIC_DAYS.entertainment
+      : HEURISTIC_DAYS.default;
     // Top-6 kombinasi jam prima × hari prioritas (spread: hari berbeda untuk tiap jam)
     hours.slice(0, 6).forEach((hour, idx) => {
-      const dow = dayOrder[idx % dayOrder.length]!;
+      // `dayOrder` dijamin non-kosong oleh tipenya; `?? dayOrder[0]` hanya untuk
+      // memenuhi noUncheckedIndexedAccess dan tidak pernah dieksekusi.
+      const dow = dayOrder[idx % dayOrder.length] ?? dayOrder[0];
       slots.push({
         platform: platformKey,
         dayOfWeek: dow,

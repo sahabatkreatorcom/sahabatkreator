@@ -1,6 +1,6 @@
 // Token creator untuk Public API (/v1).
 //
-// Format token : sk_live_<32 char base64url>
+// Format token : sk_api_<32 char base64url>  (prefix lama `sk_live_` masih diterima — lihat di bawah)
 // Disimpan di DB: HANYA SHA-256-nya (tokenHash) + prefix pendek (tokenPrefix)
 // untuk tampilan. Plaintext dikembalikan satu kali saat create, tidak pernah
 // lagi — sama seperti pola report_share.token.
@@ -20,8 +20,32 @@ import {
 import { and, eq } from "drizzle-orm";
 import type { AuthContext, SessionUser } from "./auth-guard";
 
-/** Prefix token public API — membedakannya dari secret lain di log. */
-export const API_KEY_TOKEN_PREFIX = "sk_live_";
+/**
+ * Prefix token public API — membedakannya dari secret lain di log.
+ *
+ * MENGAPA bukan `sk_live_`: prefix itu **identik dengan format Stripe live secret
+ * key** (`sk_live_` + 24+ alfanumerik), sehingga GitHub secret scanning menandai
+ * token kita sebagai "Stripe API Key" dan **menolak push**. `sk_api_` mengikuti
+ * konvensi ID lain di repo (`sk_<tipe>_`: `sk_socacc_`, `sk_devapp_`, `sk_oauthpend_`).
+ */
+export const API_KEY_TOKEN_PREFIX = "sk_api_";
+
+/**
+ * Prefix lama yang MASIH diterima saat verifikasi.
+ *
+ * MENGAPA dipertahankan: `verifyApiKey` memeriksa prefix SEBELUM hashing, jadi
+ * mengganti prefix saja akan membuat seluruh key yang sudah beredar balas 401 —
+ * dan key lama hanya bisa diganti dengan membuat key baru. Transisinya harus
+ * non-breaking. Entri ini boleh dihapus setelah tidak ada lagi baris `api_key`
+ * yang `tokenPrefix`-nya memakai nilai lama.
+ */
+export const API_KEY_LEGACY_TOKEN_PREFIXES: readonly string[] = ["sk_live_"];
+
+/** Prefix yang diterima verifikasi: yang baru + legacy transisi. */
+const ACCEPTED_API_KEY_PREFIXES: readonly string[] = [
+  API_KEY_TOKEN_PREFIX,
+  ...API_KEY_LEGACY_TOKEN_PREFIXES,
+];
 
 /** Token = prefix + 32 char base64url (24 random bytes). */
 const TOKEN_RANDOM_BYTES = 24;
@@ -33,6 +57,12 @@ export type ApiKeyRuntime = {
   tokenPrefix: string;
   organizationId: string;
   scopes: string[];
+  /**
+   * App developer pemilik key (jalur connect akun lewat API).
+   * NULL = key biasa buatan Settings → API, yang tidak punya allowlist redirect
+   * dan karena itu tidak boleh memakai endpoint connect (RFC rfc-oauth-connect.md).
+   */
+  developerAppId: string | null;
 };
 
 export type ApiKeyAuth = {
@@ -92,7 +122,8 @@ function safeEqualHex(a: string, b: string): boolean {
  * Error DB DIPROPOGASI (bukan null) supaya tidak terbaca sebagai 401.
  */
 export async function verifyApiKey(raw: string | null): Promise<ApiKeyAuth | null> {
-  if (!raw?.startsWith(API_KEY_TOKEN_PREFIX)) return null;
+  // Terima prefix baru DAN legacy (transisi, lihat API_KEY_LEGACY_TOKEN_PREFIXES).
+  if (!raw || !ACCEPTED_API_KEY_PREFIXES.some((prefix) => raw.startsWith(prefix))) return null;
 
   const tokenHash = hashApiKey(raw);
 
@@ -149,6 +180,7 @@ export async function verifyApiKey(raw: string | null): Promise<ApiKeyAuth | nul
       tokenPrefix: row.tokenPrefix,
       organizationId: row.organizationId,
       scopes: row.scopes ?? [],
+      developerAppId: row.developerAppId,
     },
   };
 }

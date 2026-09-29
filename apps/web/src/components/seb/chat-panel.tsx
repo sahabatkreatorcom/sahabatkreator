@@ -8,6 +8,14 @@ import { cn } from "@/lib/utils";
 import { queryKeys } from "../../lib/query-keys";
 import type { SebChatAttachment, SebChatMessage, SebChatSession } from "./types";
 
+/** Auto-resize textarea mengikuti isi (maks 6 baris = 144px) agar input multi-baris nyaman.
+ * Di module scope (bukan di dalam komponen) supaya identitasnya stabil — kalau
+ * dideklarasikan di dalam komponen, `useEffect(..., [autoResize])` jalan tiap render. */
+function autoResize(el: HTMLTextAreaElement) {
+  el.style.height = "auto";
+  el.style.height = `${Math.min(el.scrollHeight, 144)}px`;
+}
+
 function AttachmentGrid({ attachments }: { attachments: SebChatAttachment[] }) {
   return (
     <div className="mt-2 grid grid-cols-3 gap-1.5">
@@ -121,15 +129,9 @@ export function SebChatPanel({
     (sessions.length === 0 && !optimistic.length) ||
     (!activeSessionId && (newChat || sessions.length === 0) && !optimistic.length);
 
-  // Auto-resize textarea mengikuti isi (maks 6 baris) agar input multi-baris nyaman
-  function autoResize(el: HTMLTextAreaElement) {
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 144)}px`;
-  }
-
   useEffect(() => {
     if (inputRef.current) autoResize(inputRef.current);
-  }, [autoResize]);
+  }, []);
 
   function submit() {
     const message = draft.trim();

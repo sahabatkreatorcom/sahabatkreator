@@ -25,6 +25,7 @@ import {
   groupByDate,
   MONTHS_ID,
   NOTE_COLORS,
+  parseDateKey,
   startOfWeek,
   toLocalISODate,
 } from "@/components/calendar/shared";
@@ -207,8 +208,10 @@ export function CalendarPage() {
     const group = groups.find((g) => g.id === groupId);
     if (!group) return;
     const original = group.scheduledAt ? new Date(group.scheduledAt) : new Date();
-    const [y, m, d] = dateKey.split("-").map(Number);
-    const next = new Date(y!, m! - 1, d!, original.getHours(), original.getMinutes(), 0, 0);
+    const parts = parseDateKey(dateKey);
+    if (!parts) return;
+    const [y, m, d] = parts;
+    const next = new Date(y, m - 1, d, original.getHours(), original.getMinutes(), 0, 0);
     reschedule.mutate({ id: groupId, scheduledAt: next.toISOString() });
   }
 
@@ -217,8 +220,10 @@ export function CalendarPage() {
     const groups = [...postsByDate.values()].flat();
     const group = groups.find((g) => g.id === groupId);
     const originalMinutes = group?.scheduledAt ? new Date(group.scheduledAt).getMinutes() : 0;
-    const [y, m, d] = dateKey.split("-").map(Number);
-    const next = new Date(y!, m! - 1, d!, hour, originalMinutes, 0, 0);
+    const parts = parseDateKey(dateKey);
+    if (!parts) return;
+    const [y, m, d] = parts;
+    const next = new Date(y, m - 1, d, hour, originalMinutes, 0, 0);
     reschedule.mutate({ id: groupId, scheduledAt: next.toISOString() });
   }
 
@@ -491,7 +496,9 @@ export function CalendarPage() {
                   variant="destructive"
                   size="sm"
                   onClick={() => {
-                    deleteNote.mutate(noteModal.id!);
+                    const noteId = noteModal.id;
+                    if (!noteId) return;
+                    deleteNote.mutate(noteId);
                     setNoteModal(null);
                   }}
                 >

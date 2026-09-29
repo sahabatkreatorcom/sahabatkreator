@@ -10,6 +10,7 @@
 // di auth-guard.ts mengembalikannya — semua guard lama (requireOrg dkk.)
 // bekerja tanpa perubahan.
 
+import type { FeatureKey } from "@sahabatkreator/db";
 import type { ApiKeyScope } from "@sahabatkreator/db/schema";
 import type { Context, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -27,7 +28,14 @@ declare module "hono" {
   }
 }
 
-/** Key fitur public API (harus sinkron dengan seed + feature-catalog). */
+/**
+ * Key fitur public API.
+ *
+ * `satisfies Record<string, FeatureKey>` mengunci nilainya ke katalog fitur
+ * (packages/db/src/feature-keys.ts): salah ketik di sini jadi error `tsc`,
+ * bukan 402 misterius untuk seluruh pelanggan karena key tidak pernah cocok
+ * dengan `plan.features`.
+ */
 export const API_FEATURES = {
   /** Akses /v1 sama sekali — plan non-Free */
   access: "api_access",
@@ -35,7 +43,7 @@ export const API_FEATURES = {
   write: "api_write",
   /** Webhook keluar (delivery event org) — Enterprise */
   webhook: "api_webhook",
-} as const;
+} as const satisfies Record<string, FeatureKey>;
 
 /** Method yang tidak mengubah data — lolos gate api_write. */
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);

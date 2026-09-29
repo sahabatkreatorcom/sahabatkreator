@@ -58,15 +58,15 @@ pemakaian lewat UI.
 
 ```bash
 # Cara 1 — env
-SAHABATKREATOR_API_KEY=sk_live_... bun run start
+SAHABATKREATOR_API_KEY=sk_api_... bun run start
 
 # Cara 2 — argumen pertama
-bun run start sk_live_...
+bun run start sk_api_...
 ```
 
 | Env | Default | Keterangan |
 |---|---|---|
-| `SAHABATKREATOR_API_KEY` | — (wajib) | Token `sk_live_...` |
+| `SAHABATKREATOR_API_KEY` | — (wajib) | Token `sk_api_...` |
 | `SERVER_URL` | `http://localhost:3000` | Origin API, **tanpa** trailing slash |
 
 Saat boot, server memanggil `GET /v1/ping` sekali untuk memverifikasi token dan
@@ -95,7 +95,7 @@ diberi scope apa pun — hanya `ping` yang akan tersedia.
       "command": "bun",
       "args": ["run", "<ABSOLUTE_PATH_TO_REPO>/apps/mcp/src/index.ts"],
       "env": {
-        "SAHABATKREATOR_API_KEY": "sk_live_...",
+        "SAHABATKREATOR_API_KEY": "sk_api_...",
         "SERVER_URL": "https://sahabatkreator.com"
       }
     }

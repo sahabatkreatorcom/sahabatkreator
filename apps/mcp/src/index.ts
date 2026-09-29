@@ -10,8 +10,8 @@
 // mengurus transport: stdio, satu proses per klien, dijalankan di mesin pengguna.
 //
 // Menjalankan:
-//   SAHABATKREATOR_API_KEY=sk_live_... bun run start
-//   atau:   bun run start sk_live_...        (arg pertama = token)
+//   SAHABATKREATOR_API_KEY=sk_api_... bun run start
+//   atau:   bun run start sk_api_...        (arg pertama = token)
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";

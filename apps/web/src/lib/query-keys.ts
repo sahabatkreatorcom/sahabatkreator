@@ -121,6 +121,7 @@ export const queryKeys = {
   webhookEndpoints: ["webhook-endpoints"] as const,
   webhookDeliveries: ["webhook-deliveries"] as const,
   apiKeys: ["api-keys"] as const,
+  developerApps: ["developer-apps"] as const,
 
   // ---------- Notifikasi / push ----------
   notifications: ["notifications"] as const,

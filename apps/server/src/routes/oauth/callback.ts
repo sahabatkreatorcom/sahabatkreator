@@ -1,7 +1,15 @@
 // GET /oauth/:platform/callback — endpoint redirect dari platform.
+//
+// DUA jalur berbagi endpoint ini:
+//   1. UI Sahabat Kreator  — stateRow.developerAppId NULL. SK yang menyelesaikan
+//      connect (exchange code → profil → pending picker atau langsung connect)
+//      lalu redirect ke WEB_URL/accounts.
+//   2. API developer       — stateRow.developerAppId terisi. SK hanya jadi PROXY:
+//      code diteruskan apa adanya ke redirectUri milik developer, dan TIDAK
+//      menyentuh akun sama sekali. Lihat docs/rfc-oauth-connect.md §5.3.
 
 import { db } from "@sahabatkreator/db";
-import { oauthPendingSelection, oauthState, socialAccount } from "@sahabatkreator/db/schema";
+import { oauthState } from "@sahabatkreator/db/schema";
 import { env } from "@sahabatkreator/env/server";
 import {
   exchangeCodeForToken,
@@ -11,19 +19,8 @@ import {
 } from "@sahabatkreator/publishing";
 import { and, eq } from "drizzle-orm";
 import type { Context } from "hono";
-import { fireActivity } from "../../lib/activity-log";
-import { checkFeatureGate } from "../../lib/billing";
-import { encrypt } from "../../lib/crypto";
-import { generateId } from "../../lib/id";
-import {
-  buildPendingLinkedIn,
-  buildPendingPages,
-  buildPendingPinterest,
-  buildPendingYouTube,
-  type RawLinkedInOrganization,
-  type RawMetaPage,
-  type RawYouTubeChannel,
-} from "../../lib/oauth-connect";
+import { buildRedirectUrl } from "../../lib/developer-app";
+import { buildPendingFromToken } from "../../lib/oauth-connect";
 import { getAppCredential } from "./credentials";
 
 /**
@@ -43,7 +40,35 @@ export async function handleCallback(c: Context): Promise<Response> {
     const code = c.req.query("code");
     const state = c.req.query("state");
     const errorParam = c.req.query("error_description") ?? c.req.query("error");
-    if (errorParam) return failRedirect(errorParam);
+
+    // Platform mengembalikan error (mis. user menolak consent). Untuk jalur API
+    // error HARUS sampai ke developer, bukan ke halaman /accounts kita — kalau
+    // tidak, UI developer menggantung menunggu callback yang tidak pernah datang.
+    // Lookup di sini sengaja read-only (state tidak dikonsumsi) supaya perilaku
+    // jalur UI tidak berubah dari sebelumnya.
+    if (errorParam) {
+      if (state) {
+        const [errState] = await db
+          .select({
+            developerAppId: oauthState.developerAppId,
+            redirectUri: oauthState.redirectUri,
+          })
+          .from(oauthState)
+          .where(and(eq(oauthState.state, state), eq(oauthState.platform, platform)))
+          .limit(1);
+        if (errState?.developerAppId && errState.redirectUri) {
+          await db.delete(oauthState).where(eq(oauthState.state, state));
+          return c.redirect(
+            buildRedirectUrl(errState.redirectUri, {
+              error: "access_denied",
+              error_description: errorParam,
+            }),
+          );
+        }
+      }
+      return failRedirect(errorParam);
+    }
+
     if (!code || !state) return failRedirect("Kode otorisasi tidak lengkap");
 
     // Validasi state: harus ada, belum expired, sekali pakai (delete langsung)
@@ -57,6 +82,23 @@ export async function handleCallback(c: Context): Promise<Response> {
       return failRedirect("State OAuth kedaluwarsa. Coba hubungkan ulang.");
     }
 
+    // ── Jalur API: SK HANYA proxy ────────────────────────────────────────────
+    // JANGAN exchange code, JANGAN connect, JANGAN buat pending. Developer yang
+    // memutuskan kapan akun benar-benar dihubungkan (POST /v1/accounts/:p/connect,
+    // fase 3), sehingga platform asset-selection bisa menampilkan picker-nya
+    // sendiri dan kontraknya seragam dengan Repliz.
+    //
+    // State tetap DIHAPUS (baris di atas) meski code diteruskan: org sudah bisa
+    // diresolusi dari API key di langkah connect (key terikat organisasi), jadi
+    // state tidak dibutuhkan lagi — dan jaminan sekali-pakai tetap utuh.
+    if (stateRow.developerAppId) {
+      if (!stateRow.redirectUri) {
+        return failRedirect("State OAuth tidak punya tujuan redirect.");
+      }
+      return c.redirect(buildRedirectUrl(stateRow.redirectUri, { code, state }));
+    }
+
+    // ── Jalur UI: perilaku lama, hanya isinya dipindah ke helper bersama ─────
     const cred = await getAppCredential(platform);
 
     // Exchange code → token
@@ -65,215 +107,26 @@ export async function handleCallback(c: Context): Promise<Response> {
     // Fetch profil user
     const profile = await fetchPlatformProfile(platform, token);
 
-    // Meta (FB/IG) multi-Page → jangan auto-pilih; simpan pending & minta user pilih
-    // (kenapa: pages[0] bisa bukan Page yang dimaksud → salah akun publish)
-    if (
-      (platform === "instagram" || platform === "facebook") &&
-      Array.isArray(profile.extra?.pages) &&
-      (profile.extra.pages as RawMetaPage[]).length > 1
-    ) {
-      const pending = buildPendingPages(platform, profile.extra.pages as RawMetaPage[]);
-      await db.insert(oauthPendingSelection).values({
-        id: pending.id,
-        userId: stateRow.userId,
-        organizationId: stateRow.organizationId,
-        platform,
-        pagesData: pending.pagesData,
-        expiresAt: pending.expiresAt,
-      });
-      return c.redirect(`${env.WEB_URL}/accounts?pending=${encodeURIComponent(pending.id)}`);
-    }
+    const result = await buildPendingFromToken({
+      platform,
+      token,
+      profile,
+      organizationId: stateRow.organizationId,
+      userId: stateRow.userId,
+    });
 
-    // LinkedIn multi-entity (note.md #15): user ADMIN ≥ 1 company → pilih profil
-    // pribadi vs company (posting sebagai company butuh scope org ter-approve).
-    // Tanpa organizations (product belum approved) → lanjut auto-connect person.
-    if (
-      platform === "linkedin" &&
-      Array.isArray(profile.extra?.organizations) &&
-      (profile.extra.organizations as RawLinkedInOrganization[]).length > 0
-    ) {
-      const person = profile.extra.person as { sub: string; name: string };
-      const pending = buildPendingLinkedIn({
-        person: { sub: person.sub, name: person.name },
-        organizations: profile.extra.organizations as RawLinkedInOrganization[],
-        accessToken: token.accessToken,
-        refreshToken: token.refreshToken,
-        expiresAt: token.expiresAt,
-        scopes: token.scopes,
-      });
-      await db.insert(oauthPendingSelection).values({
-        id: pending.id,
-        userId: stateRow.userId,
-        organizationId: stateRow.organizationId,
-        platform: "linkedin",
-        pagesData: pending.pagesData,
-        expiresAt: pending.expiresAt,
-      });
-      return c.redirect(`${env.WEB_URL}/accounts?pending=${encodeURIComponent(pending.id)}`);
-    }
-
-    // LinkedIn company-only (app Community Management API). Flow ini TIDAK punya
-    // profil person (app tanpa `openid` → /v2/userinfo tidak tersedia), jadi user
-    // selalu memilih salah satu halaman company yang dia admin.
-    if (platform === "linkedin_org") {
-      const organizations = (profile.extra?.organizations ?? []) as RawLinkedInOrganization[];
-      if (organizations.length === 0) {
-        return failRedirect("Tidak ada halaman company LinkedIn yang bisa dihubungkan.");
-      }
-      const pending = buildPendingLinkedIn({
-        organizations,
-        accessToken: token.accessToken,
-        refreshToken: token.refreshToken,
-        expiresAt: token.expiresAt,
-        scopes: token.scopes,
-        platform: "linkedin_org",
-      });
-      await db.insert(oauthPendingSelection).values({
-        id: pending.id,
-        userId: stateRow.userId,
-        organizationId: stateRow.organizationId,
-        platform: "linkedin_org",
-        pagesData: pending.pagesData,
-        expiresAt: pending.expiresAt,
-      });
-      return c.redirect(`${env.WEB_URL}/accounts?pending=${encodeURIComponent(pending.id)}`);
-    }
-
-    // Pinterest: entitas = board (publish butuh board_id) → user pilih board via picker
-    if (platform === "pinterest" && Array.isArray(profile.extra?.boards)) {
-      const boards = profile.extra.boards as Array<{ id: string; name: string; privacy?: string }>;
-      if (boards.length === 0) {
-        return failRedirect(
-          "Akun Pinterest tidak memiliki board. Buat minimal satu board dulu di Pinterest.",
+    switch (result.kind) {
+      case "pending":
+        return c.redirect(
+          `${env.WEB_URL}/accounts?pending=${encodeURIComponent(result.pendingId)}`,
         );
-      }
-      const pending = buildPendingPinterest({
-        username: profile.username,
-        avatarUrl: profile.avatarUrl,
-        boards,
-        accessToken: token.accessToken,
-        refreshToken: token.refreshToken,
-        expiresAt: token.expiresAt,
-        scopes: token.scopes,
-      });
-      await db.insert(oauthPendingSelection).values({
-        id: pending.id,
-        userId: stateRow.userId,
-        organizationId: stateRow.organizationId,
-        platform: "pinterest",
-        pagesData: pending.pagesData,
-        expiresAt: pending.expiresAt,
-      });
-      return c.redirect(`${env.WEB_URL}/accounts?pending=${encodeURIComponent(pending.id)}`);
-    }
-
-    // YouTube multi-channel: `channels?mine=true` mengembalikan semua channel
-    // milik akun Google (termasuk brand account). Satu token = satu akun Google,
-    // jadi >1 channel wajib dipilih user — tanpa ini user diam-diam tersambung
-    // ke channel pertama. Channel tunggal → lanjut auto-connect di bawah
-    // (metadata = profile.extra, pola sama dengan Page Meta jalur tunggal).
-    if (platform === "youtube") {
-      const channels = (profile.extra?.channels ?? []) as RawYouTubeChannel[];
-      if (channels.length > 1) {
-        const pending = buildPendingYouTube({
-          channels,
-          accessToken: token.accessToken,
-          refreshToken: token.refreshToken,
-          expiresAt: token.expiresAt,
-          scopes: token.scopes,
-        });
-        await db.insert(oauthPendingSelection).values({
-          id: pending.id,
-          userId: stateRow.userId,
-          organizationId: stateRow.organizationId,
-          platform: "youtube",
-          pagesData: pending.pagesData,
-          expiresAt: pending.expiresAt,
-        });
-        return c.redirect(`${env.WEB_URL}/accounts?pending=${encodeURIComponent(pending.id)}`);
-      }
-    }
-
-    // Upsert social_account (unique: platform + platformAccountId)
-    // Bila akun sama sudah ada di org lain → error (satu akun platform satu org, hindari bentrok publish)
-    const [existing] = await db
-      .select({ id: socialAccount.id, organizationId: socialAccount.organizationId })
-      .from(socialAccount)
-      .where(
-        and(
-          eq(socialAccount.platform, platform),
-          eq(socialAccount.platformAccountId, profile.platformAccountId),
-        ),
-      )
-      .limit(1);
-
-    const accessTokenEnc = encrypt(token.accessToken);
-    const refreshTokenEnc = token.refreshToken ? encrypt(token.refreshToken) : null;
-
-    if (existing) {
-      if (existing.organizationId !== stateRow.organizationId) {
+      case "connected":
+        return c.redirect(`${env.WEB_URL}/accounts?connect_success=${platform}`);
+      case "conflict":
         return failRedirect("Akun ini sudah terhubung di organisasi lain.");
-      }
-      // Re-connect: update token & profil (user re-grant setelah token expire/revoke)
-      await db
-        .update(socialAccount)
-        .set({
-          username: profile.username,
-          displayName: profile.displayName ?? null,
-          avatarUrl: profile.avatarUrl ?? null,
-          accessTokenEnc,
-          refreshTokenEnc,
-          tokenExpiresAt: token.expiresAt ?? null,
-          scopes: token.scopes,
-          isConnected: true,
-          lastError: null,
-          metadata: profile.extra ?? null,
-          lastSyncedAt: new Date(),
-        })
-        .where(eq(socialAccount.id, existing.id));
-
-      // Catat aktivitas org: akun di-reconnect (user pelaku = pemilik state OAuth)
-      fireActivity({
-        orgId: stateRow.organizationId,
-        userId: stateRow.userId,
-        action: "account.reconnected",
-        targetType: "social_account",
-        targetId: existing.id,
-        metadata: { platform, username: profile.username },
-      });
-    } else {
-      // Gate limit akun (pool per-user) — throw 402 → failRedirect di bawah.
-      await checkFeatureGate(stateRow.organizationId, "social_accounts");
-      const id = generateId("socacc");
-      await db.insert(socialAccount).values({
-        id,
-        organizationId: stateRow.organizationId,
-        platform,
-        platformAccountId: profile.platformAccountId,
-        username: profile.username,
-        displayName: profile.displayName ?? null,
-        avatarUrl: profile.avatarUrl ?? null,
-        accessTokenEnc,
-        refreshTokenEnc,
-        tokenExpiresAt: token.expiresAt ?? null,
-        scopes: token.scopes,
-        isConnected: true,
-        metadata: profile.extra ?? null,
-        lastSyncedAt: new Date(),
-      });
-
-      // Catat aktivitas org: akun baru terhubung via OAuth
-      fireActivity({
-        orgId: stateRow.organizationId,
-        userId: stateRow.userId,
-        action: "account.connected",
-        targetType: "social_account",
-        targetId: id,
-        metadata: { platform, username: profile.username },
-      });
+      case "error":
+        return failRedirect(result.message);
     }
-
-    return c.redirect(`${env.WEB_URL}/accounts?connect_success=${platform}`);
   } catch (error) {
     console.error(`[oauth] callback ${platform} gagal:`, error);
     const msg = error instanceof Error ? error.message : "Gagal menghubungkan akun";

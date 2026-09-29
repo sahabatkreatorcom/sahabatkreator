@@ -132,7 +132,7 @@ export function DayView({
                                 }`}
                               >
                                 <span className="font-mono text-[10px] text-[var(--text-secondary)]">
-                                  {formatTimeId(g.scheduledAt!)}
+                                  {formatTimeId(g.scheduledAt)}
                                 </span>
                                 <div className="flex -space-x-1">
                                   {g.posts.map((p) => {

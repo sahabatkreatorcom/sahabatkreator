@@ -128,8 +128,13 @@ export function DashboardPage() {
     engagement?.unreadByType && Object.values(engagement.unreadByType).reduce((a, b) => a + b, 0);
 
   const upcoming = (postsData?.groups ?? [])
-    .filter((g) => g.scheduledAt && new Date(g.scheduledAt) > new Date())
-    .sort((a, b) => new Date(a.scheduledAt!).getTime() - new Date(b.scheduledAt!).getTime())
+    // Type predicate (bukan `.filter(Boolean)` + `scheduledAt!`) supaya
+    // `scheduledAt` menyempit ke string untuk `.sort` di bawah.
+    .filter((g): g is typeof g & { scheduledAt: string } => {
+      if (!g.scheduledAt) return false;
+      return new Date(g.scheduledAt) > new Date();
+    })
+    .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
     .slice(0, 5);
 
   const accounts = overview?.accounts ?? [];

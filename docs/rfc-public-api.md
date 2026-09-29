@@ -115,9 +115,9 @@ handler `/api` bekerja tanpa satu baris pun diubah.
 
 | Aspek | Nilai |
 |---|---|
-| Format | `sk_live_` + 32 karakter base64url (dari 24 byte acak) |
+| Format | `sk_api_` + 32 karakter base64url (dari 24 byte acak) |
 | Disimpan | `token_hash` = SHA-256 hex (unik global) |
-| Ditampilkan | `token_prefix` = 12 karakter pertama, mis. `sk_live_ab12` |
+| Ditampilkan | `token_prefix` = 12 karakter pertama, mis. `sk_api_ab12` |
 | Plaintext | Hanya pada respons create & rotate. Tidak pernah disimpan |
 | Perbandingan | `timingSafeEqual` atas buffer hex |
 
@@ -129,7 +129,8 @@ force seperti password.
 
 Urutan penolakan (semua → `null` → 401):
 
-1. Prefix bukan `sk_live_`.
+1. Prefix bukan `sk_api_` (atau prefix legacy `sk_live_` — diterima selama transisi;
+   lihat `API_KEY_LEGACY_TOKEN_PREFIXES` di `apps/server/src/lib/api-key.ts`).
 2. Hash tidak ketemu di DB.
 3. `revokedAt` terisi.
 4. `expiresAt` sudah lewat.
@@ -331,7 +332,7 @@ pernah berbeda diam-diam dari allowlist `/v1`.
 ### 7.1 stdio — `apps/mcp`
 
 ```bash
-SAHABATKREATOR_API_KEY=sk_live_... bun run start   # atau: bun run start sk_live_...
+SAHABATKREATOR_API_KEY=sk_api_... bun run start   # atau: bun run start sk_api_...
 ```
 
 - `SERVER_URL` (default `http://localhost:3000`) menentukan basis API.

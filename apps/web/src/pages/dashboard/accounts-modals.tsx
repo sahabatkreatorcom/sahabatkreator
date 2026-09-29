@@ -184,18 +184,21 @@ export function PagePickerModal({
   onClose: () => void;
   onConnected: () => void;
 }) {
-  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: [...queryKeys.accountsPending, pendingId],
     queryFn: () =>
       api.get<{
         platform: string;
-        pages: Array<{
-          pageId: string;
-          pageName: string;
+        // Bentuk yang SAMA dengan `assets[]` di respons POST /connect — jangan
+        // tambah pemetaan kedua di sini (RFC §11 #7).
+        assets: Array<{
+          id: string;
+          name: string;
+          username: string | null;
+          picture: string | null;
           hasInstagram: boolean;
-          igUsername: string | null;
           isPersonal: boolean;
         }>;
       }>(`/accounts/pending/${pendingId}`),
@@ -203,9 +206,9 @@ export function PagePickerModal({
   });
 
   const select = useMutation({
-    mutationFn: (pageId: string) =>
+    mutationFn: (assetId: string) =>
       api.post<{ ok: boolean; username: string }>(`/accounts/pending/${pendingId}/select`, {
-        pageId,
+        assetId,
       }),
     onSuccess: (res) => {
       toast.success(`@${res.username} terhubung`);
@@ -265,14 +268,14 @@ export function PagePickerModal({
       ) : (
         <div className="space-y-3">
           <div className="max-h-80 space-y-2 overflow-y-auto">
-            {data?.pages.map((page) => {
-              const selected = selectedPageId === page.pageId;
-              const disabled = isInstagramFlow && !page.hasInstagram;
+            {data?.assets.map((asset) => {
+              const selected = selectedAssetId === asset.id;
+              const disabled = isInstagramFlow && !asset.hasInstagram;
               return (
                 <button
-                  key={page.pageId}
+                  key={asset.id}
                   type="button"
-                  onClick={() => setSelectedPageId(page.pageId)}
+                  onClick={() => setSelectedAssetId(asset.id)}
                   disabled={disabled}
                   className={`flex w-full items-center gap-3 rounded-[var(--radius-lg)] border p-4 text-left transition-colors ${
                     selected
@@ -282,7 +285,7 @@ export function PagePickerModal({
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--bg-tertiary)]">
                     {isLinkedInAnyFlow ? (
-                      page.isPersonal ? (
+                      asset.isPersonal ? (
                         <User className="h-5 w-5 text-[var(--text-secondary)]" />
                       ) : (
                         <Building2 className="h-5 w-5 text-[var(--text-secondary)]" />
@@ -291,25 +294,25 @@ export function PagePickerModal({
                       <Pin className="h-5 w-5 text-[var(--text-secondary)]" />
                     ) : isYouTubeFlow ? (
                       <YouTubeIcon className="h-5 w-5 text-[var(--text-secondary)]" />
-                    ) : page.hasInstagram ? (
+                    ) : asset.hasInstagram ? (
                       <AtSign className="h-5 w-5 text-[var(--text-secondary)]" />
                     ) : (
                       <Info className="h-5 w-5 text-[var(--text-muted)]" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm">{page.pageName}</p>
+                    <p className="font-medium text-sm">{asset.name}</p>
                     <p className="text-[var(--text-muted)] text-xs">
                       {isLinkedInAnyFlow
-                        ? page.isPersonal
+                        ? asset.isPersonal
                           ? "Profil pribadi"
                           : "Halaman company"
                         : isPinterestFlow
-                          ? `Board — @${page.igUsername ?? "pinterest"}`
+                          ? `Board — @${asset.username ?? "pinterest"}`
                           : isYouTubeFlow
                             ? "Channel YouTube"
-                            : page.hasInstagram
-                              ? `IG: @${page.igUsername ?? "bisnis"}`
+                            : asset.hasInstagram
+                              ? `IG: @${asset.username ?? "bisnis"}`
                               : "Tanpa Instagram Business"}
                     </p>
                   </div>
@@ -323,8 +326,8 @@ export function PagePickerModal({
               Batal
             </Button>
             <Button
-              disabled={!selectedPageId || select.isPending}
-              onClick={() => selectedPageId && select.mutate(selectedPageId)}
+              disabled={!selectedAssetId || select.isPending}
+              onClick={() => selectedAssetId && select.mutate(selectedAssetId)}
             >
               {select.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Hubungkan

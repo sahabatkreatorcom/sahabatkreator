@@ -11,14 +11,33 @@ import { generateId } from "./id";
 
 let client: S3Client | null = null;
 
+/**
+ * Kredensial R2 lengkap, atau null bila belum dikonfigurasi.
+ * Sumber kebenaran tunggal "R2 siap dipakai" — sekaligus menyempitkan tipe ke
+ * `string` (guard yang hanya mengembalikan boolean tidak bisa menyempitkan
+ * properti `env`, sehingga pemanggil terpaksa pakai `env.X!`).
+ */
+function readR2Credentials(): {
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+} | null {
+  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET } = env;
+  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET) return null;
+  return {
+    accountId: R2_ACCOUNT_ID,
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+  };
+}
+
 export function isStorageConfigured(): boolean {
-  return Boolean(
-    env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_BUCKET,
-  );
+  return readR2Credentials() !== null;
 }
 
 function getClient(): S3Client {
-  if (!isStorageConfigured()) {
+  const creds = readR2Credentials();
+  if (!creds) {
     throw new Error(
       "R2 belum dikonfigurasi. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET di root .env",
     );
@@ -26,10 +45,10 @@ function getClient(): S3Client {
   if (!client) {
     client = new S3Client({
       region: "auto",
-      endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      endpoint: `https://${creds.accountId}.r2.cloudflarestorage.com`,
       credentials: {
-        accessKeyId: env.R2_ACCESS_KEY_ID!,
-        secretAccessKey: env.R2_SECRET_ACCESS_KEY!,
+        accessKeyId: creds.accessKeyId,
+        secretAccessKey: creds.secretAccessKey,
       },
     });
   }

@@ -293,6 +293,10 @@ function PreviewModal({ render, onClose }: { render: RenderEntry | null; onClose
       {render && (
         <div className="space-y-4">
           <div className="flex justify-center overflow-hidden rounded-[var(--radius-md)] bg-black">
+            {/* Video hasil render CI dari proyek user — pipeline render tidak menghasilkan berkas
+                subtitle, jadi <track> tidak punya sumber untuk diisi. Caption/teks di layar
+                ditangani saat komposisi video, bukan di pratinjau. */}
+            {/* biome-ignore lint/a11y/useMediaCaption: hasil render CI, tidak ada berkas caption */}
             <video
               key={render.videoUrl}
               src={render.videoUrl}

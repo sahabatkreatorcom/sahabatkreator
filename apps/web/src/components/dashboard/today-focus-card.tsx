@@ -30,12 +30,16 @@ type OptimalTimes = {
 
 const TODAY_LABELS = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
-/** Jam "HH:MM" dari ISO string (zona waktu lokal user) */
-function formatTime(iso: string): string {
+/** Jam "HH:MM" (zona waktu lokal user). Nullish/tanggal invalid → "—" supaya
+ * pemanggil tidak perlu non-null assertion di JSX. */
+function formatTime(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(iso));
+  }).format(date);
 }
 
 export function TodayFocusCard() {
@@ -59,9 +63,11 @@ export function TodayFocusCard() {
   const endOfDay = new Date(startOfDay);
   endOfDay.setDate(startOfDay.getDate() + 1);
 
+  // Type predicate (bukan `.filter(Boolean)`) supaya `scheduledAt` menyempit ke
+  // string dan baris berikutnya tidak butuh non-null assertion.
   const todayGroups = (data?.groups ?? [])
-    .filter((g) => g.scheduledAt)
-    .map((g) => ({ ...g, at: new Date(g.scheduledAt!) }))
+    .filter((g): g is typeof g & { scheduledAt: string } => g.scheduledAt !== null)
+    .map((g) => ({ ...g, at: new Date(g.scheduledAt) }))
     .filter((g) => g.at >= startOfDay && g.at < endOfDay)
     .sort((a, b) => a.at.getTime() - b.at.getTime());
 
@@ -73,7 +79,7 @@ export function TodayFocusCard() {
     );
   }
 
-  const todayLabel = TODAY_LABELS[new Date().getDay()]!;
+  const todayLabel = TODAY_LABELS[new Date().getDay()] ?? "";
 
   return (
     <div className="card p-6">
@@ -88,14 +94,14 @@ export function TodayFocusCard() {
             <span className="font-bold text-[var(--text-primary)]">{todayGroups.length} post</span>{" "}
             terjadwal, berikutnya jam{" "}
             <span className="font-semibold text-[var(--accent-gold)]">
-              {formatTime(todayGroups[0]?.scheduledAt!)}
+              {formatTime(todayGroups[0]?.at)}
             </span>
           </p>
           <ul className="mt-3 space-y-1.5">
             {todayGroups.slice(0, 3).map((g) => (
               <li key={g.id} className="flex items-center gap-2 text-sm">
                 <span className="shrink-0 font-semibold text-[var(--accent-gold)] text-xs">
-                  {formatTime(g.scheduledAt!)}
+                  {formatTime(g.at)}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-[var(--text-secondary)]">
                   {g.content || "(tanpa caption)"}

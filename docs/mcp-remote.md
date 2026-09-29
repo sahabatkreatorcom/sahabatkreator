@@ -24,7 +24,7 @@ Desain & keputusan: [docs/rfc-public-api.md](rfc-public-api.md) §7.
 | Dev (lewat Vite, same-origin) | `http://localhost:5173/mcp` |
 
 Kredensialnya **API key creator yang sama** dengan `/v1` (Settings → API):
-`Authorization: Bearer sk_live_...`.
+`Authorization: Bearer sk_api_...`.
 
 Tool yang muncul mengikuti **scope key**. Key read-only tidak akan pernah
 melihat tool tulis — kalau tool yang Anda harapkan tidak muncul, hampir selalu
@@ -40,7 +40,7 @@ penyebabnya scope, bukan koneksi.
 claude mcp add sahabatkreator \
   --transport http \
   https://sahabatkreator.com/mcp \
-  --header "Authorization: Bearer sk_live_..."
+  --header "Authorization: Bearer sk_api_..."
 ```
 
 ### Cursor / Windsurf / VS Code
@@ -52,7 +52,7 @@ Tambahkan ke `mcp.json`:
   "mcpServers": {
     "sahabatkreator": {
       "url": "https://sahabatkreator.com/mcp",
-      "headers": { "Authorization": "Bearer sk_live_..." }
+      "headers": { "Authorization": "Bearer sk_api_..." }
     }
   }
 }
@@ -131,21 +131,21 @@ Handshake tanpa klien, cukup `curl`:
 ```bash
 # 1. initialize
 curl -s https://sahabatkreator.com/mcp \
-  -H "authorization: Bearer sk_live_..." \
+  -H "authorization: Bearer sk_api_..." \
   -H "content-type: application/json" \
   -H "accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
 
 # 2. daftar tool (yang muncul sesuai scope key)
 curl -s https://sahabatkreator.com/mcp \
-  -H "authorization: Bearer sk_live_..." \
+  -H "authorization: Bearer sk_api_..." \
   -H "content-type: application/json" \
   -H "accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
 
 # 3. panggil tool
 curl -s https://sahabatkreator.com/mcp \
-  -H "authorization: Bearer sk_live_..." \
+  -H "authorization: Bearer sk_api_..." \
   -H "content-type: application/json" \
   -H "accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_posts","arguments":{"perPage":5}}}'

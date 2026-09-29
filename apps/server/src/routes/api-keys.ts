@@ -20,6 +20,7 @@ import { z } from "zod";
 import { generateApiKey } from "../lib/api-key";
 import { errorResponse, requireOrgAdmin } from "../lib/auth-guard";
 import { checkPlanFeature } from "../lib/billing";
+import { resolveDeveloperApp } from "../lib/developer-app";
 import { generateId } from "../lib/id";
 import { API_FEATURES } from "../lib/public-api";
 
@@ -38,6 +39,11 @@ const createKeySchema = z.object({
   scopes: z.array(scopeSchema).min(1, "Pilih minimal satu scope").max(API_KEY_SCOPES.length),
   // Opsional: key kedaluwarsa otomatis (disarankan untuk integrasi pihak ketiga)
   expiresInDays: z.number().int().min(1).max(3650).optional(),
+  // Opsional: ikat key ke developer app → key ini boleh memakai endpoint connect
+  // akun lewat API (`GET /v1/accounts/:platform/authorize`) dan mewarisi allowlist
+  // redirect app tersebut. Tanpa app, endpoint itu menjawab 403 — tidak ada tujuan
+  // redirect yang bisa dipercaya. Lihat docs/rfc-oauth-connect.md.
+  developerAppId: z.string().trim().min(1).optional(),
 });
 
 /** Bentuk aman untuk list — tanpa tokenHash. */
@@ -46,6 +52,7 @@ const listColumns = {
   name: apiKeyTable.name,
   tokenPrefix: apiKeyTable.tokenPrefix,
   scopes: apiKeyTable.scopes,
+  developerAppId: apiKeyTable.developerAppId,
   createdAt: apiKeyTable.createdAt,
   lastUsedAt: apiKeyTable.lastUsedAt,
   revokedAt: apiKeyTable.revokedAt,
@@ -95,6 +102,16 @@ apiKeyRoute.post("/", async (c) => {
       );
     }
 
+    // Ikat ke developer app: WAJIB milik org ini & aktif. `resolveDeveloperApp`
+    // memakai org sebagai kondisi query (bukan cek setelahnya), jadi app milik
+    // org lain tidak bisa dipakai walaupun ID-nya diketahui.
+    const app = input.developerAppId
+      ? await resolveDeveloperApp(input.developerAppId, orgId)
+      : null;
+    if (input.developerAppId && !app) {
+      return c.json({ message: "Developer app tidak ditemukan atau tidak aktif." }, 400);
+    }
+
     const { plaintext, tokenPrefix, tokenHash } = generateApiKey();
     const [row] = await db
       .insert(apiKeyTable)
@@ -106,6 +123,7 @@ apiKeyRoute.post("/", async (c) => {
         tokenPrefix,
         tokenHash,
         scopes: [...new Set(input.scopes)],
+        developerAppId: app?.id ?? null,
         expiresAt: input.expiresInDays
           ? new Date(Date.now() + input.expiresInDays * 86_400_000)
           : null,

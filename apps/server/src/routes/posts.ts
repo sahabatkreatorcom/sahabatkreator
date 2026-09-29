@@ -323,8 +323,9 @@ postsRoute.get("/conflicts", async (c) => {
     const conflicts: ScheduleConflictItem[] = [];
     for (const [socialAccountId, accountPosts] of byAccount) {
       for (let i = 1; i < accountPosts.length; i++) {
-        const a = accountPosts[i - 1]!;
-        const b = accountPosts[i]!;
+        const a = accountPosts[i - 1];
+        const b = accountPosts[i];
+        if (!a || !b) continue;
         if (!a.scheduledAt || !b.scheduledAt) continue;
         const deltaMinutes = Math.abs(b.scheduledAt.getTime() - a.scheduledAt.getTime()) / 60_000;
         if (deltaMinutes >= CONFLICT_WINDOW_MINUTES) continue;
@@ -412,7 +413,13 @@ postsRoute.post("/", async (c) => {
     const postMediaValues: (typeof postMedia.$inferInsert)[] = [];
 
     for (const item of input.items) {
-      const account = accounts.find((a) => a.id === item.socialAccountId)!;
+      // Guard nyata (bukan `!`): validasi "Ada akun yang tidak valid" di atas
+      // menjamin id-nya ada, tapi kalau logika itu berubah, `account.platform`
+      // akan melempar TypeError dan jadi 500 — guard ini mengembalikannya ke 400.
+      const account = accounts.find((a) => a.id === item.socialAccountId);
+      if (!account) {
+        return c.json({ message: "Ada akun yang tidak valid" }, 400);
+      }
       const postId = generateId("post");
       postValues.push({
         id: postId,

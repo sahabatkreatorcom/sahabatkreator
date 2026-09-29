@@ -78,6 +78,18 @@ v1Route.get("/ping", async (c) => {
 mountRoutes(v1Route, "/accounts", accountsRoute, [
   { method: "GET", path: "/", scope: "accounts:read" },
   { method: "GET", path: "/:id/statistic", scope: "accounts:read" },
+  // Connect akun lewat API (RFC rfc-oauth-connect.md). GET, tapi scope-nya
+  // `accounts:write` dan handler-nya menegakkan `api_write` secara manual —
+  // lihat catatan di routes/accounts.ts (publicApiPlanGate melewatkan gate tulis
+  // untuk method safe).
+  { method: "GET", path: "/:platform/authorize", scope: "accounts:write" },
+  // Fase 3 — tukar `code` jadi akun. `connect` & `exchange` sama-sama POST, jadi
+  // gate `api_write` otomatis dari publicApiPlanGate.
+  { method: "POST", path: "/:platform/connect", scope: "accounts:write" },
+  { method: "POST", path: "/:platform/exchange", scope: "accounts:write" },
+  // Picker aset: GET-nya juga butuh gate tulis manual (lihat accounts.ts).
+  { method: "GET", path: "/pending/:id", scope: "accounts:write" },
+  { method: "POST", path: "/pending/:id/select", scope: "accounts:write" },
 ]);
 mountRoutes(v1Route, "/posts", postsRoute, [
   { method: "GET", path: "/", scope: "posts:read" },

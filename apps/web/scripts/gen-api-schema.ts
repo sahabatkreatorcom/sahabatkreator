@@ -16,10 +16,10 @@
 // Migrasi router /api ke zod-openapi adalah pekerjaan terpisah (besar);
 // setelah selesai, dokumen ini akan otomatis meng-cover semuanya tanpa
 // perubahan script — cukup tambahkan ke OPENAPI_DOCS di bawah.
-import { writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import openapiTS, { astToString } from "openapi-typescript";
 import { createOpenApiDocument, createPublicApiDocument } from "@sahabatkreator/api";
+import openapiTS, { astToString } from "openapi-typescript";
 
 async function main() {
   const docs = [
@@ -37,7 +37,10 @@ async function main() {
     paths: Object.assign({}, ...docs.map((d) => d.doc.paths)),
     components: {
       schemas: Object.assign({}, ...docs.map((d) => d.doc.components?.schemas ?? {})),
-      securitySchemes: Object.assign({}, ...docs.map((d) => d.doc.components?.securitySchemes ?? {})),
+      securitySchemes: Object.assign(
+        {},
+        ...docs.map((d) => d.doc.components?.securitySchemes ?? {}),
+      ),
     },
   };
 

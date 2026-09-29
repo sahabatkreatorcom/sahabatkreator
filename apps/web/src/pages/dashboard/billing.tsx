@@ -277,7 +277,13 @@ export function BillingPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => (window.location.href = p.paymentLinkUrl!)}
+                    onClick={() => {
+                      // Ambil ulang ke lokal: TS tidak menyempitkan properti objek
+                      // di dalam closure, jadi `p.paymentLinkUrl!` tidak bisa dihindari
+                      // tanpa langkah ini.
+                      const url = p.paymentLinkUrl;
+                      if (url) window.location.href = url;
+                    }}
                   >
                     Bayar Sekarang
                     <ExternalLink className="h-3.5 w-3.5" />

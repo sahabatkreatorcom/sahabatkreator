@@ -18,11 +18,30 @@ import { generateId } from "../../lib/id";
 import { getAppCredential } from "./credentials";
 
 /**
- * GET /oauth/:platform/start — mulai OAuth flow.
+ * GET /oauth/:platform/start — mulai OAuth flow (jalur UI).
  * Return JSON { authorizeUrl } — frontend redirect ke URL tsb.
  * (Tidak langsung 302 agar state tercatat dulu di DB.)
  */
 export async function handleStart(c: Context): Promise<Response> {
+  return startOAuthFlow(c);
+}
+
+/**
+ * Inti start flow — dipakai jalur UI (`handleStart`) DAN jalur API
+ * (`GET /v1/accounts/:platform/authorize`).
+ *
+ * MENGAPA satu fungsi: pemilihan URL authorize (bridge Repliz vs native) adalah
+ * logika yang mudah bercabang diam-diam. Menyalinnya ke endpoint API berarti dua
+ * salinan yang harus dijaga sinkron setiap kali routing bridge berubah.
+ *
+ * `developer` HANYA diisi jalur API: menandai state sebagai milik developer app,
+ * sehingga callback berhenti jadi proxy (tidak connect) dan meneruskan `code`
+ * ke `redirectUri`. Lihat docs/rfc-oauth-connect.md §5.3.
+ */
+export async function startOAuthFlow(
+  c: Context,
+  developer?: { developerAppId: string; redirectUri: string },
+): Promise<Response> {
   try {
     const ctx = await requireOrg(c);
     const platform = c.req.param("platform") as OAuthPlatform;
@@ -49,6 +68,7 @@ export async function handleStart(c: Context): Promise<Response> {
         organizationId: ctx.organization.id,
         userId: ctx.user.id,
         expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        ...developer,
       });
       await db.delete(oauthState).where(lt(oauthState.expiresAt, new Date()));
       // State HARUS di path (bukan query) — validasi redirect Repliz menolak URL
@@ -77,6 +97,7 @@ export async function handleStart(c: Context): Promise<Response> {
       organizationId: ctx.organization.id,
       userId: ctx.user.id,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      ...developer,
     });
 
     // Bersihkan state expired (housekeeping ringan tiap start)

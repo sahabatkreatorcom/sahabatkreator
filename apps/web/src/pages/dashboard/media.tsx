@@ -787,6 +787,11 @@ export function MediaPage() {
         >
           <div className="flex justify-center">
             {previewing.mimeType.startsWith("video/") ? (
+              // Ini pemutar berkas mentah yang di-upload user (atau diimpor via URL) — aplikasi
+              // tidak pernah menerima berkas subtitle, jadi <track> tidak punya sumber untuk diisi
+              // dan track kosong justru menyesatkan screen reader. Caption ditangani platform
+              // tujuan saat publish, bukan di pratinjau pustaka.
+              // biome-ignore lint/a11y/useMediaCaption: berkas mentah user, tidak ada sumber caption
               <video
                 key={previewing.id}
                 src={previewing.url}
@@ -802,6 +807,10 @@ export function MediaPage() {
                     <Play className="h-10 w-10 fill-[var(--accent-gold)] text-[var(--accent-gold)]" />
                   </div>
                 </div>
+                {/* Alasan sama seperti video di atas: audio mentah user, tanpa berkas subtitle.
+                    Bentuk kurung-kurawal wajib di sini — komentar garis miring-ganda di posisi
+                    children JSX akan ter-render sebagai teks, bukan dianggap komentar. */}
+                {/* biome-ignore lint/a11y/useMediaCaption: berkas mentah user, tidak ada sumber caption */}
                 <audio
                   key={previewing.id}
                   src={previewing.url}

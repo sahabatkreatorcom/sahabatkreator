@@ -13,9 +13,7 @@
   "paths": {
     "/health": {
       "get": {
-        "tags": [
-          "System"
-        ],
+        "tags": ["System"],
         "responses": {
           "200": {
             "description": "Service health",
@@ -32,9 +30,7 @@
     },
     "/private": {
       "get": {
-        "tags": [
-          "Example"
-        ],
+        "tags": ["Example"],
         "security": [
           {
             "bearerAuth": []
@@ -69,35 +65,24 @@
     "schemas": {
       "HealthResponse": {
         "type": "object",
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "ok"
-            ]
+            "enum": ["ok"]
           }
         }
       },
       "PrivateDataResponse": {
         "type": "object",
-        "required": [
-          "message",
-          "user"
-        ],
+        "required": ["message", "user"],
         "properties": {
           "message": {
             "type": "string"
           },
           "user": {
             "type": "object",
-            "required": [
-              "id",
-              "email",
-              "name"
-            ],
+            "required": ["id", "email", "name"],
             "properties": {
               "id": {
                 "type": "string"
@@ -106,10 +91,7 @@
                 "type": "string"
               },
               "name": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               }
             }
           }
@@ -117,9 +99,7 @@
       },
       "UnauthorizedResponse": {
         "type": "object",
-        "required": [
-          "message"
-        ],
+        "required": ["message"],
         "properties": {
           "message": {
             "type": "string"

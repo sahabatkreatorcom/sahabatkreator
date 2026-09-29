@@ -7,7 +7,7 @@ import {
   GRAPH_THREADS_REFRESH_URL,
 } from "../config";
 import { httpRequest } from "../http";
-import { PublishError } from "../types";
+import { type OAuthTokenResponse, PublishError } from "../types";
 import { OAUTH_CONFIGS } from "./platform-configs";
 import { parseGrantedScopes, requestedScopes } from "./scopes";
 import type { AppCredential, OAuthPlatform, TokenResult } from "./types";
@@ -65,7 +65,7 @@ export async function exchangeCodeForToken(
     headers.Authorization = `Basic ${Buffer.from(`${cred.clientId}:${cred.clientSecret}`).toString("base64")}`;
   }
 
-  const res = await httpRequest<Record<string, any>>(config.tokenUrl, {
+  const res = await httpRequest<OAuthTokenResponse>(config.tokenUrl, {
     method: "POST",
     headers,
     body: body.toString(),
@@ -264,7 +264,7 @@ export async function refreshAccessToken(
     headers.Authorization = `Basic ${Buffer.from(`${cred.clientId}:${cred.clientSecret}`).toString("base64")}`;
   }
 
-  const res = await httpRequest<Record<string, any>>(config.tokenUrl, {
+  const res = await httpRequest<OAuthTokenResponse>(config.tokenUrl, {
     method: "POST",
     headers,
     body: body.toString(),

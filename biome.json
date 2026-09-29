@@ -12,6 +12,7 @@
       "!**/.next",
       "!**/dist",
       "!**/.turbo",
+      "!**/coverage",
       "!**/dev-dist",
       "!**/.zed",
       "!**/.vscode",
@@ -26,7 +27,8 @@
       "!**/.svelte-kit",
       "!**/wrangler.jsonc",
       "!**/.source",
-      "!**/convex/_generated"
+      "!**/convex/_generated",
+      "!**/.kilo"
     ]
   },
   "formatter": {

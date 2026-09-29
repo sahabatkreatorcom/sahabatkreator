@@ -30,14 +30,19 @@ activityRoute.get("/", async (c) => {
     const q = c.req.query("q")?.trim() ?? "";
 
     const conditions = [eq(activityLog.organizationId, ctx.organization.id)];
-    if (type && CATEGORY_PREFIXES[type]) {
-      const prefixes = CATEGORY_PREFIXES[type]!;
+    // `or()` bertipe `SQL | undefined` (undefined bila daftar argumennya kosong).
+    // Diperiksa, bukan di-assert `!` — assert akan mendorong `undefined` ke dalam
+    // `conditions` dan merusak SQL yang dihasilkan `and(...)`.
+    const prefixes = CATEGORY_PREFIXES[type];
+    if (prefixes) {
       const prefixMatches = prefixes.map((p) => ilike(activityLog.action, `${p}%`));
-      conditions.push(or(...prefixMatches)!);
+      const prefixCondition = or(...prefixMatches);
+      if (prefixCondition) conditions.push(prefixCondition);
     }
     if (q) {
       const like = `%${q}%`;
-      conditions.push(or(ilike(userTable.name, like), ilike(activityLog.action, like))!);
+      const searchCondition = or(ilike(userTable.name, like), ilike(activityLog.action, like));
+      if (searchCondition) conditions.push(searchCondition);
     }
     const where = and(...conditions);
 

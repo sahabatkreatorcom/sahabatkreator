@@ -43,7 +43,9 @@ async function publishInstagramViaFb(input: PublishInput): Promise<PublishResult
     }
   }
 
-  let creationId: string;
+  // `| undefined` (bukan `string`) supaya guard di bawah benar-benar menyempitkan
+  // tipe — dengan `let creationId: string` guard `if (!creationId)` jadi dead code.
+  let creationId: string | undefined;
 
   if (input.media.length > 1) {
     // Carousel: buat container per item (max 10) → container utama
@@ -82,7 +84,7 @@ async function publishInstagramViaFb(input: PublishInput): Promise<PublishResult
       },
     });
     if (!res.ok) await throwFromResponse(res, "IG carousel container");
-    creationId = (await res.json()).id!;
+    creationId = (await res.json()).id;
   } else {
     const image = firstImage(input);
     const video = firstVideo(input);
@@ -100,7 +102,7 @@ async function publishInstagramViaFb(input: PublishInput): Promise<PublishResult
       },
     });
     if (!res.ok) await throwFromResponse(res, "IG container");
-    creationId = (await res.json()).id!;
+    creationId = (await res.json()).id;
   }
 
   if (!creationId) {

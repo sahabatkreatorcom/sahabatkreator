@@ -8,7 +8,7 @@
 // Jalankan setelah schema / path /v1 berubah:
 //   bun scripts/gen-public-api.ts
 // lalu commit perubahan scripts/public-api.json.
-import { writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createOpenApiDocument, createPublicApiDocument } from "../src/index";
 

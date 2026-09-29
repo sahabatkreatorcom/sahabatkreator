@@ -61,6 +61,7 @@ import { commerceRoute } from "./routes/commerce";
 import { competitorRoute } from "./routes/competitor";
 import { contactRoute } from "./routes/contact";
 import { dataDeletionRoute } from "./routes/data-deletion";
+import { developerAppRoute } from "./routes/developer-apps";
 import { dmRoute } from "./routes/dm";
 import { engagementRoute } from "./routes/engagement";
 import { goalRoute } from "./routes/goal";
@@ -148,6 +149,9 @@ api.route("/me", meRoute);
 api.route("/user", userRoute);
 api.route("/activity", activityRoute);
 api.route("/api-keys", apiKeyRoute);
+// Developer app = pemilik allowlist redirect untuk connect akun lewat API.
+// Session-only, sama seperti api-keys (lihat catatan di routes/developer-apps.ts).
+api.route("/developer-apps", developerAppRoute);
 api.route("/webhook-endpoints", webhookEndpointRoute);
 api.route("/posts", postsRoute);
 api.route("/calendar", calendarRoute);

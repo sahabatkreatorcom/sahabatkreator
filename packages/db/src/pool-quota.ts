@@ -18,13 +18,14 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { generateId } from "./id";
 import { db } from "./index";
+import { type PlanTier, pickPoolSubscription } from "./pool-plan";
 import { aiUsage, aiUsageLog } from "./schema/ai";
 import { plan, renderUsage, subscription } from "./schema/billing";
 import { media, post } from "./schema/content";
 import { member } from "./schema/organization";
 import { socialAccount } from "./schema/social";
 
-export type PlanTier = "free" | "pro" | "business" | "enterprise";
+export type { PlanTier };
 
 export type PlanLimits = {
   tier: PlanTier;
@@ -75,8 +76,6 @@ export const DEFAULT_LIMITS: Record<PlanTier, PlanLimits> = {
   },
 };
 
-const TIER_RANK: Record<PlanTier, number> = { free: 0, pro: 1, business: 2, enterprise: 3 };
-
 /** Periode bulan format "YYYY-MM" */
 export function currentPeriod(): string {
   const now = new Date();
@@ -108,45 +107,119 @@ export async function resolvePoolOrgIds(organizationId: string): Promise<string[
   return ids.length ? ids : [organizationId];
 }
 
-/** Tier tertinggi dari langganan aktif di pool (default free). */
-export async function getPoolTier(orgIds: string[]): Promise<PlanTier> {
-  const subs = await db
+/** Kolom baris plan yang dipakai limit & fitur — satu bentuk, satu sumber. */
+const PLAN_ROW_COLUMNS = {
+  tier: plan.tier,
+  maxSocialAccounts: plan.maxSocialAccounts,
+  maxScheduledPostsPerMonth: plan.maxScheduledPostsPerMonth,
+  maxTeamMembers: plan.maxTeamMembers,
+  maxMediaStorageMb: plan.maxMediaStorageMb,
+  aiCreditsPerMonth: plan.aiCreditsPerMonth,
+  renderCreditsPerMonth: plan.renderCreditsPerMonth,
+  features: plan.features,
+};
+
+type PoolPlanRow = {
+  tier: PlanTier;
+  maxSocialAccounts: number;
+  maxScheduledPostsPerMonth: number;
+  maxTeamMembers: number;
+  maxMediaStorageMb: number;
+  aiCreditsPerMonth: number;
+  renderCreditsPerMonth: number;
+  features: string[];
+};
+
+async function loadPoolSubscriptions(orgIds: string[]) {
+  return db
     .select({
       tier: subscription.tier,
       status: subscription.status,
       currentPeriodEnd: subscription.currentPeriodEnd,
+      planId: subscription.planId,
     })
     .from(subscription)
     .where(inArray(subscription.organizationId, orgIds));
-
-  let best: PlanTier = "free";
-  for (const sub of subs) {
-    if (sub.status !== "active") continue;
-    if (sub.currentPeriodEnd && sub.currentPeriodEnd < new Date()) continue;
-    const tier = sub.tier as PlanTier;
-    if (TIER_RANK[tier] > TIER_RANK[best]) best = tier;
-  }
-  return best;
 }
 
-/** Limit efektif pool: plan row tier tertinggi (interval bulanan, aktif) → fallback default. */
-export async function getPoolLimits(orgIds: string[]): Promise<PlanLimits> {
-  const tier = await getPoolTier(orgIds);
-  const [row] = await db
-    .select({
-      maxSocialAccounts: plan.maxSocialAccounts,
-      maxScheduledPostsPerMonth: plan.maxScheduledPostsPerMonth,
-      maxTeamMembers: plan.maxTeamMembers,
-      maxMediaStorageMb: plan.maxMediaStorageMb,
-      aiCreditsPerMonth: plan.aiCreditsPerMonth,
-      renderCreditsPerMonth: plan.renderCreditsPerMonth,
-    })
-    .from(plan)
-    .where(and(eq(plan.tier, tier), eq(plan.billingIntervalMonths, 1), eq(plan.isActive, true)))
-    .limit(1);
+/** Tier tertinggi dari langganan aktif di pool (default free). */
+export async function getPoolTier(orgIds: string[]): Promise<PlanTier> {
+  const best = pickPoolSubscription(await loadPoolSubscriptions(orgIds));
+  return best?.tier ?? "free";
+}
 
+/**
+ * Baris plan efektif pool — SATU-SATUNYA sumber limit DAN features, supaya
+ * keduanya tidak mungkin berasal dari baris yang berbeda.
+ *
+ * Urutan resolusi:
+ * 1. Baris yang benar-benar dibeli (`subscription.planId`) — interval apa pun.
+ *    Ini yang membuat langganan TAHUNAN memakai baris tahunan; dulu selalu baris
+ *    bulanan, jadi mengubah limit baris tahunan tidak berpengaruh sama sekali.
+ * 2. Baris aktif untuk tier (bulanan sebelum tahunan).
+ * 3. Baris non-aktif untuk tier — menonaktifkan plan tidak boleh diam-diam
+ *    mengembalikan limit ke konstanta kode selama pelanggan lama masih ada.
+ * 4. Tidak ada baris sama sekali → null; caller pakai DEFAULT_LIMITS + warning.
+ */
+async function resolvePoolPlan(
+  orgIds: string[],
+): Promise<{ tier: PlanTier; row: PoolPlanRow | null }> {
+  const best = pickPoolSubscription(await loadPoolSubscriptions(orgIds));
+  const tier = best?.tier ?? "free";
+
+  // Guard `row.tier === tier`: planId bisa basi (mis. admin mengubah tier baris
+  // plan setelah pelanggan membeli). Tanpa guard ini, planId basi bisa memberi
+  // limit lebih tinggi daripada tier langganannya.
+  if (best?.planId) {
+    const [row] = await db
+      .select(PLAN_ROW_COLUMNS)
+      .from(plan)
+      .where(eq(plan.id, best.planId))
+      .limit(1);
+    if (row && row.tier === tier) return { tier, row };
+  }
+
+  const [activeRow] = await db
+    .select(PLAN_ROW_COLUMNS)
+    .from(plan)
+    .where(and(eq(plan.tier, tier), eq(plan.isActive, true)))
+    // ASC: interval 1 (bulanan) menang atas 12 (tahunan) → deterministik.
+    .orderBy(plan.billingIntervalMonths)
+    .limit(1);
+  if (activeRow) return { tier, row: activeRow };
+
+  const [inactiveRow] = await db
+    .select(PLAN_ROW_COLUMNS)
+    .from(plan)
+    .where(eq(plan.tier, tier))
+    .orderBy(plan.billingIntervalMonths)
+    .limit(1);
+  if (inactiveRow) {
+    console.warn(
+      `[pool-quota] tier "${tier}" tidak punya baris plan aktif — memakai baris non-aktif agar pelanggan lama tidak kehilangan limit`,
+    );
+    return { tier, row: inactiveRow };
+  }
+
+  console.warn(
+    `[pool-quota] tidak ada baris plan untuk tier "${tier}" — memakai DEFAULT_LIMITS kode`,
+  );
+  return { tier, row: null };
+}
+
+/** Limit efektif pool dari baris plan yang diresolusi (fallback: konstanta kode). */
+export async function getPoolLimits(orgIds: string[]): Promise<PlanLimits> {
+  const { tier, row } = await resolvePoolPlan(orgIds);
   if (!row) return DEFAULT_LIMITS[tier];
-  return { tier, ...row };
+  return {
+    tier,
+    maxSocialAccounts: row.maxSocialAccounts,
+    maxScheduledPostsPerMonth: row.maxScheduledPostsPerMonth,
+    maxTeamMembers: row.maxTeamMembers,
+    maxMediaStorageMb: row.maxMediaStorageMb,
+    aiCreditsPerMonth: row.aiCreditsPerMonth,
+    renderCreditsPerMonth: row.renderCreditsPerMonth,
+  };
 }
 
 /** Limit efektif pool untuk satu org aktif (resolve pool dulu). */
@@ -155,18 +228,13 @@ export async function getPoolLimitsForOrg(organizationId: string): Promise<PlanL
 }
 
 /**
- * Fitur aktif pool: `features` (string[] key) dari plan tier tertinggi
- * (interval bulanan, aktif). Kosong bila plan row tidak ada — gate menolak.
+ * Fitur aktif pool — dari baris plan yang SAMA dengan limit (lihat
+ * resolvePoolPlan). Kosong hanya bila tidak ada baris plan sama sekali.
  */
 export async function getPoolFeatures(
   orgIds: string[],
 ): Promise<{ tier: PlanTier; features: string[] }> {
-  const tier = await getPoolTier(orgIds);
-  const [row] = await db
-    .select({ features: plan.features })
-    .from(plan)
-    .where(and(eq(plan.tier, tier), eq(plan.billingIntervalMonths, 1), eq(plan.isActive, true)))
-    .limit(1);
+  const { tier, row } = await resolvePoolPlan(orgIds);
   return { tier, features: row?.features ?? [] };
 }
 

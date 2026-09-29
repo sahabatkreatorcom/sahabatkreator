@@ -1,6 +1,6 @@
 // API Admin — statistik platform, user & org management, plans, credentials, settings
 
-import { db } from "@sahabatkreator/db";
+import { db, FEATURE_KEYS, isFeatureKey } from "@sahabatkreator/db";
 import {
   bridgeConfig,
   plan,
@@ -48,10 +48,17 @@ const planUpsertSchema = z.object({
   maxMediaStorageMb: z.number().int().min(0),
   aiCreditsPerMonth: z.number().int().min(0),
   renderCreditsPerMonth: z.number().int().min(0),
-  features: z.array(z.string().max(100)).max(20),
+  // Setiap key wajib ada di katalog fitur (packages/db/src/feature-keys.ts).
+  // Tanpa ini, typo seperti `api_wirte` tersimpan ke DB dan mengunci fitur itu
+  // untuk SEMUA tier tanpa gejala — `checkPlanFeature` mencocokkan persis.
+  features: z
+    .array(z.string().max(100).refine(isFeatureKey, { message: "Key fitur tidak dikenal" }))
+    .max(FEATURE_KEYS.length),
   isActive: z.boolean(),
   sortOrder: z.number().int().min(0),
 });
+
+export { planUpsertSchema };
 
 /** POST /admin/plans — buat/update plan (upsert by tier+interval) */
 adminConfigRoute.post("/plans", async (c) => {
@@ -399,7 +406,7 @@ adminConfigRoute.patch("/settings", async (c) => {
 });
 
 // ---------- Konfigurasi pembayaran (Sumopod Pay) ----------
-// Adaptasi stripe-config reference: secret encrypted + masked, DB → env fallback.
+// Secret disimpan terenkripsi + di-mask di respons; resolve: DB (admin) → fallback env.
 
 /** Mask secret: hanya 4 karakter terakhir yang terlihat */
 function maskSecret(secret: string): string {

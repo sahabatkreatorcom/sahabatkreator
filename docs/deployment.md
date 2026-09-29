@@ -220,7 +220,7 @@ curl -s https://app.sahabatkreator.com/health
 curl -s -X POST https://app.sahabatkreator.com/mcp \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
-  -H 'Authorization: Bearer sk_live_...' \
+  -H 'Authorization: Bearer sk_api_...' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}' \
   | head -c 120
 # → {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":...,"serverInfo":{"name":"sahabatkreator"...}}}
@@ -770,14 +770,14 @@ MCP — dua transport (stdio di mesin pengguna, HTTP di server). RFC lengkap:
 
 ```
 klien eksternal (Zapier/Make/dashboard klien/MCP)
-  │  Authorization: Bearer sk_live_...   (atau X-API-Key)
+  │  Authorization: Bearer sk_api_...   (atau X-API-Key)
   ▼
 /v1  ── verifyApiKey ── rate limit 60/menit per key ── plan gate ── scope
   │
   └─ handler = route /api yang SAMA (di-mount ulang lewat allowlist tertutup)
 
 agen AI (Claude Code / Cursor / ChatGPT Responses API)
-  │  POST /mcp  Authorization: Bearer sk_live_...
+  │  POST /mcp  Authorization: Bearer sk_api_...
   ▼
 /mcp ── verifyApiKey ── envelope limit 120/menit ── plan gate (access)
   │      └─ tools/call → buildToolRequest → Request internal ke /v1 di app
@@ -850,7 +850,7 @@ curl -s https://sahabatkreator.com/v1/openapi.json | head -c 200
 curl -s -o /dev/null -w '%{http_code}\n' https://sahabatkreator.com/v1/ping
 
 # 3. Dengan token asli (buat di Settings → API)
-curl -s -H "Authorization: Bearer sk_live_..." https://sahabatkreator.com/v1/ping
+curl -s -H "Authorization: Bearer sk_api_..." https://sahabatkreator.com/v1/ping
 
 # 4. Drift spec OpenAPI (jalankan tiap kali skema /v1 berubah)
 cd packages/api && bun src/verify-openapi.ts
@@ -859,7 +859,7 @@ cd packages/api && bun src/verify-openapi.ts
 curl -s -X POST https://sahabatkreator.com/mcp \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
-  -H 'Authorization: Bearer sk_live_...' \
+  -H 'Authorization: Bearer sk_api_...' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}' \
   | head -c 200
 # → serverInfo.name = "sahabatkreator"
@@ -868,7 +868,7 @@ curl -s -X POST https://sahabatkreator.com/mcp \
 curl -s -X POST https://sahabatkreator.com/mcp \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
-  -H 'Authorization: Bearer sk_live_...' \
+  -H 'Authorization: Bearer sk_api_...' \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
 
 # 7. GET /mcp harus 405 + Allow: POST (bukan SSE yang menggantung di nginx)

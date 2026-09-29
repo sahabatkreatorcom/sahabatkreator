@@ -211,10 +211,12 @@ async function uploadVideoResumable(
 
 async function publishYouTube(input: PublishInput): Promise<PublishResult> {
   const videos = input.media.filter((m) => m.type === "video");
-  if (videos.length === 0) {
+  // Satu guard saja: cek elemen pertama (bukan `videos.length === 0` lalu `videos[0]!`)
+  // supaya TypeScript menyempitkan tipe tanpa non-null assertion.
+  const video = videos[0];
+  if (!video) {
     throw new PublishError("youtube_requires_video", "YouTube memerlukan minimal 1 video.", false);
   }
-  const video = videos[0]!;
   const title = String(input.platformSettings.title ?? input.content.slice(0, 100) ?? "Untitled");
   const description = composeCaption(input.content, input.hashtags);
   const tags = input.hashtags.map((h) => h.replace(/^#/, ""));

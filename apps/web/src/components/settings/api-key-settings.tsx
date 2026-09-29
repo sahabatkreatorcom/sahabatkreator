@@ -29,11 +29,14 @@ type ApiKeyRow = {
   name: string;
   tokenPrefix: string;
   scopes: string[];
+  developerAppId: string | null;
   createdAt: string;
   lastUsedAt: string | null;
   revokedAt: string | null;
   expiresAt: string | null;
 };
+
+type DeveloperAppOption = { id: string; name: string; isActive: boolean };
 
 type CreatedKey = { key: ApiKeyRow; plaintext: string; notice: string };
 
@@ -50,6 +53,9 @@ const SCOPE_OPTIONS: { group: string; items: { key: string; label: string }[] }[
     group: "Akun & Analitik",
     items: [
       { key: "accounts:read", label: "Daftar akun sosmed" },
+      // Butuh Developer App yang menempel (allowlist redirect) — tanpa app,
+      // endpoint connect menjawab 403. Lihat docs/rfc-oauth-connect.md.
+      { key: "accounts:write", label: "Hubungkan akun sosmed" },
       { key: "analytics:read", label: "Analitik performa" },
       { key: "reports:read", label: "Ringkasan laporan" },
     ],
@@ -96,6 +102,7 @@ export function ApiKeySettings() {
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<string[]>([]);
   const [expiresInDays, setExpiresInDays] = useState("");
+  const [developerAppId, setDeveloperAppId] = useState("");
   const [created, setCreated] = useState<CreatedKey | null>(null);
   const [copied, setCopied] = useState(false);
   // 402 = plan tidak punya fitur api_access (free) — tampilkan upsell, bukan error mentah
@@ -106,6 +113,15 @@ export function ApiKeySettings() {
     queryFn: () => api.get<{ keys: ApiKeyRow[] }>("/api-keys"),
   });
   const keys = data?.keys ?? [];
+
+  // Hanya app AKTIF yang bisa dipakai: `resolveDeveloperApp` menyaring
+  // `isActive = true`, jadi menawarkan app nonaktif hanya akan menghasilkan 400.
+  const { data: appData } = useQuery({
+    queryKey: queryKeys.developerApps,
+    queryFn: () => api.get<{ apps: DeveloperAppOption[] }>("/developer-apps"),
+  });
+  const devApps = (appData?.apps ?? []).filter((a) => a.isActive);
+  const appNameById = new Map((appData?.apps ?? []).map((a) => [a.id, a.name]));
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys });
 
@@ -119,6 +135,7 @@ export function ApiKeySettings() {
       api.post<CreatedKey>("/api-keys", {
         name: name.trim(),
         scopes,
+        ...(developerAppId ? { developerAppId } : {}),
         ...(expiresInDays ? { expiresInDays: Number(expiresInDays) } : {}),
       }),
     onSuccess: (res) => {
@@ -127,9 +144,12 @@ export function ApiKeySettings() {
       setShowForm(false);
       setName("");
       setScopes([]);
+      setDeveloperAppId("");
       setExpiresInDays("");
       setBlocked(false);
       invalidate();
+      // Jumlah key per app berubah → segarkan panel Developer Apps.
+      queryClient.invalidateQueries({ queryKey: queryKeys.developerApps });
     },
     onError: handleError,
   });
@@ -270,6 +290,28 @@ export function ApiKeySettings() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="apikey-devapp">Developer app (opsional)</Label>
+              <select
+                id="apikey-devapp"
+                value={developerAppId}
+                onChange={(e) => setDeveloperAppId(e.target.value)}
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-2 text-sm"
+              >
+                <option value="">Tanpa app — tidak bisa connect akun lewat API</option>
+                {devApps.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[var(--text-muted)] text-xs">
+                Hanya app yang dipilih di sini yang boleh memakai endpoint connect akun (scope{" "}
+                <code>accounts:write</code>). Key tanpa app tetap bisa memakai scope lain. Belum
+                punya app? Buat dulu di panel Developer Apps di atas.
+              </p>
+            </div>
+
             <div className="space-y-3">
               <Label>Scope akses</Label>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -353,6 +395,11 @@ export function ApiKeySettings() {
                           {s}
                         </Badge>
                       ))}
+                      {k.developerAppId && (
+                        <Badge variant="outline">
+                          app: {appNameById.get(k.developerAppId) ?? k.developerAppId}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   {!isRevoked && (
@@ -395,7 +442,7 @@ export function ApiKeySettings() {
       <div className="card space-y-3 p-6">
         <h3 className="font-semibold text-sm">Contoh pemakaian</h3>
         <pre className="overflow-x-auto rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] p-3 text-xs">
-          {`curl -H "Authorization: Bearer sk_live_..." \\
+          {`curl -H "Authorization: Bearer sk_api_..." \\
   https://api.sahabatkreator.com/v1/ping`}
         </pre>
         <p className="text-[var(--text-muted)] text-xs">

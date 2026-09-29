@@ -1,4 +1,4 @@
-// Schema domain BILLING — Sumopod Pay (pengganti Stripe)
+// Schema domain BILLING — Sumopod Pay
 import { relations } from "drizzle-orm";
 import {
   bigint,

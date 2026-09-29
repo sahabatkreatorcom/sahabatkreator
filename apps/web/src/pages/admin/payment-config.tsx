@@ -1,4 +1,4 @@
-// Admin: Konfigurasi Pembayaran (Sumopod Pay) — adaptasi stripe-config reference.
+// Admin: Konfigurasi Pembayaran (Sumopod Pay).
 // Secret dienkripsi AES-256 di server; tidak pernah dikirim balik ke client.
 // Field secret kosong = pertahankan nilai tersimpan.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

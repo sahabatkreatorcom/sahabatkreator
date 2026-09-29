@@ -20,8 +20,8 @@ import * as billingModule from "../lib/billing";
 import { closeRateLimitStore } from "../lib/rate-limit";
 import { mcpRoute, registerMcpDispatch } from "./mcp";
 
-const TOKEN = "sk_live_testtoken0123456789";
-const OTHER_TOKEN = "sk_live_othertoken012345678";
+const TOKEN = "sk_api_testtoken0123456789";
+const OTHER_TOKEN = "sk_api_othertoken012345678";
 
 type VerifyResult = NonNullable<Awaited<ReturnType<typeof apiKeyModule.verifyApiKey>>>;
 
@@ -44,9 +44,12 @@ function makeAuth(keyId: string, scopes: string[]): VerifyResult {
     key: {
       id: keyId,
       name: "Test Key",
-      tokenPrefix: "sk_live_test",
+      tokenPrefix: "sk_api_test",
       organizationId: "org_1",
       scopes,
+      // Key tanpa developer app — endpoint connect (/v1/accounts/…/authorize)
+      // menolak key seperti ini karena tidak punya allowlist redirect.
+      developerAppId: null,
     },
   };
 }

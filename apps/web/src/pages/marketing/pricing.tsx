@@ -1,5 +1,6 @@
 // Halaman Pricing — tabel perbandingan paket (desktop) + kartu bertumpuk (mobile).
 // Interval toggle 1/12 bulan; logic & row bersama di pricing-shared.ts.
+import type { FeatureKey } from "@sahabatkreator/db";
 import { useQuery } from "@tanstack/react-query";
 import { Check, Loader2, X } from "lucide-react";
 import { Fragment, useState } from "react";
@@ -7,10 +8,12 @@ import { Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { FEATURE_CATALOG, GLOBAL_FEATURES } from "@/lib/feature-catalog";
 import { useSeo } from "@/lib/seo";
 import { queryKeys } from "../../lib/query-keys";
 import {
   annualSavings,
+  annualToggleLabel,
   type Cell,
   CREDIT_ROWS,
   ctaFor,
@@ -24,6 +27,7 @@ import {
   SECTION_CREDITS,
   SECTION_FEATURES,
   SECTION_LIMITS,
+  sharedFeatureKeys,
   TIER_LABEL,
   TIER_ORDER,
 } from "./pricing-shared";
@@ -70,21 +74,59 @@ function TableRow({ row, plans }: { row: Row; plans: Plan[] }) {
   );
 }
 
+/**
+ * Kartu "Semua paket dapat" — fitur yang tidak membedakan paket.
+ *
+ * Isinya dua sumber yang berbeda dan sengaja dipisah:
+ * 1. key katalog yang dimiliki SETIAP paket (dihitung dari data plan, jadi
+ *    admin cukup ubah /admin/plans — lihat sharedFeatureKeys), dan
+ * 2. GLOBAL_FEATURES, fitur tanpa gate yang tidak pernah ada di plan.features.
+ *
+ * Tujuannya menghapus baris ✓✓✓✓ dari tabel perbandingan: baris seperti itu
+ * memakan ruang tapi tidak memberi informasi pilihan apa pun.
+ */
+function SharedFeaturesCard({ items }: { items: { label: string; hint: string }[] }) {
+  return (
+    <div className="card mb-8 p-6 md:p-8">
+      <div className="mb-5 text-center">
+        <h2 className="font-bold text-xl">Semua paket dapat</h2>
+        <p className="mt-1 text-[var(--text-secondary)] text-sm">
+          Sudah termasuk di paket Gratis — tidak perlu upgrade.
+        </p>
+      </div>
+      <ul className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((item) => (
+          <li key={item.label} className="flex items-start gap-2.5">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-gold)]" aria-hidden />
+            <div>
+              <div className="font-medium text-sm">{item.label}</div>
+              <div className="text-[var(--text-muted)] text-xs">{item.hint}</div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** Kartu paket untuk mobile — fitur ditampilkan hanya yang termasuk. */
 function MobilePlanCard({
   tier,
   plan,
   monthly,
   interval,
+  exclude,
 }: {
   tier: string;
   plan: Plan;
   monthly: Plan;
   interval: 1 | 12;
+  /** Fitur yang sudah tampil di kartu "Semua paket dapat" — jangan diulang. */
+  exclude: FeatureKey[];
 }) {
   const hl = tier === HIGHLIGHT_TIER;
   const link = ctaFor(tier);
-  const includedFeatures = featureRows([monthly])
+  const includedFeatures = featureRows([monthly], exclude)
     .filter((r) => r.cells([monthly])[0]?.kind === "check")
     .map((r) => r.label);
 
@@ -158,6 +200,13 @@ function MobilePlanCard({
                 </li>
               ))}
             </ul>
+          ) : exclude.length > 0 ? (
+            // Paket ini tidak punya fitur pembeda (mis. Gratis: semua fiturnya
+            // juga dimiliki tier atas) — jangan tampilkan "—" yang terbaca
+            // seperti tidak dapat fitur apa pun.
+            <p className="mt-2 text-[var(--text-muted)] text-sm">
+              Semua fitur inti sudah termasuk — lihat "Semua paket dapat" di atas.
+            </p>
           ) : (
             <p className="mt-2 text-[var(--text-muted)] text-sm">—</p>
           )}
@@ -169,34 +218,6 @@ function MobilePlanCard({
 
 export function PricingPage() {
   const [interval, setInterval] = useState<1 | 12>(1);
-  useSeo({
-    title: "Harga — Paket untuk Semua Kebutuhan",
-    description:
-      "Pilih paket Sahabat Kreator sesuai kebutuhan. Mulai gratis, upgrade kapan saja. Pembayaran QRIS dan transfer bank Indonesia.",
-    path: "/harga",
-    jsonLd: {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: [
-        {
-          "@type": "Question",
-          name: "Apakah ada paket gratis?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "Ya, paket Gratis bisa dipakai selamanya dengan 1 akun sosial media, 10 post terjadwal per bulan, dan 50 kredit render per bulan.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "Metode pembayaran apa yang didukung?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "Kami mendukung pembayaran QRIS dan transfer virtual account dari semua bank besar di Indonesia.",
-          },
-        },
-      ],
-    },
-  });
 
   const { data, isLoading } = useQuery({
     queryKey: [...queryKeys.plans, "allIntervals"],
@@ -215,12 +236,66 @@ export function PricingPage() {
     tiers.push({ tier, plan, monthly });
   }
 
+  // Badge toggle tahunan dihitung dari data plan — tidak boleh hard-code
+  // "Hemat 2 bulan" karena harga editable admin (lihat annualToggleLabel).
+  const annualBadge = annualToggleLabel(tiers);
+
+  // Angka FAQ diambil dari paket Gratis yang benar-benar aktif di DB, supaya
+  // JSON-LD tidak berbohong saat admin mengubah limit lewat /admin/plans.
+  const freePlan = allPlans.find((p) => p.tier === "free" && p.billingIntervalMonths === 1);
+  const freeFaqText = freePlan
+    ? `Ya, paket Gratis bisa dipakai selamanya dengan ${freePlan.maxSocialAccounts} akun sosial media, ${freePlan.maxScheduledPostsPerMonth} post terjadwal per bulan, dan ${freePlan.renderCreditsPerMonth} kredit render per bulan.`
+    : "Ya, paket Gratis bisa dipakai selamanya untuk memulai — tanpa kartu kredit.";
+
+  useSeo({
+    title: "Harga — Paket untuk Semua Kebutuhan",
+    description:
+      "Pilih paket Sahabat Kreator sesuai kebutuhan. Mulai gratis, upgrade kapan saja. Pembayaran QRIS dan transfer bank Indonesia.",
+    path: "/harga",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: [
+        {
+          "@type": "Question",
+          name: "Apakah ada paket gratis?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: freeFaqText,
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Metode pembayaran apa yang didukung?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Kami mendukung pembayaran QRIS dan transfer virtual account dari semua bank besar di Indonesia.",
+          },
+        },
+      ],
+    },
+  });
+
   const plans = tiers.map((t) => t.plan);
   const featureSource = tiers.map((t) => t.monthly);
+
+  // Fitur yang sama di semua paket pindah ke kartu "Semua paket dapat",
+  // sisanya jadi baris pembanding. Keduanya berasal dari satu perhitungan yang
+  // sama supaya tidak ada fitur yang hilang atau tampil dua kali.
+  const sharedKeys = sharedFeatureKeys(featureSource);
+  const sharedKeySet = new Set<string>(sharedKeys);
+  const sharedItems = [
+    ...FEATURE_CATALOG.filter((f) => sharedKeySet.has(f.key)).map(({ label, hint }) => ({
+      label,
+      hint,
+    })),
+    ...GLOBAL_FEATURES.map(({ label, hint }) => ({ label, hint })),
+  ];
+
   const rows: { section: string; row: Row }[] = [
     ...LIMIT_ROWS.map((row) => ({ section: SECTION_LIMITS, row })),
     ...CREDIT_ROWS.map((row) => ({ section: SECTION_CREDITS, row })),
-    ...featureRows(featureSource).map((row) => ({ section: SECTION_FEATURES, row })),
+    ...featureRows(featureSource, sharedKeys).map((row) => ({ section: SECTION_FEATURES, row })),
   ];
   const colSpan = plans.length + 1;
 
@@ -231,7 +306,8 @@ export function PricingPage() {
           Harga <span className="text-gradient">transparan</span>
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-[var(--text-secondary)] text-lg">
-          Mulai gratis dan upgrade saat Anda tumbuh. Bandingkan semua paket dalam satu tabel.
+          Mulai gratis dan upgrade saat Anda tumbuh. Fitur yang sudah termasuk di semua paket ada di
+          bawah ini, sisanya bisa Anda bandingkan per paket.
         </p>
       </div>
 
@@ -250,8 +326,8 @@ export function PricingPage() {
               }`}
             >
               {iv === 1 ? "1 Bulan" : "12 Bulan"}
-              {iv === 12 && (
-                <span className="ml-1.5 text-[var(--accent-gold)] text-xs">Hemat 2 bulan</span>
+              {iv === 12 && annualBadge && (
+                <span className="ml-1.5 text-[var(--accent-gold)] text-xs">{annualBadge}</span>
               )}
             </button>
           ))}
@@ -264,7 +340,12 @@ export function PricingPage() {
         </div>
       ) : (
         <>
-          {/* Mobile — kartu bertumpuk */}
+          {/* Kartu 1 — fitur yang sama di semua paket (di atas, sebelum pilihan
+              paket: di mobile kartu paket bertumpuk tinggi, jadi kartu ini tidak
+              akan pernah terlihat kalau diletakkan di bawah). */}
+          {sharedItems.length > 0 && <SharedFeaturesCard items={sharedItems} />}
+
+          {/* Kartu 2 (mobile) — kartu paket bertumpuk, fitur pembeda saja */}
           <div className="space-y-5 md:hidden">
             {tiers.map(({ tier, plan, monthly }) => (
               <MobilePlanCard
@@ -273,6 +354,7 @@ export function PricingPage() {
                 plan={plan}
                 monthly={monthly}
                 interval={interval}
+                exclude={sharedKeys}
               />
             ))}
           </div>
@@ -349,8 +431,7 @@ export function PricingPage() {
 
       <div className="mt-16 text-center text-[var(--text-muted)] text-sm">
         <p>
-          Pembayaran via QRIS & virtual account. Semua paket berbayar termasuk semua fitur inti.
-          Butuh paket khusus?{" "}
+          Butuh paket khusus, volume besar, atau pertanyaan lain?{" "}
           <Link to="/kontak" className="text-[var(--accent-gold)] underline">
             Hubungi kami
           </Link>

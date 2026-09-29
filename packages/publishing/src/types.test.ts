@@ -125,7 +125,10 @@ describe("PLATFORM_DAILY_LIMITS", () => {
   });
 
   it("tiktok adalah yang paling konservatif (limit resmi terkecil)", () => {
-    expect(PLATFORM_DAILY_LIMITS.tiktok).toBeLessThanOrEqual(PLATFORM_DAILY_LIMITS.instagram!);
+    // `?? 0` bukan pelonggaran: bila key `instagram` hilang (regresi), limit 0
+    // membuat assertion ini gagal — bukan lolos.
+    const instagramLimit = PLATFORM_DAILY_LIMITS.instagram ?? 0;
+    expect(PLATFORM_DAILY_LIMITS.tiktok).toBeLessThanOrEqual(instagramLimit);
   });
 
   it("manual = 0 berarti platform hanya untuk pencatatan", () => {

@@ -18,8 +18,10 @@ export function requestedScopes(platform: OAuthPlatform, cred: AppCredential): s
   return [...new Set([...OAUTH_CONFIGS[platform].scopes, ...parseExtraScopes(cred)])];
 }
 
-/** Scope yang benar-benar di-grant platform (response token field "scope") — fallback ke requested */
-export function parseGrantedScopes(data: Record<string, any>): string[] | undefined {
+/** Scope yang benar-benar di-grant platform (response token field "scope") — fallback ke requested.
+ * Menerima `scope?: unknown` (bukan tipe token penuh) supaya tetap bisa dipanggil dengan bentuk
+ * response apa pun; validasi tipe dilakukan runtime lewat `typeof`. */
+export function parseGrantedScopes(data: { scope?: unknown }): string[] | undefined {
   const raw = typeof data.scope === "string" ? data.scope.trim() : "";
   if (!raw) return undefined;
   const granted = raw.split(/[\s,]+/).filter(Boolean);

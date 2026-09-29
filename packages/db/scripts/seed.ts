@@ -6,6 +6,12 @@ import { config } from "dotenv";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
+import {
+  BUSINESS_FEATURES,
+  ENTERPRISE_FEATURES,
+  FREE_FEATURES,
+  PRO_FEATURES,
+} from "../src/feature-presets";
 import { blogCategory, blogPost, blogPostTag, plan, platformSettings } from "../src/schema";
 
 config({ path: resolve(process.cwd(), "../../.env") });
@@ -14,66 +20,10 @@ config({ path: resolve(process.cwd(), "../../.env") });
 // bukan teks bebas — limit numerik (akun/post/storage/kredit) sudah tampil otomatis
 // di halaman harga dari field angka, jadi jangan diduplikasi sebagai teks.
 //
-// Fitur didefinisikan SEKALI per tier lalu dipakai ulang oleh varian bulanan &
-// tahunan. Sebelumnya varian tahunan masih menyimpan teks bebas lama
-// ("Semua fitur Pro"), yang membuat baris plan tahunan tidak punya key katalog.
-// Gate fitur tidak terpengaruh (pool quota hanya membaca billingIntervalMonths=1),
-// tapi admin editor /admin/plans menampilkannya mentah — jadi jangan diulang.
-const PRO_FEATURES = [
-  "multi_platform",
-  "scheduling",
-  "story",
-  "engagement_inbox",
-  "ai_caption",
-  "ai_coach",
-  "analytics",
-  "analytics_compare",
-  "media_library",
-  "api_access",
-  "onboarding_help",
-];
-
-const BUSINESS_FEATURES = [
-  "multi_platform",
-  "scheduling",
-  "story",
-  "engagement_inbox",
-  "ai_caption",
-  "ai_coach",
-  "analytics",
-  "analytics_compare",
-  "reports_export",
-  "media_library",
-  "automation",
-  "team",
-  "products",
-  "api_access",
-  "api_write",
-  "onboarding_help",
-];
-
-const ENTERPRISE_FEATURES = [
-  "multi_platform",
-  "scheduling",
-  "story",
-  "engagement_inbox",
-  "ai_caption",
-  "ai_coach",
-  "analytics",
-  "analytics_compare",
-  "reports_export",
-  "media_library",
-  "automation",
-  "listening",
-  "competitors",
-  "team",
-  "products",
-  "api_access",
-  "api_write",
-  "api_webhook",
-  "priority_support",
-  "onboarding_help",
-];
+// Preset per tier ada di packages/db/src/feature-presets.ts (bertipe FeatureKey[]
+// dan diuji terhadap FEATURE_KEYS) lalu dipakai ulang oleh varian bulanan &
+// tahunan. Dulu didefinisikan lokal di file ini sehingga tidak bisa diuji dan
+// typo-nya hanya ketahuan dari fitur yang hilang diam-diam di produksi.
 
 const PLANS = [
   {
@@ -89,7 +39,7 @@ const PLANS = [
     maxMediaStorageMb: 500,
     aiCreditsPerMonth: 0,
     renderCreditsPerMonth: 50,
-    features: ["scheduling", "holiday_ideas", "analytics", "media_library", "onboarding_help"],
+    features: FREE_FEATURES,
     isActive: true,
     sortOrder: 1,
   },
