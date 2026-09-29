@@ -20,6 +20,7 @@ Desain & keputusan: [docs/rfc-public-api.md](rfc-public-api.md) §7.
 | Lingkungan | URL |
 |---|---|
 | Produksi | `https://sahabatkreator.com/mcp` |
+| Staging | `https://app.sahabatkreator.com/mcp` |
 | Dev (langsung ke server) | `http://localhost:3000/mcp` |
 | Dev (lewat Vite, same-origin) | `http://localhost:5173/mcp` |
 
@@ -78,12 +79,56 @@ const response = await client.responses.create({
 });
 ```
 
-### Claude Desktop
+### claude.ai web & Claude Desktop (Connectors)
 
-Untuk server **remote**, Claude Desktop memakai jalur **Connectors** di
-Settings. Jalur itu menuntut OAuth, yang **belum** kita sediakan (§4). Selama
-itu, pakai transport stdio di
-[apps/mcp/README.md](../apps/mcp/README.md) — itu yang didukung penuh hari ini.
+claude.ai (dan Claude Desktop yang memakai panel Connectors) mendukung
+**remote MCP server by URL**. Autentikasi tetap API key kita — lewat
+**Request headers**, BUKAN OAuth (yang memang masih belum kita sediakan,
+§4). Syaratnya: header-nya harus nama standar (`authorization`,
+`x-api-key`, atau `x-auth-token`) — kita terima ketiganya, jadi aman.
+
+> **Status beta:** Request headers belum tersedia untuk semua organisasi
+> Claude. Kalau Anda tidak melihat bagian **Request headers** di dialog
+> *Add custom connector*, org Anda belum diizinkan; minta akses ke
+> `mcp-review@anthropic.com`. Selama itu, pakai Claude Code (di atas)
+> atau transport stdio di [apps/mcp/README.md](../apps/mcp/README.md).
+
+Langkahnya (plan pribadi Free/Pro/Max; di Team/Enterprise hanya **Owner**
+yang bisa menambah konektor org — anggota lain memakai
+`https://claude.ai/admin-settings/connectors`):
+
+1. Buka **Settings → Customize → Connectors** (atau **Organization
+   settings → Connectors** untuk org), klik **Add custom connector**.
+2. **MCP server URL**:
+   `https://sahabatkreator.com/mcp` (produksi) atau
+   `https://app.sahabatkreator.com/mcp` (staging).
+3. **Authentication** → pilih **No sign-in**. (Jangan pilih "Sign in
+   now"/"Sign in when needed" — itu menuntut OAuth, §4.)
+4. Buka **Request headers** → pilih header `authorization` → isi value
+   persis: `Bearer sk_api_...` (ketik "Bearer " beserta spasinya — Claude
+   mengirim nilai apa adanya tanpa menambah skema).
+5. Tandai **Required**, klik **Add**.
+
+Setelah konektor ditambah, tool mulai dalam keadaan **Not set** — Claude
+akan bertanya sebelum memakai tool mana pun. Atur per-tool ke
+**Auto-use** untuk tool baca (`list_posts`, dll.) kalau ingin jalan
+tanpa konfirmasi. Tool yang muncul tetap mengikuti **scope key**
+(§1); key read-only tidak akan melihat tool tulis.
+
+Beberapa hal yang sering jadi pertanyaan:
+
+- **Tidak bisa mengubah auth setelah disimpan.** Ganti API key = hapus
+  konektornya, tambah ulang, dan semua anggota harus reconnect.
+- **Nilai header tidak ditampilkan lagi setelah disimpan** — memang
+  begitu; simpan key-nya di tempat lain.
+- **Satu key untuk satu konektor org** — semua anggota org yang
+  terhubung memakai key yang sama. Karena kuota `/v1` dihitung **per
+  key** (60 `tools/call` per menit), konektor yang dipakai banyak orang
+  berbagi kuota itu. Untuk pemakaian per-orang, masing-masing tambah
+  konektor sendiri dengan key sendiri di plan pribadi.
+- Egress Claude datang dari `160.79.104.0/21` — allowlist itu kalau
+  firewall server membatasi inbound (jarang diperlukan di belakang
+  Cloudflare).
 
 ---
 
@@ -116,11 +161,12 @@ tambahan, dan sebaliknya.
 |---|---|
 | `GET`/`DELETE /mcp` → **405** | Stateless: tidak ada pesan server→klien untuk di-stream, tidak ada sesi untuk ditutup |
 | Tidak ada sampling / elicitation / progress notification | Semua tool request/response sederhana; mode stateless |
-| ChatGPT Connectors & claude.ai web connector belum bisa | Keduanya menuntut OAuth 2.1 (discovery, DCR/CIMD, PKCE) — belum dibangun |
+| ChatGPT Connectors belum bisa | Menuntut OAuth 2.1 (discovery, DCR/CIMD, PKCE) — belum dibangun. claude.ai web connector **sudah bisa** lewat Request headers (API key, beta per-org), lihat §2 |
 | Tidak ada resumability SSE | Transport menjawab JSON, bukan SSE (lihat [rfc §7.2](rfc-public-api.md)) |
 
 Klien yang **bisa** mengirim header sendiri — Claude Code, Cursor, Windsurf,
-Claude Desktop config, ChatGPT Responses API — sudah terlayani tanpa OAuth.
+claude.ai web & Claude Desktop (Request headers), ChatGPT Responses API —
+sudah terlayani tanpa OAuth.
 
 ---
 
