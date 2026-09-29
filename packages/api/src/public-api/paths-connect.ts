@@ -3,9 +3,26 @@
 // MENGAPA path ditulis manual: handler /v1 adalah route /api lama yang di-mount
 // ulang lewat allowlist — dokumen ini MENDESKRIPSIKANnya, bukan men-generate
 // routenya. Sama seperti paths-read.ts / paths-phase3.ts.
+import { PlatformEnum } from "./common";
 import { errorResponses, jsonContent, op, pathParam } from "./paths-helpers";
 
 const S = (name: string) => ({ $ref: `#/components/schemas/${name}` });
+
+/**
+ * Path param `{platform}` — enum hanya berisi platform yang BENAR-BENAR
+ * didukung (lihat PlatformEnum). Instagram punya dua jalur koneksi yang
+ * menghasilkan akun berbeda: `instagram` (lewat Facebook Page) dan
+ * `instagram_standalone` (Instagram Login langsung).
+ */
+const platformParam = () =>
+  pathParam(
+    "platform",
+    "Platform tujuan. Instagram punya **dua jalur**: `instagram` (lewat Facebook Page, " +
+      "metabolehkan comment & DM bersama Facebook) dan `instagram_standalone` (Instagram Login " +
+      "langsung, untuk akun tanpa Page). Platform lain: `facebook`, `threads`, `tiktok`, " +
+      "`youtube`, `pinterest`, `linkedin`, `linkedin_org`, `bluesky`, `google_business`.",
+    { type: "string", enum: PlatformEnum.options },
+  );
 
 const CONFLICT = {
   "409": {
@@ -59,13 +76,7 @@ export function buildConnectPaths() {
           "Anda menukarkan `code` lewat `POST /v1/accounts/{platform}/connect`.\n\n" +
           "Butuh plan Business+ (`api_write`) dan API key yang terikat ke developer app.",
         scopes: ["accounts:write"],
-        parameters: [
-          pathParam(
-            "platform",
-            "Platform tujuan, mis. `instagram`, `facebook`, `tiktok`, `youtube`, `linkedin`.",
-          ),
-          redirectParam,
-        ],
+        parameters: [platformParam(), redirectParam],
         responses: {
           "200": {
             description: "URL otorisasi platform.",
@@ -94,6 +105,7 @@ export function buildConnectPaths() {
           "Daftar platform yang butuh pemilihan adalah detail internal kami dan berubah setiap kali " +
           "akses API platform disetujui — karena itu tidak ada status 400 khusus untuk itu.",
         scopes: ["accounts:write"],
+        parameters: [platformParam()],
         requestBody: S("ConnectRequest"),
         responses: CONNECT_RESPONSES,
       }),
@@ -109,6 +121,7 @@ export function buildConnectPaths() {
           "responsnya `{ accountId }` dan akun sudah terhubung.\n\n" +
           "`code` bersifat sekali pakai: panggil `connect` ATAU `exchange`, jangan keduanya.",
         scopes: ["accounts:write"],
+        parameters: [platformParam()],
         requestBody: S("ConnectRequest"),
         responses: CONNECT_RESPONSES,
       }),

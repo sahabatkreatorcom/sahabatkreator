@@ -61,8 +61,8 @@ export function jsonContent(schema: Ref) {
   return { "application/json": { schema } };
 }
 
-export function pathParam(name: string, description?: string) {
-  return { name, in: "path" as const, required: true, schema: { type: "string" }, description };
+export function pathParam(name: string, description?: string, schema: object = { type: "string" }) {
+  return { name, in: "path" as const, required: true, schema, description };
 }
 
 export function queryParam(name: string, schema: object, description?: string) {

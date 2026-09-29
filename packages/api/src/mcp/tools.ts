@@ -15,6 +15,7 @@
 // ulang di sini alih-alih diimpor dari SDK.
 import type { ApiKeyScope } from "@sahabatkreator/db/schema";
 import { z } from "zod";
+import { PlatformEnum } from "../public-api/common";
 
 /**
  * Cermin `ToolAnnotations` dari spec MCP (2025-06-18).
@@ -160,18 +161,7 @@ export const MCP_TOOLS: McpToolDef[] = [
     openWorld: true,
     params: {
       prompt: z.string().min(3).describe("Topik/deskripsi konten"),
-      platform: z
-        .enum([
-          "instagram",
-          "facebook",
-          "tiktok",
-          "youtube",
-          "linkedin",
-          "pinterest",
-          "threads",
-          "x",
-        ])
-        .describe("Platform target"),
+      platform: PlatformEnum.describe("Platform target"),
       tone: z
         .enum(["santai", "profesional", "lucu", "inspiratif", "promosi"])
         .optional()

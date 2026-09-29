@@ -3661,9 +3661,22 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "instagram",
+                "instagram_standalone",
+                "facebook",
+                "threads",
+                "tiktok",
+                "youtube",
+                "pinterest",
+                "linkedin",
+                "linkedin_org",
+                "bluesky",
+                "google_business"
+              ]
             },
-            "description": "Platform tujuan, mis. `instagram`, `facebook`, `tiktok`, `youtube`, `linkedin`."
+            "description": "Platform tujuan. Instagram punya **dua jalur**: `instagram` (lewat Facebook Page, metabolehkan comment & DM bersama Facebook) dan `instagram_standalone` (Instagram Login langsung, untuk akun tanpa Page). Platform lain: `facebook`, `threads`, `tiktok`, `youtube`, `pinterest`, `linkedin`, `linkedin_org`, `bluesky`, `google_business`."
           },
           {
             "name": "redirect",
@@ -3765,7 +3778,30 @@
             "apiKeyAuth": []
           }
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "instagram",
+                "instagram_standalone",
+                "facebook",
+                "threads",
+                "tiktok",
+                "youtube",
+                "pinterest",
+                "linkedin",
+                "linkedin_org",
+                "bluesky",
+                "google_business"
+              ]
+            },
+            "description": "Platform tujuan. Instagram punya **dua jalur**: `instagram` (lewat Facebook Page, metabolehkan comment & DM bersama Facebook) dan `instagram_standalone` (Instagram Login langsung, untuk akun tanpa Page). Platform lain: `facebook`, `threads`, `tiktok`, `youtube`, `pinterest`, `linkedin`, `linkedin_org`, `bluesky`, `google_business`."
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -3892,7 +3928,30 @@
             "apiKeyAuth": []
           }
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "instagram",
+                "instagram_standalone",
+                "facebook",
+                "threads",
+                "tiktok",
+                "youtube",
+                "pinterest",
+                "linkedin",
+                "linkedin_org",
+                "bluesky",
+                "google_business"
+              ]
+            },
+            "description": "Platform tujuan. Instagram punya **dua jalur**: `instagram` (lewat Facebook Page, metabolehkan comment & DM bersama Facebook) dan `instagram_standalone` (Instagram Login langsung, untuk akun tanpa Page). Platform lain: `facebook`, `threads`, `tiktok`, `youtube`, `pinterest`, `linkedin`, `linkedin_org`, `bluesky`, `google_business`."
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -6929,14 +6988,16 @@
             "type": "string",
             "enum": [
               "instagram",
+              "instagram_standalone",
               "facebook",
+              "threads",
               "tiktok",
               "youtube",
+              "pinterest",
               "linkedin",
               "linkedin_org",
-              "pinterest",
-              "threads",
-              "x"
+              "bluesky",
+              "google_business"
             ]
           },
           "tone": {
@@ -7013,14 +7074,16 @@
             "type": "string",
             "enum": [
               "instagram",
+              "instagram_standalone",
               "facebook",
+              "threads",
               "tiktok",
               "youtube",
+              "pinterest",
               "linkedin",
               "linkedin_org",
-              "pinterest",
-              "threads",
-              "x"
+              "bluesky",
+              "google_business"
             ]
           },
           "count": {
@@ -7065,14 +7128,16 @@
             "type": "string",
             "enum": [
               "instagram",
+              "instagram_standalone",
               "facebook",
+              "threads",
               "tiktok",
               "youtube",
+              "pinterest",
               "linkedin",
               "linkedin_org",
-              "pinterest",
-              "threads",
-              "x"
+              "bluesky",
+              "google_business"
             ]
           },
           "style": {
@@ -7120,14 +7185,16 @@
             "type": "string",
             "enum": [
               "instagram",
+              "instagram_standalone",
               "facebook",
+              "threads",
               "tiktok",
               "youtube",
+              "pinterest",
               "linkedin",
               "linkedin_org",
-              "pinterest",
-              "threads",
-              "x"
+              "bluesky",
+              "google_business"
             ]
           },
           "tone": {
@@ -7204,13 +7271,16 @@
             "type": "string",
             "enum": [
               "instagram",
+              "instagram_standalone",
               "facebook",
+              "threads",
               "tiktok",
               "youtube",
-              "linkedin",
               "pinterest",
-              "threads",
-              "x"
+              "linkedin",
+              "linkedin_org",
+              "bluesky",
+              "google_business"
             ]
           },
           "niche": {

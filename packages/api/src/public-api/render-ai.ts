@@ -2,6 +2,7 @@
 
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
+import { PlatformEnum } from "./common";
 
 extendZodWithOpenApi(z);
 
@@ -265,17 +266,7 @@ export const AiCreditsSchema = z
 export const CaptionSchema = z
   .object({
     prompt: z.string().min(3).max(500),
-    platform: z.enum([
-      "instagram",
-      "facebook",
-      "tiktok",
-      "youtube",
-      "linkedin",
-      "linkedin_org",
-      "pinterest",
-      "threads",
-      "x",
-    ]),
+    platform: PlatformEnum,
     tone: z
       .enum(["santai", "profesional", "lucu", "inspiratif", "promosi"])
       .default("santai")
@@ -295,17 +286,7 @@ export const CaptionResponseSchema = z
 export const HashtagSchema = z
   .object({
     prompt: z.string().min(3).max(300),
-    platform: z.enum([
-      "instagram",
-      "facebook",
-      "tiktok",
-      "youtube",
-      "linkedin",
-      "linkedin_org",
-      "pinterest",
-      "threads",
-      "x",
-    ]),
+    platform: PlatformEnum,
     count: z.number().int().min(3).max(30).default(10).optional(),
   })
   .openapi("HashtagRequest");
@@ -317,17 +298,7 @@ export const HashtagResponseSchema = z
 export const RewriteSchema = z
   .object({
     text: z.string().min(10).max(3000),
-    platform: z.enum([
-      "instagram",
-      "facebook",
-      "tiktok",
-      "youtube",
-      "linkedin",
-      "linkedin_org",
-      "pinterest",
-      "threads",
-      "x",
-    ]),
+    platform: PlatformEnum,
     style: z
       .enum(["lebih-santai", "lebih-formal", "lebih-pendek", "lebih-panjang", "hook-kuat", "seo"])
       .default("lebih-santai")
@@ -342,17 +313,7 @@ export const RewriteResponseSchema = z
 export const RepurposeSchema = z
   .object({
     content: z.string().min(10).max(6000),
-    targetPlatform: z.enum([
-      "instagram",
-      "facebook",
-      "tiktok",
-      "youtube",
-      "linkedin",
-      "linkedin_org",
-      "pinterest",
-      "threads",
-      "x",
-    ]),
+    targetPlatform: PlatformEnum,
     tone: z.string().max(40).optional(),
   })
   .openapi("RepurposeRequest");
@@ -383,16 +344,7 @@ export const TrendsResponseSchema = z
 export const TrendIdeasSchema = z
   .object({
     trend: z.string().min(2).max(200),
-    platform: z.enum([
-      "instagram",
-      "facebook",
-      "tiktok",
-      "youtube",
-      "linkedin",
-      "pinterest",
-      "threads",
-      "x",
-    ]),
+    platform: PlatformEnum,
     niche: z.string().max(120).optional(),
   })
   .openapi("TrendIdeasRequest");

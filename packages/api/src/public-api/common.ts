@@ -51,16 +51,30 @@ export const PaginationQuerySchema = z
   })
   .openapi("PaginationQuery");
 
+/**
+ * Platform yang BENAR-BENAR didukung aplikasi (sama dengan `PLATFORMS` di
+ * apps/web/src/lib/platforms.tsx, minus `manual` — itu reminder-only, bukan
+ * platform publish).
+ *
+ * Dulu daftar ini mendrift: memuat `"x"` (Twitter/X — **tidak ada adapternya**,
+ * lihat packages/publishing/src/adapters) dan tidak memuat `instagram_standalone`
+ * (jalur Instagram Login terpisah dari `instagram` lewat Facebook Page),
+ * `bluesky`, serta `google_business` yang sudah hidup. Dipakai schema request
+ * AI (render-ai.ts), path param connect (paths-connect.ts), dan tool MCP
+ * (mcp/tools.ts) — satu sumber, tidak boleh ada daftar kedua.
+ */
 export const PlatformEnum = z.enum([
   "instagram",
+  "instagram_standalone",
   "facebook",
+  "threads",
   "tiktok",
   "youtube",
+  "pinterest",
   "linkedin",
   "linkedin_org",
-  "pinterest",
-  "threads",
-  "x",
+  "bluesky",
+  "google_business",
 ]);
 
 export const ErrorResponseRef = { $ref: "#/components/schemas/ErrorResponse" } as const;

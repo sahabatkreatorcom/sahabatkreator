@@ -3404,8 +3404,19 @@ export interface paths {
         };
         header?: never;
         path: {
-          /** @description Platform tujuan, mis. `instagram`, `facebook`, `tiktok`, `youtube`, `linkedin`. */
-          platform: string;
+          /** @description Platform tujuan. Instagram punya **dua jalur**: `instagram` (lewat Facebook Page, metabolehkan comment & DM bersama Facebook) dan `instagram_standalone` (Instagram Login langsung, untuk akun tanpa Page). Platform lain: `facebook`, `threads`, `tiktok`, `youtube`, `pinterest`, `linkedin`, `linkedin_org`, `bluesky`, `google_business`. */
+          platform:
+            | "instagram"
+            | "instagram_standalone"
+            | "facebook"
+            | "threads"
+            | "tiktok"
+            | "youtube"
+            | "pinterest"
+            | "linkedin"
+            | "linkedin_org"
+            | "bluesky"
+            | "google_business";
         };
         cookie?: never;
       };
@@ -3503,7 +3514,21 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path?: never;
+        path: {
+          /** @description Platform tujuan. Instagram punya **dua jalur**: `instagram` (lewat Facebook Page, metabolehkan comment & DM bersama Facebook) dan `instagram_standalone` (Instagram Login langsung, untuk akun tanpa Page). Platform lain: `facebook`, `threads`, `tiktok`, `youtube`, `pinterest`, `linkedin`, `linkedin_org`, `bluesky`, `google_business`. */
+          platform:
+            | "instagram"
+            | "instagram_standalone"
+            | "facebook"
+            | "threads"
+            | "tiktok"
+            | "youtube"
+            | "pinterest"
+            | "linkedin"
+            | "linkedin_org"
+            | "bluesky"
+            | "google_business";
+        };
         cookie?: never;
       };
       requestBody: {
@@ -3622,7 +3647,21 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path?: never;
+        path: {
+          /** @description Platform tujuan. Instagram punya **dua jalur**: `instagram` (lewat Facebook Page, metabolehkan comment & DM bersama Facebook) dan `instagram_standalone` (Instagram Login langsung, untuk akun tanpa Page). Platform lain: `facebook`, `threads`, `tiktok`, `youtube`, `pinterest`, `linkedin`, `linkedin_org`, `bluesky`, `google_business`. */
+          platform:
+            | "instagram"
+            | "instagram_standalone"
+            | "facebook"
+            | "threads"
+            | "tiktok"
+            | "youtube"
+            | "pinterest"
+            | "linkedin"
+            | "linkedin_org"
+            | "bluesky"
+            | "google_business";
+        };
         cookie?: never;
       };
       requestBody: {
@@ -4653,14 +4692,16 @@ export interface components {
       /** @enum {string} */
       platform:
         | "instagram"
+        | "instagram_standalone"
         | "facebook"
+        | "threads"
         | "tiktok"
         | "youtube"
+        | "pinterest"
         | "linkedin"
         | "linkedin_org"
-        | "pinterest"
-        | "threads"
-        | "x";
+        | "bluesky"
+        | "google_business";
       /**
        * @default santai
        * @enum {string}
@@ -4684,14 +4725,16 @@ export interface components {
       /** @enum {string} */
       platform:
         | "instagram"
+        | "instagram_standalone"
         | "facebook"
+        | "threads"
         | "tiktok"
         | "youtube"
+        | "pinterest"
         | "linkedin"
         | "linkedin_org"
-        | "pinterest"
-        | "threads"
-        | "x";
+        | "bluesky"
+        | "google_business";
       /** @default 10 */
       count: number;
     };
@@ -4704,14 +4747,16 @@ export interface components {
       /** @enum {string} */
       platform:
         | "instagram"
+        | "instagram_standalone"
         | "facebook"
+        | "threads"
         | "tiktok"
         | "youtube"
+        | "pinterest"
         | "linkedin"
         | "linkedin_org"
-        | "pinterest"
-        | "threads"
-        | "x";
+        | "bluesky"
+        | "google_business";
       /**
        * @default lebih-santai
        * @enum {string}
@@ -4733,14 +4778,16 @@ export interface components {
       /** @enum {string} */
       targetPlatform:
         | "instagram"
+        | "instagram_standalone"
         | "facebook"
+        | "threads"
         | "tiktok"
         | "youtube"
+        | "pinterest"
         | "linkedin"
         | "linkedin_org"
-        | "pinterest"
-        | "threads"
-        | "x";
+        | "bluesky"
+        | "google_business";
       tone?: string;
     };
     RepurposeResponse: {
@@ -4761,13 +4808,16 @@ export interface components {
       /** @enum {string} */
       platform:
         | "instagram"
+        | "instagram_standalone"
         | "facebook"
+        | "threads"
         | "tiktok"
         | "youtube"
-        | "linkedin"
         | "pinterest"
-        | "threads"
-        | "x";
+        | "linkedin"
+        | "linkedin_org"
+        | "bluesky"
+        | "google_business";
       niche?: string;
     };
     TrendIdeasResponse: {
