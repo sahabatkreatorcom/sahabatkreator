@@ -34,6 +34,7 @@
     "apps/server": {
       "name": "server",
       "dependencies": {
+        "@asteasolutions/zod-to-openapi": "catalog:",
         "@aws-sdk/client-s3": "^3.1116.0",
         "@aws-sdk/s3-request-presigner": "^3.1116.0",
         "@hono/zod-openapi": "^1.6.1",
@@ -147,7 +148,7 @@
     "packages/api": {
       "name": "@sahabatkreator/api",
       "dependencies": {
-        "@asteasolutions/zod-to-openapi": "^9.1.0",
+        "@asteasolutions/zod-to-openapi": "catalog:",
         "@sahabatkreator/auth": "workspace:*",
         "@sahabatkreator/db": "workspace:*",
         "@sahabatkreator/env": "workspace:*",
@@ -273,6 +274,7 @@
     "kysely": "0.28.17",
   },
   "catalog": {
+    "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@modelcontextprotocol/sdk": "^1.30.1",
     "@playwright/test": "^1.62.1",
     "@types/bun": "^1.4.0",

@@ -12,6 +12,7 @@
     "verify:integrations": "bun scripts/verify-integrations.ts"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "catalog:",
     "@aws-sdk/client-s3": "^3.1116.0",
     "@aws-sdk/s3-request-presigner": "^3.1116.0",
     "@hono/zod-openapi": "^1.6.1",

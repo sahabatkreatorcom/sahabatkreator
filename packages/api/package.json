@@ -16,7 +16,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@asteasolutions/zod-to-openapi": "^9.1.0",
+    "@asteasolutions/zod-to-openapi": "catalog:",
     "@sahabatkreator/auth": "workspace:*",
     "@sahabatkreator/db": "workspace:*",
     "@sahabatkreator/env": "workspace:*",
