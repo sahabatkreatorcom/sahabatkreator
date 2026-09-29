@@ -93,6 +93,18 @@ claude.ai (dan Claude Desktop yang memakai panel Connectors) mendukung
 > `mcp-review@anthropic.com`. Selama itu, pakai Claude Code (di atas)
 > atau transport stdio di [apps/mcp/README.md](../apps/mcp/README.md).
 
+> **Peringatan "required sign-in" saat menambah konektor itu NORMAL.**
+> Saat URL dimasukkan, Claude mengecek server **tanpa** header yang
+> belum Anda konfigurasi — server kita memang membalas **401** (API key
+> wajib, §1), lalu Claude menandai **"Sign in now — Detected"** dan
+> memperingatkan bahwa *No sign-in* "will likely fail". Itu heuristik
+> dari probe tanpa kredensial; Claude tidak bisa membedakan "butuh OAuth"
+> dengan "butuh API key statis". **Abaikan dan simpan saja**, selama
+> bagian *Request headers* sudah berisi `Bearer sk_api_...` — setelah
+> tersimpan, Claude mengirim header itu di **setiap** request, jadi
+> handshake sebenarnya berhasil. (Bila ternyata gagal juga, lihat
+> pembedaan di §6.)
+
 Langkahnya (plan pribadi Free/Pro/Max; di Team/Enterprise hanya **Owner**
 yang bisa menambah konektor org — anggota lain memakai
 `https://claude.ai/admin-settings/connectors`):
@@ -217,3 +229,6 @@ ada.
 | Error tool berisi `403` | Key tidak punya scope untuk endpoint itu (dicek ulang di `/v1`) |
 | Error tool berisi `429` | Kuota `/v1` habis (60/menit per key) |
 | Klien bilang "cannot be reached" | URL salah, atau bukan HTTPS di produksi |
+| Peringatan "required sign-in" / **Sign in now — Detected** di dialog *Add custom connector* claude.ai | Probe Claude tanpa kredensial dapat 401 kita — **normal dan aman diabaikan** selama *Request headers* terisi (`Bearer sk_api_...`). Lihat catatan di §2 |
+| Konektor claude.ai benar-benar gagal connect walau header terisi | Cek dulu server-side dengan `curl` §5 langkah 1–2: kalau dua-duanya lulus, berarti org Claude belum punya akses beta `static_headers` (bagian *Request headers* tak pernah muncul) → header tidak pernah dikirim. Pakai Claude Code (§2) sampai beta keluar |
+| Bagian **Request headers** tidak ada di dialog sama sekali | Org Claude belum diizinkan beta `static_headers` — header tidak akan dikirim, koneksi pasti 401. Alternatif: Claude Code CLI atau stdio |
