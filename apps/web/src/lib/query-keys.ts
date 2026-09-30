@@ -28,6 +28,8 @@ export const queryKeys = {
   teamAssignments: ["team-assignments"] as const,
   userSessions: ["user-sessions"] as const,
   threadsAccounts: ["threads-accounts"] as const,
+  /** Post milik akun Threads sendiri (langsung dari Threads API) */
+  threadsOwnPosts: ["threads-own-posts"] as const,
   tiktokCreatorInfo: ["tiktok-creator-info"] as const,
   bridgeStats: ["bridge-stats"] as const,
 

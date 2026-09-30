@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { ThreadsOwnPostsPanel } from "@/components/analytics/threads-own-posts-panel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageLoader } from "@/components/ui/spinner";
 import { api } from "@/lib/api";
@@ -490,6 +491,11 @@ export function PostResultsPage() {
           Performa post yang sudah tayang — views, likes, komentar, dan engagement rate per platform
         </p>
       </div>
+
+      {/* Post milik akun Threads sendiri — ditarik langsung dari Threads API,
+          terpisah dari grid di bawah (yang hanya berisi post yang diterbitkan
+          lewat aplikasi ini). Tidak tampil bila tidak ada akun Threads. */}
+      <ThreadsOwnPostsPanel />
 
       {/* Ringkasan */}
       {!isLoading && allPosts.length > 0 && (

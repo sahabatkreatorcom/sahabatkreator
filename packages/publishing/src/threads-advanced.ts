@@ -26,6 +26,31 @@ const POST_FIELDS =
 const PROFILE_POST_FIELDS =
   "id,text,username,permalink,timestamp,media_type,is_quote_post,topic_tag";
 
+// Post MILIK SENDIRI (`GET /{threads-user-id}/threads`) — boleh memakai field
+// lengkap termasuk `children` (item carousel) + `thumbnail_url` (poster video)
+// agar detail post bisa menampilkan teks, gambar, DAN video.
+const OWN_POST_FIELDS = [
+  "id",
+  "text",
+  "username",
+  "permalink",
+  "shortcode",
+  "timestamp",
+  "media_type",
+  "media_url",
+  "thumbnail_url",
+  "alt_text",
+  "topic_tag",
+  "has_replies",
+  "is_reply",
+  "is_quote_post",
+  "children{media_type,media_url,thumbnail_url,alt_text}",
+].join(",");
+
+// Fallback bila Graph menolak satu field di atas (400): daftar post tetap
+// tampil walau detail media lebih terbatas.
+const OWN_POST_FIELDS_MIN = "id,text,username,permalink,timestamp,media_type,media_url";
+
 const LOCATION_FIELDS = "id,name,address,city,country,latitude,longitude,postal_code";
 
 // Timeout pendek + tanpa retry network: bila Graph menggantung, kita kembalikan
@@ -42,6 +67,35 @@ export type ThreadsPost = {
   has_replies?: boolean;
   is_reply?: boolean;
   is_quote_post?: boolean;
+};
+
+/** Satu item di dalam carousel (`children`) post milik sendiri */
+export type ThreadsMediaChild = {
+  id?: string;
+  media_type?: string;
+  media_url?: string;
+  thumbnail_url?: string;
+  alt_text?: string;
+};
+
+/**
+ * Post milik akun sendiri — field lebih kaya dari `ThreadsPost` karena endpoint
+ * `/{user-id}/threads` mengizinkan `children` + `thumbnail_url` + `alt_text`.
+ * `media_type`: `TEXT_POST | IMAGE | VIDEO | AUDIO | CAROUSEL_ALBUM | REPOST_FACADE`.
+ */
+export type ThreadsOwnPost = ThreadsPost & {
+  shortcode?: string;
+  media_url?: string;
+  thumbnail_url?: string;
+  alt_text?: string;
+  topic_tag?: string;
+  children?: { data?: ThreadsMediaChild[] };
+};
+
+export type ThreadsOwnPostsResult = {
+  posts: ThreadsOwnPost[];
+  /** Cursor halaman berikutnya (`paging.cursors.after`) — null bila habis */
+  nextCursor: string | null;
 };
 
 export type ThreadsLocation = {
@@ -228,4 +282,52 @@ export async function getThreadsProfilePosts(input: {
   });
   if (!res.ok) await throwThreadsError(res, "Threads profile posts");
   return (await res.json()).data ?? [];
+}
+
+/**
+ * Ambil daftar post **milik akun Threads sendiri** (bukan post publik orang
+ * lain) beserta detail medianya — teks, gambar, video, dan carousel.
+ *
+ * `GET /{threads-user-id}/threads` — scope `threads_basic`.
+ *
+ * Berbeda dari `getThreadsProfilePosts` (butuh `threads_profile_discovery` dan
+ * hanya untuk profil publik), endpoint ini selalu tersedia selama token akun
+ * masih hidup dan `userId` = `platformAccountId` akun sendiri.
+ *
+ * Paginasi mengikuti cursor: kirim `after` dari `nextCursor` hasil panggilan
+ * sebelumnya.
+ */
+export async function getThreadsOwnPosts(input: {
+  accessToken: string;
+  userId: string;
+  limit?: number;
+  after?: string;
+}): Promise<ThreadsOwnPostsResult> {
+  const fetchPage = (fields: string) =>
+    httpRequest<{
+      data?: ThreadsOwnPost[];
+      paging?: { cursors?: { after?: string } };
+    }>(`${GRAPH_THREADS}/${input.userId}/threads`, {
+      query: {
+        fields,
+        limit: input.limit ?? 25,
+        after: input.after,
+        access_token: input.accessToken,
+      },
+      retries: 0,
+      timeoutMs: THREADS_TIMEOUT_MS,
+    });
+
+  // Field lengkap dulu; bila Graph menolak (400) karena satu field belum
+  // tersedia untuk app/token ini, ulangi dengan field minimal agar daftar
+  // post tetap tampil (detail media jadi lebih terbatas).
+  let res = await fetchPage(OWN_POST_FIELDS);
+  if (!res.ok && res.status === 400) res = await fetchPage(OWN_POST_FIELDS_MIN);
+  if (!res.ok) await throwThreadsError(res, "Threads own posts");
+
+  const body = await res.json();
+  return {
+    posts: body.data ?? [],
+    nextCursor: body.paging?.cursors?.after ?? null,
+  };
 }

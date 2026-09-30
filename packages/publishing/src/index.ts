@@ -200,11 +200,15 @@ export * from "./reply";
 export {
   deleteThreadsPost,
   getThreadsMentions,
+  getThreadsOwnPosts,
   getThreadsProfilePosts,
   lookupThreadsProfile,
   searchThreadsKeywords,
   searchThreadsLocations,
   type ThreadsLocation,
+  type ThreadsMediaChild,
+  type ThreadsOwnPost,
+  type ThreadsOwnPostsResult,
   type ThreadsPost,
   type ThreadsProfile,
 } from "./threads-advanced";

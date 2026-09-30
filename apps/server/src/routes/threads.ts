@@ -7,6 +7,7 @@ import { post, socialAccount } from "@sahabatkreator/db/schema";
 import {
   deleteThreadsPost,
   getThreadsMentions,
+  getThreadsOwnPosts,
   getThreadsProfilePosts,
   lookupThreadsProfile,
   PublishError,
@@ -117,6 +118,8 @@ threadsRoute.get("/_debug", async (c) => {
       "profile-posts": `/profile_posts?username=${encodeURIComponent(q.replace(/^@/, ""))}&fields=id,text,username,permalink,timestamp,media_type,is_quote_post,topic_tag`,
       keyword: `/keyword_search?q=${encodeURIComponent(q)}&search_type=TOP&fields=id,text,username,permalink,timestamp`,
       mentions: `/${account.platformAccountId}/mentions?fields=id,text,username,timestamp,permalink`,
+      // Post milik sendiri — dipakai fitur "Post Threads saya" di /post-results
+      "my-posts": `/${account.platformAccountId}/threads?fields=id,text,media_type,media_url,thumbnail_url,permalink,timestamp&limit=5`,
       // Cek scope yang benar-benar dimiliki token akun ini
       scopes: `/debug_token?input_token=${encodeURIComponent(token)}`,
     };
@@ -151,6 +154,40 @@ threadsRoute.get("/accounts", async (c) => {
         ),
       );
     return c.json({ accounts });
+  } catch (error) {
+    return fail(error);
+  }
+});
+
+/**
+ * GET /threads/my-posts?accountId=&limit=&after=
+ * Daftar post MILIK akun Threads sendiri (bukan post publik orang lain),
+ * lengkap dengan detail media (teks, gambar, video, carousel).
+ *
+ * `GET /{threads-user-id}/threads` — scope `threads_basic`. userId selalu
+ * diambil dari `platformAccountId` akun org (tidak dari input user), jadi
+ * tidak mungkin membaca post akun lain.
+ */
+threadsRoute.get("/my-posts", async (c) => {
+  try {
+    const ctx = await requireOrg(c);
+    const accountId = c.req.query("accountId");
+    if (!accountId) {
+      throw new HTTPError(400, "Parameter accountId wajib diisi");
+    }
+    // Batasi 1..50 agar satu panggilan tidak pernah menarik halaman besar
+    // (Graph default 25; di atas 50 biasanya ditolak).
+    const rawLimit = Number(c.req.query("limit") ?? 25);
+    const limit = Number.isFinite(rawLimit) ? Math.min(50, Math.max(1, Math.trunc(rawLimit))) : 25;
+
+    const account = await getThreadsAccount(accountId, ctx.organization.id);
+    const result = await getThreadsOwnPosts({
+      accessToken: account.accessToken,
+      userId: account.platformAccountId,
+      limit,
+      after: c.req.query("after") || undefined,
+    });
+    return c.json({ accountId: account.id, username: account.username, ...result });
   } catch (error) {
     return fail(error);
   }
