@@ -837,6 +837,28 @@ type PinterestCache = {
 const pinterestCache = new Map<string, PinterestCache>();
 const PINTEREST_CACHE_TTL_MS = 5 * 60 * 1000; // 5 menit
 
+/**
+ * Pilih URL thumbnail terbaik dari `media.images` Pinterest.
+ *
+ * Pinterest TIDAK selalu mengirim set key yang sama: pin baru sering hanya
+ * punya `150x150`/`400x300`/`600x`/`1200x` **tanpa `236x`**. Dulu kode hanya
+ * membaca `236x` → thumbnail selalu null walau API mengirim gambar. Sekarang
+ * ambil berurutan sesuai preferensi ukuran, lalu jatuh ke key pertama yang ada.
+ */
+function pickPinterestImage(images?: Record<string, { url?: string }>): string | null {
+  if (!images) return null;
+  for (const key of ["400x300", "600x", "236x", "1200x", "150x150"]) {
+    const url = images[key]?.url;
+    if (url) return url;
+  }
+  return Object.values(images).find((v) => v?.url)?.url ?? null;
+}
+
+/**
+ * GET /analytics/pinterest — profil + pin terbaru akun Pinterest (on-demand).
+ * Pinterest Developer Guidelines melarang penyimpanan data API, jadi hasilnya
+ * TIDAK pernah ditulis ke DB: hanya cache in-memory pendek + diteruskan ke UI.
+ */
 analyticsRoute.get("/pinterest", async (c) => {
   try {
     const ctx = await requireOrg(c);
@@ -989,7 +1011,7 @@ analyticsRoute.get("/pinterest", async (c) => {
         return {
           id: pin.id,
           title: pin.title ?? "",
-          thumbnail: pin.media?.images?.["236x"]?.url ?? null,
+          thumbnail: pickPinterestImage(pin.media?.images),
           createdAt: pin.created_at ?? "",
           impressions: m?.impressions ?? null,
           engagements: m?.engagements ?? null,
