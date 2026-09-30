@@ -64,6 +64,7 @@ import {
   TrendsResponseSchema,
   VideoJobResponseSchema,
 } from "./render-ai";
+import { WebhookDeliveriesResponseSchema, WebhookEventsResponseSchema } from "./webhooks";
 import {
   AutomationListResponseSchema,
   AutomationRuleResponseSchema,
@@ -133,6 +134,8 @@ const ROOT_SCHEMAS = [
   TrendsResponseSchema,
   TrendIdeasSchema,
   TrendIdeasResponseSchema,
+  WebhookDeliveriesResponseSchema,
+  WebhookEventsResponseSchema,
 ];
 
 /**

@@ -84,4 +84,26 @@ export function op(cfg: PathOp) {
   };
 }
 
+/**
+ * operationId deterministik dari method + path untuk semua operasi yang belum
+ * punya operationId eksplisit. Format = `${method}_${path}` dengan `/` dan `{`
+ * diganti `_` — identik dengan id fallback yang dipakai parser
+ * vitepress-openapi-docs, supaya halaman docs yang sudah ada tetap resolve.
+ *
+ * Contoh: `GET /v1/posts/{id}/publish` → `get_v1_posts_id_publish`.
+ * Stabil lintas regenerasi; dipakai docs site sebagai `<OpenApiEndpoint id>`.
+ */
+export function withOperationIds<T extends Record<string, Record<string, unknown>>>(paths: T): T {
+  for (const [path, ops] of Object.entries(paths)) {
+    for (const [method, operation] of Object.entries(ops)) {
+      if (!operation || typeof operation !== "object") continue;
+      const record = operation as Record<string, unknown>;
+      if (record.operationId) continue;
+      const slug = path.replace(/^\//, "").replace(/[{}]/g, "").replace(/[/-]/g, "_");
+      record.operationId = `${method}_${slug}`;
+    }
+  }
+  return paths;
+}
+
 export type Paths = OpenAPIPaths;

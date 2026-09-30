@@ -24,6 +24,7 @@
       "!**/.wrangler",
       "!**/.alchemy",
       "!**/scripts/public-api.json",
+      "!packages/api/src/openapi.json",
       "!**/.svelte-kit",
       "!**/wrangler.jsonc",
       "!**/.source",

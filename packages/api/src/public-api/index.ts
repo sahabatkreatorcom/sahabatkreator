@@ -8,8 +8,10 @@ import { extendZodWithOpenApi, OpenApiGeneratorV31 } from "@asteasolutions/zod-t
 import { z } from "zod";
 import { publicApiRegistry } from "./common";
 import { buildConnectPaths } from "./paths-connect";
+import { withOperationIds } from "./paths-helpers";
 import { buildPhase3Paths } from "./paths-phase3";
 import { buildPublicApiPaths } from "./paths-read";
+import { buildWebhookPaths } from "./paths-webhooks";
 import { registerPublicApiSchemas } from "./register";
 
 extendZodWithOpenApi(z);
@@ -18,7 +20,7 @@ registerPublicApiSchemas();
 
 const SCOPES_DESCRIPTION = `Scope yang dibutuhkan key untuk endpoint ini. Key harus
 memiliki minimal satu scope terdaftar (diberikan saat membuat key di Settings → API).
-Lihat https://docs.sahabatkreator.com/v1#scopes untuk daftar lengkap.`;
+Lihat https://docs.sahabatkreator.com/api/authentication#scopes untuk daftar lengkap.`;
 
 export function createPublicApiDocument() {
   const generator = new OpenApiGeneratorV31(publicApiRegistry.definitions);
@@ -36,7 +38,7 @@ export function createPublicApiDocument() {
     },
     servers: [
       {
-        url: "https://api.sahabatkreator.com",
+        url: "https://sahabatkreator.com/v1",
         description: "Production",
       },
       {
@@ -55,12 +57,17 @@ export function createPublicApiDocument() {
       { name: "Automation", description: "Aturan balasan otomatis" },
       { name: "AI", description: "Generator caption/hashtag/rewrite (mengonsumsi kredit)" },
       { name: "Trends", description: "Tren & ide konten" },
+      {
+        name: "Webhooks",
+        description: "Audit pengiriman webhook keluar & daftar event",
+      },
     ],
-    paths: {
+    paths: withOperationIds({
       ...buildPublicApiPaths(),
       ...buildPhase3Paths(),
       ...buildConnectPaths(),
-    },
+      ...buildWebhookPaths(),
+    }),
     components: {
       ...components,
       securitySchemes: {

@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://api.sahabatkreator.com",
+      "url": "https://sahabatkreator.com/v1",
       "description": "Production"
     },
     {
@@ -55,6 +55,10 @@
     {
       "name": "Trends",
       "description": "Tren & ide konten"
+    },
+    {
+      "name": "Webhooks",
+      "description": "Audit pengiriman webhook keluar & daftar event"
     }
   ],
   "paths": {
@@ -143,7 +147,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_ping"
       }
     },
     "/v1/accounts": {
@@ -233,7 +238,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_accounts"
       }
     },
     "/v1/accounts/{id}/statistic": {
@@ -333,7 +339,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_accounts_id_statistic"
       }
     },
     "/v1/posts": {
@@ -483,7 +490,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_posts"
       },
       "post": {
         "summary": "Buat post",
@@ -581,7 +589,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_posts"
       }
     },
     "/v1/posts/{id}": {
@@ -681,7 +690,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_posts_id"
       },
       "delete": {
         "summary": "Hapus post",
@@ -779,7 +789,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "delete_v1_posts_id"
       }
     },
     "/v1/posts/{id}/publish": {
@@ -886,7 +897,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_posts_id_publish"
       }
     },
     "/v1/posts/{id}/retry": {
@@ -996,7 +1008,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_posts_id_retry"
       }
     },
     "/v1/analytics/overview": {
@@ -1118,7 +1131,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_analytics_overview"
       }
     },
     "/v1/analytics/timeseries": {
@@ -1220,7 +1234,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_analytics_timeseries"
       }
     },
     "/v1/analytics/top-posts": {
@@ -1329,7 +1344,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_analytics_top_posts"
       }
     },
     "/v1/reports/summary": {
@@ -1440,7 +1456,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_reports_summary"
       }
     },
     "/v1/media": {
@@ -1539,7 +1556,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_media"
       }
     },
     "/v1/media/import": {
@@ -1649,7 +1667,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_media_import"
       }
     },
     "/v1/renders/manifest": {
@@ -1739,7 +1758,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_renders_manifest"
       }
     },
     "/v1/automation": {
@@ -1829,7 +1849,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_automation"
       },
       "post": {
         "summary": "Buat aturan automation",
@@ -1927,7 +1948,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_automation"
       }
     },
     "/v1/automation/{id}": {
@@ -2037,7 +2059,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "patch_v1_automation_id"
       },
       "delete": {
         "summary": "Hapus aturan automation",
@@ -2135,7 +2158,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "delete_v1_automation_id"
       }
     },
     "/v1/carousel": {
@@ -2245,7 +2269,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_carousel"
       }
     },
     "/v1/carousel/{id}": {
@@ -2345,7 +2370,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_carousel_id"
       }
     },
     "/v1/video": {
@@ -2455,7 +2481,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_video"
       }
     },
     "/v1/video/{id}": {
@@ -2555,7 +2582,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_video_id"
       }
     },
     "/v1/auto-clip": {
@@ -2665,7 +2693,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_auto_clip"
       }
     },
     "/v1/auto-clip/{id}": {
@@ -2765,7 +2794,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_auto_clip_id"
       }
     },
     "/v1/auto-clip/{id}/select": {
@@ -2885,7 +2915,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_auto_clip_id_select"
       }
     },
     "/v1/ai/usage": {
@@ -2975,7 +3006,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_ai_usage"
       }
     },
     "/v1/ai/caption": {
@@ -3085,7 +3117,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_ai_caption"
       }
     },
     "/v1/ai/hashtag": {
@@ -3195,7 +3228,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_ai_hashtag"
       }
     },
     "/v1/ai/rewrite": {
@@ -3305,7 +3339,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_ai_rewrite"
       }
     },
     "/v1/ai/repurpose": {
@@ -3415,7 +3450,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_ai_repurpose"
       }
     },
     "/v1/trends": {
@@ -3517,7 +3553,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_trends"
       }
     },
     "/v1/trends/ideas": {
@@ -3637,7 +3674,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_trends_ideas"
       }
     },
     "/v1/accounts/{platform}/authorize": {
@@ -3760,7 +3798,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_accounts_platform_authorize"
       }
     },
     "/v1/accounts/{platform}/connect": {
@@ -3910,7 +3949,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_accounts_platform_connect"
       }
     },
     "/v1/accounts/{platform}/exchange": {
@@ -4060,7 +4100,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_accounts_platform_exchange"
       }
     },
     "/v1/accounts/pending/{id}": {
@@ -4170,7 +4211,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "get_v1_accounts_pending_id"
       }
     },
     "/v1/accounts/pending/{id}/select": {
@@ -4300,7 +4342,202 @@
               }
             }
           }
-        }
+        },
+        "operationId": "post_v1_accounts_pending_id_select"
+      }
+    },
+    "/v1/webhooks/deliveries": {
+      "get": {
+        "summary": "Log pengiriman webhook",
+        "description": "Audit pengiriman webhook organisasi (maks 100). Konfigurasi endpoint sendiri hanya bisa diatur via UI sesi (Settings → Webhook), bukan API.",
+        "tags": [
+          "Webhooks"
+        ],
+        "x-required-scopes": [
+          "webhooks:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar delivery terbaru.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookDeliveriesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_v1_webhooks_deliveries"
+      }
+    },
+    "/v1/webhooks/events": {
+      "get": {
+        "summary": "Daftar event yang dapat dilanggan",
+        "description": "Daftar event webhook yang bisa dipilih saat membuat endpoint. Versi ini adalah kontrak stabil: event baru hanya ditambahkan, tidak dihapus atau diubah namanya.",
+        "tags": [
+          "Webhooks"
+        ],
+        "x-required-scopes": [
+          "webhooks:read"
+        ],
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Daftar event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookEventsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Permintaan tidak valid (validasi schema / input salah).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API key tidak ada, tidak valid, atau sudah dicabut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Plan tidak termasuk api_access (atau api_write untuk endpoint tulis).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Key tidak memiliki scope yang dibutuhkan endpoint ini.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Endpoint tidak ditemukan, atau sumber daya tidak ada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan (60/menit per key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_v1_webhooks_events"
       }
     }
   },
@@ -7333,6 +7570,86 @@
           "ideas",
           "credits"
         ]
+      },
+      "WebhookDeliveriesResponse": {
+        "type": "object",
+        "properties": {
+          "deliveries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WebhookDeliveryItem"
+            }
+          }
+        },
+        "required": [
+          "deliveries"
+        ]
+      },
+      "WebhookDeliveryItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "endpointId": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "delivered",
+              "failed"
+            ]
+          },
+          "attempt": {
+            "type": "integer"
+          },
+          "responseStatus": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deliveredAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "endpointId",
+          "event",
+          "status",
+          "attempt",
+          "responseStatus",
+          "createdAt",
+          "deliveredAt"
+        ]
+      },
+      "WebhookEventsResponse": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "events"
+        ]
       }
     },
     "parameters": {},
@@ -7344,5 +7661,5 @@
       }
     }
   },
-  "x-scope-descriptions": "Scope yang dibutuhkan key untuk endpoint ini. Key harus\nmemiliki minimal satu scope terdaftar (diberikan saat membuat key di Settings → API).\nLihat https://docs.sahabatkreator.com/v1#scopes untuk daftar lengkap."
+  "x-scope-descriptions": "Scope yang dibutuhkan key untuk endpoint ini. Key harus\nmemiliki minimal satu scope terdaftar (diberikan saat membuat key di Settings → API).\nLihat https://docs.sahabatkreator.com/api/authentication#scopes untuk daftar lengkap."
 }

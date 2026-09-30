@@ -2,6 +2,8 @@
 //
 // Token plaintext HANYA tampil di panel reveal (sekali), tidak pernah lagi
 // setelah panel ditutup — server pun hanya menyimpan SHA-256-nya.
+
+import { env } from "@sahabatkreator/env/web";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
@@ -443,12 +445,8 @@ export function ApiKeySettings() {
         <h3 className="font-semibold text-sm">Contoh pemakaian</h3>
         <pre className="overflow-x-auto rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] p-3 text-xs">
           {`curl -H "Authorization: Bearer sk_api_..." \\
-  https://api.sahabatkreator.com/v1/ping`}
+  https://sahabatkreator.com/v1/ping`}
         </pre>
-        <p className="text-[var(--text-muted)] text-xs">
-          Ganti host dengan URL server yang kamu pakai. Endpoint tersedia di bawah /v1 — daftar
-          lengkap ada di halaman /docs.
-        </p>
       </div>
     </div>
   );
