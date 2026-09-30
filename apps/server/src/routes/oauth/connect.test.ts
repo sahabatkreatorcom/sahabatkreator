@@ -217,7 +217,14 @@ describe("connectWithCode — routing native vs bridge", () => {
     primeBridge("facebook");
     mocks.replizExchangeCode.mockResolvedValue("token_repliz");
     mocks.replizGetFacebookPages.mockResolvedValue([
-      { id: "fb_1", name: "Page Satu", username: "igsatu", token: "rt1" },
+      {
+        id: "fb_1",
+        name: "Page Satu",
+        username: "igsatu",
+        picture: "https://scontent.fbcdn.net/page1.jpg",
+        token: "rt1",
+      },
+      { id: "fb_2", name: "Page Dua", username: "igdua", token: "rt2" },
     ]);
 
     const result = await connectWithCode({ platform: "facebook", code: "abc", ...CTX });
@@ -227,8 +234,19 @@ describe("connectWithCode — routing native vs bridge", () => {
         id: "fb_1",
         name: "Page Satu",
         username: "igsatu",
-        picture: null,
+        // Foto Page Repliz WAJIB sampai ke picker — kalau tidak, avatar hilang
+        // dan UI jatuh ke ikon generik.
+        picture: "https://scontent.fbcdn.net/page1.jpg",
         // Bridge tidak melaporkan IG tertaut per Page → false, bukan menebak.
+        hasInstagram: false,
+        isPersonal: false,
+      },
+      {
+        id: "fb_2",
+        name: "Page Dua",
+        username: "igdua",
+        // Page tanpa `picture` → null, bukan string kosong.
+        picture: null,
         hasInstagram: false,
         isPersonal: false,
       },

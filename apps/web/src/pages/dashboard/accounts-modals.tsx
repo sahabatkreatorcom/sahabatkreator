@@ -228,6 +228,10 @@ export function PagePickerModal({
   // Ikon brand dari PLATFORMS (lucide v1 tidak punya ikon brand).
   const isYouTubeFlow = data?.platform === "youtube";
   const YouTubeIcon = PLATFORMS.youtube.icon;
+  // facebook = Page Meta via bridge Repliz; ikon brand dipakai sebagai fallback
+  // saat Page tidak punya foto.
+  const isFacebookFlow = data?.platform === "facebook";
+  const FacebookIcon = PLATFORMS.facebook.icon;
 
   const title = isLinkedInOrgFlow
     ? "Pilih Halaman Company LinkedIn"
@@ -283,23 +287,38 @@ export function PagePickerModal({
                       : "border-[var(--border)] hover:border-[var(--accent-gold)]"
                   } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--bg-tertiary)]">
-                    {isLinkedInAnyFlow ? (
-                      asset.isPersonal ? (
-                        <User className="h-5 w-5 text-[var(--text-secondary)]" />
+                  {/* Avatar entitas bila tersedia (foto Page / thumbnail channel /
+                      foto profil) — sebelumnya sel ini SELALU ikon generik, jadi
+                      `assets[].picture` dari server tidak pernah terpakai. Ikon
+                      hanya fallback saat entitas memang tanpa gambar. */}
+                  {asset.picture ? (
+                    <Avatar
+                      src={asset.picture}
+                      alt={asset.name}
+                      name={asset.name}
+                      className="h-10 w-10"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--bg-tertiary)]">
+                      {isLinkedInAnyFlow ? (
+                        asset.isPersonal ? (
+                          <User className="h-5 w-5 text-[var(--text-secondary)]" />
+                        ) : (
+                          <Building2 className="h-5 w-5 text-[var(--text-secondary)]" />
+                        )
+                      ) : isPinterestFlow ? (
+                        <Pin className="h-5 w-5 text-[var(--text-secondary)]" />
+                      ) : isYouTubeFlow ? (
+                        <YouTubeIcon className="h-5 w-5 text-[var(--text-secondary)]" />
+                      ) : isFacebookFlow ? (
+                        <FacebookIcon className="h-5 w-5 text-[var(--text-secondary)]" />
+                      ) : asset.hasInstagram ? (
+                        <AtSign className="h-5 w-5 text-[var(--text-secondary)]" />
                       ) : (
-                        <Building2 className="h-5 w-5 text-[var(--text-secondary)]" />
-                      )
-                    ) : isPinterestFlow ? (
-                      <Pin className="h-5 w-5 text-[var(--text-secondary)]" />
-                    ) : isYouTubeFlow ? (
-                      <YouTubeIcon className="h-5 w-5 text-[var(--text-secondary)]" />
-                    ) : asset.hasInstagram ? (
-                      <AtSign className="h-5 w-5 text-[var(--text-secondary)]" />
-                    ) : (
-                      <Info className="h-5 w-5 text-[var(--text-muted)]" />
-                    )}
-                  </div>
+                        <Info className="h-5 w-5 text-[var(--text-muted)]" />
+                      )}
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm">{asset.name}</p>
                     <p className="text-[var(--text-muted)] text-xs">
@@ -311,9 +330,17 @@ export function PagePickerModal({
                           ? `Board — @${asset.username ?? "pinterest"}`
                           : isYouTubeFlow
                             ? "Channel YouTube"
-                            : asset.hasInstagram
-                              ? `IG: @${asset.username ?? "bisnis"}`
-                              : "Tanpa Instagram Business"}
+                            : isFacebookFlow
+                              ? // `hasInstagram` selalu false di jalur bridge Repliz
+                                // (API-nya tidak melaporkan IG tertaut), jadi tanpa
+                                // cabang ini Page Facebook berlabel "Tanpa Instagram
+                                // Business" — menyesatkan di picker Facebook.
+                                asset.username
+                                ? `Facebook Page — @${asset.username}`
+                                : "Facebook Page"
+                              : asset.hasInstagram
+                                ? `IG: @${asset.username ?? "bisnis"}`
+                                : "Tanpa Instagram Business"}
                     </p>
                   </div>
                   {selected && <Check className="h-4 w-4 shrink-0 text-[var(--accent-gold)]" />}

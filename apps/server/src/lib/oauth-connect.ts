@@ -792,6 +792,10 @@ export async function connectViaRepliz(params: {
       pageAccessTokenEnc: encrypt(p.token), // token entitas Repliz, terenkripsi at-rest
       igUserId: null,
       igUsername: p.username ?? null,
+      // `picture` dari Repliz (foto Page / thumbnail channel) → avatar picker.
+      // Tanpa baris ini `toPendingAssets` selalu mengembalikan `picture: null`
+      // untuk SELURUH platform bridge, jadi picker jatuh ke ikon generik.
+      avatarUrl: p.picture ?? null,
       // Marker flow bridge — `pending/:id/select` mendeteksi ini untuk connect
       // lewat Repliz alih-alih adapter native.
       replizBridge: true,
