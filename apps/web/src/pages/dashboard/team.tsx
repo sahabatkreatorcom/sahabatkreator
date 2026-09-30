@@ -125,7 +125,10 @@ export function TeamPage() {
 
   if (isLoading) return <PageLoader />;
 
-  const members = (data ?? []) as unknown as Member[];
+  // better-auth 1.6.x: organization.listMembers() mengembalikan { members, total },
+  // bukan array. Cast `as unknown as Member[]` yang lama menyembunyikan ini dari
+  // TypeScript, sehingga `members.map` meledak saat data benar-benar ada.
+  const members = (data as unknown as { members?: Member[] } | undefined)?.members ?? [];
   const invitations = ((invitesData ?? []) as unknown as Invitation[]).filter(
     (i) => i.status === "pending",
   );
