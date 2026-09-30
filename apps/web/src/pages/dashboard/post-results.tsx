@@ -3,7 +3,12 @@
 // /analytics/top-posts yang sudah ter-agregat (snapshot post_analytics terbaru).
 //
 // Layout grid dgn thumbnail media (seperti profil sosmed) — lebih mudah
-// mengenali post secara visual dibanding list teks.
+// mengenali post secara visual dibanding list teks. Klik kartu → modal detail
+// (teks lengkap + gambar/video + metrik) untuk SEMUA platform.
+//
+// Sumber data: tabel `post` (post yang diterbitkan lewat app + hasil impor
+// posts-sync dari platform). Post Threads masuk lewat posts-sync
+// (`GET /{threads-user-id}/threads`) sehingga tampil di grid yang sama.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
@@ -14,6 +19,7 @@ import {
   Loader2,
   MessageCircle,
   Play,
+  RefreshCw,
   Share2,
   Trash2,
   TrendingUp,
@@ -21,7 +27,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ThreadsOwnPostsPanel } from "@/components/analytics/threads-own-posts-panel";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageLoader } from "@/components/ui/spinner";
 import { api } from "@/lib/api";
@@ -91,7 +97,7 @@ function sortPosts(posts: TopPost[], sort: SortKey): TopPost[] {
   return [...posts].sort((a, b) => value(b) - value(a));
 }
 
-function PostCard({ post, rank, onPlay }: { post: TopPost; rank: number; onPlay: () => void }) {
+function PostCard({ post, rank, onOpen }: { post: TopPost; rank: number; onOpen: () => void }) {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
 
@@ -121,29 +127,14 @@ function PostCard({ post, rank, onPlay }: { post: TopPost; rank: number; onPlay:
       {/* Thumbnail media (rasio 1:1 seperti grid sosmed) atau caption post */}
       <div className="relative aspect-square bg-[var(--bg-tertiary)]">
         {showMedia ? (
-          isVideo ? (
-            // Video: thumbnail bisa diklik → lightbox memuat video asli
-            // (preload="none") hanya saat dibuka. Grid tetap ringan.
-            <button
-              type="button"
-              onClick={onPlay}
-              className="group/play absolute inset-0 h-full w-full cursor-pointer"
-              aria-label="Putar video"
-            >
-              <img
-                src={post.media?.url}
-                alt={post.content?.slice(0, 80) ?? "Post"}
-                loading="lazy"
-                onError={() => setImgError(true)}
-                className="h-full w-full object-cover"
-              />
-              <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover/play:bg-black/25">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/70 backdrop-blur">
-                  <Play className="ml-0.5 h-5 w-5 fill-white text-white" />
-                </span>
-              </span>
-            </button>
-          ) : (
+          // Thumbnail (gambar atau poster video) diklik → modal detail.
+          // Video tetap `preload="none"` supaya grid tetap ringan.
+          <button
+            type="button"
+            onClick={onOpen}
+            className="group/play absolute inset-0 h-full w-full cursor-pointer"
+            aria-label="Lihat detail post"
+          >
             <img
               src={post.media?.url}
               alt={post.content?.slice(0, 80) ?? "Post"}
@@ -151,11 +142,24 @@ function PostCard({ post, rank, onPlay }: { post: TopPost; rank: number; onPlay:
               onError={() => setImgError(true)}
               className="h-full w-full object-cover"
             />
-          )
+            {isVideo && (
+              <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover/play:bg-black/25">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/70 backdrop-blur">
+                  <Play className="ml-0.5 h-5 w-5 fill-white text-white" />
+                </span>
+              </span>
+            )}
+          </button>
         ) : (
           // Post teks-only — tampilkan isi caption (bukan ikon saja) agar
           // post dikenali; watermark ikon platform sebagai identitas.
-          <div className="absolute inset-0 flex items-center justify-center p-5">
+          // Bisa diklik juga → detail (mis. post Threads text-only).
+          <button
+            type="button"
+            onClick={onOpen}
+            className="absolute inset-0 flex w-full cursor-pointer items-center justify-center p-5 text-left"
+            aria-label="Lihat detail post"
+          >
             {Icon && (
               <Icon
                 className="pointer-events-none absolute inset-0 m-auto h-24 w-24 opacity-[0.08]"
@@ -166,7 +170,7 @@ function PostCard({ post, rank, onPlay }: { post: TopPost; rank: number; onPlay:
             <p className="relative z-10 line-clamp-5 text-center font-medium text-[var(--text-secondary)] text-sm">
               {post.content || "(media saja)"}
             </p>
-          </div>
+          </button>
         )}
 
         {/* Badge video play (indikator sekunder — tombol utama overlay di atas) */}
@@ -311,11 +315,17 @@ function PostCard({ post, rank, onPlay }: { post: TopPost; rank: number; onPlay:
   );
 }
 
-/** Lightbox video — memuat video asli hanya saat dibuka (preload="none"),
- * sehingga grid 50 post tetap ringan. Auto-cleanup saat ditutup. */
-function VideoLightbox({ post, onClose }: { post: TopPost; onClose: () => void }) {
+/**
+ * Modal detail post — teks lengkap, gambar/video, dan metrik.
+ *
+ * Dipakai SEMUA platform (termasuk post Threads hasil impor) supaya cara
+ * melihat detail konsisten: klik kartu mana pun → detail. Video dimuat hanya
+ * saat modal dibuka (`preload="none"`), jadi grid tetap ringan.
+ */
+function PostDetailModal({ post, onClose }: { post: TopPost; onClose: () => void }) {
   const cfg = PLATFORMS[post.platform as keyof typeof PLATFORMS];
   const Icon = cfg?.icon;
+  const isVideo = post.media?.type === "video";
   const videoUrl = post.media?.videoUrl;
 
   useEffect(() => {
@@ -337,49 +347,112 @@ function VideoLightbox({ post, onClose }: { post: TopPost; onClose: () => void }
         onClick={onClose}
         aria-hidden
       />
-      <div className="relative z-10 w-full max-w-3xl animate-fade-in space-y-3">
-        {videoUrl ? (
+      <div className="relative z-10 flex max-h-[88vh] w-full max-w-3xl animate-fade-in flex-col overflow-hidden rounded-[var(--radius-lg)] bg-[var(--bg-primary)] shadow-2xl">
+        {/* Kepala: akun + platform + tanggal */}
+        <div className="flex items-start justify-between gap-3 border-[var(--border-light)] border-b p-4">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {post.avatarUrl ? (
+              <img
+                src={post.avatarUrl}
+                alt=""
+                className="h-9 w-9 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              Icon && (
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-tertiary)]">
+                  <Icon className="h-4 w-4" style={{ color: cfg?.color }} />
+                </span>
+              )
+            )}
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-sm">
+                {post.displayName || post.username || "—"}
+              </p>
+              <p className="truncate text-[11px] text-[var(--text-muted)]">
+                {cfg?.label ?? post.platform}
+                {post.username && ` · @${post.username}`}
+                {post.publishedAt && ` · ${formatDate(post.publishedAt, "long")}`}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--bg-tertiary)] px-3 py-1.5 text-xs hover:bg-[var(--bg-secondary)]"
+          >
+            <X className="h-3.5 w-3.5" /> Tutup
+          </button>
+        </div>
+
+        {/* Media */}
+        {isVideo && videoUrl ? (
           <video
             key={videoUrl}
             src={videoUrl}
+            poster={post.media?.url}
             controls
             autoPlay
             preload="none"
             playsInline
-            className="max-h-[72vh] w-full rounded-[var(--radius-lg)] bg-black"
+            className="max-h-[50vh] w-full bg-black"
           >
-            {/* Track placeholder — platform umumnya tidak sertakan caption
-                transkrip; wajib ada untuk a11y (biome). */}
+            {/* Track placeholder — platform tidak menyertakan transkrip; wajib
+                ada untuk a11y (biome). */}
             <track kind="captions" />
           </video>
+        ) : post.media ? (
+          <img
+            src={post.media.url}
+            alt={post.content?.slice(0, 80) ?? "Post"}
+            className="max-h-[50vh] w-full bg-black object-contain"
+          />
         ) : (
-          <div className="flex aspect-video w-full items-center justify-center rounded-[var(--radius-lg)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] text-sm">
-            Video tidak tersedia
+          <div className="flex items-center justify-center bg-[var(--bg-tertiary)] px-6 py-10 text-center text-[var(--text-muted)] text-sm italic">
+            Post ini tidak punya media (text-only)
           </div>
         )}
-        <div className="flex items-center justify-between gap-3 px-1">
-          <p className="line-clamp-2 text-sm text-white/90">{post.content}</p>
-          <div className="flex shrink-0 items-center gap-2">
-            {Icon && <Icon className="h-4 w-4" style={{ color: cfg?.color }} />}
-            {post.platformPostUrl && (
-              <a
-                href={post.platformPostUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-white/70 text-xs hover:text-white hover:underline"
-              >
-                <ExternalLink className="h-3 w-3" /> Buka di platform
-              </a>
+
+        {/* Teks lengkap + metrik */}
+        <div className="space-y-3 overflow-y-auto p-4">
+          {post.content ? (
+            <p className="whitespace-pre-wrap text-[var(--text-primary)] text-sm">{post.content}</p>
+          ) : (
+            <p className="text-[var(--text-muted)] text-sm italic">(post tanpa teks)</p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-[var(--border-light)] border-t pt-3 text-[var(--text-secondary)] text-xs">
+            <span className="inline-flex items-center gap-1">
+              <Eye className="h-3.5 w-3.5" /> {formatCompact(post.views)} views
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Heart className="h-3.5 w-3.5" /> {formatCompact(post.likes)} likes
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <MessageCircle className="h-3.5 w-3.5" /> {formatCompact(post.comments)} komentar
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Share2 className="h-3.5 w-3.5" /> {formatCompact(post.shares)} share
+            </span>
+            {post.engagementRate !== null && (
+              <span className="inline-flex items-center gap-1">
+                <TrendingUp className="h-3.5 w-3.5" /> {post.engagementRate}% engage
+              </span>
             )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex items-center gap-1 text-white/70 text-xs hover:text-white"
-            >
-              <X className="h-3.5 w-3.5" /> Tutup
-            </button>
           </div>
         </div>
+
+        {post.platformPostUrl && (
+          <div className="border-[var(--border-light)] border-t p-4">
+            <a
+              href={post.platformPostUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-[var(--accent-gold)] text-sm hover:underline"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> Buka post di {cfg?.label ?? post.platform}
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -395,8 +468,24 @@ export function PostResultsPage() {
   const [platform, setPlatform] = useState<string>("all");
   const [account, setAccount] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("views");
-  // Post video yang sedang diputar di lightbox (null = tertutup)
-  const [playing, setPlaying] = useState<TopPost | null>(null);
+  // Post yang detailnya sedang dibuka (null = tertutup)
+  const [detail, setDetail] = useState<TopPost | null>(null);
+  const queryClient = useQueryClient();
+
+  // Import manual konten yang dipublikasikan langsung di platform (termasuk
+  // Threads) → muncul di grid ini. Worker juga sinkron otomatis tiap 4 jam;
+  // tombol ini untuk yang ingin segera melihat post terbarunya.
+  const syncPosts = useMutation({
+    mutationFn: () => api.post<{ summary: { totalPostsImported: number } }>("/posts/sync", {}),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.postResults });
+      const n = res.summary?.totalPostsImported ?? 0;
+      toast.success(
+        n > 0 ? `${n} konten platform berhasil diimpor` : "Konten platform sudah terbaru",
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   // Ambil SEMUA post sekali, filter platform client-side. Filter server-side
   // menyebabkan daftar platform ikut tersaring → tombol platform lain hilang
@@ -483,23 +572,37 @@ export function PostResultsPage() {
       : null;
   const withMedia = posts.filter((p) => p.media !== null).length;
 
-  // Threads punya sumber data sendiri: post milik user ditarik LIVE dari Threads
-  // API (tabel `post` aplikasi tidak menyimpan post Threads — lihat komentar di
-  // threads-own-posts-panel.tsx). Jadi saat filter Threads aktif, slot hasil
-  // diisi panel itu, bukan grid kosong.
-  const isThreadsView = platform === "threads";
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-bold text-2xl">Hasil Post</h1>
-        <p className="mt-1 text-[var(--text-secondary)] text-sm">
-          Performa post yang sudah tayang — views, likes, komentar, dan engagement rate per platform
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-bold text-2xl">Hasil Post</h1>
+          <p className="mt-1 text-[var(--text-secondary)] text-sm">
+            Performa post yang sudah tayang — views, likes, komentar, dan engagement rate per
+            platform
+          </p>
+        </div>
+        {/* Sinkron manual: tarik konten yang dipublikasikan langsung di platform
+            (IG, FB, YouTube, Threads) ke grid ini. Berlaku untuk semua platform
+            sekaligus — bukan tombol khusus satu platform. */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => syncPosts.mutate()}
+          disabled={syncPosts.isPending}
+          title="Impor konten yang dipublikasikan langsung di platform (90 hari terakhir)"
+        >
+          {syncPosts.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
+          Sinkron Platform
+        </Button>
       </div>
 
-      {/* Ringkasan — hanya untuk grid (view Threads punya hitungannya sendiri) */}
-      {!isThreadsView && !isLoading && allPosts.length > 0 && (
+      {/* Ringkasan */}
+      {!isLoading && allPosts.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="card p-4">
             <div className="flex items-center gap-2 text-[var(--text-muted)] text-xs">
@@ -644,9 +747,7 @@ export function PostResultsPage() {
           ke platform kosong membuat dokumen menyusut di bawah posisi scroll dan
           browser "melompat" ke atas. */}
       <div className="min-h-[360px]">
-        {isThreadsView ? (
-          <ThreadsOwnPostsPanel />
-        ) : isLoading ? (
+        {isLoading ? (
           <PageLoader />
         ) : posts.length === 0 ? (
           <EmptyState
@@ -664,21 +765,21 @@ export function PostResultsPage() {
           // Grid responsif: 2 kolom mobile → 5 kolom layar besar
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {posts.map((p, index) => (
-              <PostCard key={p.postId} post={p} rank={index + 1} onPlay={() => setPlaying(p)} />
+              <PostCard key={p.postId} post={p} rank={index + 1} onOpen={() => setDetail(p)} />
             ))}
           </div>
         )}
       </div>
 
-      {!isThreadsView && posts.length > 0 && (
+      {posts.length > 0 && (
         <p className="text-[var(--text-muted)] text-xs">
           {posts.length} post · {withMedia} dengan media · metrik diperbarui otomatis setiap 1 menit
         </p>
       )}
 
-      {/* Video lightbox — element <video> hanya ada di DOM saat playing !== null,
+      {/* Modal detail — elemen <video> hanya ada di DOM saat detail !== null,
           sehingga tidak ada byte video yang dimuat untuk grid */}
-      {playing && <VideoLightbox post={playing} onClose={() => setPlaying(null)} />}
+      {detail && <PostDetailModal post={detail} onClose={() => setDetail(null)} />}
     </div>
   );
 }

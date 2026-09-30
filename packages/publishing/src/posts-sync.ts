@@ -19,6 +19,7 @@ import {
   getFacebookPageStories,
   getInstagramMedia,
   getInstagramStories,
+  getThreadsOwnPostsForSync,
   getTikTokVideos,
   getYouTubeVideos,
 } from "./posts-sync-api";
@@ -26,12 +27,16 @@ import { type ReplizContent, replizActiveCredentials, replizListContent } from "
 import { refreshAccountToken } from "./token-refresh";
 
 /** Platform yang didukung posts-sync (punya API list konten terbit).
- *  Pinterest dikecualikan — Developer Guidelines melarang penyimpanan metadata.
+ *  Pinterest dikecualikan — Developer Guidelines Pinterest: "you may not store
+ *  any information accessed through any Pinterest Materials including the API"
+ *  (kecuali campaign analytics milik akun sendiri), jadi pin TIDAK boleh
+ *  disimpan di DB. Data Pinterest ditampilkan on-demand di panel Analytics.
  */
 export const POSTS_SYNC_PLATFORMS = new Set<string>([
   "instagram",
   "instagram_standalone",
   "facebook",
+  "threads",
   "tiktok",
   "youtube",
 ]);
@@ -295,6 +300,12 @@ async function fetchExternalPosts(
       ]);
       if (!posts.ok) return { error: posts.error };
       return stories.ok ? [...posts.data, ...stories.data] : posts.data;
+    }
+    case "threads": {
+      // Post milik akun Threads sendiri — scope threads_basic. Ini yang membuat
+      // post Threads muncul di grid/kalender yang sama dengan IG/FB/YouTube.
+      const result = await getThreadsOwnPostsForSync(accessToken, account.platformAccountId, since);
+      return result.ok ? result.data : { error: result.error };
     }
     case "tiktok": {
       const result = await getTikTokVideos(accessToken, since);

@@ -6,6 +6,7 @@
 
 import { GRAPH_FB_URL, GRAPH_IG_URL, TIKTOK_OPEN_API_URL, YOUTUBE_API_URL } from "./config";
 import { httpRequest } from "./http";
+import { getThreadsOwnPosts } from "./threads-advanced";
 
 const GRAPH_FB = GRAPH_FB_URL;
 /** IG standalone (Instagram API with Instagram Login) — host graph.instagram.com */
@@ -15,8 +16,8 @@ export const GRAPH_IG = GRAPH_IG_URL;
 export type ExternalPost = {
   externalId: string;
   caption: string;
-  /** IMAGE | VIDEO | CAROUSEL | REEL | STORY */
-  mediaType: "IMAGE" | "VIDEO" | "CAROUSEL" | "REEL" | "STORY";
+  /** TEXT (tanpa media) | IMAGE | VIDEO | CAROUSEL | REEL | STORY */
+  mediaType: "TEXT" | "IMAGE" | "VIDEO" | "CAROUSEL" | "REEL" | "STORY";
   mediaUrl?: string;
   thumbnailUrl?: string;
   permalink: string;
@@ -361,6 +362,77 @@ export async function getYouTubeVideos(
       });
     }
     return { ok: true, data: posts };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Threads — post milik akun sendiri
+// ---------------------------------------------------------------------------
+
+/** Map `media_type` Threads → `ExternalPost.mediaType` (dipakai UI utk badge & video) */
+function mapThreadsMediaType(mediaType?: string): ExternalPost["mediaType"] {
+  switch (mediaType) {
+    case "IMAGE":
+      return "IMAGE";
+    case "VIDEO":
+      return "VIDEO";
+    case "CAROUSEL_ALBUM":
+      return "CAROUSEL";
+    default:
+      // TEXT_POST, AUDIO, REPOST_FACADE → tidak ada media inline
+      return "TEXT";
+  }
+}
+
+/**
+ * Ambil post milik akun Threads sendiri untuk diimpor ke DB.
+ * `GET /{threads-user-id}/threads` — scope `threads_basic`.
+ *
+ * Beda dari platform lain (yang punya endpoint media/uploaded):
+ * - VIDEO: `media_url` = URL file video (dipakai lightbox), `thumbnail_url` = poster.
+ * - IMAGE: `media_url` = URL gambar → dipakai sebagai thumbnail sekaligus media.
+ * - CAROUSEL: item pertama di `children` dipakai sebagai perwakilan.
+ *
+ * Catatan: tanpa scope ini, post Threads tidak akan pernah muncul di kalender
+ * maupun /post-results (tabel `post` tidak menyimpan post Threads).
+ */
+export async function getThreadsOwnPostsForSync(
+  accessToken: string,
+  userId: string,
+  since?: Date,
+): Promise<FetchResult> {
+  try {
+    // 50 = batas maksimum yang diterima Graph untuk endpoint ini.
+    const { posts } = await getThreadsOwnPosts({ accessToken, userId, limit: 50 });
+    const out: ExternalPost[] = [];
+
+    for (const p of posts) {
+      if (!p.id) continue;
+      const publishedAt = p.timestamp ? new Date(p.timestamp) : null;
+      if (!publishedAt || Number.isNaN(publishedAt.getTime())) continue;
+      if (since && publishedAt < since) continue;
+
+      // Item yang mewakili media: anak carousel pertama, atau post itu sendiri.
+      const source = p.children?.data?.[0] ?? p;
+      const isVideo = source.media_type === "VIDEO" || p.media_type === "VIDEO";
+      const mediaUrl = source.media_url ?? p.media_url;
+      const posterUrl = source.thumbnail_url ?? p.thumbnail_url;
+      const thumbnailUrl = isVideo ? posterUrl : mediaUrl;
+
+      out.push({
+        externalId: p.id,
+        caption: p.text ?? "",
+        mediaType: mapThreadsMediaType(p.media_type),
+        ...(mediaUrl ? { mediaUrl } : {}),
+        ...(thumbnailUrl ? { thumbnailUrl } : {}),
+        permalink: p.permalink ?? "",
+        publishedAt,
+      });
+    }
+
+    return { ok: true, data: out };
   } catch (error) {
     return fail(error);
   }
