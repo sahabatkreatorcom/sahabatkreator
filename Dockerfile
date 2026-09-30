@@ -52,6 +52,7 @@ COPY apps/mcp/package.json apps/mcp/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
 COPY apps/worker/package.json apps/worker/
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile
 
 # --- build: web (Vite) + server (tsdown) ----------------------------------------
 FROM deps AS build
