@@ -74,6 +74,48 @@ async function resolveAppSecret(app: DeletionApp): Promise<string | null> {
   return APP_CONFIG[app].envSecret ?? null;
 }
 
+/**
+ * Ambil `signed_request` dari raw body apa pun bentuknya.
+ *
+ * Meta mengirim **form-urlencoded** (`signed_request=<base64url>.<base64url>`),
+ * tapi sejumlah tooling (Graph API Explorer, curl manual, test) mengirim JSON
+ * atau string mentah. Bentuk body TIDAK boleh disimpulkan dari isinya —
+ * deteksi berbasis isi pernah membuat protokol resmi Meta gagal:
+ * body `signed_request=abc.def` tidak cocok regex "raw signed_request" (ada `=`),
+ * lalu jatuh ke `JSON.parse` yang melempar → endpoint balas 400
+ * "signed_request wajib ada" padahal Meta mengirim dengan benar.
+ * Akibatnya callback data deletion GAGAL dan App Review ditolak.
+ *
+ * Urutan deteksi (aman untuk semua bentuk):
+ * 1. JSON `{ "signed_request": "..." }` (body diawali `{`)
+ * 2. form-urlencoded `signed_request=...` (protokol Meta; otomatis URL-decode)
+ * 3. string mentah `signature.payload` tanpa prefix
+ */
+export function extractSignedRequest(rawBody: string): string | undefined {
+  const trimmed = rawBody.trim();
+  if (!trimmed) return undefined;
+
+  if (trimmed.startsWith("{")) {
+    try {
+      const body = JSON.parse(trimmed) as { signed_request?: unknown };
+      if (typeof body.signed_request === "string" && body.signed_request) {
+        return body.signed_request;
+      }
+    } catch {
+      // bukan JSON valid → lanjut ke bentuk lain
+    }
+  }
+
+  // form-urlencoded: URLSearchParams men-decode %XX dan '+' dengan benar
+  const fromForm = new URLSearchParams(trimmed).get("signed_request");
+  if (fromForm) return fromForm;
+
+  // raw signed_request (base64url) — tanpa '=' sehingga tidak tertangkap di atas
+  if (/^[a-z0-9_-]+\.[a-z0-9_-]+$/i.test(trimmed)) return trimmed;
+
+  return undefined;
+}
+
 /** Verifikasi & parse signed_request Meta → payload atau null */
 function parseSignedRequest(signedRequest: string, secret: string): Record<string, unknown> | null {
   const dotIndex = signedRequest.indexOf(".");
@@ -157,20 +199,7 @@ async function handleDeletionRequest(app: DeletionApp, rawBody: string): Promise
   }
 
   // Body: form-urlencoded (standar Meta) atau JSON
-  let signedRequest: string | undefined;
-  try {
-    const contentTypeMatch = /application\/x-www-form-urlencoded/.test(rawBody);
-    if (contentTypeMatch || /^[a-z0-9_-]+\.[a-z0-9_-]+$/i.test(rawBody.trim())) {
-      // Form-encoded: signed_request=xxx (bisa URL-encoded) atau raw signed_request
-      const params = new URLSearchParams(rawBody);
-      signedRequest = params.get("signed_request") ?? rawBody.trim();
-    } else {
-      const body = JSON.parse(rawBody) as { signed_request?: string };
-      signedRequest = body.signed_request;
-    }
-  } catch {
-    signedRequest = undefined;
-  }
+  const signedRequest = extractSignedRequest(rawBody);
   if (!signedRequest) {
     return Response.json({ message: "signed_request wajib ada" }, { status: 400 });
   }
