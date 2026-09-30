@@ -37,9 +37,14 @@ import { z } from "zod";
 const platformSettingsSchema = z.record(z.string(), z.unknown());
 
 export const createPostSchema = z.object({
-  scheduledAt: z.string().optional(),
+  // `.nullable()` WAJIB: web app mengirim `null` eksplisit untuk "tidak ada nilai"
+  // (audioTrackId: soundTrack?.id ?? null, scheduledAt: null saat mode draft).
+  // Tanpa nullable, Zod menolak dengan "expected string, received null" sehingga
+  // SEMUA publish/draft gagal di validasi — sebelum platform mana pun dipanggil.
+  // Public API (CreatePostSchema) sudah nullable sejak awal; schema ini tertinggal.
+  scheduledAt: z.string().nullable().optional(),
   timezone: z.string().optional(),
-  audioTrackId: z.string().optional(),
+  audioTrackId: z.string().nullable().optional(),
   content: z.string().optional(),
   productIds: z.array(z.string()).default([]),
   items: z.array(
