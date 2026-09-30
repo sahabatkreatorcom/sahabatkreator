@@ -483,6 +483,12 @@ export function PostResultsPage() {
       : null;
   const withMedia = posts.filter((p) => p.media !== null).length;
 
+  // Threads punya sumber data sendiri: post milik user ditarik LIVE dari Threads
+  // API (tabel `post` aplikasi tidak menyimpan post Threads — lihat komentar di
+  // threads-own-posts-panel.tsx). Jadi saat filter Threads aktif, slot hasil
+  // diisi panel itu, bukan grid kosong.
+  const isThreadsView = platform === "threads";
+
   return (
     <div className="space-y-6">
       <div>
@@ -492,13 +498,8 @@ export function PostResultsPage() {
         </p>
       </div>
 
-      {/* Post milik akun Threads sendiri — ditarik langsung dari Threads API,
-          terpisah dari grid di bawah (yang hanya berisi post yang diterbitkan
-          lewat aplikasi ini). Tidak tampil bila tidak ada akun Threads. */}
-      <ThreadsOwnPostsPanel />
-
-      {/* Ringkasan */}
-      {!isLoading && allPosts.length > 0 && (
+      {/* Ringkasan — hanya untuk grid (view Threads punya hitungannya sendiri) */}
+      {!isThreadsView && !isLoading && allPosts.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="card p-4">
             <div className="flex items-center gap-2 text-[var(--text-muted)] text-xs">
@@ -638,28 +639,38 @@ export function PostResultsPage() {
         </div>
       </div>
 
-      {isLoading ? (
-        <PageLoader />
-      ) : posts.length === 0 ? (
-        <EmptyState
-          icon={<BarChart3 className="h-10 w-10" />}
-          title={platform !== "all" ? "Belum ada post untuk platform ini" : "Belum ada post tayang"}
-          description={
-            platform !== "all"
-              ? `Akun ${PLATFORMS[platform as keyof typeof PLATFORMS]?.label ?? platform} sudah terhubung, tapi belum ada post yang diterbitkan melalui platform ini.`
-              : "Hasil post muncul di sini setidaknya satu post berhasil diterbitkan dan analytics-nya tersinkron."
-          }
-        />
-      ) : (
-        // Grid responsif: 2 kolom mobile → 5 kolom layar besar
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {posts.map((p, index) => (
-            <PostCard key={p.postId} post={p} rank={index + 1} onPlay={() => setPlaying(p)} />
-          ))}
-        </div>
-      )}
+      {/* Slot hasil. `min-h` menjaga tinggi halaman tetap stabil saat filter
+          platform berpindah — tanpa itu, pindah dari platform berisi banyak post
+          ke platform kosong membuat dokumen menyusut di bawah posisi scroll dan
+          browser "melompat" ke atas. */}
+      <div className="min-h-[360px]">
+        {isThreadsView ? (
+          <ThreadsOwnPostsPanel />
+        ) : isLoading ? (
+          <PageLoader />
+        ) : posts.length === 0 ? (
+          <EmptyState
+            icon={<BarChart3 className="h-10 w-10" />}
+            title={
+              platform !== "all" ? "Belum ada post untuk platform ini" : "Belum ada post tayang"
+            }
+            description={
+              platform !== "all"
+                ? `Akun ${PLATFORMS[platform as keyof typeof PLATFORMS]?.label ?? platform} sudah terhubung, tapi belum ada post yang diterbitkan melalui platform ini.`
+                : "Hasil post muncul di sini setidaknya satu post berhasil diterbitkan dan analytics-nya tersinkron."
+            }
+          />
+        ) : (
+          // Grid responsif: 2 kolom mobile → 5 kolom layar besar
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {posts.map((p, index) => (
+              <PostCard key={p.postId} post={p} rank={index + 1} onPlay={() => setPlaying(p)} />
+            ))}
+          </div>
+        )}
+      </div>
 
-      {posts.length > 0 && (
+      {!isThreadsView && posts.length > 0 && (
         <p className="text-[var(--text-muted)] text-xs">
           {posts.length} post · {withMedia} dengan media · metrik diperbarui otomatis setiap 1 menit
         </p>

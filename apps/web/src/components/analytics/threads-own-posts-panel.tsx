@@ -325,8 +325,9 @@ export function ThreadsOwnPostsPanel() {
             Post Threads Saya
           </h2>
           <p className="mt-1 text-[var(--text-secondary)] text-xs">
-            Daftar post milik akun Threads sendiri, diambil langsung dari Threads API. Klik
-            &ldquo;Lihat detail&rdquo; untuk melihat teks, gambar, dan video.
+            Daftar post milik akun Threads sendiri, diambil langsung dari Threads API — termasuk
+            post yang dibuat langsung di aplikasi Threads. Klik &ldquo;Lihat detail&rdquo; untuk
+            melihat teks, gambar, dan video.
           </p>
         </div>
 
