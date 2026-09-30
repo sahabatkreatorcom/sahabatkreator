@@ -16,6 +16,14 @@ export const LINKEDIN_API_VERSION = env.LINKEDIN_API_VERSION || "202608";
 export const BLUESKY_PDS_URL = env.BLUESKY_PDS_URL || "https://bsky.social";
 
 /**
+ * AppView publik Bluesky — dipakai untuk MEMBACA data publik (mis. daftar post
+ * sendiri via app.bsky.feed.getAuthorFeed). Tidak butuh token sama sekali, jadi
+ * posts-sync tidak perlu createSession (rate limit login 300/hari tetap aman).
+ */
+export const BLUESKY_PUBLIC_API_URL =
+  env.BLUESKY_PUBLIC_API_URL || "https://public.api.bsky.app";
+
+/**
  * Base URL API Pinterest v5 — set ke https://api-sandbox.pinterest.com/v5 untuk
  * uji di Sandbox (docs/developer-tools/sandbox).
  */

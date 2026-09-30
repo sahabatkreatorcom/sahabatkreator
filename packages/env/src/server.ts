@@ -38,6 +38,7 @@ export const env = createEnv({
     META_GRAPH_VERSION: z.string().default("v26.0"),
     LINKEDIN_API_VERSION: z.string().default("202608"), // sunset bulanan — update rutin
     BLUESKY_PDS_URL: z.url().default("https://bsky.social"),
+    BLUESKY_PUBLIC_API_URL: z.url().default("https://public.api.bsky.app"),
     PINTEREST_API_BASE_URL: z.url().default("https://api.pinterest.com/v5"),
     // OAuth app kredensial — fallback bila belum diisi admin via Admin Panel → Kredensial Platform
     // (playbook docs/social-platforms/app-review-playbook.md)

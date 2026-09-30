@@ -14,6 +14,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { decrypt } from "./crypto";
 import {
   type ExternalPost,
+  getBlueskyOwnPosts,
   GRAPH_IG,
   getFacebookPagePosts,
   getFacebookPageStories,
@@ -39,6 +40,7 @@ export const POSTS_SYNC_PLATFORMS = new Set<string>([
   "threads",
   "tiktok",
   "youtube",
+  "bluesky",
 ]);
 
 /** Deteksi error token permanen — akun harus dihubungkan ulang user. */
@@ -313,6 +315,15 @@ async function fetchExternalPosts(
     }
     case "youtube": {
       const result = await getYouTubeVideos(accessToken, account.platformAccountId, since);
+      return result.ok ? result.data : { error: result.error };
+    }
+    case "bluesky": {
+      // AppView publik — tidak butuh accessToken (app password hanya untuk publish).
+      // DID lebih stabil daripada handle (handle bisa diganti user).
+      const actor = account.platformAccountId.startsWith("did:")
+        ? account.platformAccountId
+        : account.username;
+      const result = await getBlueskyOwnPosts(actor, since);
       return result.ok ? result.data : { error: result.error };
     }
     default:

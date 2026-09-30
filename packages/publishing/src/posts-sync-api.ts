@@ -4,7 +4,13 @@
 // Dipakai oleh posts-sync.ts (orchestration). Semua request lewat httpRequest
 // (timeout + retry 429/5xx + backoff).
 
-import { GRAPH_FB_URL, GRAPH_IG_URL, TIKTOK_OPEN_API_URL, YOUTUBE_API_URL } from "./config";
+import {
+  BLUESKY_PUBLIC_API_URL,
+  GRAPH_FB_URL,
+  GRAPH_IG_URL,
+  TIKTOK_OPEN_API_URL,
+  YOUTUBE_API_URL,
+} from "./config";
 import { httpRequest } from "./http";
 import { getThreadsOwnPosts } from "./threads-advanced";
 
@@ -284,6 +290,110 @@ export async function getTikTokVideos(
         mediaType: "VIDEO",
         thumbnailUrl: item.cover_image_url,
         permalink: item.share_url ?? "",
+        publishedAt,
+      });
+    }
+    return { ok: true, data: posts };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bluesky — post milik akun sendiri (AT Protocol AppView publik, TANPA token)
+// ---------------------------------------------------------------------------
+//
+// `app.bsky.feed.getAuthorFeed` bisa dipanggil tanpa autentikasi lewat AppView
+// publik (public.api.bsky.app) — jadi posts-sync tidak perlu createSession
+// (login Bluesky dibatasi 300/hari). Semua post Bluesky memang publik.
+
+/** Embed Bluesky → media grid. Menangani images/video/recordWithMedia. */
+function mapBlueskyEmbed(embed: unknown): Pick<ExternalPost, "mediaType" | "mediaUrl" | "thumbnailUrl"> {
+  if (!embed || typeof embed !== "object") return { mediaType: "TEXT" };
+  const e = embed as Record<string, unknown>;
+
+  // recordWithMedia#view = kutipan + media → medianya ada di properti `media`
+  const inner =
+    e.$type === "app.bsky.embed.recordWithMedia#view" && e.media && typeof e.media === "object"
+      ? (e.media as Record<string, unknown>)
+      : e;
+  const type = typeof inner.$type === "string" ? inner.$type : "";
+
+  if (type === "app.bsky.embed.images#view") {
+    const images = Array.isArray(inner.images) ? (inner.images as Record<string, unknown>[]) : [];
+    const first = images[0] ?? {};
+    const fullsize = typeof first.fullsize === "string" ? first.fullsize : undefined;
+    const thumb = typeof first.thumb === "string" ? first.thumb : undefined;
+    const cover = thumb ?? fullsize;
+    return {
+      mediaType: images.length > 1 ? "CAROUSEL" : "IMAGE",
+      ...(fullsize ? { mediaUrl: fullsize } : {}),
+      ...(cover ? { thumbnailUrl: cover } : {}),
+    };
+  }
+
+  if (type === "app.bsky.embed.video#view") {
+    const playlist = typeof inner.playlist === "string" ? inner.playlist : undefined;
+    const thumb = typeof inner.thumbnail === "string" ? inner.thumbnail : undefined;
+    return {
+      mediaType: "VIDEO",
+      ...(playlist ? { mediaUrl: playlist } : {}),
+      ...(thumb ? { thumbnailUrl: thumb } : {}),
+    };
+  }
+
+  // external#view (link card) & record#view (kutipan murni) → tidak punya media
+  return { mediaType: "TEXT" };
+}
+
+/**
+ * Post milik satu akun Bluesky. `actor` boleh handle maupun DID (DID lebih stabil
+ * karena handle bisa berubah). Repost & balasan dibuang — bukan karya sendiri.
+ */
+export async function getBlueskyOwnPosts(
+  actor: string,
+  since?: Date,
+  limit = 50,
+): Promise<FetchResult> {
+  try {
+    const res = await httpRequest<{
+      feed?: Array<{
+        post?: {
+          uri?: string;
+          author?: { handle?: string };
+          record?: { text?: string; createdAt?: string; reply?: unknown };
+          embed?: unknown;
+        };
+        /** ada `reason` = repost orang lain, bukan post sendiri */
+        reason?: unknown;
+      }>;
+    }>(`${BLUESKY_PUBLIC_API_URL}/xrpc/app.bsky.feed.getAuthorFeed`, {
+      query: { actor, limit, filter: "posts_no_replies" },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return { ok: false, error: `Bluesky feed: HTTP ${res.status} ${text.slice(0, 150)}` };
+    }
+    const feed = (await res.json()).feed ?? [];
+    const posts: ExternalPost[] = [];
+    for (const item of feed) {
+      if (item.reason) continue;
+      const post = item.post;
+      const uri = post?.uri;
+      if (!uri) continue;
+      if (post?.record?.reply) continue;
+      const createdRaw = post?.record?.createdAt;
+      if (!createdRaw) continue;
+      const publishedAt = new Date(createdRaw);
+      if (Number.isNaN(publishedAt.getTime())) continue;
+      if (since && publishedAt < since) continue;
+      const rkey = uri.split("/").pop();
+      const handle = post?.author?.handle;
+      posts.push({
+        externalId: uri,
+        caption: post?.record?.text ?? "",
+        ...mapBlueskyEmbed(post?.embed),
+        permalink: rkey && handle ? `https://bsky.app/profile/${handle}/post/${rkey}` : uri,
         publishedAt,
       });
     }
