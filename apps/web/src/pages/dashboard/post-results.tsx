@@ -72,15 +72,18 @@ type TopPostsResponse = { posts: TopPost[] };
 type SortKey = "views" | "likes" | "comments" | "engagement" | "recent";
 
 /**
- * Penjelasan khusus per platform saat grid kosong — pesan generik
- * ("belum ada post yang diterbitkan") MENYESATKAN untuk TikTok: post bisa saja
- * sudah tayang, tapi TikTok hanya mengembalikan video yang publik. Selama akun
- * masih mode privat (wajib selama aplikasi belum lulus audit Content Posting API),
- * daftarnya memang selalu kosong — itu aturan platform, bukan kegagalan sinkron.
+ * Penjelasan khusus per platform saat grid kosong. Pesan generik ("belum ada post
+ * yang diterbitkan") MENYESATKAN untuk platform yang kosongnya bukan karena user
+ * belum posting — TikTok (hanya video publik), LinkedIn (izin baca partner-only),
+ * dan Pinterest (dilarang disimpan oleh Developer Guidelines Pinterest).
  */
 const EMPTY_PLATFORM_NOTE: Partial<Record<string, string>> = {
   tiktok:
     "TikTok hanya mengembalikan video yang bersifat publik. Selama akun TikTok masih mode privat — yang wajib dipakai sampai aplikasi lulus audit Content Posting API — daftar ini memang akan kosong. Ini perilaku resmi TikTok, bukan kegagalan sinkronisasi.",
+  linkedin:
+    "LinkedIn tidak menyediakan izin baca untuk post pribadi — daftar post sendiri hanya tersedia lewat API partner (partnerApiPostsExternal) yang tidak diberikan ke aplikasi biasa. Karena itu grid ini hanya berisi post yang diterbitkan lewat Sahabat Kreator.",
+  pinterest:
+    "Pin Pinterest sengaja tidak disimpan di database — Developer Guidelines Pinterest melarang menyimpan data apa pun dari API-nya (kecuali analitik kampanye akun sendiri). Data pin ditampilkan on-demand di panel Pinterest pada halaman Analitik.",
 };
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
