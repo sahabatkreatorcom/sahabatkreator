@@ -10,6 +10,10 @@
     "skipLibCheck": true,
     "types": ["vite/client"],
     "rootDirs": ["."],
+    // Tanpa noEmit, `tsc` tanpa flag (mis. `bunx tsc` / `tsc -b` yang salah
+    // target) memuntahkan .js di samping tiap source. Vite yang membangun app
+    // ini, bukan tsc — jadi emit di sini tidak pernah dibutuhkan.
+    "noEmit": true,
     "paths": {
       "@/*": ["./src/*"]
     }

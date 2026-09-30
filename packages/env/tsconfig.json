@@ -1,3 +1,8 @@
 {
-  "extends": "@sahabatkreator/config/tsconfig.base.json"
+  "extends": "@sahabatkreator/config/tsconfig.base.json",
+  "compilerOptions": {
+    // Paket ini hanya berisi tipe/skema — tidak pernah dibangun dengan tsc.
+    // Tanpa noEmit, `tsc` tanpa flag akan menulis .js di samping source.
+    "noEmit": true
+  }
 }
