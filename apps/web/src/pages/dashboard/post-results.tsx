@@ -71,6 +71,18 @@ type TopPostsResponse = { posts: TopPost[] };
 
 type SortKey = "views" | "likes" | "comments" | "engagement" | "recent";
 
+/**
+ * Penjelasan khusus per platform saat grid kosong — pesan generik
+ * ("belum ada post yang diterbitkan") MENYESATKAN untuk TikTok: post bisa saja
+ * sudah tayang, tapi TikTok hanya mengembalikan video yang publik. Selama akun
+ * masih mode privat (wajib selama aplikasi belum lulus audit Content Posting API),
+ * daftarnya memang selalu kosong — itu aturan platform, bukan kegagalan sinkron.
+ */
+const EMPTY_PLATFORM_NOTE: Partial<Record<string, string>> = {
+  tiktok:
+    "TikTok hanya mengembalikan video yang bersifat publik. Selama akun TikTok masih mode privat — yang wajib dipakai sampai aplikasi lulus audit Content Posting API — daftar ini memang akan kosong. Ini perilaku resmi TikTok, bukan kegagalan sinkronisasi.",
+};
+
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "views", label: "Views" },
   { key: "likes", label: "Likes" },
@@ -757,7 +769,8 @@ export function PostResultsPage() {
             }
             description={
               platform !== "all"
-                ? `Akun ${PLATFORMS[platform as keyof typeof PLATFORMS]?.label ?? platform} sudah terhubung, tapi belum ada post yang diterbitkan melalui platform ini.`
+                ? (EMPTY_PLATFORM_NOTE[platform] ??
+                  `Akun ${PLATFORMS[platform as keyof typeof PLATFORMS]?.label ?? platform} sudah terhubung, tapi belum ada post yang diterbitkan melalui platform ini.`)
                 : "Hasil post muncul di sini setidaknya satu post berhasil diterbitkan dan analytics-nya tersinkron."
             }
           />

@@ -727,6 +727,44 @@ describe("tiktok adapter", () => {
       ),
     ).rejects.toMatchObject({ code: "tiktok_video_format_invalid", retryable: false });
   });
+
+  it("HTTP 403 unaudited_client_can_only_post_to_private_accounts → pesan Indonesia, permanen", async () => {
+    queue(
+      json(
+        { error: { code: "unaudited_client_can_only_post_to_private_accounts", message: "raw" } },
+        { status: 403 },
+      ),
+    );
+    const err = await adapter("tiktok")
+      .publish(input({ media: [vid()], platformSettings: { privacy: "PUBLIC_TO_EVERYONE" } }))
+      .catch((e: unknown) => e as { code: string; message: string; retryable: boolean });
+
+    expect(err.code).toBe("tiktok_unaudited_client_can_only_post_to_private_accounts");
+    expect(err.retryable).toBe(false);
+    // Pesan diterjemahkan, bukan pesan mentah TikTok
+    expect(err.message).toContain("belum lulus audit");
+    expect(err.message).not.toContain("raw");
+  });
+
+  it("privacy_level_option_mismatch → pesan Indonesia menunjuk Pengaturan Platform", async () => {
+    queue(json({ error: { code: "privacy_level_option_mismatch", message: "raw" } }));
+    const err = await adapter("tiktok")
+      .publish(input({ media: [vid()], platformSettings: { privacy: "PUBLIC_TO_EVERYONE" } }))
+      .catch((e: unknown) => e as { code: string; message: string });
+
+    expect(err.code).toBe("tiktok_privacy_level_option_mismatch");
+    expect(err.message).toContain("Pengaturan Platform");
+  });
+
+  it("error code tanpa terjemahan → pakai pesan asli platform", async () => {
+    queue(json({ error: { code: "some_new_code", message: "pesan asli tiktok" } }));
+    const err = await adapter("tiktok")
+      .publish(input({ media: [vid()], platformSettings: { privacy: "SELF_ONLY" } }))
+      .catch((e: unknown) => e as { code: string; message: string });
+
+    expect(err.code).toBe("tiktok_some_new_code");
+    expect(err.message).toContain("pesan asli tiktok");
+  });
 });
 
 // ---------------------------------------------------------------------------

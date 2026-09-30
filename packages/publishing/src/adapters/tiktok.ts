@@ -6,7 +6,8 @@
 // Upload URL-based: domain R2 harus terverifikasi di TikTok dev console.
 
 import { TIKTOK_PUBLISH_URL } from "../config";
-import { httpRequest, throwFromResponse } from "../http";
+import { httpRequest, type HttpResponse, throwFromResponse } from "../http";
+import { tiktokErrorMessage } from "../tiktok-creator-info";
 import {
   composeCaption,
   type PlatformAdapter,
@@ -22,6 +23,48 @@ type TikTokInitResponse = {
   };
   error?: { code?: string; message?: string; log_id?: string };
 };
+
+/**
+ * Response body hanya bisa dibaca SEKALI — ambil teks mentah lalu parse sendiri,
+ * supaya jalur error (HTTP non-2xx) tetap bisa memakai `error.code` dari body.
+ */
+async function readTikTokBody(
+  res: HttpResponse,
+): Promise<{ raw: string; body: TikTokInitResponse | null }> {
+  const raw = await res.text().catch(() => "");
+  if (!raw) return { raw, body: null };
+  try {
+    return { raw, body: JSON.parse(raw) as TikTokInitResponse };
+  } catch {
+    return { raw, body: null };
+  }
+}
+
+/**
+ * Lempar PublishError yang sudah diterjemahkan ke bahasa Indonesia.
+ * `error.code` dari TikTok lebih informatif daripada status HTTP — utamakan itu.
+ */
+function throwTikTokInitError(
+  context: string,
+  res: { status: number },
+  raw: string,
+  body: TikTokInitResponse | null,
+): never {
+  const code = body?.error?.code;
+  const logId = body?.error?.log_id;
+  if (code && code !== "ok") {
+    throw new PublishError(
+      `tiktok_${code}`,
+      `TikTok: ${tiktokErrorMessage(code, body?.error?.message)}${logId ? ` (log_id: ${logId})` : ""}`,
+      code === "rate_limit_exceeded" || res.status === 429 || res.status >= 500,
+    );
+  }
+  throw new PublishError(
+    `http_${res.status}`,
+    `${context}: ${raw ? raw.slice(0, 300) : `HTTP ${res.status}`}`,
+    res.status === 429 || (res.status >= 500 && res.status <= 504),
+  );
+}
 
 /**
  * Privasi post — TANPA default. Content Sharing Guidelines mewajibkan user
@@ -150,20 +193,16 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
       }),
       retries: 1, // init rate limit ketat 6/mnt — jangan agresif retry
     });
-    if (!res.ok) await throwFromResponse(res, "TikTok video init");
-    const data = await res.json();
-    if (data.error?.code && data.error.code !== "ok") {
-      throw new PublishError(
-        `tiktok_${data.error.code}`,
-        `TikTok: ${data.error.message ?? data.error.code}${data.error.log_id ? ` (log_id: ${data.error.log_id})` : ""}`,
-        data.error.code === "rate_limit_exceeded",
-      );
+    const { raw, body } = await readTikTokBody(res);
+    if (!res.ok || (body?.error?.code && body.error.code !== "ok")) {
+      throwTikTokInitError("TikTok video init", res, raw, body);
     }
-    if (!data.data?.publish_id) {
+    const publishId = body?.data?.publish_id;
+    if (!publishId) {
       throw new PublishError("tiktok_no_publish_id", "TikTok tidak mengembalikan publish_id", true);
     }
     // Async: TikTok mendownload video & moderasi → worker poll
-    return { status: "processing", handle: data.data.publish_id };
+    return { status: "processing", handle: publishId };
   }
 
   // ---- Photo post (carousel foto) via content/init ----
@@ -210,19 +249,15 @@ async function publishTikTok(input: PublishInput): Promise<PublishResult> {
     }),
     retries: 1,
   });
-  if (!res.ok) await throwFromResponse(res, "TikTok photo init");
-  const data = await res.json();
-  if (data.error?.code && data.error.code !== "ok") {
-    throw new PublishError(
-      `tiktok_${data.error.code}`,
-      `TikTok: ${data.error.message ?? data.error.code}${data.error.log_id ? ` (log_id: ${data.error.log_id})` : ""}`,
-      data.error.code === "rate_limit_exceeded",
-    );
+  const { raw, body } = await readTikTokBody(res);
+  if (!res.ok || (body?.error?.code && body.error.code !== "ok")) {
+    throwTikTokInitError("TikTok photo init", res, raw, body);
   }
-  if (!data.data?.publish_id) {
+  const photoPublishId = body?.data?.publish_id;
+  if (!photoPublishId) {
     throw new PublishError("tiktok_no_publish_id", "TikTok tidak mengembalikan publish_id", true);
   }
-  return { status: "processing", handle: data.data.publish_id };
+  return { status: "processing", handle: photoPublishId };
 }
 
 /**

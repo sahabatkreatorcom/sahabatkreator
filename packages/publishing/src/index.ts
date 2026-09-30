@@ -216,6 +216,8 @@ export {
   fetchTikTokCreatorInfo,
   TIKTOK_CREATOR_BLOCKED_CODES,
   TIKTOK_DEFAULT_MAX_DURATION_SEC,
+  TIKTOK_PUBLISH_ERROR_MESSAGES,
+  tiktokErrorMessage,
   type TikTokCreatorInfo,
 } from "./tiktok-creator-info";
 export { countNeedsReconnect, refreshDueTokens, type TokenRefreshResult } from "./token-refresh";

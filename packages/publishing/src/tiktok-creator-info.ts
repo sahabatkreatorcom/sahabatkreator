@@ -49,6 +49,35 @@ export const TIKTOK_CREATOR_BLOCKED_CODES: Record<string, string> = {
     "Kuota pengguna aktif hari ini untuk aplikasi ini sudah penuh — coba lagi besok.",
 };
 
+/**
+ * Terjemahan error code Content Posting API → pesan yang bisa dibaca user.
+ * Berlaku untuk `/post/publish/video/init/` & `/post/publish/content/init/`
+ * (kode `unaudited_client_*` & `privacy_level_option_mismatch` hanya muncul di sini,
+ * bukan di creator_info/query).
+ *
+ * Catatan `unaudited_client_can_only_post_to_private_accounts`: selama aplikasi belum
+ * lulus audit Content Posting API, TikTok MEMBLOKIR post ke akun publik. Jadi akun uji
+ * memang harus privat — ini aturan platform, bukan bug aplikasi.
+ */
+export const TIKTOK_PUBLISH_ERROR_MESSAGES: Record<string, string> = {
+  ...TIKTOK_CREATOR_BLOCKED_CODES,
+  unaudited_client_can_only_post_to_private_accounts:
+    "Aplikasi ini belum lulus audit Content Posting API TikTok, sehingga TikTok hanya mengizinkan post ke akun privat. Jadikan akun TikTok ini privat (Setelan → Privasi → Akun privat), atau tunggu audit aplikasi selesai.",
+  privacy_level_option_mismatch:
+    "Status privasi yang dipilih tidak tersedia untuk akun TikTok ini — buka Pengaturan Platform dan pilih ulang dari daftar opsi yang muncul.",
+  url_ownership_unverified:
+    "Domain penyimpanan media belum diverifikasi di TikTok Developer Console — URL video harus berasal dari domain yang sudah diverifikasi.",
+  rate_limit_exceeded: "Terlalu banyak permintaan ke TikTok — tunggu sebentar lalu coba lagi.",
+};
+
+/**
+ * Pesan ramah untuk sebuah error code TikTok. `fallback` dipakai bila kode belum
+ * punya terjemahan (mis. pesan asli dari TikTok), lalu kode mentah sebagai upaya terakhir.
+ */
+export function tiktokErrorMessage(code: string, fallback?: string): string {
+  return TIKTOK_PUBLISH_ERROR_MESSAGES[code] ?? fallback ?? code;
+}
+
 /** Default fallback bila API tidak mengembalikan batas durasi */
 export const TIKTOK_DEFAULT_MAX_DURATION_SEC = 60;
 
