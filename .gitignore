@@ -12,6 +12,11 @@ build
 # `bunx vite build --outDir .verify-dist --emptyOutDir`.
 .verify-dist
 
+# Rekaman mentah respons API untuk fixture dokumentasi. Berisi data akun nyata
+# (nama, handle, foto, isi DM) — JANGAN di-commit. Yang di-commit hanya hasil
+# sanitasinya: apps/web/scripts/docs-fixtures/fixtures.json
+apps/web/scripts/docs-fixtures/raw.json
+
 # Environment variables
 .env
 .env*.local

@@ -28,15 +28,37 @@ export type AvatarProps = HTMLAttributes<HTMLDivElement> &
     fallback?: string;
   };
 
+/**
+ * Inisial untuk avatar tanpa gambar: maksimal dua huruf.
+ *
+ * Sebelumnya seluruh nama ditulis di dalam lingkaran, sehingga nama dua kata
+ * seperti "Demo Kreator" terpotong di tengah kata dan terbaca seperti "Demo"
+ * bertumpuk "Kreator". Nilai yang sudah berupa inisial pendek (mis. "SK")
+ * dilewatkan apa adanya supaya pemanggil yang memang mengirim inisial tidak
+ * berubah.
+ */
+export function avatarInitials(value: string): string {
+  const text = value.trim();
+  if (text.length === 0) return "?";
+  // Sudah inisial: 1–2 huruf tanpa spasi.
+  if (text.length <= 2 && !text.includes(" ")) return text.toUpperCase();
+
+  const words = text.split(/\s+/).filter(Boolean);
+  const first = words[0]?.[0] ?? "";
+  const second = words.length > 1 ? (words[1]?.[0] ?? "") : (words[0]?.[1] ?? "");
+  return `${first}${second}`.toUpperCase() || "?";
+}
+
 export function Avatar({ className, size, src, alt, name, fallback, ...props }: AvatarProps) {
-  const text = fallback ?? name ?? "?";
+  const label = fallback ?? name ?? "?";
+  const initials = avatarInitials(label);
   return (
     <div className={cn(avatarVariants({ size }), className)} {...props}>
       {src ? (
-        <img src={src} alt={alt ?? text} className="aspect-square h-full w-full object-cover" />
+        <img src={src} alt={alt ?? label} className="aspect-square h-full w-full object-cover" />
       ) : (
         <span className="bg-[var(--accent-gold-light)] font-semibold text-[var(--accent-gold)]">
-          {text}
+          {initials}
         </span>
       )}
     </div>

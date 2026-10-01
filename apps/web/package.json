@@ -11,8 +11,10 @@
     "start": "vite",
     "test": "vitest run --passWithNoTests",
     "codegen:openapi": "bun run scripts/gen-api-schema.ts",
-    "docs:screenshots": "bun run scripts/docs-screenshots.ts",
-    "docs:sitemap": "bun run scripts/docs-sitemap.ts",
+  "docs:screenshots": "bun run scripts/docs-screenshots.ts",
+  "docs:fixtures:record": "bun run scripts/docs-fixtures.record.ts",
+  "docs:fixtures:sanitize": "bun run scripts/docs-fixtures.sanitize.ts",
+  "docs:sitemap": "bun run scripts/docs-sitemap.ts",
     "generate-pwa-assets": "pwa-assets-generator"
   },
   "dependencies": {
