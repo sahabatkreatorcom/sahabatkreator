@@ -301,6 +301,10 @@ async function syncInstagram(ctx: SyncContext, base: string): Promise<SyncResult
 
   const items: EngagementUpsert[] = [];
   for (const media of mediaList) {
+    // ⚠️ `from` TIDAK tersedia di IG Graph API — permintaan nama/foto penulis
+    // akan ditolak. Jadi yang bisa diisi hanyalah username; `authorName` dan
+    // `authorAvatarUrl` memang null untuk Instagram. UI harus tahan terhadap
+    // ini (lihat pemakaian `authorName ?? authorUsername` di inbox).
     const commentsRes = await httpRequest<{ data?: IgComment[] }>(`${base}/${media.id}/comments`, {
       query: { fields: "id,text,username,timestamp", limit: 50, access_token: token },
     });
@@ -356,7 +360,14 @@ async function syncFacebook(ctx: SyncContext): Promise<SyncResult> {
       }>;
     }>(`${GRAPH_FB}/${post.id}/comments`, {
       query: {
-        fields: "id,message,created_time,from{id,name,picture.type(large)}",
+        // ⚠️ JEBAKAN META: `access_token` WAJIB ada di dalam daftar `fields`,
+        // bukan hanya sebagai parameter query terpisah. Sejak Graph API v2.11,
+        // blok `from{…}` yang diminta tanpa access_token di dalam fields
+        // dijawab dengan objek `from` yang KOSONG (id/name/picture tidak
+        // dikirim, tanpa error). Akibatnya kolom author_name/avatar_url selalu
+        // null dan komentar tampil tanpa identitas penulis. Karena itu token
+        // disisipkan DI SINI, di dalam string fields.
+        fields: "id,message,created_time,from{id,name,picture.type(large)},access_token",
         limit: 50,
         access_token: token,
       },
@@ -391,7 +402,10 @@ async function syncFacebook(ctx: SyncContext): Promise<SyncResult> {
     }>;
   }>(`${GRAPH_FB}/${pageId}/ratings`, {
     query: {
-      fields: "id,created_time,rating,review_text,reviewer{id,name,picture.type(large)}",
+      // Sama seperti komentar di atas: `access_token` harus ada di dalam
+      // `fields`, kalau tidak blok `reviewer{…}` dijawab kosong.
+      fields:
+        "id,created_time,rating,review_text,reviewer{id,name,picture.type(large)},access_token",
       limit: 50,
       access_token: token,
     },
