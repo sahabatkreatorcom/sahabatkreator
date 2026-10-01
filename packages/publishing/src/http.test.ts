@@ -20,6 +20,7 @@ import {
   extractErrorMessage,
   type HttpResponse,
   httpRequest,
+  parseJsonPreservingBigIds,
   parseRetryAfterMs,
   throwFromResponse,
 } from "./http";
@@ -280,5 +281,86 @@ describe("downloadMedia — storage guard", () => {
 
     const buf = await downloadMedia("https://r2.test/m/1");
     expect(buf.byteLength).toBe(3);
+  });
+});
+
+describe("id panjang tidak kehilangan presisi", () => {
+  // TikTok mengembalikan id video sebagai ANGKA 19 digit. Number.MAX_SAFE_INTEGER
+  // hanya 16 digit, jadi JSON.parse membulatkannya dan tautan "Lihat Post"
+  // mengarah ke video yang tidak ada. Kasus nyata yang dilaporkan:
+  // 7691614497802292487 → 7691614497802292000 (selisih 487).
+  const REAL_ID = "7691614497802292487";
+
+  it("id 19 digit dibaca utuh sebagai string", () => {
+    const parsed = parseJsonPreservingBigIds(
+      `{"data":{"publicly_available_post_id":${REAL_ID},"status":"PUBLISH_COMPLETE"}}`,
+    ) as { data: { publicly_available_post_id: unknown; status: string } };
+
+    expect(parsed.data.publicly_available_post_id).toBe(REAL_ID);
+    expect(typeof parsed.data.publicly_available_post_id).toBe("string");
+    // Pembulatan yang dulu terjadi, sebagai pengingat kalau regresi:
+    expect(parsed.data.publicly_available_post_id).not.toBe("7691614497802292000");
+    expect(parsed.data.status).toBe("PUBLISH_COMPLETE");
+  });
+
+  it("id di dalam array (format TikTok) juga dibaca utuh", () => {
+    const parsed = parseJsonPreservingBigIds(`{"id":[${REAL_ID}]}`) as { id: unknown[] };
+    expect(parsed.id).toEqual([REAL_ID]);
+  });
+
+  it("bilangan pendek tetap berupa angka", () => {
+    const parsed = parseJsonPreservingBigIds(
+      '{"views":12345,"likes":0,"duration":60,"reach":123456789012345}',
+    ) as Record<string, unknown>;
+
+    expect(parsed.views).toBe(12345);
+    expect(parsed.likes).toBe(0);
+    expect(parsed.duration).toBe(60);
+    expect(parsed.reach).toBe(123456789012345);
+    expect(typeof parsed.reach).toBe("number");
+  });
+
+  it("16 digit ke atas jadi string — ambangnya sengaja konservatif", () => {
+    // 9.007.199.254.740.991 (MAX_SAFE_INTEGER) sendiri masih aman, tapi
+    // tetangganya tidak, dan jumlah digit tidak bisa membedakannya. Karena itu
+    // 16 digit ke atas selalu dianggap id. Tidak ada metrik nyata (views,
+    // follower) yang mencapai 16 digit, jadi tidak ada yang dirugikan.
+    const parsed = parseJsonPreservingBigIds(
+      '{"follower_count":9007199254740991,"views":1234567890123456}',
+    ) as Record<string, unknown>;
+
+    expect(parsed.follower_count).toBe("9007199254740991");
+    expect(parsed.views).toBe("1234567890123456");
+  });
+
+  it("deretan angka di dalam string tidak diubah", () => {
+    const parsed = parseJsonPreservingBigIds(
+      `{"caption":"order 1234567890123456789 sudah dikirim","id":${REAL_ID}}`,
+    ) as { caption: string; id: string };
+
+    expect(parsed.caption).toBe("order 1234567890123456789 sudah dikirim");
+    expect(parsed.id).toBe(REAL_ID);
+  });
+
+  it("angka di dalam string yang memuat kutip escaped tidak merusak parse", () => {
+    const parsed = parseJsonPreservingBigIds(
+      '{"a":"kata \\"1234567890123456789\\" di dalam","b":1234567890123456789}',
+    ) as { a: string; b: string };
+
+    expect(parsed.a).toBe('kata "1234567890123456789" di dalam');
+    expect(parsed.b).toBe("1234567890123456789");
+  });
+
+  it("httpRequest().json() memakai parser ini", async () => {
+    fetchMock.mockResolvedValueOnce(
+      fakeResponse({ body: `{"data":{"publicly_available_post_id":${REAL_ID}}}` }),
+    );
+
+    const res = await httpRequest<{ data: { publicly_available_post_id: string } }>(
+      "https://open.tiktokapis.com/v2/post/publish/status/fetch/",
+    );
+    const data = await res.json();
+
+    expect(data.data.publicly_available_post_id).toBe(REAL_ID);
   });
 });

@@ -25,6 +25,79 @@ export type HttpResponse<T = unknown> = {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Batas aman bilangan bulat JavaScript: 9.007.199.254.740.991 (16 digit). */
+const MAX_SAFE_DIGITS = 16;
+
+/**
+ * JSON.parse yang mempertahankan bilangan bulat panjang sebagai STRING.
+ *
+ * TikTok mengembalikan id video sebagai ANGKA JSON — 19 digit, jauh di atas
+ * Number.MAX_SAFE_INTEGER. JSON.parse membulatkannya lebih dulu, sehingga id
+ * 7691614497802292487 menjadi 7691614497802292000 dan tautan "Lihat Post"
+ * mengarah ke video yang tidak ada. Kerusakan ini TIDAK bisa diperbaiki setelah
+ * parse — digitnya sudah hilang — jadi pencegahannya harus di lapisan ini.
+ *
+ * Bilangan ≥ 16 digit di posisi NILAI ditulis ulang menjadi string sebelum
+ * parse. Pemindaian melacak apakah posisi sedang berada di dalam string,
+ * supaya deretan angka yang kebetulan ada di dalam teks tidak ikut diubah.
+ */
+export function parseJsonPreservingBigIds(text: string): unknown {
+  let out = "";
+  let inString = false;
+  let escaped = false;
+  /** Karakter bermakna terakhir di LUAR string — penanda posisi nilai. */
+  let prev = "";
+  let i = 0;
+
+  while (i < text.length) {
+    const ch = text[i] as string;
+
+    if (inString) {
+      out += ch;
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') {
+        inString = false;
+        prev = '"';
+      }
+      i += 1;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      out += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === " " || ch === "\n" || ch === "\r" || ch === "\t") {
+      out += ch;
+      i += 1;
+      continue;
+    }
+
+    // Angka hanya berbahaya kalau berdiri sebagai NILAI: setelah ':' (nilai
+    // objek), '[' (elemen pertama array), atau ',' (elemen berikutnya).
+    if (ch >= "0" && ch <= "9" && (prev === ":" || prev === "[" || prev === ",")) {
+      let end = i;
+      while (end < text.length && (text[end] as string) >= "0" && (text[end] as string) <= "9") {
+        end += 1;
+      }
+      const digits = text.slice(i, end);
+      out += digits.length >= MAX_SAFE_DIGITS ? `"${digits}"` : digits;
+      prev = "#"; // sebuah nilai baru saja selesai
+      i = end;
+      continue;
+    }
+
+    out += ch;
+    prev = ch;
+    i += 1;
+  }
+
+  return JSON.parse(out);
+}
+
 /**
  * Parse header Retry-After — dukung dua format:
  * - detik: "120"
@@ -104,7 +177,15 @@ export async function httpRequest<T = unknown>(
           continue;
         }
       }
-      return res as HttpResponse<T>;
+      // json() dibungkus agar id panjang tidak kehilangan presisi — lihat
+      // parseJsonPreservingBigIds. Body dibaca lewat text() lalu diparse sendiri.
+      return {
+        ok: res.ok,
+        status: res.status,
+        headers: res.headers,
+        text: () => res.text(),
+        json: async () => parseJsonPreservingBigIds(await res.text()) as T,
+      } satisfies HttpResponse<T>;
     } catch (error) {
       if (attempt < retries) {
         await sleep(1000 * 2 ** attempt + Math.random() * 500);
