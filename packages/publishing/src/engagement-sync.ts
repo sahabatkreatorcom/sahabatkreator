@@ -26,6 +26,7 @@ import {
   YOUTUBE_API_URL,
 } from "./config";
 import { decrypt } from "./crypto";
+import { normalizeHandle } from "./handle";
 import { httpRequest } from "./http";
 
 const GRAPH_FB = GRAPH_FB_URL;
@@ -311,7 +312,7 @@ async function syncInstagram(ctx: SyncContext, base: string): Promise<SyncResult
         organizationId: ctx.account.organizationId,
         type: "comment",
         platformItemId: comment.id,
-        authorUsername: comment.username ? `@${comment.username}` : null,
+        authorUsername: normalizeHandle(comment.username),
         content: comment.text ?? null,
         mediaUrl: media.media_url ?? null,
         occurredAt: comment.timestamp ? new Date(comment.timestamp) : null,
@@ -462,7 +463,7 @@ async function syncThreads(ctx: SyncContext): Promise<SyncResult> {
         type: "comment",
         platformItemId: reply.id,
         parentId: thread.id,
-        authorUsername: reply.username ? `@${reply.username}` : null,
+        authorUsername: normalizeHandle(reply.username),
         content: reply.text ?? null,
         occurredAt: reply.timestamp ? new Date(reply.timestamp) : null,
       });
@@ -484,7 +485,7 @@ async function syncThreads(ctx: SyncContext): Promise<SyncResult> {
         organizationId: ctx.account.organizationId,
         type: "mention",
         platformItemId: mention.id,
-        authorUsername: mention.username ? `@${mention.username}` : null,
+        authorUsername: normalizeHandle(mention.username),
         content: mention.text ?? null,
         occurredAt: mention.timestamp ? new Date(mention.timestamp) : null,
       });
@@ -744,7 +745,7 @@ async function syncRepliz(ctx: SyncContext): Promise<SyncResult> {
       platformItemId: c._id,
       platformAuthorId: commenter?.id ?? null,
       authorName: handle ?? null,
-      authorUsername: handle ? `@${handle}` : null,
+      authorUsername: normalizeHandle(handle),
       authorAvatarUrl: commenter?.picture ?? null,
       content: c.comment?.text?.trim() || null,
       mediaUrl: media?.url ?? null,

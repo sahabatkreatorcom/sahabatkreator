@@ -15,7 +15,11 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { db } from "@sahabatkreator/db";
 import { platformCredential, socialAccount } from "@sahabatkreator/db/schema";
 import { env } from "@sahabatkreator/env/server";
-import { type EngagementUpsert, upsertEngagementItems } from "@sahabatkreator/publishing";
+import {
+  type EngagementUpsert,
+  normalizeHandle,
+  upsertEngagementItems,
+} from "@sahabatkreator/publishing";
 import { and, eq, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { decrypt } from "../lib/crypto";
@@ -219,7 +223,7 @@ async function processMetaPayload(raw: string, platformsCsv: string): Promise<nu
           type: "comment",
           platformItemId: String(value.id),
           platformAuthorId: value?.from?.id ? String(value.from.id) : null,
-          authorUsername: value?.from?.username ? `@${value.from.username}` : null,
+          authorUsername: normalizeHandle(value?.from?.username),
           authorName: value?.from?.username ?? null,
           content: value?.text ?? null,
           parentId: value?.media?.id ? String(value.media.id) : null,
@@ -232,7 +236,7 @@ async function processMetaPayload(raw: string, platformsCsv: string): Promise<nu
           type: "mention",
           platformItemId: String(value.comment_id),
           platformAuthorId: value?.from?.id ? String(value.from.id) : null,
-          authorUsername: value?.username ? `@${value.username}` : null,
+          authorUsername: normalizeHandle(value?.username),
           content: value?.text ?? null,
           mediaUrl: value?.media_url ?? null,
           occurredAt: null,

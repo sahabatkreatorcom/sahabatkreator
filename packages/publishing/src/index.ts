@@ -31,6 +31,7 @@ export {
   processAutomation,
 } from "./automation";
 export * from "./config";
+export { normalizeHandle } from "./handle";
 export {
   sendDMReply,
   syncAccountDMs,
