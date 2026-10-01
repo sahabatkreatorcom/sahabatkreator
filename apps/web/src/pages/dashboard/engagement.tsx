@@ -248,11 +248,30 @@ function EngagementCard({ item }: { item: Item }) {
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold text-sm">
-              {item.authorName ?? item.authorUsername ?? "Anonim"}
-            </span>
-            {item.authorUsername && (
-              <span className="text-[var(--text-muted)] text-xs">@{item.authorUsername}</span>
+            {/*
+              `authorName` kosong BUKAN selalu tanda data hilang: Instagram
+              tidak menyediakan nama/foto penulis komentar lewat Graph API
+              (hanya `username`), dan Facebook kadang tidak mengirim `from`
+              untuk komentar anonim/promosi. Karena itu jangan tampilkan
+              "Anonim" — pakai @username bila ada, dan kalau dua-duanya kosong
+              sebut "Penulis tidak tersedia" supaya jelas ini keterbatasan
+              data dari platform, bukan tampilan yang rusak.
+            */}
+            {item.authorName && <span className="font-semibold text-sm">{item.authorName}</span>}
+            {item.authorUsername ? (
+              <span
+                className={
+                  item.authorName ? "text-[var(--text-muted)] text-xs" : "font-semibold text-sm"
+                }
+              >
+                @{item.authorUsername}
+              </span>
+            ) : (
+              !item.authorName && (
+                <span className="font-semibold text-[var(--text-muted)] text-sm">
+                  Penulis tidak tersedia
+                </span>
+              )
             )}
             <span className="flex items-center gap-1 text-[var(--text-muted)] text-xs">
               {Icon && <Icon className="h-3 w-3" style={{ color: cfg?.color }} />}@
