@@ -86,12 +86,14 @@ const EMPTY_PLATFORM_NOTE: Partial<Record<string, string>> = {
     "Pin Pinterest sengaja tidak disimpan di database — Developer Guidelines Pinterest melarang menyimpan data apa pun dari API-nya (kecuali analitik kampanye akun sendiri). Data pin ditampilkan on-demand di panel Pinterest pada halaman Analitik.",
 };
 
+// "Terbaru" ditaruh pertama karena itu urutan default — pilihan yang sedang
+// aktif harus langsung terlihat tanpa harus menggeser deretan tombol.
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "recent", label: "Terbaru" },
   { key: "views", label: "Views" },
   { key: "likes", label: "Likes" },
   { key: "comments", label: "Komentar" },
   { key: "engagement", label: "Engagement" },
-  { key: "recent", label: "Terbaru" },
 ];
 
 function sortPosts(posts: TopPost[], sort: SortKey): TopPost[] {
@@ -112,7 +114,21 @@ function sortPosts(posts: TopPost[], sort: SortKey): TopPost[] {
   return [...posts].sort((a, b) => value(b) - value(a));
 }
 
-function PostCard({ post, rank, onOpen }: { post: TopPost; rank: number; onOpen: () => void }) {
+/**
+ * Kartu post di grid.
+ *
+ * `rank` = peringkat performa (1 = teratas). Dikirim `null` saat daftar
+ * diurutkan "Terbaru", karena pada urutan itu nomor peringkat tidak bermakna.
+ */
+function PostCard({
+  post,
+  rank,
+  onOpen,
+}: {
+  post: TopPost;
+  rank: number | null;
+  onOpen: () => void;
+}) {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
 
@@ -195,10 +211,12 @@ function PostCard({ post, rank, onOpen }: { post: TopPost; rank: number; onOpen:
           </div>
         )}
 
-        {/* Peringkat */}
-        <div className="absolute top-2 left-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-black/60 px-1.5 font-semibold text-[11px] text-white backdrop-blur">
-          {rank}
-        </div>
+        {/* Peringkat performa — hanya saat diurutkan berdasarkan metrik */}
+        {rank !== null && (
+          <div className="absolute top-2 left-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-black/60 px-1.5 font-semibold text-[11px] text-white backdrop-blur">
+            {rank}
+          </div>
+        )}
 
         {/* Platform badge */}
         {Icon && (
@@ -285,7 +303,11 @@ function PostCard({ post, rank, onOpen }: { post: TopPost; rank: number; onOpen:
           )}
 
           {/* Hapus post di platform — hanya untuk akun bridge Repliz.
-              Konfirmasi inline karena tindakan permanen (undo tidak ada). */}
+              Konfirmasi inline karena tindakan permanen (undo tidak ada).
+              Dulu tombol ini hanya muncul saat kursor mengarah ke kartu
+              (opacity-0 → group-hover), sehingga praktis tidak terlihat di
+              layar sentuh dan sulit ditemukan. Sekarang selalu tampil dengan
+              warna redup supaya terlihat ada tapi tidak mencolok. */}
           {post.isBridge && post.platformPostId && (
             <div className="ml-auto flex items-center">
               {confirming ? (
@@ -315,11 +337,12 @@ function PostCard({ post, rank, onOpen }: { post: TopPost; rank: number; onOpen:
                 <button
                   type="button"
                   onClick={() => setConfirming(true)}
-                  className="inline-flex items-center text-[11px] text-[var(--text-muted)] opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+                  className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px] text-[var(--text-muted)] transition-colors hover:bg-red-500/10 hover:text-red-500"
                   aria-label="Hapus post di platform"
                   title="Hapus post di platform (permanen)"
                 >
                   <Trash2 className="h-3 w-3" />
+                  Hapus
                 </button>
               )}
             </div>
@@ -482,7 +505,11 @@ export function PostResultsPage() {
 
   const [platform, setPlatform] = useState<string>("all");
   const [account, setAccount] = useState<string>("all");
-  const [sort, setSort] = useState<SortKey>("views");
+  // Urutan default "recent" (terbaru lebih dulu): grid ini dipakai untuk
+  // memeriksa post yang baru tayang — mis. memastikan hasil publikasi terakhir
+  // benar — sehingga post terbaru harus langsung terlihat tanpa mengganti
+  // urutan. Pengurutan performa (views/likes) tetap tersedia sebagai pilihan.
+  const [sort, setSort] = useState<SortKey>("recent");
   // Post yang detailnya sedang dibuka (null = tertutup)
   const [detail, setDetail] = useState<TopPost | null>(null);
   const queryClient = useQueryClient();
@@ -794,10 +821,20 @@ export function PostResultsPage() {
             }
           />
         ) : (
-          // Grid responsif: 2 kolom mobile → 5 kolom layar besar
+          // Grid responsif: 2 kolom mobile → 5 kolom layar besar.
+          //
+          // Peringkat (badge angka) HANYA bermakna saat diurutkan berdasarkan
+          // performa: "1" berarti paling banyak views/likes. Pada urutan
+          // "Terbaru" angkanya cuma nomor baris dan bisa menyesatkan (post
+          // terbaru berlabel 1 seolah paling bagus) — jadi badge-nya disembunyikan.
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {posts.map((p, index) => (
-              <PostCard key={p.postId} post={p} rank={index + 1} onOpen={() => setDetail(p)} />
+              <PostCard
+                key={p.postId}
+                post={p}
+                rank={sort === "recent" ? null : index + 1}
+                onOpen={() => setDetail(p)}
+              />
             ))}
           </div>
         )}
