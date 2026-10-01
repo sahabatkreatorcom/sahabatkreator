@@ -180,7 +180,16 @@ function EngagementCard({ item }: { item: Item }) {
     mutationFn: () => api.patch(`/engagement/comments/${item.id}`, { hidden: !item.hidden }),
     onSuccess: () => {
       invalidate();
-      toast.success(item.hidden ? "Komentar ditampilkan kembali" : "Komentar disembunyikan");
+      if (item.hidden) {
+        toast.success("Komentar ditampilkan kembali");
+      } else {
+        // Jelaskan ke mana item pergi — daftar default hanya menampilkan yang tampil,
+        // jadi komentar yang baru disembunyikan langsung keluar dari inbox.
+        toast.success("Komentar disembunyikan", {
+          description:
+            'Komentar ini pindah ke filter Tampilan → "Disembunyikan". Ubah filter itu untuk menampilkan kembali.',
+        });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -673,15 +682,20 @@ export function EngagementPage() {
   const [status, setStatus] = useState<string | undefined>();
   const [platform, setPlatform] = useState<string>("all");
   const [sentiment, setSentiment] = useState<string>("all");
+  // Moderasi (M12): komentar yang disembunyikan tidak ikut daftar default —
+  // API default `hidden=false`. Tanpa filter ini, item yang baru disembunyikan
+  // langsung hilang dari inbox sehingga tombol "Tampilkan" tak pernah terlihat.
+  const [showHidden, setShowHidden] = useState(false);
   const isCollabTab = type === "collab";
 
   const { data, isLoading } = useQuery({
-    queryKey: [...queryKeys.engagementInbox, type, status, platform],
+    queryKey: [...queryKeys.engagementInbox, type, status, platform, showHidden],
     queryFn: () => {
       const params = new URLSearchParams();
       if (type) params.set("type", type);
       if (status) params.set("status", status);
       if (platform !== "all") params.set("platform", platform);
+      if (showHidden) params.set("hidden", "true");
       const qs = params.toString();
       return api.get<Inbox>(`/engagement${qs ? `?${qs}` : ""}`);
     },
@@ -866,6 +880,19 @@ export function EngagementPage() {
               ))}
             </select>
           </div>
+          {/* Tampilan — sembunyikan/tampilkan komentar yang dimoderasi (M12) */}
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-[var(--text-muted)] text-xs">Tampilan</span>
+            <select
+              value={showHidden ? "hidden" : "visible"}
+              onChange={(e) => setShowHidden(e.target.value === "hidden")}
+              className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-primary)] px-2 text-xs"
+              aria-label="Filter tampilan komentar"
+            >
+              <option value="visible">Tampil</option>
+              <option value="hidden">Disembunyikan</option>
+            </select>
+          </div>
         </div>
       )}
 
@@ -892,8 +919,12 @@ export function EngagementPage() {
       ) : items.length === 0 ? (
         <EmptyState
           icon={<MessageCircle className="h-6 w-6" />}
-          title="Inbox bersih!"
-          description="Belum ada interaksi yang perlu dibalas. Interaksi baru akan muncul di sini."
+          title={showHidden ? "Tidak ada komentar tersembunyi" : "Inbox bersih!"}
+          description={
+            showHidden
+              ? "Belum ada komentar yang disembunyikan di akun ini."
+              : "Belum ada interaksi yang perlu dibalas. Interaksi baru akan muncul di sini."
+          }
         />
       ) : (
         <div className="space-y-4">
