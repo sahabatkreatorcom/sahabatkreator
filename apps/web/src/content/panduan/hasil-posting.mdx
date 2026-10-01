@@ -1,0 +1,73 @@
+# Hasil Posting
+
+Halaman **Hasil Post** menampilkan semua konten yang sudah benar-benar tayang di platform, lengkap
+dengan angka performanya. Ini halaman yang dipakai untuk memeriksa "apa yang sudah terjadi".
+
+<Screenshot
+  src="/docs/panduan/post-results.webp"
+  alt="Halaman Hasil Post menampilkan daftar konten yang sudah tayang beserta metriknya"
+  caption="Hasil Post — konten yang sudah tayang, dari semua platform dalam satu daftar."
+/>
+
+## Yang ditampilkan
+
+Setiap kartu konten memuat platform asalnya, waktu tayang, pratinjau, dan metrik yang tersedia:
+
+| Metrik | Arti |
+|---|---|
+| **Views** | Berapa kali konten dilihat. Tidak semua platform menyediakannya. |
+| **Likes** | Jumlah suka. |
+| **Komentar** | Jumlah komentar yang masuk. |
+| **Saves** | Berapa kali konten disimpan — indikator kuat bahwa isinya berguna. |
+| **Share** | Berapa kali konten dibagikan ulang. |
+
+Dari setiap kartu Anda bisa membuka detail, membuka konten aslinya di platform, atau menghapusnya di
+platform.
+
+<Callout variant="info" title="Angka tidak selalu langsung muncul">
+  Metrik diambil dari API platform secara berkala, bukan real-time. Setelah konten baru tayang,
+  biasanya perlu beberapa menit sampai angka pertamanya terisi. Kalau baru saja memposting dan
+  angkanya masih kosong, tunggu sebentar lalu muat ulang halaman.
+</Callout>
+
+## Menyinkronkan data
+
+Tombol **Sinkron Platform** menarik daftar konten terbaru dari semua akun yang terhubung. Gunakan
+kalau Anda memposting sesuatu langsung dari aplikasi platform dan ingin konten itu ikut tercatat di
+sini.
+
+Setelah selesai, muncul pemberitahuan yang membedakan tiga kemungkinan:
+
+- **Konten baru diimpor** — ada konten yang belum pernah tercatat, sekarang masuk.
+- **Konten diperbarui** — tidak ada konten baru, tetapi datanya disegarkan.
+- **Sudah terbaru** — tidak ada perubahan sama sekali.
+
+Proses ini juga berjalan otomatis di latar belakang, jadi tombol ini hanya untuk memaksa pembaruan
+saat Anda tidak ingin menunggu.
+
+## Menangani posting yang gagal
+
+Konten yang gagal tayang muncul dengan status gagal dan alasannya. Penyebab yang paling sering:
+
+| Alasan | Yang harus dilakukan |
+|---|---|
+| Izin akun dicabut atau kedaluwarsa | Hubungkan ulang akun tersebut di **Akun Sosmed**. |
+| Media ditolak platform | Periksa rasio, ukuran, atau durasi. Beberapa platform menolak video terlalu panjang. |
+| Konten melanggar kebijakan platform | Perbaiki isinya, lalu jadwalkan ulang. |
+| Batas platform tercapai | Beberapa platform membatasi jumlah unggahan per hari. Coba lagi besok. |
+
+Setelah masalahnya dibereskan, konten bisa dijadwalkan ulang tanpa perlu ditulis dari awal.
+
+<Callout variant="tip" title="Aktifkan notifikasi">
+  Kalau Sahabat Kreator dipasang sebagai PWA, Anda akan menerima notifikasi saat ada konten gagal —
+  jadi tidak perlu rajin memeriksa halaman ini.
+</Callout>
+
+## Menghapus konten
+
+Menghapus konten dari halaman ini akan menghapusnya **di platform aslinya**, bukan hanya di Sahabat
+Kreator. Tindakan ini permanen dan tidak bisa dibatalkan, jadi pastikan Anda memilih konten yang
+benar.
+
+Kalau yang Anda inginkan hanya menyembunyikan konten dari daftar tanpa menyentuh platform, jangan
+gunakan tombol hapus.

@@ -214,12 +214,21 @@ const FAQ_ENTRIES: FaqEntry[] = [
     question: "Apakah tersedia API publik untuk integrasi?",
     answer: (
       <>
-        API untuk integrasi pihak ketiga sedang dalam pengembangan dan akan dibuka bertahap. Jika
-        Anda punya kebutuhan integrasi khusus,{" "}
+        Tersedia. Public API v1 sudah aktif untuk paket Pro ke atas (method tulis butuh paket Bisnis
+        ke atas) — lengkap dengan API key ber-scope, webhook, dan akses lewat MCP untuk agen AI.
+        Mulai dari{" "}
+        <Link to="/developers" className="text-[var(--accent-gold)] underline">
+          dokumentasi API
+        </Link>{" "}
+        atau{" "}
+        <Link to="/developers/mulai-cepat" className="text-[var(--accent-gold)] underline">
+          panduan mulai cepat
+        </Link>
+        . Untuk kebutuhan integrasi khusus,{" "}
         <Link to="/kontak" className="text-[var(--accent-gold)] underline">
           hubungi kami
-        </Link>{" "}
-        untuk mendiskusikan kebutuhan Anda.
+        </Link>
+        .
       </>
     ),
   },

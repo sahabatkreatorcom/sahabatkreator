@@ -1,0 +1,86 @@
+# Menghubungkan Akun
+
+Sebelum bisa menjadwalkan konten, Anda perlu menghubungkan minimal satu akun sosial media. Prosesnya
+memakai **OAuth resmi** dari masing-masing platform — kami tidak pernah meminta atau menyimpan
+password akun sosial Anda.
+
+## Platform yang didukung
+
+Instagram, Facebook, Threads, TikTok, YouTube, Pinterest, LinkedIn, Bluesky, dan Google Business
+Profile. Satu organisasi boleh memiliki beberapa akun di platform yang sama — misalnya dua akun
+Instagram untuk dua brand.
+
+<Callout variant="info" title="Satu akun, satu organisasi">
+  Satu akun platform hanya boleh terhubung ke satu organisasi. Kalau akun tersebut sudah dipakai di
+  organisasi lain, penghubungan akan ditolak. Ini mencegah dua tim mengelola akun yang sama tanpa
+  sepengetahuan satu sama lain.
+</Callout>
+
+## Menghubungkan akun
+
+<Steps>
+  <Step title="Buka Akun Sosmed">
+    Dari sidebar, pilih **Pengaturan → Akun Sosmed**, lalu klik **Hubungkan akun**.
+  </Step>
+  <Step title="Pilih platform">
+    Anda akan dibawa ke halaman izin resmi platform tersebut. Pastikan Anda sudah masuk ke akun yang
+    benar di browser — kalau tidak, keluar dulu dari akun platform yang salah.
+  </Step>
+  <Step title="Setujui izin yang diminta">
+    Kami hanya meminta izin yang benar-benar dipakai untuk menerbitkan konten, membaca statistik, dan
+    membalas komentar. Daftar izin ditampilkan oleh platform pada halaman persetujuan.
+  </Step>
+  <Step title="Pilih aset bila diminta">
+    Beberapa platform memiliki beberapa aset — Page Facebook, profil Instagram yang tertaut, board
+    Pinterest, atau channel YouTube. Kalau muncul pilihan, pilih yang ingin dikelola lalu simpan.
+  </Step>
+  <Step title="Pastikan statusnya Aktif">
+    Setelah selesai, akun muncul di daftar **Akun Sosmed** dengan status terhubung. Kalau statusnya
+    belum aktif, coba hubungkan ulang.
+  </Step>
+</Steps>
+
+<Screenshot
+  src="/docs/panduan/accounts.webp"
+  alt="Daftar akun sosial media yang terhubung beserta statusnya"
+  caption="Halaman Akun Sosmed — semua akun yang dikelola organisasi Anda."
+/>
+
+## Hal khusus per platform
+
+| Platform | Yang perlu diperhatikan |
+|---|---|
+| **Instagram** | Harus berupa akun Business atau Creator yang tertaut ke sebuah Page Facebook. Akun pribadi tidak bisa dipakai untuk menerbitkan konten lewat API. |
+| **Facebook** | Anda memilih satu Page saat menghubungkan. Untuk mengelola beberapa Page, hubungkan berulang. |
+| **Threads** | Terpisah dari Instagram. Perlu izin tambahan saat pertama kali menghubungkan. |
+| **TikTok** | Akun harus memenuhi syarat API TikTok. Video yang diunggah lewat API kadang diproses beberapa menit sebelum tayang. |
+| **YouTube** | Anda akan memilih channel saat menghubungkan. Unggahan video berukuran besar diproses bertahap. |
+| **LinkedIn** | Bisa memilih profil pribadi atau halaman company. Perhatikan bahwa keduanya punya audiens berbeda. |
+| **Bluesky** | Memakai App Password, bukan password utama. Buat di pengaturan Bluesky Anda. |
+
+## Kalau akun terputus
+
+Platform secara berkala menerbitkan ulang token akses, dan kami memperbaruinya otomatis. Tapi ada
+dua situasi yang membuat akun berhenti bisa menerbitkan:
+
+- **Anda mencabut akses** dari sisi platform. Selesaikan dengan menghubungkan ulang.
+- **Anda mengganti password** akun sosial di beberapa platform. Beberapa platform mencabut semua
+  token aktif saat password berubah.
+
+Tandanya: konten yang dijadwalkan gagal tayang dengan alasan izin. Buka **Hasil Post**, lihat pesan
+gagalnya, lalu hubungkan ulang akun tersebut. Konten yang gagal tetap tersimpan dan bisa dicoba lagi
+setelah akun aktif kembali.
+
+<Callout variant="tip" title="Aktifkan notifikasi">
+  Kalau Sahabat Kreator dipasang sebagai PWA, Anda akan mendapat notifikasi saat sebuah konten gagal
+  tayang — sehingga masalah akun terputus bisa ditangani sebelum terlambat.
+</Callout>
+
+## Menghapus akun yang terhubung
+
+Buka **Pengaturan → Akun Sosmed**, pilih akun, lalu pilih opsi untuk melepasnya. Konten yang sudah
+tayang tidak ikut terhapus dari platform — yang hilang hanya kemampuan mengelola akun itu dari
+Sahabat Kreator.
+
+Untuk mencabut akses dari sisi platform, buka pengaturan aplikasi terhubung di akun sosial Anda
+(misalnya **Facebook → Pengaturan → Aplikasi dan situs web**) lalu hapus Sahabat Kreator dari daftar.

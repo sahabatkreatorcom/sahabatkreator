@@ -1,0 +1,77 @@
+# Public API v1
+
+Sahabat Kreator menyediakan API HTTP untuk membangun integrasi di luar dashboard: menyambungkan Zapier atau Make, menarik data analitik ke sistem internal Anda, membuat konten terjadwal secara otomatis, sampai menjalankan alur kerja dari agen AI lewat MCP.
+
+- **Base URL** — `https://sahabatkreator.com/v1`
+- **Referensi interaktif** — [sahabatkreator.com/v1/docs](/v1/docs)
+- **Spesifikasi OpenAPI 3.1** — [sahabatkreator.com/v1/openapi.json](/v1/openapi.json)
+
+Keduanya terbuka tanpa token, jadi Anda bisa melihat seluruh bentuk request dan respons sebelum membuat API key.
+
+## Apa yang bisa dilakukan
+
+| Grup | Endpoint | Kegunaan |
+|---|---|---|
+| System | `GET /ping` | Memastikan token valid sekaligus melihat scope dan organisasi yang terikat. |
+| Accounts | 7 endpoint | Mendaftar akun sosial dan menghubungkan akun baru lewat alur OAuth. |
+| Posts | 6 endpoint | Membuat, menjadwalkan, menerbitkan, mengulang, dan menghapus konten. |
+| Analytics | 3 endpoint | Ringkasan, deret waktu, dan konten dengan performa terbaik. |
+| Reports | `GET /reports/summary` | Rangkuman siap dipakai untuk laporan klien. |
+| Media | 2 endpoint | Mendaftar dan mengimpor aset dari URL. |
+| Renders | 8 endpoint | Membuat carousel, video, dan auto-clip secara asinkron. |
+| Automation | 4 endpoint | Mengelola aturan otomatis. |
+| AI | 5 endpoint | Caption, hashtag, rewrite, repurpose, dan pemakaian kredit. |
+| Trends | 2 endpoint | Data tren dan pembuatan ide dari tren. |
+| Webhooks | 2 endpoint | Riwayat pengiriman dan daftar event. |
+
+<Callout variant="tip" title="Mulai dari sini">
+  Kalau ini pertama kali Anda memakai API-nya, ikuti [Mulai Cepat](/developers/mulai-cepat) —
+  dari membuat key sampai permintaan pertama berhasil, sekitar lima menit.
+</Callout>
+
+## Yang perlu disiapkan
+
+<Steps>
+  <Step title="Paket yang memadai">
+    Seluruh endpoint `/v1` butuh paket **Pro** atau lebih tinggi. Method tulis (POST, PATCH, DELETE)
+    butuh paket **Bisnis** atau lebih tinggi.
+  </Step>
+  <Step title="API key">
+    Dibuat di **Settings → API**. Token hanya ditampilkan sekali dan server menyimpan hash-nya saja.
+  </Step>
+  <Step title="Scope yang sesuai">
+    Scope dipilih saat key dibuat dan tidak bisa diubah setelahnya. Pilih secukupnya — key read-only
+    untuk dashboard, key dengan scope tulis hanya untuk integrasi yang memang perlu.
+  </Step>
+</Steps>
+
+## Aturan penting yang sering terlewat
+
+- **Key terikat ke organisasi, bukan ke pengguna.** Kalau pembuat key dikeluarkan dari organisasi, key langsung mati — tidak perlu dicabut manual.
+- **`POST /v1/accounts/{platform}/connect` bisa membalas dua bentuk.** Periksa apakah respons berisi `accountId` (selesai) atau `pendingId` (pengguna masih harus memilih aset). Jangan mengasumsikan salah satunya.
+- **Konfigurasi webhook tidak bisa diubah lewat API.** Tujuan webhook hanya bisa diatur dari UI, supaya token yang bocor tidak bisa mengalihkan data Anda ke server lain.
+- **Rate limit 60 permintaan per menit per key.** Respons `429` selalu menyertakan header `Retry-After`.
+- **Belum ada `Idempotency-Key`.** POST yang di-retry bisa membuat dua resource — pastikan sisi Anda tidak mengulang otomatis tanpa memeriksa.
+
+## Halaman selanjutnya
+
+<CardGrid>
+  <CardLink href="/developers/mulai-cepat" title="Mulai Cepat">
+    Membuat API key dan menjalankan permintaan pertama.
+  </CardLink>
+  <CardLink href="/developers/autentikasi" title="Autentikasi & Scope">
+    Bearer token, daftar scope, dan rotasi key.
+  </CardLink>
+  <CardLink href="/developers/menghubungkan-akun" title="Menghubungkan Akun via API">
+    Alur OAuth penuh dari sisi integrasi Anda.
+  </CardLink>
+  <CardLink href="/developers/webhook" title="Webhook">
+    Menerima notifikasi kejadian dan memverifikasi signature.
+  </CardLink>
+  <CardLink href="/developers/error-dan-batas" title="Error, Rate Limit & Kredit">
+    Arti setiap status dan berapa kredit yang dipotong.
+  </CardLink>
+  <CardLink href="/developers/resep" title="Resep Integrasi">
+    Contoh nyata: Zapier, Make, Google Sheets, dan MCP.
+  </CardLink>
+</CardGrid>

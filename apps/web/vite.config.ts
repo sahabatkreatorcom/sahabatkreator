@@ -2,6 +2,7 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import mdx from "@mdx-js/rollup";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
@@ -55,6 +56,16 @@ function stagingSeoGuardPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [
+    // MDX harus jalan SEBELUM plugin React: ia mengubah .mdx menjadi modul
+    // React sebelum transform JSX/TS milik React menyentuhnya. Dokumentasi
+    // publik di src/content/**/*.mdx dirender oleh DocsPage.
+    // `providerImportSource` membuat seluruh file .mdx otomatis menerima
+    // komponen dari <MDXProvider> (lihat components/docs/mdx-components.tsx),
+    // jadi penulis dokumen bisa memakai <Callout> / <Screenshot> tanpa import.
+    {
+      ...mdx({ providerImportSource: "@mdx-js/react" }),
+      enforce: "pre",
+    },
     tailwindcss(),
     react(),
     stagingSeoGuardPlugin(),

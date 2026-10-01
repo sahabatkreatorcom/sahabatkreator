@@ -1,0 +1,112 @@
+# Pemecahan Masalah
+
+Kumpulan masalah yang paling sering terjadi, beserta langkah penyelesaiannya.
+
+## Akun sosial terputus atau tidak bisa posting
+
+**Gejala:** konten yang dijadwalkan gagal dengan alasan izin, atau akun berstatus tidak aktif di
+halaman **Akun Sosmed**.
+
+**Penyebab:** platform menerbitkan token akses berumur terbatas. Kami memperbaruinya otomatis, tetapi
+token bisa batal lebih awal kalau Anda mencabut akses dari sisi platform, mengganti password akun
+sosial, atau mengubah pengaturan keamanan akun tersebut.
+
+**Solusi:** hubungkan ulang akun itu di **Pengaturan → Akun Sosmed**. Konten yang gagal tetap
+tersimpan dan bisa dijadwalkan ulang setelah akun aktif kembali.
+
+## Konten terjadwal tidak tayang
+
+<Steps>
+  <Step title="Periksa Hasil Post">
+    Halaman **Hasil Post** menampilkan status beserta alasannya. Ini selalu langkah pertama — pesan
+    gagalnya biasanya sudah menunjukkan penyebabnya.
+  </Step>
+  <Step title="Periksa zona waktu">
+    Jam yang dipakai adalah zona waktu organisasi. Kalau Anda mengelola klien di zona waktu lain,
+    jadwal bisa terasa "meleset" padahal sebenarnya benar.
+  </Step>
+  <Step title="Periksa media">
+    Ukuran berlebih, rasio yang tidak didukung, atau durasi video yang melewati batas platform bisa
+    membuat pengiriman ditolak.
+  </Step>
+  <Step title="Periksa akun">
+    Kalau pesan gagalnya menyebut izin, hubungkan ulang akun tersebut.
+  </Step>
+</Steps>
+
+## Media gagal diunggah
+
+| Gejala | Kemungkinan penyebab |
+|---|---|
+| Unggahan berhenti di tengah | Koneksi tidak stabil, atau berkas melebihi 100 MB. |
+| Format ditolak | Periksa daftar format yang didukung di [Media & Aset](/panduan/media). |
+| Video tidak diproses platform | Beberapa platform membutuhkan beberapa menit untuk memproses video setelah diunggah. |
+
+Coba lagi dari jaringan yang lebih stabil, dan perkecil berkasnya bila ukurannya mendekati batas.
+
+## Angka analitik kosong atau tidak berubah
+
+Metrik diambil dari API platform secara berkala, bukan real-time. Konten yang baru tayang biasanya
+butuh beberapa menit sampai angka pertamanya terisi.
+
+Kalau sebuah metrik kosong untuk konten yang sudah lama tayang, kemungkinan platform tersebut tidak
+menyediakan metrik itu. Sel kosong berarti "platform tidak memberikannya", bukan berarti nol.
+
+Data sebelum akun dihubungkan tidak bisa ditarik ke belakang — riwayat dimulai sejak akun tersambung.
+
+## Tombol Sinkron sepertinya tidak melakukan apa-apa
+
+Ini normal dalam beberapa situasi. Setelah menekan **Sinkron Platform**, muncul pemberitahuan yang
+membedakan tiga hasil:
+
+- **Konten baru diimpor** — ada konten baru yang masuk.
+- **Konten diperbarui** — tidak ada konten baru, hanya datanya disegarkan.
+- **Sudah terbaru** — tidak ada perubahan sama sekali.
+
+Kalau yang muncul adalah dua yang terakhir, tombolnya bekerja dengan benar — memang tidak ada yang
+perlu diubah. Angka metrik pada konten yang baru diimpor juga baru terisi setelah sistem menarik
+statistiknya.
+
+## Notifikasi tidak masuk
+
+Notifikasi push memerlukan Sahabat Kreator dipasang sebagai PWA dan izin notifikasi yang diaktifkan.
+
+1. Pastikan aplikasi sudah ditambahkan ke layar utama.
+2. Periksa izin notifikasi di pengaturan browser untuk situs ini.
+3. Coba matikan lalu nyalakan lagi notifikasi dari pengaturan akun.
+
+Beberapa browser memblokir notifikasi secara otomatis pada mode hemat daya atau saat tab lama tidak
+dibuka.
+
+## Lupa password atau tidak bisa masuk
+
+Gunakan tautan **Lupa password** di halaman masuk. Kalau email pemulihan tidak masuk, periksa folder
+spam, dan pastikan alamatnya benar.
+
+Kalau akun memakai 2FA dan Anda kehilangan akses ke aplikasi authenticator, hubungi dukungan —
+pemulihan 2FA memerlukan verifikasi identitas.
+
+## API mengembalikan error
+
+| Status | Arti | Solusi |
+|---|---|---|
+| `401` | Token tidak valid atau sudah dicabut | Periksa header, buat key baru bila perlu |
+| `402` | Paket belum mencukupi | Upgrade paket |
+| `403` | Scope key tidak sesuai | Buat key dengan scope yang tepat |
+| `429` | Lewat batas 60 permintaan per menit | Tunggu sesuai header `Retry-After` |
+
+Daftar lengkapnya ada di [Error, Rate Limit & Kredit](/developers/error-dan-batas).
+
+## Masih belum terselesaikan?
+
+Hubungi kami lewat [halaman kontak](/kontak). Supaya penanganannya cepat, sertakan:
+
+- Nama organisasi Anda.
+- Halaman atau fitur yang bermasalah.
+- Waktu kejadiannya, sedetail mungkin.
+- Tangkapan layar pesan errornya, bila ada.
+
+<Callout variant="warning" title="Jangan pernah kirim token">
+  Dukungan kami tidak pernah meminta API key, password, atau token akses platform. Kalau ada pihak
+  yang mengaku dari Sahabat Kreator dan memintanya, jangan berikan.
+</Callout>

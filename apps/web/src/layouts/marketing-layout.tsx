@@ -168,6 +168,16 @@ export function MarketingLayout() {
                 </Link>
               </li>
               <li>
+                <Link to="/panduan" className="hover:text-[var(--text-primary)]">
+                  Panduan
+                </Link>
+              </li>
+              <li>
+                <Link to="/developers" className="hover:text-[var(--text-primary)]">
+                  Dokumentasi API
+                </Link>
+              </li>
+              <li>
                 <Link to="/faq" className="hover:text-[var(--text-primary)]">
                   FAQ
                 </Link>

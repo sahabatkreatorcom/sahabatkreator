@@ -1,0 +1,68 @@
+# Automation
+
+Halaman **Automation** memungkinkan Anda menyiapkan aturan yang berjalan sendiri: ketika sesuatu
+terjadi, lakukan sesuatu. Ini yang membuat Anda bisa menangani volume besar tanpa menambah orang.
+
+## Cara kerja sebuah aturan
+
+Setiap aturan terdiri dari dua bagian:
+
+| Bagian | Arti |
+|---|---|
+| **Pemicu** | Kejadian yang mengawali aturan — misalnya komentar masuk berisi kata tertentu. |
+| **Tindakan** | Yang dilakukan sistem saat pemicu terpenuhi — misalnya membalas dengan template tertentu. |
+
+Anda bisa mengaktifkan dan menonaktifkan aturan tanpa menghapusnya, sehingga aman untuk mencoba lalu
+mematikannya kembali kalau hasilnya tidak sesuai.
+
+<Screenshot
+  src="/docs/panduan/automation.webp"
+  alt="Halaman automation menampilkan daftar aturan beserta pemicu dan tindakannya"
+  caption="Automation — aturan yang berjalan tanpa perlu Anda pantau."
+/>
+
+## Pemakaian yang aman
+
+<Steps>
+  <Step title="Mulai dari sapaan DM pertama">
+    Ini kasus paling aman: pengguna baru mengirim pesan, sistem menyapa dan menjelaskan cara
+    menghubungi manusia. Tidak ada risiko salah paham.
+  </Step>
+  <Step title="Lanjut ke pertanyaan rutin">
+    Balasan untuk pertanyaan yang jawabannya selalu sama: jam operasional, tautan katalog, cara
+    pemesanan.
+  </Step>
+  <Step title="Terakhir, penanganan komentar">
+    Balasan otomatis untuk komentar berisi kata tertentu. Ini yang paling berisiko terasa dingin,
+    jadi tulis template-nya dengan hati-hati.
+  </Step>
+</Steps>
+
+<Callout variant="warning" title="Yang sebaiknya tidak diotomatiskan">
+  Keluhan, masalah pembayaran, dan pertanyaan yang menyangkut data pribadi sebaiknya selalu
+  ditangani manusia. Balasan otomatis yang salah pada percakapan seperti ini bisa memperburuk
+  situasi, dan kesannya sulit dihapus.
+</Callout>
+
+## Melihat jejak eksekusi
+
+Setiap kali sebuah aturan berjalan, kejadiannya dicatat: aturan mana, pemicu apa, dan tindakan apa
+yang dijalankan. Jejak ini penting untuk dua hal:
+
+- Memastikan aturan benar-benar berjalan seperti yang Anda bayangkan.
+- Mengetahui apakah sistem membalas orang yang seharusnya ditangani manusia.
+
+Bila ada aturan yang berjalan terlalu sering, jejaknya akan menunjukkan — biasanya karena kata
+pemicunya terlalu umum.
+
+## Automation lewat API
+
+Kalau Anda ingin mengelola aturan dari sistem lain, tersedia endpoint `GET`, `POST`, `PATCH`, dan
+`DELETE` di `/v1/automation` dengan scope `automation:read` dan `automation:write`. Lihat
+[Dokumentasi API](/developers).
+
+<Callout variant="tip" title="Uji dengan akun sendiri dulu">
+  Sebelum mengaktifkan aturan pada akun yang ramai, kirim sendiri pesan atau komentar pemicunya, lalu
+  periksa apakah balasannya sesuai harapan. Jauh lebih cepat daripada memperbaiki setelah puluhan
+  orang menerima balasan yang salah.
+</Callout>

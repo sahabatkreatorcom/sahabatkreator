@@ -6,6 +6,8 @@ import { AdminLayout } from "./layouts/admin-layout";
 import { AuthLayout } from "./layouts/auth-layout";
 // Dashboard
 import { DashboardLayout } from "./layouts/dashboard-layout";
+// Dokumentasi publik (/panduan, /developers) — eager demi SEO
+import { DocsLayout } from "./layouts/docs-layout";
 import { MarketingLayout } from "./layouts/marketing-layout";
 import { RequireAdmin } from "./layouts/require-admin";
 import { RedirectIfAuthenticated, RequireAuth } from "./layouts/require-auth";
@@ -18,6 +20,8 @@ import { TwoFactorPage } from "./pages/auth/two-factor";
 import { VerifyEmailPage } from "./pages/auth/verify-email";
 import { ChangelogPage } from "./pages/changelog";
 import { ComparePage } from "./pages/compare";
+// Dokumentasi publik — renderer tunggal untuk semua halaman .mdx
+import { DocsPage } from "./pages/docs/docs-page";
 // Undangan org (publik)
 import { InviteAcceptPage } from "./pages/dashboard/invite-accept";
 import { FaqPage } from "./pages/faq";
@@ -266,6 +270,19 @@ export const router = createBrowserRouter([
           { path: "/rss.xml", element: <Navigate to="/blog" replace /> },
           { path: "/legal/:doc", element: <LegalRedirect /> },
           { path: "/ketentuan/:doc", element: <LegalRedirect /> },
+        ],
+      },
+
+      // ---------- Dokumentasi publik (SEO) ----------
+      // Satu renderer (DocsPage) melayani semua halaman; kontennya diambil dari
+      // src/content/<section>/<slug>.mdx. Peta halaman ada di lib/docs-nav.ts.
+      {
+        element: <DocsLayout />,
+        children: [
+          { path: "/panduan", element: <DocsPage /> },
+          { path: "/panduan/*", element: <DocsPage /> },
+          { path: "/developers", element: <DocsPage /> },
+          { path: "/developers/*", element: <DocsPage /> },
         ],
       },
 

@@ -1,0 +1,135 @@
+# Menghubungkan Akun via API
+
+Alur ini memungkinkan aplikasi Anda menghubungkan akun sosial milik pengguna **tanpa** mereka perlu
+membuka dashboard Sahabat Kreator. Cocok untuk agency dashboard, onboarding klien, atau alat
+internal yang ingin menyatukan proses koneksi.
+
+Butuh scope `accounts:write`.
+
+## Prasyarat — sekali saja, lewat dashboard
+
+<Steps>
+  <Step title="Buat developer app">
+    Buka **Settings → API → Developer app**, buat satu app, lalu isi **Redirect URI** — satu per
+    baris. Hanya URI yang terdaftar di sini yang boleh dipakai. Pencocokan bersifat **exact match**
+    (tanpa wildcard), dan `http` hanya diizinkan untuk `localhost`.
+  </Step>
+  <Step title="Pasang developer app ke API key">
+    Buat API key dengan scope `accounts:write`, lalu pilih developer app tadi pada kolom
+    **Developer app (opsional)**. Tanpa langkah ini, langkah 1 di bawah akan dijawab `403`.
+  </Step>
+</Steps>
+
+## Langkah 1 — minta izin pengguna
+
+```bash
+curl -s -H "Authorization: Bearer $SK_TOKEN" \
+  "https://sahabatkreator.com/v1/accounts/instagram/authorize?redirect=https://app.example.com/callback"
+```
+
+```json
+{ "authorizeUrl": "https://www.instagram.com/oauth/authorize?..." }
+```
+
+Arahkan browser pengguna ke `authorizeUrl`. Setelah menyetujui, platform mengembalikan mereka ke
+`redirect` Anda dengan `?code=…&state=…`, atau `?error=access_denied&error_description=…` bila
+ditolak.
+
+<Callout variant="warning" title="Selalu verifikasi state">
+  `state` dikembalikan apa adanya. Verifikasi nilainya di callback Anda untuk mencegah CSRF, dan
+  tangani `error=access_denied` sebagai pembatalan biasa — bukan kegagalan sistem.
+</Callout>
+
+## Langkah 2 — tukar `code` menjadi akun
+
+```bash
+curl -s -X POST https://sahabatkreator.com/v1/accounts/instagram/connect \
+  -H "Authorization: Bearer $SK_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code":"..."}'
+```
+
+Responsnya **polimorfik**. Periksa bentuknya — jangan mengasumsikan salah satu:
+
+| Bentuk respons | Arti |
+|---|---|
+| `{"accountId":"sk_socacc_…"}` | Selesai — akun sudah terhubung. |
+| `{"pendingId":"…","assets":[…]}` | Platform punya beberapa aset (Page, board, channel). Pengguna harus memilih dulu. |
+
+`code` bersifat **sekali pakai**. `POST /v1/accounts/{platform}/exchange` adalah alias `connect`
+(body dan respons identik) — panggil salah satu, jangan keduanya.
+
+<Callout variant="tip" title="Jangan hardcode daftar platform">
+  Tidak perlu tahu platform mana yang langsung selesai dan mana yang perlu memilih. Cukup cek
+  apakah respons berisi `accountId` atau `pendingId`.
+</Callout>
+
+## Langkah 3 — hanya bila respons berisi `pendingId`
+
+```bash
+# 1) tampilkan pilihan ke pengguna
+curl -s -H "Authorization: Bearer $SK_TOKEN" \
+  "https://sahabatkreator.com/v1/accounts/pending/$PENDING_ID"
+
+# 2) kirim pilihannya
+curl -s -X POST "https://sahabatkreator.com/v1/accounts/pending/$PENDING_ID/select" \
+  -H "Authorization: Bearer $SK_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"assetId":"<id dari assets[]>"}'
+```
+
+```json
+{ "ok": true, "username": "nama_akun" }
+```
+
+`pendingId` berlaku **10 menit**. Setelah itu server membalas `410` dan pengguna harus mengulang
+dari Langkah 1. Asetnya sengaja dibalas **tanpa token apa pun** — token disimpan terenkripsi di sisi
+kami.
+
+## Bentuk satu aset
+
+Bentuknya sama, baik di `assets[]` pada respons `connect` maupun pada respons `GET /pending/{id}`,
+jadi tidak ada pemetaan yang perlu Anda tulis.
+
+| Field | Arti |
+|---|---|
+| `id` | Kirim kembali sebagai `assetId` ke endpoint `select`. |
+| `name` | Nama Page, board, channel, atau profil. |
+| `username` | Username terkait (`null` bila tidak ada). |
+| `picture` | URL avatar (`null` bila tidak ada). |
+| `hasInstagram` | **Meta saja** — Page punya Instagram Business tertaut. Pada alur `instagram`, aset dengan nilai `false` **tidak bisa dipilih**; jangan tampilkan sebagai opsi. |
+| `isPersonal` | **LinkedIn saja** — `true` berarti profil pribadi, `false` berarti halaman company. |
+
+## Error yang khas
+
+| Status | Arti |
+|---|---|
+| `400` | `code` kosong, sudah dipakai, kedaluwarsa, atau platform menolak. |
+| `402` | Paket tidak punya `api_access` atau `api_write`. |
+| `403` | Key tidak punya developer app, atau `redirect` tidak ada di allowlist. |
+| `409` | Akun itu **sudah terhubung di organisasi lain** — satu akun platform hanya boleh dimiliki satu organisasi. |
+| `410` | `pendingId` kedaluwarsa. |
+
+Menghubungkan ulang akun yang sudah ada **di organisasi Anda sendiri** bukan error — akun yang sama
+hanya diperbarui.
+
+## Membaca akun yang sudah terhubung
+
+```bash
+curl -s -H "Authorization: Bearer $SK_TOKEN" \
+  "https://sahabatkreator.com/v1/accounts?perPage=50"
+```
+
+Untuk statistik satu akun (jumlah pengikut, jumlah konten, dan sejenisnya):
+
+```bash
+curl -s -H "Authorization: Bearer $SK_TOKEN" \
+  "https://sahabatkreator.com/v1/accounts/$ACCOUNT_ID/statistic"
+```
+
+<Callout variant="info" title="Token platform bisa kedaluwarsa">
+  Platform seperti Instagram dan Threads menerbitkan token berumur terbatas. Kami memperbaruinya
+  otomatis, tapi bila pengguna mencabut akses dari sisi platform, akun akan berhenti bisa
+  memposting. Tangani `post.failed` di [webhook](/developers/webhook) untuk memberi tahu pengguna
+  bahwa mereka perlu menghubungkan ulang.
+</Callout>

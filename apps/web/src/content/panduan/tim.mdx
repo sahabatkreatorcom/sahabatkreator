@@ -1,0 +1,70 @@
+# Tim & Kolaborasi
+
+Halaman **Tim** mengatur siapa saja yang boleh mengakses organisasi Anda dan apa yang boleh mereka
+lakukan.
+
+<Screenshot
+  src="/docs/panduan/tim.webp"
+  alt="Halaman tim menampilkan daftar anggota beserta perannya"
+  caption="Tim — anggota, peran, dan undangan yang masih menunggu."
+/>
+
+## Mengundang anggota
+
+<Steps>
+  <Step title="Buka Tim lalu pilih undang">
+    Masukkan alamat email orang yang ingin Anda tambahkan.
+  </Step>
+  <Step title="Tentukan peran">
+    Pilih peran sesuai kebutuhan. Mulai dari peran paling terbatas, lalu naikkan bila memang perlu.
+  </Step>
+  <Step title="Bagikan tautan undangan">
+    Undangan dikirim ke email tersebut. Selama belum diterima, undangan muncul di daftar dengan status
+    menunggu.
+  </Step>
+</Steps>
+
+## Peran dan izin
+
+| Peran | Cocok untuk |
+|---|---|
+| **Pemilik** | Pemilik bisnis. Punya akses penuh, termasuk tagihan dan penghapusan organisasi. |
+| **Admin** | Pengelola operasional. Bisa mengatur akun, konten, dan anggota, tetapi tidak menyentuh kepemilikan organisasi. |
+| **Anggota** | Tim konten. Bisa membuat dan menjadwalkan konten, membalas pesan, dan melihat analitik. |
+| **Hanya lihat** | Klien atau pengawas. Bisa melihat konten dan laporan tanpa mengubah apa pun. |
+
+<Callout variant="tip" title="Pilih peran paling terbatas yang masih cukup">
+  Kesalahan paling umum adalah memberi semua orang peran Admin karena lebih praktis. Akibatnya,
+  satu kelalaian bisa mengubah atau menghapus pekerjaan orang lain. Menetapkan peran dengan benar
+  sejak awal jauh lebih murah daripada memperbaikinya setelah masalah terjadi.
+</Callout>
+
+## Bekerja bersama tanpa saling menimpa
+
+Halaman **Aktivitas** mencatat siapa melakukan apa dan kapan. Kalau ada konten yang hilang atau
+berubah tanpa penjelasan, ini tempat pertama yang perlu diperiksa.
+
+Pembagian kerja yang berhasil biasanya sederhana:
+
+- Satu orang bertanggung jawab atas **kalender** — memastikan tidak ada hari kosong dan tidak ada
+  jadwal yang bertabrakan.
+- Orang lain bertanggung jawab atas **inbox dan komentar** — memastikan tidak ada pesan yang
+  terlewat.
+- Peran **hanya lihat** dipakai untuk klien yang perlu memantau tanpa ikut mengubah.
+
+## Keamanan akun anggota
+
+Setiap anggota memakai akunnya sendiri — jangan berbagi satu login. Kalau ada anggota yang keluar,
+cukup hapus dari daftar Tim dan aksesnya langsung berhenti.
+
+<Callout variant="info" title="API key ikut terpengaruh">
+  API key terikat pada organisasi, tetapi peran pembuatnya diperiksa ulang setiap permintaan. Kalau
+  orang yang membuat key dikeluarkan dari organisasi, key tersebut langsung berhenti berfungsi —
+  tidak perlu dicabut manual. Ini berlaku juga untuk key yang dipakai integrasi pihak ketiga.
+</Callout>
+
+## Autentikasi dua faktor
+
+Sebaiknya setiap anggota mengaktifkan 2FA lewat aplikasi authenticator di pengaturan keamanan akun
+masing-masing. Ini pengaman yang paling murah untuk mencegah akses tidak sah, terutama pada akun yang
+memegang akses ke banyak akun sosial klien.

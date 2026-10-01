@@ -1,0 +1,75 @@
+# Inbox & Engagement
+
+Ada dua halaman untuk berinteraksi dengan audiens: **Engagement** untuk komentar dan mention, dan
+**Inbox DM** untuk pesan pribadi. Keduanya menggabungkan semua platform dalam satu tampilan, jadi
+Anda tidak perlu berpindah-pindah aplikasi.
+
+<Screenshot
+  src="/docs/panduan/inbox.webp"
+  alt="Kotak masuk DM Sahabat Kreator menampilkan percakapan dari beberapa platform"
+  caption="Inbox DM — percakapan dari semua akun dalam satu daftar."
+/>
+
+## Engagement — komentar dan mention
+
+Halaman **Engagement** mengumpulkan komentar dan mention dari akun-akun yang terhubung. Setiap baris
+menampilkan nama pengguna, platform asal, isi komentar, dan waktu masuknya.
+
+Yang bisa dilakukan:
+
+- **Membalas langsung** dari dalam Sahabat Kreator. Balasan dikirim ke platform asal, jadi audiens
+  melihatnya seperti balasan biasa.
+- **Menyaring per platform atau per akun** ketika Anda hanya ingin fokus pada satu kanal.
+- **Menandai sudah ditangani** supaya anggota tim lain tahu komentar itu sudah dibalas.
+
+<Callout variant="info" title="Nama pengguna tanpa tanda @">
+  Di dalam basis data, nama pengguna disimpan tanpa awalan `@`; tampilan yang menambahkannya. Jadi
+  kalau Anda melihat `@namauser`, yang tersimpan sebenarnya `namauser`.
+</Callout>
+
+## Inbox DM
+
+**Inbox DM** bekerja seperti aplikasi pesan: daftar percakapan di kiri, isi percakapan di kanan.
+Percakapan dari semua platform bercampur dalam satu daftar, diurutkan dari yang paling baru.
+
+Balasan yang Anda kirim langsung sampai ke platform asal. Untuk pesan yang sering diulang, gunakan
+**balasan tersimpan** — template yang bisa dipanggil sekali klik.
+
+## Balasan tersimpan
+
+Balasan tersimpan berguna ketika pertanyaan yang sama muncul berulang kali: jam operasional, harga,
+cara pengiriman, atau tautan katalog. Simpan sekali, lalu pakai berkali-kali.
+
+Pola yang berhasil:
+
+<Steps>
+  <Step title="Kelompokkan berdasarkan niat, bukan kata kunci">
+    Buat balasan untuk "tanya harga", "tanya stok", "komplain pengiriman" — bukan untuk setiap
+    kalimat yang mungkin dipakai.
+  </Step>
+  <Step title="Sisakan ruang untuk personal">
+    Tulis template yang masih perlu disesuaikan sedikit, supaya tidak terasa seperti balasan robot.
+  </Step>
+  <Step title="Tinjau setiap bulan">
+    Harga dan kebijakan berubah. Balasan tersimpan yang basi lebih berbahaya daripada tidak ada
+    template sama sekali.
+  </Step>
+</Steps>
+
+## Automation untuk skala besar
+
+Kalau volume pesannya besar, **Automation** bisa menangani yang berulang secara otomatis — misalnya
+sapaan pembuka saat ada DM pertama, atau balasan untuk komentar berisi kata tertentu. Lihat
+[Automation](/panduan/automation) untuk aturan yang tersedia.
+
+<Callout variant="warning" title="Jangan mengotomatiskan keluhan">
+  Balasan otomatis paling aman untuk pertanyaan rutin. Untuk keluhan, keluhan pengiriman, atau
+  masalah pembayaran, biarkan manusia yang menjawab — percakapan yang terasa diabaikan lebih mahal
+  daripada waktu yang dihemat.
+</Callout>
+
+## Kalau balasan tidak terkirim
+
+Balasan dikirim lewat API platform, jadi bisa gagal karena alasan yang sama dengan posting: izin
+akun dicabut, atau platform sedang bermasalah. Kalau balasan gagal, coba lagi setelah beberapa saat;
+kalau terus gagal, periksa status akun di **Akun Sosmed**.

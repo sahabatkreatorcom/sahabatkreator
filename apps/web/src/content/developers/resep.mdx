@@ -1,0 +1,149 @@
+# Resep Integrasi
+
+Kumpulan alur yang paling sering diminta, lengkap dengan perintah yang bisa langsung dijalankan.
+
+## Menjadwalkan konten dari sistem lain
+
+Misalnya Anda punya CMS internal dan ingin setiap artikel baru otomatis masuk ke kalender konten.
+
+```bash
+curl -X POST https://sahabatkreator.com/v1/posts \
+  -H "Authorization: Bearer $SK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "Artikel baru: 5 Tips Produktivitas untuk Kreator",
+    "platforms": ["instagram", "facebook", "threads"],
+    "scheduledAt": "2026-10-02T09:00:00+07:00",
+    "media": [{ "url": "https://cdn.example.com/artikel-5-tips.jpg" }]
+  }'
+```
+
+<Callout variant="tip" title="Selalu sertakan offset zona waktu">
+  `scheduledAt` menerima ISO 8601. Tanpa offset (`+07:00`), waktu ditafsirkan sebagai UTC — dan
+  konten Anda tayang tujuh jam lebih awal dari yang Anda kira.
+</Callout>
+
+## Membuat carousel lalu menunggu hasilnya
+
+Render berjalan asinkron. Buat job, lalu poll sampai statusnya bukan lagi `queued` atau `rendering`.
+
+```bash
+JOB=$(curl -s -X POST https://sahabatkreator.com/v1/carousel \
+  -H "Authorization: Bearer $SK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"topic":"Tips produktivitas konten","slides":5}' | jq -r '.id')
+
+while true; do
+  STATUS=$(curl -s -H "Authorization: Bearer $SK_API_KEY" \
+    "https://sahabatkreator.com/v1/carousel/$JOB" | jq -r '.status')
+  echo "status: $STATUS"
+  [ "$STATUS" != "queued" ] && [ "$STATUS" != "rendering" ] && break
+  sleep 5
+done
+```
+
+Pola yang sama berlaku untuk `/v1/video/{id}` dan `/v1/auto-clip/{id}`.
+
+<Callout variant="info" title="Kenapa polling butuh scope tulis?">
+  `GET /v1/carousel/{id}` memakai scope `renders:write`. Polling adalah bagian tak terpisahkan dari
+  alur tulis — buat job lalu poll sampai selesai — sehingga tidak ada key read-only yang bisa
+  memulai pekerjaan tapi tidak bisa menyelesaikannya.
+</Callout>
+
+## Mengirim data ke Google Sheets
+
+Alur paling umum untuk pelaporan klien. Tidak perlu menulis kode sama sekali.
+
+<Steps>
+  <Step title="Buat trigger di Zapier atau Make">
+    Pilih **Webhook → Catch Hook** (Zapier) atau **Webhook → Custom webhook** (Make), lalu salin URL
+    yang diberikan.
+  </Step>
+  <Step title="Daftarkan endpoint di Sahabat Kreator">
+    Buka **Settings → Webhook → Buat endpoint**. Tempel URL tadi, pilih event `post.published`,
+    lalu isi secret minimal 16 karakter.
+  </Step>
+  <Step title="Petakan field ke kolom">
+    Tambahkan aksi **Google Sheets → Create Spreadsheet Row** dengan pemetaan:
+
+    | Kolom | Field |
+    |---|---|
+    | ID Konten | `data.postGroupId` |
+    | Platform | `data.platform` |
+    | Tautan | `data.url` |
+    | Waktu Tayang | `deliveredAt` |
+  </Step>
+  <Step title="Uji dengan satu konten">
+    Terbitkan satu konten percobaan, lalu pastikan barisnya muncul. Kalau tidak, cek riwayat di
+    **Settings → Webhook** untuk melihat respons yang dikembalikan Google.
+  </Step>
+</Steps>
+
+## Menarik ringkasan performa untuk dashboard klien
+
+```bash
+# Ringkasan periode
+curl -s -H "Authorization: Bearer $SK_API_KEY" \
+  "https://sahabatkreator.com/v1/analytics/overview?from=2026-09-01&to=2026-09-30"
+
+# Deret waktu harian untuk grafik
+curl -s -H "Authorization: Bearer $SK_API_KEY" \
+  "https://sahabatkreator.com/v1/analytics/timeseries?from=2026-09-01&to=2026-09-30&interval=day"
+
+# Konten dengan performa terbaik
+curl -s -H "Authorization: Bearer $SK_API_KEY" \
+  "https://sahabatkreator.com/v1/analytics/top-posts?limit=20"
+```
+
+Endpoint baca tidak memotong kredit, jadi menarik data setiap kali halaman dibuka tidak masalah —
+selama tetap di bawah 60 permintaan per menit.
+
+## Memakai agen AI lewat MCP
+
+Kalau Anda memakai Claude Code, Cursor, atau klien MCP lain, ada dua jalur:
+
+**MCP remote** — tanpa instalasi apa pun, cukup arahkan klien ke `POST /mcp` di
+`https://sahabatkreator.com`. Cocok untuk ChatGPT Responses API dan klien berbasis HTTP.
+
+**MCP stdio** — dijalankan di mesin Anda sendiri. Lihat
+[`apps/mcp/README.md`](https://github.com/sahabatkreatorcom/sahabatkreator/blob/main/apps/mcp/README.md)
+untuk cara pemasangannya.
+
+<Callout variant="warning" title="Batas waktu Cloudflare">
+  Proxy di depan API memutus koneksi yang tidak mengirim respons lebih dari ~100 detik. Tool call
+  yang butuh waktu lebih lama dari itu akan terputus di lapisan Cloudflare, bukan di aplikasi.
+  Untuk pekerjaan panjang, pilih tool yang mengembalikan ID job lalu poll terpisah.
+</Callout>
+
+## Membangun alur "hubungkan akun" di aplikasi Anda
+
+Kalau aplikasi Anda perlu menghubungkan akun sosial pengguna tanpa membuka dashboard kami, alurnya
+tiga langkah:
+
+```bash
+# 1. Minta URL izin
+AUTH_URL=$(curl -s -H "Authorization: Bearer $SK_API_KEY" \
+  "https://sahabatkreator.com/v1/accounts/instagram/authorize?redirect=https://app.example.com/callback" \
+  | jq -r '.authorizeUrl')
+
+# 2. Setelah pengguna kembali dengan ?code=…, tukar jadi akun
+curl -s -X POST https://sahabatkreator.com/v1/accounts/instagram/connect \
+  -H "Authorization: Bearer $SK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"code\":\"$CODE\"}"
+```
+
+Respons langkah 2 bisa berisi `accountId` (selesai) atau `pendingId` (pengguna harus memilih aset
+dulu). Rinciannya ada di [Menghubungkan Akun via API](/developers/menghubungkan-akun).
+
+## Menghasilkan caption dari judul konten
+
+```bash
+curl -X POST https://sahabatkreator.com/v1/ai/caption \
+  -H "Authorization: Bearer $SK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"kopi arabika lokal","platform":"instagram","tone":"santai"}'
+```
+
+Memotong 1 kredit AI. Untuk menghasilkan beberapa aset sekaligus dari satu konten panjang, gunakan
+`POST /v1/ai/repurpose`.

@@ -1,0 +1,85 @@
+# Integrasi & API
+
+Selain dipakai lewat dashboard, Sahabat Kreator bisa dihubungkan ke sistem lain. Ada tiga cara, dan
+pilihannya tergantung seberapa dalam integrasi yang Anda butuhkan.
+
+| Cara | Cocok untuk | Perlu koding? |
+|---|---|---|
+| **Webhook** | Mengirim data ke sistem lain saat terjadi sesuatu | Tidak |
+| **API key** | Sistem Anda menarik atau mengirim data | Ya |
+| **MCP** | Agen AI mengoperasikan Sahabat Kreator | Tidak |
+
+## Webhook — memberi tahu sistem lain
+
+Webhook mengirim pemberitahuan ke alamat yang Anda tentukan setiap kali ada kejadian: konten tayang,
+konten gagal, render selesai, dan sebagainya. Ini cara paling sederhana untuk menyambungkan Sahabat
+Kreator ke alat seperti Zapier, Make, atau Google Sheets.
+
+<Steps>
+  <Step title="Buka Pengaturan → Webhook">
+    Di sini Anda mengelola endpoint webhook organisasi.
+  </Step>
+  <Step title="Buat endpoint baru">
+    Isi URL tujuan, pilih kejadian yang ingin dikirim, lalu tentukan secret minimal 16 karakter.
+  </Step>
+  <Step title="Pakai secret untuk memverifikasi">
+    Setiap kiriman disertai tanda tangan HMAC. Verifikasi di sisi penerima supaya tidak ada pihak lain
+    yang bisa mengirim data palsu ke sistem Anda.
+  </Step>
+</Steps>
+
+Konfigurasi webhook **hanya bisa diubah dari UI**, tidak lewat API. Ini disengaja: kalau token bisa
+mengubah tujuan webhook, token yang bocor bisa mengalihkan seluruh data organisasi Anda ke server
+lain.
+
+Detail teknisnya — daftar kejadian, bentuk kiriman, cara verifikasi tanda tangan, dan aturan
+percobaan ulang — ada di [Dokumentasi API](/developers/webhook).
+
+## API key — integrasi penuh
+
+Untuk integrasi yang lebih dalam, buat API key di **Pengaturan → API**.
+
+<Callout variant="warning" title="Token hanya tampil sekali">
+  Setelah key dibuat, token ditampilkan satu kali saja. Server menyimpan hash-nya, jadi token yang
+  hilang tidak bisa dipulihkan — harus dibuat ulang. Simpan di tempat aman seperti secret manager,
+  bukan di dalam kode atau catatan biasa.
+</Callout>
+
+Beberapa hal yang perlu diketahui sebelum mulai:
+
+- **Akses API butuh paket Pro ke atas.** Method tulis butuh paket Bisnis ke atas.
+- **Scope dipilih saat key dibuat** dan tidak bisa diubah setelahnya. Buat key baru kalau scope-nya
+  kurang.
+- **Setiap key punya batas 60 permintaan per menit.**
+- **Key terikat pada organisasi.** Kalau pembuat key dikeluarkan dari organisasi, key langsung mati.
+
+Panduan lengkapnya ada di [Dokumentasi API](/developers), dan referensi interaktifnya di
+[`/v1/docs`](/v1/docs).
+
+## MCP — untuk agen AI
+
+Kalau Anda memakai agen AI seperti Claude Code, Cursor, atau klien lain yang mendukung MCP, Sahabat
+Kreator bisa dioperasikan langsung dari sana. Dua jalur tersedia:
+
+- **MCP remote** (`POST /mcp`) — tanpa instalasi apa pun, cukup arahkan klien ke
+  `https://sahabatkreator.com`.
+- **MCP stdio** — dijalankan di mesin Anda sendiri, cocok kalau ingin kontrol penuh atas prosesnya.
+
+<Callout variant="info" title="Batas waktu">
+  Proxy di depan API memutus koneksi yang tidak mengirim respons lebih dari sekitar 100 detik. Untuk
+  pekerjaan yang lebih lama — misalnya merender video — pilih alat yang mengembalikan ID pekerjaan,
+  lalu periksa statusnya secara terpisah.
+</Callout>
+
+## Contoh yang paling sering diminta
+
+| Kebutuhan | Caranya |
+|---|---|
+| Catat setiap konten tayang ke Google Sheets | Webhook dengan kejadian `post.published` |
+| Kirim laporan bulanan otomatis ke klien | `GET /v1/reports/summary` lewat API |
+| Jadwalkan konten dari CMS internal | `POST /v1/posts` lewat API |
+| Hubungkan akun sosial dari aplikasi Anda sendiri | Alur `authorize` → `connect` → `select` |
+| Minta agen AI menyiapkan draft konten | MCP atau `POST /v1/ai/caption` |
+
+Resep lengkap dengan perintah yang bisa langsung dijalankan ada di
+[Resep Integrasi](/developers/resep).

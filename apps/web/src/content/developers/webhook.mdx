@@ -1,0 +1,109 @@
+# Webhook
+
+Webhook memberi tahu sistem Anda ketika sesuatu terjadi di Sahabat Kreator — konten tayang, render
+selesai, atau automation terpicu. Anda tidak perlu melakukan polling.
+
+<Callout variant="info" title="Konfigurasi hanya lewat UI">
+  Endpoint webhook **tidak** bisa dibuat atau diubah lewat API. Atur di
+  **Settings → Webhook → Buat endpoint**. Ini disengaja: kalau token bisa mengubah tujuan webhook,
+  token yang bocor bisa mengalihkan seluruh data Anda ke server lain.
+
+  API hanya menyediakan pembacaan riwayat lewat `GET /v1/webhooks/deliveries` dan
+  `GET /v1/webhooks/events` (scope `webhooks:read`).
+</Callout>
+
+## Event yang tersedia
+
+```
+post.published       post.failed          post.scheduled
+render.completed     render.failed
+media.imported       automation.triggered
+```
+
+## Bentuk request
+
+```http
+POST <url-anda>
+Content-Type: application/json
+x-sk-event: post.published
+x-sk-signature: v1=<hex hmac-sha256>
+x-sk-delivery: sk_whdel_<32 hex>
+
+{"event":"post.published","deliveredAt":"2026-09-27T03:00:00.000Z","data":{…}}
+```
+
+Header `x-sk-delivery` berisi ID unik per pengiriman — pakai sebagai kunci deduplikasi bila sistem
+Anda bisa menerima event yang sama dua kali karena retry.
+
+## Verifikasi signature
+
+Sign HMAC-SHA256 atas **body mentah** dengan secret endpoint Anda, lalu bandingkan secara
+**constant-time**.
+
+```ts
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+function verify(rawBody: string, header: string, secret: string): boolean {
+  const expected = createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
+  const got = header.startsWith("v1=") ? header.slice(3) : header;
+  if (got.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(got, "hex"), Buffer.from(expected, "hex"));
+}
+```
+
+```python
+import hmac, hashlib
+
+def verify(raw_body: bytes, header: str, secret: str) -> bool:
+    expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    got = header[3:] if header.startswith("v1=") else header
+    return hmac.compare_digest(got, expected)
+```
+
+<Callout variant="warning" title="Pakai body mentah, bukan hasil parse ulang">
+  Hitung signature dari string persis yang Anda terima. Kalau Anda parse JSON lalu
+  `JSON.stringify` ulang, urutan key bisa berubah dan signature akan gagal — meskipun datanya
+  identik.
+</Callout>
+
+## Retry dan deduplikasi
+
+| Perilaku | Detail |
+|---|---|
+| Gagal (non-2xx) | Diulang **5×** dengan backoff 30 detik → 2 menit → 8 menit → 30 menit → 2 jam |
+| Timeout | **15 detik** per pengiriman |
+| Endpoint dinonaktifkan/dicabut | **Gagal permanen, tanpa retry** |
+| Event identik | `(endpoint, event, payload)` yang sama tidak dikirim dua kali — delivery boleh dianggap idempoten |
+
+Balas `2xx` secepat mungkin. Kalau perlu proses berat, masukkan ke antrean internal dan balas dulu —
+jangan menahan koneksi sampai selesai.
+
+## Pola yang disarankan
+
+<Steps>
+  <Step title="Balas 2xx lebih dulu, proses kemudian">
+    Simpan body mentah ke penyimpanan sementara, balas `200`, lalu proses di worker. Dengan begitu
+    timeout 15 detik tidak pernah menjadi masalah.
+  </Step>
+  <Step title="Verifikasi signature sebelum memproses">
+    Tolak dengan `401` bila signature tidak cocok. Jangan memproses payload yang tidak terverifikasi.
+  </Step>
+  <Step title="Deduplikasi dengan x-sk-delivery">
+    Retry bisa membuat event yang sama datang dua kali. Simpan ID pengiriman yang sudah diproses.
+  </Step>
+  <Step title="Pantau riwayat pengiriman">
+    Kalau ada yang tidak sampai, buka **Settings → Webhook** atau panggil
+    `GET /v1/webhooks/deliveries` untuk melihat status dan respons terakhir.
+  </Step>
+</Steps>
+
+## Contoh: catat post tayang ke Google Sheets
+
+1. Di Zapier, buat Zap dengan trigger **Webhook → Catch Hook**, lalu salin URL-nya.
+2. Di Sahabat Kreator: **Settings → Webhook → Buat endpoint**, tempel URL, pilih event
+   `post.published`, dan isi secret minimal 16 karakter.
+3. Tambahkan aksi **Google Sheets → Create Spreadsheet Row**, lalu petakan:
+   - `data.postGroupId` → kolom ID konten
+   - `data.platform` → kolom platform
+   - `data.url` → kolom tautan
+4. Nyalakan Zap, lalu terbitkan satu konten percobaan untuk memastikan barisnya masuk.

@@ -1,0 +1,95 @@
+# Error, Rate Limit & Kredit
+
+## Kode status
+
+| Status | Arti | Yang harus dilakukan |
+|---|---|---|
+| `400` | Body atau parameter tidak valid | Baca pesan `message` — biasanya menyebut field yang salah |
+| `401` | Token tidak ada, tidak valid, dicabut, atau kedaluwarsa | Periksa header, buat key baru bila perlu |
+| `402` | Paket tidak punya `api_access` (atau `api_write` untuk method tulis) | Upgrade paket |
+| `403` | Key tidak punya scope untuk endpoint tersebut | Buat key baru dengan scope yang sesuai |
+| `404` | Resource tidak ada **atau** bukan milik organisasi Anda | Pastikan ID benar dan berasal dari org yang sama |
+| `409` | Konflik — mis. akun sosial sudah terhubung di organisasi lain | Hubungkan dari organisasi yang memilikinya |
+| `410` | Resource sementara sudah kedaluwarsa (mis. `pendingId` 10 menit) | Ulangi alur dari awal |
+| `429` | Lewat rate limit | Tunggu sebanyak `Retry-After` detik |
+
+Semua error memakai bentuk yang sama:
+
+```json
+{ "message": "Pesan dalam Bahasa Indonesia yang siap ditampilkan" }
+```
+
+Pesan sengaja ditulis dalam Bahasa Indonesia dan bisa langsung ditampilkan ke pengguna akhir tanpa
+diterjemahkan ulang.
+
+## Rate limit
+
+| Batas | Nilai |
+|---|---|
+| Permintaan per key | **60 per menit** |
+| Dihitung per | **key**, bukan per IP |
+| Header pada `429` | `Retry-After` (detik) |
+
+Karena batasnya per key, memakai beberapa key untuk satu integrasi yang sama akan menaikkan
+total kuota — tapi itu juga mempersulit rotasi. Cara yang lebih sehat: cache respons yang jarang
+berubah, dan jangan polling lebih cepat dari yang dibutuhkan.
+
+<Callout variant="tip" title="Polling render">
+  Job render biasanya selesai dalam hitungan detik sampai beberapa menit. Polling setiap 3–5 detik
+  sudah cukup dan tidak akan menyentuh batas 60 per menit.
+</Callout>
+
+## Konsumsi kredit
+
+Aksi generatif memotong kredit **pool** organisasi — limitnya diagregasi lintas semua organisasi
+yang dimiliki pemiliknya, dengan tarif identik dengan pemakaian lewat UI.
+
+| Aksi | Kredit |
+|---|---|
+| `ai/caption`, `ai/hashtag`, `ai/rewrite`, `ai/repurpose` | 1 (AI) |
+| `trends/ideas` | 3 (AI) |
+| `carousel` | 5 (render) |
+| `video` | 10 (render) |
+| `auto-clip` | 5 (render) + 5 per klip yang dirender |
+
+Endpoint **baca** (`GET`) tidak memotong kredit. `GET /v1/trends` juga gratis — ia hanya meneruskan
+data tren eksternal.
+
+Tarif kredit per paket didefinisikan di `packages/db/scripts/seed.ts` dan bisa dilihat di
+**Admin Panel → Plans**.
+
+<Callout variant="warning" title="Periksa kredit sebelum batch besar">
+  Membuat 50 carousel sekaligus akan memotong 250 kredit render. Panggil `GET /v1/ai/usage` lebih
+  dulu, dan tangani `402` sebagai sinyal kuota habis — bukan sebagai bug.
+</Callout>
+
+## Batasan yang diketahui
+
+Kami mencantumkan ini secara terbuka supaya Anda bisa merancang integrasi tanpa terkejut:
+
+- **Belum ada OAuth2** — hanya bearer token.
+- **Belum ada `Idempotency-Key`** untuk request tulis. POST yang di-retry bisa membuat dua resource.
+- **Pagination masih `page` / `perPage`**, bukan cursor. Untuk dataset besar, halaman bisa bergeser
+  bila ada data baru di antaranya.
+- **Belum ada IP allowlist per key.**
+- **Rate limit seragam 60/menit** untuk semua paket.
+- **`webhooks:write`** sudah ada di daftar scope tapi belum dipakai endpoint mana pun.
+
+## Menangani error dengan benar
+
+<Steps>
+  <Step title="Jangan retry 400, 401, 402, 403, 404">
+    Semuanya perlu perubahan di sisi Anda. Mengulang request yang sama hanya membuang kuota.
+  </Step>
+  <Step title="Retry 429 dan 5xx dengan backoff">
+    Hormati `Retry-After`. Untuk `5xx`, pakai backoff eksponensial dan batasi jumlah percobaan.
+  </Step>
+  <Step title="Perlakukan 404 sebagai 'tidak ada atau bukan milik Anda'">
+    API sengaja tidak membedakan keduanya, supaya keberadaan resource milik organisasi lain tidak
+    bisa ditebak dari luar.
+  </Step>
+  <Step title="Log ID permintaan">
+    Saat melaporkan masalah ke dukungan, sertakan waktu, endpoint, status, dan `message` — cukup
+    untuk melacak tanpa perlu mengirim token.
+  </Step>
+</Steps>

@@ -1,0 +1,103 @@
+# Mulai Cepat
+
+Dari nol sampai permintaan pertama yang berhasil, sekitar lima menit.
+
+<Callout variant="info" title="Prasyarat">
+  Paket **Pro** atau lebih tinggi untuk mengakses `/v1`. Method tulis butuh paket **Bisnis** atau
+  lebih tinggi. Cek paket aktif Anda di **Settings → Billing**.
+</Callout>
+
+<Steps>
+  <Step title="Buat API key">
+    Buka **Settings → API → Buat key**. Beri nama yang menggambarkan pemakainya (misalnya `Zapier`
+    atau `Dashboard klien`), lalu centang scope yang dibutuhkan.
+
+    Token hanya ditampilkan **sekali**. Server menyimpan hash SHA-256-nya saja, jadi token yang
+    hilang tidak bisa dipulihkan — harus dibuat ulang.
+  </Step>
+
+  <Step title="Simpan token sebagai environment variable">
+    Jangan pernah menempelkan token langsung ke kode atau file yang ikut ter-commit.
+
+    ```bash
+    export SK_API_KEY="sk_api_..."
+    ```
+  </Step>
+
+  <Step title="Uji dengan /v1/ping">
+    Endpoint ini adalah cara tercepat membuktikan token valid sekaligus melihat scope dan organisasi
+    yang terikat.
+
+    ```bash
+    curl -s -H "Authorization: Bearer $SK_API_KEY" \
+      https://sahabatkreator.com/v1/ping
+    ```
+  </Step>
+
+  <Step title="Baca hasilnya">
+    ```json
+    {
+      "ok": true,
+      "organization": { "id": "org_...", "name": "...", "slug": "..." },
+      "key": {
+        "id": "apikey_...",
+        "name": "Zapier",
+        "prefix": "sk_api_ab12",
+        "scopes": ["posts:read", "analytics:read"]
+      },
+      "serverTime": "2026-09-27T03:00:00.000Z"
+    }
+    ```
+
+    Kalau `scopes` tidak memuat yang Anda butuhkan, buat key baru — scope tidak bisa diubah setelah
+    key dibuat.
+  </Step>
+</Steps>
+
+## Permintaan pertama yang mengubah data
+
+Setelah `ping` berhasil, coba ambil daftar akun sosial yang terhubung:
+
+```bash
+curl -s -H "Authorization: Bearer $SK_API_KEY" \
+  "https://sahabatkreator.com/v1/accounts?perPage=20"
+```
+
+Lalu jadwalkan satu konten. `scheduledAt` memakai format ISO 8601 dan sebaiknya menyertakan offset
+zona waktu (`+07:00` untuk WIB):
+
+```bash
+curl -X POST https://sahabatkreator.com/v1/posts \
+  -H "Authorization: Bearer $SK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "Promo akhir bulan! Diskon 30% untuk semua paket.",
+    "platforms": ["instagram", "facebook"],
+    "scheduledAt": "2026-10-01T09:00:00+07:00"
+  }'
+```
+
+<Callout variant="warning" title="Jangan retry POST otomatis">
+  API belum mendukung header `Idempotency-Key`. Kalau request POST diulang karena timeout, Anda bisa
+  membuat dua resource. Tangani timeout dengan memeriksa daftar resource terlebih dahulu, bukan
+  dengan mengulang langsung.
+</Callout>
+
+## Alat bantu yang tersedia
+
+| Alat | Alamat | Kegunaan |
+|---|---|---|
+| Referensi interaktif | [`/v1/docs`](/v1/docs) | Mencoba endpoint langsung dari browser, lengkap dengan contoh request. |
+| Spesifikasi OpenAPI | [`/v1/openapi.json`](/v1/openapi.json) | Digenerate ke Postman, Insomnia, atau generator klien apa pun. |
+| MCP remote | `POST /mcp` | Menghubungkan agen AI tanpa instalasi — lihat [Resep Integrasi](/developers/resep). |
+
+## Kalau ada yang gagal
+
+| Gejala | Kemungkinan penyebab |
+|---|---|
+| `401` | Token salah ketik, sudah dicabut, atau kedaluwarsa. |
+| `402` | Paket belum Pro (atau belum Bisnis untuk method tulis). |
+| `403` | Scope key tidak mencakup endpoint tersebut. |
+| `429` | Lewat 60 permintaan per menit — tunggu sesuai `Retry-After`. |
+
+Daftar lengkap ada di [Error, Rate Limit & Kredit](/developers/error-dan-batas).

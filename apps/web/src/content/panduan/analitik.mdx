@@ -1,0 +1,77 @@
+# Analitik & Laporan
+
+Halaman **Performa** adalah tempat Anda menjawab pertanyaan "konten mana yang berhasil?". Di
+dalamnya ada tiga tab: **Analitik**, **Laporan**, dan **Goal**.
+
+<Screenshot
+  src="/docs/panduan/analitik.webp"
+  alt="Halaman analitik menampilkan grafik performa dan daftar konten terbaik"
+  caption="Analitik — ringkasan, tren waktu, dan konten dengan performa terbaik."
+/>
+
+## Tab Analitik
+
+Tiga bagian utama:
+
+| Bagian | Isi |
+|---|---|
+| **Ringkasan** | Angka total periode terpilih: jangkauan, interaksi, dan pertumbuhannya dibanding periode sebelumnya. |
+| **Tren waktu** | Grafik harian atau mingguan. Berguna untuk melihat efek sebuah kampanye. |
+| **Konten terbaik** | Daftar konten dengan performa tertinggi, diurutkan berdasarkan tampilan atau interaksi. |
+
+<Callout variant="tip" title="Bandingkan periode, jangan lihat angka mentah">
+  Angka 12.000 tampilan tidak berarti apa-apa tanpa pembanding. Yang perlu Anda perhatikan adalah
+  arah perubahannya: naik atau turun dibanding periode sebelumnya, dan konten jenis apa yang
+  menyebabkannya.
+</Callout>
+
+## Cara membaca metrik
+
+| Metrik | Cara membacanya |
+|---|---|
+| **Views / jangkauan** | Seberapa banyak orang melihat. Murni soal distribusi — dipengaruhi waktu tayang dan hashtag. |
+| **Likes** | Persetujuan ringan. Mudah didapat, jadi kenaikannya kurang berarti sendirian. |
+| **Komentar** | Sinyal keterlibatan paling kuat setelah simpan. Menandakan isi konten memancing reaksi. |
+| **Saves** | Konten dianggap berguna dan disimpan untuk dilihat lagi. Ini indikator kualitas terbaik. |
+| **Share** | Konten dianggap layak direkomendasikan. Sulit dipalsukan. |
+
+Kalau sebuah konten punya views tinggi tetapi saves rendah, biasanya masalahnya ada di janji di awal
+caption: orang berhenti karena tidak merasa akan mendapat sesuatu. Sebaliknya, saves tinggi dengan
+views rendah biasanya berarti kontennya bagus tetapi kurang terdistribusi — coba waktu tayang lain.
+
+## Tab Laporan
+
+Laporan menyusun data periode tertentu menjadi rangkuman yang siap dibagikan ke klien atau atasan.
+Anda bisa memilih rentang tanggal lalu mengekspornya.
+
+Laporan yang tersedia juga bisa dibuat lewat API — lihat `GET /v1/reports/summary` di
+[Dokumentasi API](/developers). Kalau Anda mengelola banyak klien, cara ini jauh lebih hemat waktu
+daripada mengekspor satu per satu.
+
+## Tab Goal
+
+Menetapkan target membuat angka punya arti. Tentukan target, misalnya jumlah pengikut atau jumlah
+konten per bulan, lalu pantau kemajuannya di sini.
+
+<Steps>
+  <Step title="Tetapkan target yang bisa dikendalikan">
+    "Menambah 500 pengikut" hanya sebagian ada di tangan Anda. "Menerbitkan 20 konten bulan ini"
+    sepenuhnya ada di tangan Anda — pakai yang kedua untuk kebiasaan, yang pertama untuk arah.
+  </Step>
+  <Step title="Tetapkan rentang waktu">
+    Target tanpa tenggat hampir selalu terabaikan.
+  </Step>
+  <Step title="Tinjau setiap akhir bulan">
+    Sesuaikan targetnya. Target yang selalu tercapai terlalu mudah; yang tidak pernah tercapai akan
+    diabaikan.
+  </Step>
+</Steps>
+
+## Keterbatasan data yang perlu diketahui
+
+- **Metrik diambil berkala, bukan real-time.** Konten yang baru tayang butuh beberapa menit sampai
+  angkanya terisi.
+- **Tidak semua platform menyediakan semua metrik.** Views, misalnya, tidak tersedia di semua
+  platform. Sel kosong berarti platform tidak memberikannya, bukan berarti nol.
+- **Riwayat bergantung pada kapan akun dihubungkan.** Data sebelum akun terhubung tidak bisa ditarik
+  ke belakang.

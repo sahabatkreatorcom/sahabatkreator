@@ -1,0 +1,90 @@
+# Generator & Render
+
+Bagian **Aset** dan **Generator AI** di sidebar berisi alat untuk memproduksi materi visual tanpa
+perangkat desain tambahan. Semuanya bekerja dari satu ide yang Anda tulis.
+
+## Repurpose — satu konten jadi banyak
+
+Halaman **Repurpose** memecah satu konten panjang menjadi beberapa konten pendek yang siap dipakai di
+platform berbeda. Berguna ketika Anda sudah punya artikel, transkrip video, atau thread panjang dan
+ingin memanfaatkannya lebih jauh.
+
+Masukkan materi sumbernya, lalu pilih berapa banyak potongan yang diinginkan. Hasilnya bisa langsung
+diedit sebelum dijadwalkan.
+
+## Carousel — slide bergambar
+
+Halaman **Carousel** membuat rangkaian slide bergambar dari sebuah topik. Anda menentukan topik dan
+jumlah slide, sistem menyusun isinya.
+
+<Screenshot
+  src="/docs/panduan/generator-carousel.webp"
+  alt="Generator carousel menampilkan pratinjau slide dan pengaturan jumlah slide"
+  caption="Generator Carousel — slide siap tayang dari satu topik."
+/>
+
+Memotong **5 kredit render** per carousel.
+
+## Render Video
+
+Halaman **Render Video** menyusun video dari teks dan aset Anda. Cocok untuk konten yang butuh teks
+bergerak atau gabungan beberapa klip tanpa membuka editor video.
+
+Memotong **10 kredit render** per video.
+
+## Auto-Clip — potongan otomatis dari video panjang
+
+Halaman **Auto-Clip** mengambil video panjang dan mencari bagian-bagian yang paling layak dijadikan
+klip pendek. Anda lalu memilih klip mana yang ingin dirender.
+
+<Screenshot
+  src="/docs/panduan/auto-clip.webp"
+  alt="Halaman auto-clip menampilkan daftar klip yang diusulkan dari sebuah video panjang"
+  caption="Auto-Clip — pilih momen terbaik, biarkan sisanya diabaikan."
+/>
+
+Biayanya **5 kredit render** untuk analisis, ditambah **5 kredit** per klip yang benar-benar dirender.
+Jadi Anda bisa menganalisis satu video dan hanya merender dua klip tanpa membayar seluruhnya.
+
+<Callout variant="tip" title="Mulai dari video yang sudah punya transkrip jelas">
+  Auto-Clip bekerja jauh lebih baik pada video dengan audio yang jernih. Video dengan musik keras
+  atau suara bercampur cenderung menghasilkan klip yang kurang tepat.
+</Callout>
+
+## Video Renders — memantau proses
+
+Semua pekerjaan render bersifat asinkron: Anda memulai, lalu menunggu. Halaman **Video Renders**
+menampilkan status setiap pekerjaan — sedang menunggu, sedang diproses, selesai, atau gagal.
+
+Kalau sebuah render gagal, alasannya ditampilkan di sini. Penyebab yang paling sering adalah aset
+sumber yang tidak bisa dibaca atau durasi yang melewati batas.
+
+## Tips supaya hasilnya rapi
+
+<Steps>
+  <Step title="Tentukan satu pesan per konten">
+    Carousel dan video yang mencoba menyampaikan lima hal sekaligus biasanya tidak menyampaikan
+    satu pun. Satu slide atau satu klip untuk satu ide.
+  </Step>
+  <Step title="Periksa pratinjau sebelum menjadwalkan">
+    Teks yang muat di editor belum tentu muat di layar ponsel. Lihat pratinjaunya.
+  </Step>
+  <Step title="Simpan aset ke pustaka">
+    Hasil render otomatis masuk ke pustaka Media, jadi bisa dipakai ulang untuk konten lain tanpa
+    merender ulang.
+  </Step>
+</Steps>
+
+## Kredit render
+
+Kredit render terpisah dari kredit AI. Rincian pemakaiannya:
+
+| Aksi | Kredit |
+|---|---|
+| Carousel | 5 |
+| Video | 10 |
+| Auto-Clip (analisis) | 5 |
+| Auto-Clip (per klip dirender) | 5 |
+
+Kuota yang tersisa terlihat di **Pengaturan → Langganan**. Karena render lebih mahal daripada AI,
+sebaiknya uji idenya dengan konten sederhana dulu sebelum merender dalam jumlah banyak.
