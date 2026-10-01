@@ -7,6 +7,10 @@ node_modules
 dist
 build
 *.tsbuildinfo
+# Output build sementara untuk verifikasi lokal: `vite build` biasa gagal di
+# sandbox saat mengosongkan dist/assets, jadi verifikasi memakai
+# `bunx vite build --outDir .verify-dist --emptyOutDir`.
+.verify-dist
 
 # Environment variables
 .env
