@@ -174,13 +174,27 @@ export function CalendarPage() {
   // Import manual post eksternal: fetch konten terbit langsung di platform → DB.
   // Worker juga sinkron otomatis tiap 4 jam; tombol ini untuk yang ingin segera.
   const syncPosts = useMutation({
-    mutationFn: () => api.post<{ summary: { totalPostsImported: number } }>("/posts/sync", {}),
+    mutationFn: () =>
+      api.post<{ summary: { totalPostsImported: number; totalPostsUpdated: number } }>(
+        "/posts/sync",
+        {},
+      ),
     onSuccess: (data) => {
       invalidate();
-      const n = data.summary?.totalPostsImported ?? 0;
-      toast.success(
-        n > 0 ? `${n} konten platform berhasil diimpor` : "Konten platform sudah terbaru",
-      );
+      const imported = data.summary?.totalPostsImported ?? 0;
+      const updated = data.summary?.totalPostsUpdated ?? 0;
+      // `updated` juga hasil nyata (metrik/media disegarkan) — lihat post-results.tsx.
+      if (imported > 0) {
+        toast.success(
+          updated > 0
+            ? `${imported} konten baru diimpor, ${updated} konten diperbarui`
+            : `${imported} konten platform berhasil diimpor`,
+        );
+      } else if (updated > 0) {
+        toast.success(`${updated} konten platform diperbarui`);
+      } else {
+        toast.success("Konten platform sudah terbaru");
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });

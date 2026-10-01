@@ -354,7 +354,12 @@ analyticsRoute.get("/timeseries", async (c) => {
 analyticsRoute.get("/top-posts", async (c) => {
   try {
     const ctx = await requireOrg(c);
-    const limit = Math.min(Number(c.req.query("limit") ?? 10), 50);
+    // Cap dinaikkan 50 → 200: halaman /post-results menarik SEMUA post lalu
+    // memfilter platform di sisi klien. Dengan cap 50, org yang punya >50 post
+    // tayang kehilangan sebagian post — dan karena urutannya `views desc nulls
+    // last`, post yang baru diimpor (belum punya snapshot analytics) selalu
+    // terpotong, sehingga tombol "Sinkron Platform" tampak tidak berefek.
+    const limit = Math.min(Number(c.req.query("limit") ?? 10), 200);
     const platform = c.req.query("platform");
     const platformFilter = platform ? sql` and p.platform = ${platform}` : sql``;
 
@@ -404,7 +409,12 @@ analyticsRoute.get("/top-posts", async (c) => {
           ) media on true
           where p.organization_id = ${ctx.organization.id}
             and p.status = 'published'${platformFilter}
-          order by latest.views desc nulls last, latest.likes desc nulls last
+          order by latest.views desc nulls last,
+                   latest.likes desc nulls last,
+                   -- Tiebreaker: di antara post ber-metric sama (atau sama-sama
+                   -- belum punya snapshot analytics) yang terbaru tampil dulu,
+                   -- supaya hasil "Sinkron Platform" langsung terlihat di atas.
+                   p.published_at desc nulls last
           limit ${limit}`,
     );
 

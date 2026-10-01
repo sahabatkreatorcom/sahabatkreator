@@ -491,13 +491,29 @@ export function PostResultsPage() {
   // Threads) → muncul di grid ini. Worker juga sinkron otomatis tiap 4 jam;
   // tombol ini untuk yang ingin segera melihat post terbarunya.
   const syncPosts = useMutation({
-    mutationFn: () => api.post<{ summary: { totalPostsImported: number } }>("/posts/sync", {}),
+    mutationFn: () =>
+      api.post<{ summary: { totalPostsImported: number; totalPostsUpdated: number } }>(
+        "/posts/sync",
+        {},
+      ),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.postResults });
-      const n = res.summary?.totalPostsImported ?? 0;
-      toast.success(
-        n > 0 ? `${n} konten platform berhasil diimpor` : "Konten platform sudah terbaru",
-      );
+      const imported = res.summary?.totalPostsImported ?? 0;
+      const updated = res.summary?.totalPostsUpdated ?? 0;
+      // `imported` = post baru; `updated` = post lama yang metrik/media-nya
+      // disegarkan. Keduanya hasil nyata — jangan bilang "sudah terbaru" kalau
+      // sebenarnya ada puluhan baris yang baru saja diperbarui.
+      if (imported > 0) {
+        toast.success(
+          updated > 0
+            ? `${imported} konten baru diimpor, ${updated} konten diperbarui`
+            : `${imported} konten platform berhasil diimpor`,
+        );
+      } else if (updated > 0) {
+        toast.success(`${updated} konten platform diperbarui`);
+      } else {
+        toast.success("Konten platform sudah terbaru");
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -507,7 +523,7 @@ export function PostResultsPage() {
   // begitu salah satu dipilih.
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.postResults,
-    queryFn: () => api.get<TopPostsResponse>("/analytics/top-posts?limit=50"),
+    queryFn: () => api.get<TopPostsResponse>("/analytics/top-posts?limit=200"),
     // Angka engagement bisa berubah saat analytics sync — refresh berkala
     refetchInterval: 60_000,
   });
