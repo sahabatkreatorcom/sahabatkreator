@@ -199,10 +199,29 @@ const SLUG_KEYS = /^slug$/i;
 const NAME_HINT_KEYS = ["name", "displayName", "partnerName", "authorName", "channelTitle"];
 
 /**
- * Endpoint yang isinya informasi publik, bukan data pribadi. Teksnya dibiarkan
- * apa adanya (URL aset tetap diganti).
+ * Endpoint yang teksnya boleh dibiarkan utuh di bawah ini.
+ *
+ * Dua lapis, dan urutannya penting:
+ *
+ *   • PASSTHROUGH_ENDPOINT — isinya memang informasi publik (nama hari besar,
+ *     judul tren, nama paket, nama peran). Dibuat orang lain, tapi bukan data
+ *     pribadi.
+ *
+ *   • OWN_TEXT_ENDPOINT — isinya dibuat PEMILIK AKUN DEMO sendiri: nama rule
+ *     automation, nama monitor, nama sumber web, dan deskripsi rule. Label
+ *     seperti "Balas pertanyaan harga" atau "Pemantauan merek & pesaing" kalau
+ *     ikut disanitasi berubah jadi nama orang ("Nadia Kusuma", "Bagas Saputra")
+ *     dan tangkapan layarnya justru menyesatkan. Isi pesan balasan, keyword,
+ *     nama pelanggan, dan URL sumber TETAP disanitasi.
  */
 const PASSTHROUGH_ENDPOINT = /^\/api\/(holiday|billing\/plans|team\/roles|push\/vapid|trends)/;
+// `/api/listening` (tanpa sub-path) ikut: di situ nama monitor dikirim, jadi
+// tanpa mencantumkannya label "Pemantauan merek & pesaing" berubah jadi nama orang.
+const OWN_TEXT_ENDPOINT =
+  /^\/api\/(automation|listening(\/|$)|listening\/monitors|listening\/sources)/;
+// `name` = nama rule/monitor/sumber · `description` = deskripsi rule (diketik pemilik akun).
+// `keywords`/`excludedTerms` TIDAK termasuk — itu kata yang dipantau, bukan label.
+const OWN_TEXT_KEYS = new Set(["name", "description"]);
 
 function looksLikeUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
@@ -350,6 +369,7 @@ function sanitizeString(
   key: string,
   parentName: string | null,
   passthrough: boolean,
+  ownText: boolean,
 ): string {
   if (KEEP_VALUES.has(value)) {
     keptNeutral.add(value);
@@ -371,6 +391,13 @@ function sanitizeString(
 
   if (passthrough) {
     recordKept(key, value);
+    return value;
+  }
+
+  // Label yang diketik sendiri pemilik akun (nama rule/monitor) dibiarkan utuh;
+  // lihat OWN_TEXT_ENDPOINT. Isi pesan & keyword tetap disanitasi.
+  if (ownText && OWN_TEXT_KEYS.has(key)) {
+    recordKept(`own:${key}`, value);
     return value;
   }
 
@@ -420,9 +447,12 @@ function walk(
   key: string,
   parentName: string | null,
   passthrough: boolean,
+  ownText: boolean,
 ): unknown {
-  if (typeof node === "string") return sanitizeString(node, key, parentName, passthrough);
-  if (Array.isArray(node)) return node.map((item) => walk(item, key, parentName, passthrough));
+  if (typeof node === "string") return sanitizeString(node, key, parentName, passthrough, ownText);
+  if (Array.isArray(node)) {
+    return node.map((item) => walk(item, key, parentName, passthrough, ownText));
+  }
   if (node && typeof node === "object") {
     const record = node as Record<string, unknown>;
     // Nama tampilan disanitasi LEBIH DULU supaya handle di objek yang sama bisa
@@ -434,11 +464,17 @@ function walk(
     // percakapan DM `partnerName`, komentar `authorName` — jadi semuanya dilihat.
     const hintKey = NAME_HINT_KEYS.find((candidate) => typeof record[candidate] === "string");
     const ownName = hintKey
-      ? sanitizeString(record[hintKey] as string, hintKey, parentName, passthrough)
+      ? (sanitizeString(
+          record[hintKey] as string,
+          hintKey,
+          parentName,
+          passthrough,
+          ownText,
+        ) as string)
       : parentName;
     const out: Record<string, unknown> = {};
     for (const [childKey, childValue] of Object.entries(record)) {
-      out[childKey] = walk(childValue, childKey, ownName, passthrough);
+      out[childKey] = walk(childValue, childKey, ownName, passthrough, ownText);
     }
     return out;
   }
@@ -530,16 +566,19 @@ async function main() {
 
   const responses: Record<string, { status: number; contentType: string; json: unknown }> = {};
   let passthroughCount = 0;
+  let ownTextCount = 0;
 
   for (const [key, value] of Object.entries(raw.responses)) {
     const spaceAt = key.indexOf(" ");
     const endpointPath = key.slice(spaceAt + 1).split("?")[0] ?? "";
     const passthrough = PASSTHROUGH_ENDPOINT.test(endpointPath);
+    const ownText = OWN_TEXT_ENDPOINT.test(endpointPath);
     if (passthrough) passthroughCount += 1;
+    if (ownText) ownTextCount += 1;
     responses[key] = {
       status: value.status,
       contentType: value.contentType,
-      json: walk(value.json, endpointPath, null, passthrough),
+      json: walk(value.json, endpointPath, null, passthrough, ownText),
     };
   }
 
@@ -563,6 +602,9 @@ async function main() {
 
   console.log(
     `Respons        : ${Object.keys(responses).length} (${passthroughCount} endpoint dilewati apa adanya)`,
+  );
+  console.log(
+    `Teks sendiri  : ${ownTextCount} endpoint dibiarkan utuh (${OWN_TEXT_KEYS.size} kunci: ${[...OWN_TEXT_KEYS].join(", ")})`,
   );
   console.log(`Nilai diganti  : ${replacedOriginals.size}`);
   console.log(

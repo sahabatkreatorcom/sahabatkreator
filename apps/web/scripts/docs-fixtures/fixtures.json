@@ -1,6 +1,6 @@
 {
   "note": "Data fiktif untuk tangkapan layar dokumentasi /panduan dan /developers. Dihasilkan oleh apps/web/scripts/docs-fixtures.sanitize.ts — jangan disunting manual.",
-  "recordedAt": "2026-10-01T08:33:07.868Z",
+  "recordedAt": "2026-10-01T15:22:07.385Z",
   "responses": {
     "GET /api/me": {
       "status": 200,
@@ -5541,65 +5541,6 @@
         "clipperEnabled": true
       }
     },
-    "GET /api/automation": {
-      "status": 200,
-      "contentType": "application/json",
-      "json": {
-        "rules": [],
-        "accounts": [
-          {
-            "id": "sk_socacc_twgkqpzf1z",
-            "platform": "instagram_standalone",
-            "username": "nadia.kusuma"
-          },
-          {
-            "id": "sk_socacc_7vmwm3w06w",
-            "platform": "facebook",
-            "username": "yoga.prasetyo"
-          },
-          {
-            "id": "sk_socacc_st1m4eg2ki",
-            "platform": "threads",
-            "username": "rina.kartika.2"
-          },
-          {
-            "id": "sk_socacc_bh8kk70oe6",
-            "platform": "youtube",
-            "username": "fajar.firmansyah"
-          },
-          {
-            "id": "sk_socacc_3t6cpw7yzo",
-            "platform": "bluesky",
-            "username": "intan.permatasari"
-          },
-          {
-            "id": "sk_socacc_5g2a55zhzz",
-            "platform": "pinterest",
-            "username": "maya.anggraini"
-          },
-          {
-            "id": "sk_socacc_by0arnnoji",
-            "platform": "instagram",
-            "username": "rina.kartika.2"
-          },
-          {
-            "id": "sk_socacc_2uy6vd7bgz",
-            "platform": "linkedin",
-            "username": "dimas.mahendra"
-          },
-          {
-            "id": "sk_socacc_8szztnxaj6",
-            "platform": "facebook",
-            "username": "rina.kartika"
-          },
-          {
-            "id": "sk_socacc_osdxcsngzv",
-            "platform": "tiktok",
-            "username": "sari.wulandari"
-          }
-        ]
-      }
-    },
     "GET /api/trends/youtube?limit=12": {
       "status": 200,
       "contentType": "application/json",
@@ -5947,32 +5888,6 @@
         "source": "Apple Music Top 100 ID"
       }
     },
-    "GET /api/listening": {
-      "status": 200,
-      "contentType": "application/json",
-      "json": {
-        "summary": {
-          "activeMonitors": 0,
-          "totalItems": 0,
-          "unread": 0,
-          "sentiment": {
-            "positive": 0,
-            "neutral": 0,
-            "negative": 0,
-            "question": 0
-          }
-        },
-        "monitors": [],
-        "items": []
-      }
-    },
-    "GET /api/listening/sources": {
-      "status": 200,
-      "contentType": "application/json",
-      "json": {
-        "sources": []
-      }
-    },
     "GET /api/coach": {
       "status": 200,
       "contentType": "application/json",
@@ -6301,6 +6216,426 @@
           "newReview": true
         },
         "isConfigured": false
+      }
+    },
+    "GET /api/posts?from=2026-10-01T14%3A34%3A08.734Z": {
+      "status": 200,
+      "contentType": "application/json",
+      "json": {
+        "groups": [],
+        "page": 1,
+        "perPage": 50
+      }
+    },
+    "GET /api/posts?from=2026-10-01T14%3A34%3A08.792Z": {
+      "status": 200,
+      "contentType": "application/json",
+      "json": {
+        "groups": [],
+        "page": 1,
+        "perPage": 50
+      }
+    },
+    "GET /api/posts?from=2026-10-01T14%3A56%3A13.499Z": {
+      "status": 200,
+      "contentType": "application/json",
+      "json": {
+        "groups": [],
+        "page": 1,
+        "perPage": 50
+      }
+    },
+    "GET /api/posts?from=2026-10-01T14%3A56%3A13.549Z": {
+      "status": 200,
+      "contentType": "application/json",
+      "json": {
+        "groups": [],
+        "page": 1,
+        "perPage": 50
+      }
+    },
+    "GET /api/listening": {
+      "status": 200,
+      "contentType": "application/json",
+      "json": {
+        "summary": {
+          "activeMonitors": 3,
+          "totalItems": 9,
+          "unread": 9,
+          "sentiment": {
+            "positive": 1,
+            "neutral": 7,
+            "negative": 0,
+            "question": 1
+          }
+        },
+        "monitors": [
+          {
+            "id": "sk_lsn_bj3491xv3m",
+            "organizationId": "Jtjrg5zR68T1OAQgo3rGWM4e4RwoNciT",
+            "name": "Percakapan seputar konten",
+            "keywords": [
+              "gaes",
+              "yuk"
+            ],
+            "excludedTerms": [],
+            "platforms": [],
+            "isActive": true,
+            "lastSyncedAt": "2026-10-01T14:56:13.661Z",
+            "createdAt": "2026-10-01T14:56:13.331Z",
+            "updatedAt": "2026-10-01T14:56:13.662Z"
+          },
+          {
+            "id": "sk_lsn_f6d6tw5u0p",
+            "organizationId": "Jtjrg5zR68T1OAQgo3rGWM4e4RwoNciT",
+            "name": "Keluhan pelanggan",
+            "keywords": [
+              "kecewa",
+              "belum sampai",
+              "komplain",
+              "salah kirim"
+            ],
+            "excludedTerms": [],
+            "platforms": [],
+            "isActive": true,
+            "lastSyncedAt": "2026-10-01T14:56:13.624Z",
+            "createdAt": "2026-10-01T14:34:08.436Z",
+            "updatedAt": "2026-10-01T14:56:13.624Z"
+          },
+          {
+            "id": "sk_lsn_7jnfj88drm",
+            "organizationId": "Jtjrg5zR68T1OAQgo3rGWM4e4RwoNciT",
+            "name": "Pemantauan merek & pesaing",
+            "keywords": [
+              "Sahabat Kreator",
+              "sahabatkreator",
+              "review sahabat kreator"
+            ],
+            "excludedTerms": [
+              "lowongan",
+              "loker"
+            ],
+            "platforms": [],
+            "isActive": true,
+            "lastSyncedAt": "2026-10-01T14:56:13.580Z",
+            "createdAt": "2026-10-01T14:34:08.382Z",
+            "updatedAt": "2026-10-01T14:56:13.581Z"
+          }
+        ],
+        "items": [
+          {
+            "id": "sk_lsn_613b3f05b57a4362",
+            "monitorId": "sk_lsn_bj3491xv3m",
+            "sourceType": "comment",
+            "platform": "instagram_standalone",
+            "externalUrl": "/docs/mock/media-02.svg?v=1",
+            "authorName": "Bagas Saputra",
+            "authorAvatarUrl": null,
+            "content": "Terima kasih untuk 100 pesanan pertama bulan ini.",
+            "sentiment": "neutral",
+            "matchedKeywords": [
+              "gaes"
+            ],
+            "isRead": false,
+            "occurredAt": "2026-10-01T00:44:02.000Z"
+          },
+          {
+            "id": "sk_lsn_d2c70b8c5e7f4ee5",
+            "monitorId": "sk_lsn_7jnfj88drm",
+            "sourceType": "comment",
+            "platform": "threads",
+            "externalUrl": null,
+            "authorName": "Maya Anggraini",
+            "authorAvatarUrl": null,
+            "content": "Kesalahan umum yang membuat hasilnya kurang maksimal.",
+            "sentiment": "neutral",
+            "matchedKeywords": [
+              "Sahabat Kreator"
+            ],
+            "isRead": false,
+            "occurredAt": "2026-09-18T18:56:23.000Z"
+          },
+          {
+            "id": "sk_lsn_cc3dbde4130042c5",
+            "monitorId": "sk_lsn_bj3491xv3m",
+            "sourceType": "comment",
+            "platform": "threads",
+            "externalUrl": null,
+            "authorName": "Maya Anggraini",
+            "authorAvatarUrl": null,
+            "content": "Kesalahan umum yang membuat hasilnya kurang maksimal.",
+            "sentiment": "neutral",
+            "matchedKeywords": [
+              "yuk"
+            ],
+            "isRead": false,
+            "occurredAt": "2026-09-18T18:56:23.000Z"
+          },
+          {
+            "id": "sk_lsn_b90c49f0a28c46d1",
+            "monitorId": "sk_lsn_bj3491xv3m",
+            "sourceType": "comment",
+            "platform": "facebook",
+            "externalUrl": "https://contoh.id/tautan/49",
+            "authorName": "Rina Kartika",
+            "authorAvatarUrl": "/docs/mock/avatar-11.svg?v=1",
+            "content": "Pertanyaan paling sering masuk minggu ini, kami jawab di sini.",
+            "sentiment": "neutral",
+            "matchedKeywords": [
+              "gaes"
+            ],
+            "isRead": false,
+            "occurredAt": "2026-09-18T17:17:53.000Z"
+          },
+          {
+            "id": "sk_lsn_95fa89e5b1a243f2",
+            "monitorId": "sk_lsn_bj3491xv3m",
+            "sourceType": "comment",
+            "platform": "threads",
+            "externalUrl": null,
+            "authorName": "Maya Anggraini",
+            "authorAvatarUrl": null,
+            "content": "Contoh hasil sebelum dan sesudah, tanpa filter berlebihan. 20",
+            "sentiment": "neutral",
+            "matchedKeywords": [
+              "yuk"
+            ],
+            "isRead": false,
+            "occurredAt": "2026-09-16T10:53:26.000Z"
+          },
+          {
+            "id": "sk_lsn_b58ee0d4918d4366",
+            "monitorId": "sk_lsn_bj3491xv3m",
+            "sourceType": "comment",
+            "platform": "threads",
+            "externalUrl": null,
+            "authorName": "Maya Anggraini",
+            "authorAvatarUrl": null,
+            "content": "Contoh hasil sebelum dan sesudah, tanpa filter berlebihan. 21",
+            "sentiment": "neutral",
+            "matchedKeywords": [
+              "gaes"
+            ],
+            "isRead": false,
+            "occurredAt": "2026-09-16T07:24:06.000Z"
+          },
+          {
+            "id": "sk_lsn_04383596e921433f",
+            "monitorId": "sk_lsn_bj3491xv3m",
+            "sourceType": "comment",
+            "platform": "instagram",
+            "externalUrl": "/docs/mock/media-03.svg?v=1",
+            "authorName": "Maya Anggraini",
+            "authorAvatarUrl": null,
+            "content": "Contoh hasil sebelum dan sesudah, tanpa filter berlebihan. 22",
+            "sentiment": "neutral",
+            "matchedKeywords": [
+              "gaes"
+            ],
+            "isRead": false,
+            "occurredAt": "2026-09-16T07:23:49.000Z"
+          },
+          {
+            "id": "sk_lsn_66b0b84f55b74ace",
+            "monitorId": "sk_lsn_bj3491xv3m",
+            "sourceType": "comment",
+            "platform": "instagram",
+            "externalUrl": "/docs/mock/media-04.svg?v=1",
+            "authorName": "Maya Anggraini",
+            "authorAvatarUrl": null,
+            "content": "Contoh hasil sebelum dan sesudah, tanpa filter berlebihan. 23",
+            "sentiment": "positive",
+            "matchedKeywords": [
+              "gaes"
+            ],
+            "isRead": false,
+            "occurredAt": "2026-09-16T07:23:09.000Z"
+          },
+          {
+            "id": "sk_lsn_358eaf157f254fda",
+            "monitorId": "sk_lsn_bj3491xv3m",
+            "sourceType": "comment",
+            "platform": "facebook",
+            "externalUrl": "https://contoh.id/tautan/51",
+            "authorName": "Rina Kartika",
+            "authorAvatarUrl": "/docs/mock/avatar-12.svg?v=1",
+            "content": "Contoh hasil sebelum dan sesudah, tanpa filter berlebihan. 24",
+            "sentiment": "question",
+            "matchedKeywords": [
+              "gaes"
+            ],
+            "isRead": false,
+            "occurredAt": "2026-09-16T07:22:43.000Z"
+          }
+        ]
+      }
+    },
+    "GET /api/listening/sources": {
+      "status": 200,
+      "contentType": "application/json",
+      "json": {
+        "sources": [
+          {
+            "id": "sk_lss_4w229bq054",
+            "organizationId": "Jtjrg5zR68T1OAQgo3rGWM4e4RwoNciT",
+            "name": "Kanal contoh — tips pemasaran",
+            "url": "https://contoh.id/tautan/112",
+            "sourceType": "rss",
+            "isActive": true,
+            "lastCrawledAt": "2026-10-01T14:56:13.659Z",
+            "lastError": null,
+            "lastPageCount": 0,
+            "createdAt": "2026-10-01T14:34:08.707Z",
+            "updatedAt": "2026-10-01T14:56:13.660Z"
+          },
+          {
+            "id": "sk_lss_gymzj8cu4p",
+            "organizationId": "Jtjrg5zR68T1OAQgo3rGWM4e4RwoNciT",
+            "name": "Blog contoh — berita UMKM",
+            "url": "https://contoh.id/tautan/113",
+            "sourceType": "auto",
+            "isActive": true,
+            "lastCrawledAt": "2026-10-01T14:56:13.653Z",
+            "lastError": null,
+            "lastPageCount": 0,
+            "createdAt": "2026-10-01T14:34:08.663Z",
+            "updatedAt": "2026-10-01T14:56:13.653Z"
+          }
+        ]
+      }
+    },
+    "GET /api/automation": {
+      "status": 200,
+      "contentType": "application/json",
+      "json": {
+        "rules": [
+          {
+            "id": "sk_autol_cxfefbwfif",
+            "organizationId": "Jtjrg5zR68T1OAQgo3rGWM4e4RwoNciT",
+            "name": "Draft balasan pertanyaan pengiriman",
+            "description": "Menjawab pertanyaan pengiriman dengan nada ramah, tapi masih berupa draft untuk ditinjau manual dulu.",
+            "source": "dm",
+            "socialAccountId": "sk_socacc_by0arnnoji",
+            "triggers": [
+              "kirim",
+              "ongkir",
+              "sampai kapan",
+              "ekspedisi"
+            ],
+            "action": {
+              "tone": "ramah",
+              "type": "ai_reply",
+              "dryRun": true,
+              "delayMinutes": 1.5
+            },
+            "isActive": false,
+            "triggeredCount": 0,
+            "deliveredCount": 0,
+            "lastTriggeredAt": null,
+            "createdAt": "2026-10-01T14:34:08.275Z",
+            "updatedAt": "2026-10-01T14:34:08.275Z"
+          },
+          {
+            "id": "sk_autol_ecmrr4b5hp",
+            "organizationId": "Jtjrg5zR68T1OAQgo3rGWM4e4RwoNciT",
+            "name": "Arahkan komentar promo",
+            "description": "Komentar yang menanyakan promo diarahkan ke DM supaya detail pesanan tidak terbuka di kolom komentar.",
+            "source": "comment",
+            "socialAccountId": "sk_socacc_by0arnnoji",
+            "triggers": [
+              "promo",
+              "diskon",
+              "potongan",
+              "kode"
+            ],
+            "action": {
+              "type": "reply",
+              "message": "Halo! Promo bulan ini masih jalan. Detailnya kami kirim lewat DM ya, cek pesan masuk 🙌"
+            },
+            "isActive": true,
+            "triggeredCount": 0,
+            "deliveredCount": 0,
+            "lastTriggeredAt": null,
+            "createdAt": "2026-10-01T14:34:08.082Z",
+            "updatedAt": "2026-10-01T14:34:08.082Z"
+          },
+          {
+            "id": "sk_autol_tk9agyopo1",
+            "organizationId": "Jtjrg5zR68T1OAQgo3rGWM4e4RwoNciT",
+            "name": "Balas pertanyaan harga",
+            "description": "Menjawab otomatis pertanyaan harga yang paling sering masuk lewat DM, supaya tidak menumpuk di luar jam kerja.",
+            "source": "dm",
+            "socialAccountId": "sk_socacc_by0arnnoji",
+            "triggers": [
+              "harga",
+              "berapa",
+              "price list",
+              "brp"
+            ],
+            "action": {
+              "type": "reply",
+              "message": "Hai {{name}}! Terima kasih sudah bertanya 🙏 Daftar harga lengkap ada di link bio ya. Kalau mau tanya paket lain, balas pesan ini saja."
+            },
+            "isActive": true,
+            "triggeredCount": 0,
+            "deliveredCount": 0,
+            "lastTriggeredAt": null,
+            "createdAt": "2026-10-01T14:34:08.029Z",
+            "updatedAt": "2026-10-01T14:34:08.029Z"
+          }
+        ],
+        "accounts": [
+          {
+            "id": "sk_socacc_8szztnxaj6",
+            "platform": "facebook",
+            "username": "rina.kartika"
+          },
+          {
+            "id": "sk_socacc_twgkqpzf1z",
+            "platform": "instagram_standalone",
+            "username": "nadia.kusuma"
+          },
+          {
+            "id": "sk_socacc_st1m4eg2ki",
+            "platform": "threads",
+            "username": "rina.kartika.2"
+          },
+          {
+            "id": "sk_socacc_bh8kk70oe6",
+            "platform": "youtube",
+            "username": "fajar.firmansyah"
+          },
+          {
+            "id": "sk_socacc_2uy6vd7bgz",
+            "platform": "linkedin",
+            "username": "dimas.mahendra"
+          },
+          {
+            "id": "sk_socacc_3t6cpw7yzo",
+            "platform": "bluesky",
+            "username": "intan.permatasari"
+          },
+          {
+            "id": "sk_socacc_7vmwm3w06w",
+            "platform": "facebook",
+            "username": "yoga.prasetyo"
+          },
+          {
+            "id": "sk_socacc_5g2a55zhzz",
+            "platform": "pinterest",
+            "username": "maya.anggraini"
+          },
+          {
+            "id": "sk_socacc_by0arnnoji",
+            "platform": "instagram",
+            "username": "rina.kartika.2"
+          },
+          {
+            "id": "sk_socacc_osdxcsngzv",
+            "platform": "tiktok",
+            "username": "sari.wulandari"
+          }
+        ]
       }
     }
   }

@@ -11,11 +11,25 @@
  * Perekaman hanya perlu diulang kalau daftar halaman berubah (scripts/docs-shots.ts)
  * atau ada halaman baru yang memanggil endpoint baru.
  *
+ * Dua mode:
+ *
+ *   • bawaan       — cukup login, buka tiap halaman, terekam apa adanya. Hasilnya
+ *                    di-MERGE dengan raw.json yang sudah ada, jadi halaman/tab
+ *                    yang sudah pernah terekam tidak perlu dikunjungi lagi dan
+ *                    endpoint baru ikut masuk tanpa membuang yang lama.
+ *
+ *   • DOCS_FIXTURE_PREP=1 — sebelum merekam, jalankan dulu
+ *                    scripts/docs-fixtures.prep.ts: mengisi data contoh yang
+ *                    hilang di akun demo (rule automation, monitor listening,
+ *                    sumber web, lalu sync-nya). Tanpa ini halaman Automation &
+ *                    Social Listening terekam dalam keadaan KOSONG, dan tangkapan
+ *                    layarnya jadi tidak menjelaskan apa pun.
+ *
  * ⚠️ Menghantam produksi: server membatasi /api/* ke 100 request / 60 detik per
  *    IP, jadi perekaman menahan laju sendiri. Tanpa itu, /api/me balas 429 dan
  *    halaman yang terekam adalah halaman login.
  */
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { chromium, type Page } from "playwright";
@@ -25,6 +39,7 @@ const BASE = process.env.DOCS_SHOT_BASE ?? "https://sahabatkreator.com";
 const EMAIL = process.env.DOCS_SHOT_EMAIL ?? "";
 const PASSWORD = process.env.DOCS_SHOT_PASSWORD ?? "";
 const ONLY = process.env.DOCS_SHOT_ONLY ?? "";
+const PREP = process.env.DOCS_FIXTURE_PREP === "1";
 
 const RATE_WINDOW_MS = 60_000;
 const RATE_BUDGET = 60;
@@ -44,6 +59,26 @@ type Recorded = {
 
 const recorded = new Map<string, Recorded>();
 const apiHits: number[] = [];
+
+/**
+ * Muat rekaman sebelumnya supaya perekaman ulang MENAMBAH, bukan menimpa.
+ *
+ * Tanpa ini, merekam satu halaman saja (`DOCS_SHOT_ONLY=automation`) akan
+ * menghasilkan raw.json berisi 2 respons dan menghapus 51 respons lain —
+ * fixtures.json berikutnya jadi jauh lebih kecil dan seluruh tangkapan layar
+ * lain rusak.
+ */
+async function loadPrevious(): Promise<number> {
+  try {
+    const parsed = JSON.parse(await readFile(OUT_FILE, "utf8")) as {
+      responses?: Record<string, Recorded>;
+    };
+    for (const [key, value] of Object.entries(parsed.responses ?? {})) recorded.set(key, value);
+    return recorded.size;
+  } catch {
+    return 0;
+  }
+}
 
 function keyOf(method: string, url: string): string {
   const parsed = new URL(url);
@@ -114,6 +149,9 @@ async function main() {
   const shots = SHOTS.filter((shot) => shot.auth && (!ONLY || shot.name.includes(ONLY)));
   await mkdir(OUT_DIR, { recursive: true });
 
+  const previous = await loadPrevious();
+  if (previous > 0) console.log(`Rekaman sebelumnya: ${previous} respons (akan dipertahankan).`);
+
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
@@ -127,6 +165,11 @@ async function main() {
   process.stdout.write("Masuk sebagai akun demo… ");
   await login(page);
   console.log("berhasil.");
+
+  if (PREP) {
+    const { prepareDemoData } = await import("./docs-fixtures.prep");
+    await prepareDemoData(page, BASE);
+  }
 
   for (const shot of shots) {
     watchApiTraffic(page, shot.name);
@@ -156,6 +199,9 @@ async function main() {
 
   await browser.close();
   console.log(`\nSelesai: ${recorded.size} respons → ${path.relative(process.cwd(), OUT_FILE)}`);
+  if (previous > 0) {
+    console.log(`  (${previous} dari rekaman sebelumnya + ${recorded.size - previous} baru)`);
+  }
   console.log(
     "Berkas ini berisi DATA NYATA — jangan di-commit. Lanjutkan dengan docs:fixtures:sanitize.",
   );
