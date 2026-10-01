@@ -1,5 +1,5 @@
 // Comment moderation adapter — hide/unhide and delete comments on supported platforms.
-import { GRAPH_FB_URL, GRAPH_IG_URL } from "./config";
+import { GRAPH_FB_URL, GRAPH_IG_URL, GRAPH_THREADS_URL } from "./config";
 import { httpRequest, throwFromResponse } from "./http";
 import { replizActiveCredentials, replizDeleteComment } from "./repliz";
 import { PublishError } from "./types";
@@ -70,8 +70,36 @@ export async function moderateComment(
     return;
   }
 
-  const endpoint = moderationEndpoint(input);
   const accessToken = tokenFor(input);
+
+  // Threads punya endpoint sendiri: `POST /{reply-id}/manage_reply` dengan
+  // `hide=true|false`. Tidak ada hapus reply untuk Threads (API hanya
+  // menyediakan hide/unhide + manajemen siapa yang boleh membalas), jadi
+  // delete diberikan pesan jelas alih-alih memanggil endpoint yang salah.
+  // Catatan: yang dikirim harus **reply id** (bukan post id). `platformItemId`
+  // pada item tipe comment/reply sudah berupa reply id, jadi aman.
+  // Ref: https://developers.facebook.com/docs/threads/reply-management
+  // PENTING: cabang ini harus SEBELUM `moderationEndpoint()` — fungsi itu
+  // melempar untuk platform di luar IG/FB, sehingga Threads akan gagal duluan.
+  if (input.platform === "threads") {
+    if (action === "delete") {
+      throw new PublishError(
+        "comment_moderation_unsupported",
+        "Hapus balasan belum didukung untuk Threads — API Threads hanya menyediakan sembunyikan/tampilkan.",
+        false,
+      );
+    }
+    const response = await httpRequest(`${GRAPH_THREADS_URL}/${commentId}/manage_reply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `hide=${input.hidden === true ? "true" : "false"}`,
+      query: { access_token: accessToken },
+    });
+    if (!response.ok) await throwFromResponse(response, "Moderasi balasan Threads");
+    return;
+  }
+
+  const endpoint = moderationEndpoint(input);
 
   if (action === "delete") {
     const response = await httpRequest(endpoint, {
