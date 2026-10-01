@@ -59,8 +59,10 @@ describe("fixture dokumentasi", () => {
       value.startsWith("/docs/mock/"),
     );
     expect(assets.length).toBeGreaterThan(0);
+    // URL membawa penanda versi (?v=) sebagai kunci cache CDN — bukan bagian
+    // dari nama berkas, jadi dibuang dulu sebelum dicek ke disk.
     const missing = [...new Set(assets)].filter(
-      (asset) => !existsSync(path.join(PUBLIC_DIR, asset)),
+      (asset) => !existsSync(path.join(PUBLIC_DIR, asset.split("?")[0] as string)),
     );
     expect(missing).toEqual([]);
   });

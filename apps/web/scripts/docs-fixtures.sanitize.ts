@@ -167,6 +167,18 @@ const AVATAR_COUNT = 12;
 const MEDIA_COUNT = 8;
 const LOGO_COUNT = 4;
 
+/**
+ * Penanda versi pada URL placeholder. Aset di public/ disajikan dengan
+ * "Cache-Control: immutable, max-age=2592000" (lihat sahabatkreator.conf), dan
+ * Cloudflare memakai URL lengkap termasuk query sebagai kunci cache. Pernah
+ * terjadi: satu kali menjalankan skrip tangkapan layar SEBELUM placeholder-nya
+ * ter-deploy membuat Cloudflare mengunci balasan 404 selama 30 hari untuk URL
+ * tanpa query — gambarnya rusak bagi semua pengunjung. Query ini memastikan
+ * setiap kali isi placeholder berubah kita bisa memaksa kunci cache baru.
+ * Naikkan angkanya bila isi berkas SVG di public/docs/mock/ berubah.
+ */
+const MOCK_ASSET_VERSION = 1;
+
 // ---------------------------------------------------------------------------
 // Aturan per kunci
 // ---------------------------------------------------------------------------
@@ -293,7 +305,7 @@ function fakeAsset(original: string, key: string): string {
       ? { dir: "avatar", count: AVATAR_COUNT }
       : { dir: "media", count: MEDIA_COUNT };
   const index = (assetDictionary.size % kind.count) + 1;
-  const fake = `/docs/mock/${kind.dir}-${String(index).padStart(2, "0")}.svg`;
+  const fake = `/docs/mock/${kind.dir}-${String(index).padStart(2, "0")}.svg?v=${MOCK_ASSET_VERSION}`;
   assetDictionary.set(original, fake);
   replacedOriginals.add(original);
   return fake;
@@ -368,7 +380,13 @@ function sanitizeString(
     const bare = value.replace(/^@/, "");
     // parentName di sini sudah berupa nama KARANGAN (lihat walk), jadi handle
     // turunannya konsisten dengan nama yang tampil di kartu.
-    return fakeHandle(bare, parentName);
+    //
+    // Sebagian kartu tidak punya nama tampilan sama sekali — mis. kartu akun
+    // sosial yang judulnya hanya nama platform. Tanpa cadangan, semua kartu itu
+    // jatuh ke "@akun.contoh" yang sama dan terlihat jelas sebagai placeholder
+    // (dan bisa bentrok). Pakai nama orang karangan sebagai gantinya.
+    const hint = parentName ?? personAt(personCount++);
+    return fakeHandle(bare, hint);
   }
   if (NAME_KEYS.test(key)) {
     const kind: Kind = /page|account|organization|brand/i.test(key) ? "brand" : "person";
@@ -378,7 +396,14 @@ function sanitizeString(
     if (/title|subject/i.test(key)) return fromDictionary(value, "title");
     if (/message|preview|snippet|reply|draft/i.test(key)) return fromDictionary(value, "dm");
     if (/comment|question/i.test(key)) return fromDictionary(value, "comment");
-    if (/content|caption|body|text|description|summary|note|bio|about/i.test(key)) {
+    // Kolom prosa panjang (isi postingan, bio, ringkasan) selalu pakai kalimat
+    // caption. Kalau dipilih dari kolam komentar, isi postingan di /queue
+    // terbaca seperti pertanyaan pelanggan — membingungkan di dokumentasi.
+    if (/content|caption|body|description|summary|note|bio|about/i.test(key)) {
+      return fromDictionary(value, "caption");
+    }
+    // "text" bisa berupa label pendek maupun prosa; panjangnya yang menentukan.
+    if (/text/i.test(key)) {
       return value.length > 24
         ? fromDictionary(value, "caption")
         : fromDictionary(value, "comment");
