@@ -51,6 +51,9 @@ type TopPost = {
   platformPostUrl: string | null;
   platformPostId: string | null;
   isBridge: boolean;
+  /** Server (GET /analytics/top-posts) menghitung ini: platform mendukung
+   *  hapus-otomatis, atau akun bridge Repliz. Jangan hitung sendiri di sini. */
+  canDelete: boolean;
   publishedAt: string | null;
   username: string | null;
   displayName: string | null;
@@ -302,13 +305,12 @@ function PostCard({
             </a>
           )}
 
-          {/* Hapus post di platform — hanya untuk akun bridge Repliz.
-              Konfirmasi inline karena tindakan permanen (undo tidak ada).
-              Dulu tombol ini hanya muncul saat kursor mengarah ke kartu
-              (opacity-0 → group-hover), sehingga praktis tidak terlihat di
-              layar sentuh dan sulit ditemukan. Sekarang selalu tampil dengan
-              warna redup supaya terlihat ada tapi tidak mencolok. */}
-          {post.isBridge && post.platformPostId && (
+          {/* Hapus post di platform. Syaratnya `canDelete` dari server (platform
+              mendukung hapus-otomatis, atau akun bridge Repliz) — bukan lagi
+              `isBridge` saja, karena tidak ada satu pun akun bridge di org ini
+              sehingga tombolnya dulu tidak pernah muncul untuk post apa pun.
+              Konfirmasi inline karena tindakan permanen di platform. */}
+          {post.canDelete && post.platformPostId && (
             <div className="ml-auto flex items-center">
               {confirming ? (
                 <>

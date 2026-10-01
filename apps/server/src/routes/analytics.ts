@@ -7,6 +7,7 @@
 import { db } from "@sahabatkreator/db";
 import { accountAnalytics, postAnalytics, socialAccount } from "@sahabatkreator/db/schema";
 import {
+  canDeletePublishedPost,
   computeOptimalTimes,
   GRAPH_FB_URL,
   GRAPH_IG_URL,
@@ -447,13 +448,21 @@ analyticsRoute.get("/top-posts", async (c) => {
         // utk post impor) — dipakai lightbox saat thumbnail diklik. Grid tetap
         // memuat thumbnail saja agar ringan.
         const videoUrl = (r.media_url ?? settings.mediaUrl ?? null) as string | null;
+        const bridge = isBridgeAccount((r.account_metadata ?? {}) as Record<string, unknown>);
         return {
           postId: r.post_id,
           platform: r.platform,
           content: r.content,
           platformPostUrl: r.platform_post_url,
           platformPostId: r.platform_post_id,
-          isBridge: isBridgeAccount((r.account_metadata ?? {}) as Record<string, unknown>),
+          isBridge: bridge,
+          // Boleh ditampilkan tombol "Hapus" atau tidak — dihitung di sini agar
+          // frontend tidak perlu menduplikasi daftar platform yang didukung.
+          // Akun bridge selalu boleh (Repliz yang menghapus); akun native hanya
+          // untuk platform di DELETABLE_PLATFORMS (threads/tiktok/bluesky/facebook).
+          canDelete: Boolean(
+            r.platform_post_id && (bridge || canDeletePublishedPost(String(r.platform))),
+          ),
           publishedAt: r.published_at,
           username: r.username,
           displayName: r.display_name,

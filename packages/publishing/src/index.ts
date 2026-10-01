@@ -31,7 +31,12 @@ export {
   processAutomation,
 } from "./automation";
 export * from "./config";
-export { normalizeHandle } from "./handle";
+export {
+  canDeletePublishedPost,
+  DELETABLE_PLATFORMS,
+  type DeletePublishedPostInput,
+  deletePublishedPost,
+} from "./delete-post";
 export {
   sendDMReply,
   syncAccountDMs,
@@ -47,6 +52,7 @@ export {
   upsertEngagementItems,
 } from "./engagement-sync";
 export { clearWebhookEmit, emitWebhook, registerWebhookEmit } from "./event-hook";
+export { normalizeHandle } from "./handle";
 export * from "./http";
 export { type CommentModerationInput, moderateComment } from "./moderation";
 export * from "./oauth";
@@ -220,8 +226,8 @@ export {
   TIKTOK_CREATOR_BLOCKED_CODES,
   TIKTOK_DEFAULT_MAX_DURATION_SEC,
   TIKTOK_PUBLISH_ERROR_MESSAGES,
-  tiktokErrorMessage,
   type TikTokCreatorInfo,
+  tiktokErrorMessage,
 } from "./tiktok-creator-info";
 export { countNeedsReconnect, refreshDueTokens, type TokenRefreshResult } from "./token-refresh";
 export * from "./types";

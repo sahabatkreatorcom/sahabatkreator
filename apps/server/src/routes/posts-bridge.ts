@@ -9,7 +9,9 @@ import {
   socialAccount,
 } from "@sahabatkreator/db/schema";
 import {
+  canDeletePublishedPost,
   claimPostById,
+  deletePublishedPost,
   publishPost,
   replizActiveCredentials,
   replizDeleteContent,
@@ -31,6 +33,7 @@ import { z } from "zod";
 import { fireActivity } from "../lib/activity-log";
 import { errorResponse, requireOrg } from "../lib/auth-guard";
 import { checkFeatureGate } from "../lib/billing";
+import { decrypt } from "../lib/crypto";
 
 export const postsBridgeRoute = new Hono();
 /** PUT /posts/item/:id/schedule — ubah konten/waktu schedule bridge Repliz.
@@ -185,8 +188,14 @@ postsBridgeRoute.post("/mass-delete", async (c) => {
 });
 
 /** DELETE /posts/item/:id/published — hapus post yang SUDAH tayang di platform.
- * Khusus akun bridge (Gold+): DELETE /public/content/{id}?accountId=…
- * Post native butuh token platform masing-masing (di luar scope ini). */
+ *
+ * Dua jalur:
+ * 1. Akun bridge Repliz → DELETE /public/content/{id}?accountId=… (Repliz yang
+ *    menyimpan token platform).
+ * 2. Akun native → `deletePublishedPost()` memakai token kita sendiri, hanya
+ *    untuk platform di `DELETABLE_PLATFORMS` (threads/tiktok/bluesky/facebook).
+ *    Instagram tidak punya endpoint hapus media di Graph API, jadi ditolak
+ *    dengan pesan yang menjelaskan agar dihapus manual dari aplikasi IG. */
 postsBridgeRoute.delete("/item/:id/published", async (c) => {
   try {
     const ctx = await requireOrg(c);
@@ -197,9 +206,11 @@ postsBridgeRoute.delete("/item/:id/published", async (c) => {
         status: post.status,
         platformPostId: post.platformPostId,
         socialAccountId: post.socialAccountId,
+        accountPlatformAccountId: socialAccount.platformAccountId,
       })
       .from(post)
       .innerJoin(postGroup, eq(post.postGroupId, postGroup.id))
+      .innerJoin(socialAccount, eq(post.socialAccountId, socialAccount.id))
       .where(and(eq(post.id, c.req.param("id")), eq(postGroup.organizationId, ctx.organization.id)))
       .limit(1);
     if (!row) return c.json({ message: "Post tidak ditemukan" }, 404);
@@ -208,23 +219,47 @@ postsBridgeRoute.delete("/item/:id/published", async (c) => {
     }
 
     const [account] = await db
-      .select({ metadata: socialAccount.metadata })
+      .select({
+        metadata: socialAccount.metadata,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+      })
       .from(socialAccount)
       .where(eq(socialAccount.id, row.socialAccountId))
       .limit(1);
     const replizAccountId = (account?.metadata as { replizAccountId?: string } | null)
       ?.replizAccountId;
-    if (!replizAccountId) {
-      return c.json({ message: "Akun platform ini tidak terhubung via bridge Repliz" }, 400);
-    }
 
-    const cred = await replizActiveCredentials();
-    if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
+    if (replizAccountId) {
+      // Jalur bridge Repliz (seperti sebelumnya)
+      const cred = await replizActiveCredentials();
+      if (!cred) return c.json({ message: "Bridge Repliz belum dikonfigurasi" }, 503);
 
-    // Cek konten ada di Repliz (404 = sudah hilang/belum terbentuk → tetap lanjut).
-    const contentId = await resolveReplizContentId(cred, replizAccountId, row.platformPostId);
-    if (contentId) {
-      await replizDeleteContent(cred, contentId, replizAccountId);
+      // Cek konten ada di Repliz (404 = sudah hilang/belum terbentuk → tetap lanjut).
+      const contentId = await resolveReplizContentId(cred, replizAccountId, row.platformPostId);
+      if (contentId) {
+        await replizDeleteContent(cred, contentId, replizAccountId);
+      }
+    } else {
+      // Jalur native: token kita sendiri.
+      if (!canDeletePublishedPost(row.platform)) {
+        return c.json(
+          {
+            message:
+              "Platform ini belum mendukung hapus otomatis. Hapus manual di aplikasi platformnya.",
+          },
+          400,
+        );
+      }
+      if (!account?.accessTokenEnc) {
+        return c.json({ message: "Token akun tidak tersedia — hubungkan ulang akun" }, 400);
+      }
+      await deletePublishedPost({
+        platform: row.platform,
+        platformPostId: row.platformPostId,
+        accessToken: decrypt(account.accessTokenEnc),
+        platformAccountId: row.accountPlatformAccountId,
+        accountMetadata: account.metadata as Record<string, unknown> | null,
+      });
     }
 
     await db
@@ -237,7 +272,7 @@ postsBridgeRoute.delete("/item/:id/published", async (c) => {
       action: "post.deleted_from_platform",
       targetType: "post",
       targetId: row.id,
-      metadata: { platform: row.platform, via: "repliz" },
+      metadata: { platform: row.platform, via: replizAccountId ? "repliz" : "native" },
     });
 
     return c.json({ ok: true });
