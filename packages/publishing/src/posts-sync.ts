@@ -332,6 +332,30 @@ async function fetchExternalPosts(
 }
 
 /**
+ * Deteksi PostgreSQL `unique_violation` (SQLSTATE 23505) dari error drizzle.
+ *
+ * PENTING: drizzle membungkus error driver — yang dilempar adalah
+ * `DrizzleQueryError` TANPA `code`, sedangkan `code`/`constraint` asli ada di
+ * `.cause` (`DatabaseError`). Cek langsung `err.code === "23505"` karena itu
+ * SELALU false, sehingga fallback "insert → kena constraint → update" tidak
+ * pernah jalan dan setiap post eksternal yang sudah pernah diimpor akan
+ * di-skip selamanya (thumbnail & URL video tidak pernah disegarkan).
+ *
+ * Rantai `.cause` ditelusuri berlapis (drizzle bisa membungkus lebih dari satu
+ * level) dan `AggregateError.errors[]` ikut diperiksa.
+ */
+export function isUniqueViolationError(error: unknown, depth = 0): boolean {
+  if (depth > 5 || typeof error !== "object" || error === null) return false;
+  const e = error as { code?: unknown; cause?: unknown; errors?: unknown };
+
+  if (e.code === "23505") return true;
+  if (Array.isArray(e.errors) && e.errors.some((inner) => isUniqueViolationError(inner, depth + 1))) {
+    return true;
+  }
+  return isUniqueViolationError(e.cause, depth + 1);
+}
+
+/**
  * Setelan platform yang disimpan untuk post eksternal.
  *
  * `mediaUrl` WAJIB ikut diperbarui setiap sync — bukan sekali saat insert.
@@ -477,11 +501,7 @@ async function syncAccountPosts(account: SyncableAccount, since: Date): Promise<
             });
             imported++;
           } catch (upsertError) {
-            const isUniqueViolation =
-              upsertError instanceof Error &&
-              "code" in upsertError &&
-              (upsertError as { code?: string }).code === "23505";
-            if (isUniqueViolation) {
+            if (isUniqueViolationError(upsertError)) {
               await db
                 .update(post)
                 .set({
@@ -508,7 +528,14 @@ async function syncAccountPosts(account: SyncableAccount, since: Date): Promise<
               throw upsertError;
             }
           }
-        } catch {
+        } catch (error) {
+          // Jangan ditelan tanpa jejak: catch kosong di sini pernah menyembunyikan
+          // kegagalan update post eksternal selama berhari-hari (lihat
+          // isUniqueViolationError).
+          console.warn(
+            `[posts-sync] ${account.platform} gagal upsert ${ep.externalId}:`,
+            error instanceof Error ? error.message : error,
+          );
           skipped++;
         }
       }),

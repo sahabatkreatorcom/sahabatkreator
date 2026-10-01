@@ -78,6 +78,7 @@ export {
 } from "./platform-health";
 export {
   externalPlatformSettingsPatch,
+  isUniqueViolationError,
   POSTS_SYNC_PLATFORMS,
   type PostSyncResult,
   syncDueOrganizationsPosts,

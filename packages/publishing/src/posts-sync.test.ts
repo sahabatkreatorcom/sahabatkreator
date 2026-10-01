@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@sahabatkreator/db", () => ({ db: {} }));
 vi.mock("@sahabatkreator/db/schema", () => ({ post: {}, socialAccount: {} }));
 
-const { externalPlatformSettingsPatch } = await import("./posts-sync");
+const { externalPlatformSettingsPatch, isUniqueViolationError } = await import("./posts-sync");
 
 /**
  * Post eksternal menyimpan mediaType + mediaUrl di kolom jsonb `platform_settings`.
@@ -55,5 +55,54 @@ describe("externalPlatformSettingsPatch", () => {
   it("hasilnya deterministik untuk input yang sama", () => {
     const ep = { mediaType: "CAROUSEL" as const, mediaUrl: "https://x/a.jpg" };
     expect(externalPlatformSettingsPatch(ep)).toEqual(externalPlatformSettingsPatch(ep));
+  });
+});
+
+/**
+ * Drizzle melempar `DrizzleQueryError` TANPA `code`; `code`/`constraint` asli ada
+ * di `.cause`. Deteksi yang cuma membaca `err.code` selalu false, sehingga fallback
+ * "insert → unique violation → update" tidak pernah jalan. Itu nyata terjadi di
+ * produksi: post eksternal yang sudah pernah diimpor tidak pernah disegarkan lagi.
+ */
+describe("isUniqueViolationError", () => {
+  it("mendeteksi error driver pg langsung (code di root)", () => {
+    expect(isUniqueViolationError({ code: "23505" })).toBe(true);
+  });
+
+  it("mendeteksi DrizzleQueryError yang membungkus DatabaseError", () => {
+    const drizzleError = new Error("Failed query: insert into \"post\" ...");
+    (drizzleError as unknown as { cause?: unknown }).cause = {
+      code: "23505",
+      constraint: "post_org_external_uidx",
+    };
+    expect(isUniqueViolationError(drizzleError)).toBe(true);
+  });
+
+  it("mendeteksi pembungkusan berlapis", () => {
+    expect(
+      isUniqueViolationError({ cause: { cause: { cause: { code: "23505" } } } }),
+    ).toBe(true);
+  });
+
+  it("mendeteksi lewat AggregateError.errors[]", () => {
+    expect(isUniqueViolationError({ errors: [{ code: "23505" }] })).toBe(true);
+  });
+
+  it("mengabaikan kode SQLSTATE lain", () => {
+    expect(isUniqueViolationError({ cause: { code: "23503" } })).toBe(false);
+    expect(isUniqueViolationError({ cause: { code: "42P01" } })).toBe(false);
+  });
+
+  it("aman untuk nilai non-error", () => {
+    expect(isUniqueViolationError(null)).toBe(false);
+    expect(isUniqueViolationError(undefined)).toBe(false);
+    expect(isUniqueViolationError("boom")).toBe(false);
+    expect(isUniqueViolationError(42)).toBe(false);
+  });
+
+  it("berhenti menelusuri rantai cause yang sangat panjang (tidak rekursi tak terbatas)", () => {
+    let deep: { cause?: unknown } = { cause: { code: "23505" } };
+    for (let i = 0; i < 20; i++) deep = { cause: deep };
+    expect(isUniqueViolationError(deep)).toBe(false);
   });
 });
