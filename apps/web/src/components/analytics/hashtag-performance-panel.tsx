@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/spinner";
 import { api } from "@/lib/api";
 import { formatCompact, formatNumber } from "@/lib/format";
+import { PLATFORMS } from "@/lib/platforms";
 import { queryKeys } from "../../lib/query-keys";
 
 type HashtagStat = {
@@ -19,10 +20,20 @@ type HashtagsResponse = {
   hashtags: HashtagStat[];
 };
 
-export function HashtagPerformancePanel({ days }: { days: number }) {
+export function HashtagPerformancePanel({
+  days,
+  platform = null,
+}: {
+  days: number;
+  /** Platform terpilih di filter Analitik (null = semua platform) */
+  platform?: string | null;
+}) {
   const { data, isLoading } = useQuery({
-    queryKey: [...queryKeys.analyticsHashtags, days],
-    queryFn: () => api.get<HashtagsResponse>(`/analytics/hashtags?days=${days}`),
+    queryKey: [...queryKeys.analyticsHashtags, days, platform ?? "all"],
+    queryFn: () =>
+      api.get<HashtagsResponse>(
+        `/analytics/hashtags?days=${days}${platform ? `&platform=${platform}` : ""}`,
+      ),
   });
 
   const hashtags = data?.hashtags ?? [];
@@ -35,8 +46,9 @@ export function HashtagPerformancePanel({ days }: { days: number }) {
         <h2 className="font-semibold">Performa Hashtag</h2>
       </div>
       <p className="mb-4 text-[var(--text-secondary)] text-xs">
-        Top 20 hashtag dari konten tayang {days} hari terakhir, diurutkan berdasarkan total
-        engagement (likes + komentar + share).
+        Top 20 hashtag dari konten tayang {days} hari terakhir
+        {platform ? ` di ${PLATFORMS[platform as keyof typeof PLATFORMS]?.label ?? platform}` : ""},
+        diurutkan berdasarkan total engagement (likes + komentar + share).
       </p>
 
       {isLoading ? (

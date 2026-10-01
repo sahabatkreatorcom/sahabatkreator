@@ -44,6 +44,8 @@ type OverviewTotals = {
 };
 
 type Overview = {
+  /** Platform yang difilter (null = semua platform) — di-echo server */
+  platform?: string | null;
   totals: OverviewTotals;
   accounts: {
     id: string;
@@ -175,6 +177,8 @@ export function AnalyticsPage() {
   const [rangeError, setRangeError] = useState<string | null>(null);
   // Rentang terpasang (null = mode preset days)
   const [appliedRange, setAppliedRange] = useState<{ from: string; to: string } | null>(null);
+  // Filter platform ("all" = lintas platform)
+  const [platform, setPlatform] = useState<string>("all");
 
   // Rentang aktif (mode from/to): custom range ATAU preset "Bulan ini"
   // (awal bulan → hari ini). Preset 7/30/90 tetap mode days (kompatibel).
@@ -191,27 +195,53 @@ export function AnalyticsPage() {
       )
     : Number(preset);
 
+  // Suffix query platform — dipakai semua endpoint analitik yang mendukungnya
+  // (overview, timeseries, top-posts, optimal-times, hashtags).
+  const platformParam = platform !== "all" ? platform : null;
+  const platformQuery = platformParam ? `&platform=${platformParam}` : "";
+
   const overviewQuery = activeRange
-    ? `/analytics/overview?from=${activeRange.from}&to=${activeRange.to}`
-    : `/analytics/overview?days=${effectiveDays}`;
+    ? `/analytics/overview?from=${activeRange.from}&to=${activeRange.to}${platformQuery}`
+    : `/analytics/overview?days=${effectiveDays}${platformQuery}`;
+  const timeseriesQuery = `/analytics/timeseries?days=${effectiveDays}${platformQuery}`;
+  const topPostsQuery = `/analytics/top-posts?limit=10${platformQuery}`;
+  const optimalTimesQuery = `/analytics/optimal-times?limit=12${platformQuery}`;
 
   const { data: overview } = useQuery({
     queryKey: [...queryKeys.analyticsOverview, overviewQuery],
     queryFn: () => api.get<Overview>(overviewQuery),
   });
   const { data: timeseries } = useQuery({
-    queryKey: queryKeys.analyticsTimeseries,
-    queryFn: () => api.get<Timeseries>("/analytics/timeseries"),
+    queryKey: [...queryKeys.analyticsTimeseries, effectiveDays, platform],
+    queryFn: () => api.get<Timeseries>(timeseriesQuery),
   });
   const { data: topPosts, isLoading: topLoading } = useQuery({
-    queryKey: queryKeys.analyticsTopPosts,
-    queryFn: () => api.get<TopPosts>("/analytics/top-posts?limit=10"),
+    queryKey: [...queryKeys.analyticsTopPosts, platform],
+    queryFn: () => api.get<TopPosts>(topPostsQuery),
   });
   const { data: optimalTimes } = useQuery({
-    queryKey: queryKeys.analyticsOptimalTimes,
-    queryFn: () => api.get<OptimalTimes>("/analytics/optimal-times?limit=12"),
+    queryKey: [...queryKeys.analyticsOptimalTimes, platform],
+    queryFn: () => api.get<OptimalTimes>(optimalTimesQuery),
     staleTime: 10 * 60 * 1000,
   });
+
+  /**
+   * Daftar akun (tanpa filter platform) — sumber opsi dropdown platform.
+   * Diambil terpisah dari overview karena overview.accounts ikut terfilter:
+   * kalau opsi di-derive dari situ, memilih satu platform akan mengecilkan
+   * pilihan dan user tidak bisa kembali ke "Semua platform".
+   */
+  const { data: accountsData } = useQuery({
+    queryKey: queryKeys.accounts,
+    queryFn: () => api.get<{ accounts: { id: string; platform: string }[] }>("/accounts"),
+    staleTime: 5 * 60 * 1000,
+  });
+  const platformOptions = [
+    { key: "all", label: "Semua platform" },
+    ...Object.keys(PLATFORMS)
+      .filter((p) => (accountsData?.accounts ?? []).some((a) => a.platform === p))
+      .map((p) => ({ key: p, label: PLATFORMS[p as keyof typeof PLATFORMS].label })),
+  ];
 
   /** Terapkan preset — matikan custom range */
   function applyPreset(id: string) {
@@ -266,11 +296,31 @@ export function AnalyticsPage() {
         <div>
           <h1 className="font-bold text-2xl">Analitik</h1>
           <p className="mt-1 text-[var(--text-secondary)] text-sm">
-            Performa konten lintas platform
+            {platformParam
+              ? `Performa konten ${PLATFORMS[platform as keyof typeof PLATFORMS]?.label ?? platform}`
+              : "Performa konten lintas platform"}
           </p>
         </div>
 
         <div className="flex flex-col items-end gap-2">
+          {/* Filter platform — membatasi semua panel di halaman ini ke satu
+              platform (overview, tren, konten terbaik, hashtag, waktu terbaik) */}
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-[var(--text-muted)] text-xs">Platform</span>
+            <select
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value)}
+              className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-primary)] px-2 text-xs"
+              aria-label="Filter platform"
+            >
+              {platformOptions.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Preset chip: 7/30/90 hari + Bulan ini */}
           <div className="flex flex-wrap gap-1 rounded-[var(--radius-md)] border border-[var(--border)] p-1">
             {presets.map((p) => (
@@ -399,8 +449,12 @@ export function AnalyticsPage() {
         <h2 className="mb-4 font-semibold">Tren Engagement</h2>
         {chartData.length === 0 ? (
           <EmptyState
-            title="Belum ada data"
-            description="Data akan muncul setelah konten Anda tayang dan terkumpul statistik."
+            title={platformParam ? "Belum ada data di platform ini" : "Belum ada data"}
+            description={
+              platformParam
+                ? "Belum ada post platform ini yang punya snapshot metrik pada rentang terpilih. Coba ganti platform atau rentang tanggal."
+                : "Data akan muncul setelah konten Anda tayang dan terkumpul statistik."
+            }
           />
         ) : (
           <div className="h-72">
@@ -466,7 +520,9 @@ export function AnalyticsPage() {
         <div className="card p-6">
           <h2 className="mb-4 font-semibold">Followers per Akun</h2>
           {(overview?.accounts ?? []).length === 0 ? (
-            <EmptyState title="Belum ada akun terhubung" />
+            <EmptyState
+              title={platformParam ? "Tidak ada akun platform ini" : "Belum ada akun terhubung"}
+            />
           ) : (
             <ul className="space-y-3">
               {(overview?.accounts ?? []).map((a) => {
@@ -551,7 +607,13 @@ export function AnalyticsPage() {
           {topLoading ? (
             <PageLoader />
           ) : (topPosts?.posts ?? []).length === 0 ? (
-            <EmptyState title="Belum ada konten tayang" />
+            <EmptyState
+              title={
+                platformParam
+                  ? "Belum ada konten tayang di platform ini"
+                  : "Belum ada konten tayang"
+              }
+            />
           ) : (
             <ul className="divide-y divide-[var(--border-light)]">
               {(topPosts?.posts ?? []).map((p) => {
@@ -614,7 +676,7 @@ export function AnalyticsPage() {
         {/* Performa hashtag — diletakkan di grid agar sejajar dengan "Konten
             Terbaik" (tidak ada kolom kosong di sampingnya). Demografi Audiens
             tetap full-width di bawah grid. */}
-        <HashtagPerformancePanel days={effectiveDays} />
+        <HashtagPerformancePanel days={effectiveDays} platform={platformParam} />
       </div>
 
       {/* Demografi audiens (IG) — gender × usia */}

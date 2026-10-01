@@ -46,8 +46,15 @@ type PostTotals = {
 /**
  * Agregasi snapshot terbaru per post dalam rentang [from, to] (tanggal publikasi).
  * Snapshot kumulatif → distinct on (post_id) ambil yang terbaru, lalu sum.
+ * `platform` opsional: filter post milik satu platform saja (filter Analitik).
  */
-async function sumPostTotals(orgId: string, from: Date, to: Date): Promise<PostTotals> {
+async function sumPostTotals(
+  orgId: string,
+  from: Date,
+  to: Date,
+  platform?: string,
+): Promise<PostTotals> {
+  const platformFilter = platform ? sql` and p.platform = ${platform}` : sql``;
   const res = await db.execute(
     sql`select
           coalesce(sum(pa.likes), 0)::int as likes,
@@ -61,7 +68,7 @@ async function sumPostTotals(orgId: string, from: Date, to: Date): Promise<PostT
           join post p on p.id = pa.post_id
           where pa.organization_id = ${orgId}
             and p.published_at >= ${from.toISOString()}
-            and p.published_at <= ${to.toISOString()}
+            and p.published_at <= ${to.toISOString()}${platformFilter}
           order by pa.post_id, pa.date desc
         ) pa`,
   );
@@ -88,12 +95,20 @@ async function sumPostTotals(orgId: string, from: Date, to: Date): Promise<PostT
  * Halaman diambil dari snapshot harian account_analytics (metric
  * `page_views_total`/`page_post_engagements` — satu-satunya yang diterima NPE).
  * Snapshot kumulatif-harian → sum langsung per tanggal dalam rentang.
+ *
+ * `platform` opsional: FB Page Insights hanya relevan untuk platform facebook —
+ * saat filter platform lain dipilih, kontribusi ini dikosongkan agar total
+ * views/impressions murni milik platform yang dipilih.
  */
 async function sumFacebookPageInsights(
   orgId: string,
   from: Date,
   to: Date,
+  platform?: string,
 ): Promise<{ views: number; impressions: number; engagements: number }> {
+  if (platform && platform !== "facebook") {
+    return { views: 0, impressions: 0, engagements: 0 };
+  }
   const res = await db.execute(
     sql`select coalesce(sum(aa.impressions), 0)::bigint as views,
                coalesce(sum(aa.impressions), 0)::bigint as impressions,
@@ -117,15 +132,17 @@ async function sumFacebookPageInsights(
   };
 }
 
-/** Total followers org pada snapshot terakhir per akun dengan date <= batas */
-async function followersAt(orgId: string, onOrBefore: Date): Promise<number> {
+/** Total followers org pada snapshot terakhir per akun dengan date <= batas.
+ * `platform` opsional: hanya akun platform tersebut yang dihitung. */
+async function followersAt(orgId: string, onOrBefore: Date, platform?: string): Promise<number> {
+  const platformFilter = platform ? sql` and aa.platform = ${platform}` : sql``;
   const res = await db.execute(
     sql`select coalesce(sum(latest.followers), 0)::int as followers
         from (
           select distinct on (aa.social_account_id) aa.*
           from account_analytics aa
           where aa.organization_id = ${orgId}
-            and aa.date <= ${onOrBefore.toISOString().slice(0, 10)}
+            and aa.date <= ${onOrBefore.toISOString().slice(0, 10)}${platformFilter}
           order by aa.social_account_id, aa.date desc
         ) latest`,
   );
@@ -141,8 +158,10 @@ function percentDelta(current: number, previous: number): number | null {
 
 /** List akun org + snapshot followers terbaru per akun.
  * Satu query raw dengan DISTINCT ON (pola followersAt / route share report) —
- * menghindari N+1 query followers per akun. */
-async function accountsWithFollowers(orgId: string) {
+ * menghindari N+1 query followers per akun. `platform` opsional: hanya akun
+ * platform tersebut yang dikembalikan (dipakai filter platform di Analitik). */
+async function accountsWithFollowers(orgId: string, platform?: string) {
+  const platformFilter = platform ? sql` and sa.platform = ${platform}` : sql``;
   const rows = await db.execute(
     sql`select sa.id,
                sa.platform,
@@ -158,7 +177,7 @@ async function accountsWithFollowers(orgId: string) {
             order by aa.date desc
             limit 1
           ) latest on true
-          where sa.organization_id = ${orgId}
+          where sa.organization_id = ${orgId}${platformFilter}
           order by sa.created_at`,
   );
   return (rows.rows as Record<string, unknown>[]).map((r) => ({
@@ -172,15 +191,18 @@ async function accountsWithFollowers(orgId: string) {
 }
 
 /**
- * GET /analytics/overview?days=30 | ?from=&to= — ringkasan cross-platform.
+ * GET /analytics/overview?days=30 | ?from=&to=&platform= — ringkasan metrik.
  * Dengan from/to (YYYY-MM-DD): rentang current = from..to, previous = panjang
  * sama sebelum from; response menambah `comparison` (nilai previous + delta %).
+ * `platform` opsional (mis. ?platform=instagram): semua agregasi dibatasi ke
+ * satu platform — dipakai filter platform di halaman Analitik.
  */
 analyticsRoute.get("/overview", async (c) => {
   try {
     const ctx = await requireOrg(c);
     const fromStr = c.req.query("from");
     const toStr = c.req.query("to");
+    const platform = c.req.query("platform") || undefined;
 
     // ===== Mode rentang kustom: from..to + comparison vs periode sebelumnya =====
     if (fromStr || toStr) {
@@ -200,11 +222,11 @@ analyticsRoute.get("/overview", async (c) => {
       const prevFrom = new Date(prevTo.getTime() - spanMs + 1);
 
       const [current, previous, fbNow, fbPrev] = await Promise.all([
-        sumPostTotals(ctx.organization.id, from, to),
-        sumPostTotals(ctx.organization.id, prevFrom, prevTo),
+        sumPostTotals(ctx.organization.id, from, to, platform),
+        sumPostTotals(ctx.organization.id, prevFrom, prevTo, platform),
         // Page Insights Facebook (NPE): views/impressions hanya ada level akun
-        sumFacebookPageInsights(ctx.organization.id, from, to),
-        sumFacebookPageInsights(ctx.organization.id, prevFrom, prevTo),
+        sumFacebookPageInsights(ctx.organization.id, from, to, platform),
+        sumFacebookPageInsights(ctx.organization.id, prevFrom, prevTo, platform),
       ]);
 
       const currentTotals = {
@@ -220,8 +242,8 @@ analyticsRoute.get("/overview", async (c) => {
 
       // Followers: snapshot terakhir di dalam/tepat sebelum akhir periode
       const [currentFollowers, previousFollowers] = await Promise.all([
-        followersAt(ctx.organization.id, to),
-        followersAt(ctx.organization.id, prevTo),
+        followersAt(ctx.organization.id, to, platform),
+        followersAt(ctx.organization.id, prevTo, platform),
       ]);
 
       return c.json({
@@ -229,8 +251,9 @@ analyticsRoute.get("/overview", async (c) => {
           from: from.toISOString().slice(0, 10),
           to: to.toISOString().slice(0, 10),
         },
+        platform: platform ?? null,
         totals: { followers: currentFollowers, ...currentTotals },
-        accounts: await accountsWithFollowers(ctx.organization.id),
+        accounts: await accountsWithFollowers(ctx.organization.id, platform),
         comparison: {
           previous: { followers: previousFollowers, ...previousTotals },
           deltas: {
@@ -255,9 +278,10 @@ analyticsRoute.get("/overview", async (c) => {
         ctx.organization.id,
         since,
         new Date(), // sampai sekarang
+        platform,
       ),
       // Page Insights Facebook (NPE): views/impressions hanya ada level akun
-      sumFacebookPageInsights(ctx.organization.id, since, new Date()),
+      sumFacebookPageInsights(ctx.organization.id, since, new Date(), platform),
     ]);
 
     const mergedTotals = {
@@ -266,11 +290,12 @@ analyticsRoute.get("/overview", async (c) => {
       impressions: totals.impressions + fbInsights.impressions,
     };
 
-    const followersByAccount = await accountsWithFollowers(ctx.organization.id);
+    const followersByAccount = await accountsWithFollowers(ctx.organization.id, platform);
     const totalFollowers = followersByAccount.reduce((sum, a) => sum + (a.followers ?? 0), 0);
 
     return c.json({
       range: { days, since: since.toISOString() },
+      platform: platform ?? null,
       totals: { followers: totalFollowers, ...mergedTotals },
       accounts: followersByAccount,
     });
@@ -279,12 +304,16 @@ analyticsRoute.get("/overview", async (c) => {
   }
 });
 
-/** GET /analytics/timeseries?days=30 — snapshot kumulatif per hari (chart pertumbuhan).
- * Filter `days` dibatasi 1-365 (default 30) agar tidak memindai seluruh history. */
+/** GET /analytics/timeseries?days=30&platform= — snapshot kumulatif per hari (chart pertumbuhan).
+ * Filter `days` dibatasi 1-365 (default 30) agar tidak memindai seluruh history.
+ * `platform` opsional (mis. ?platform=instagram) — filter platform di Analitik.
+ * Saat platform bukan facebook, Page Insights FB tidak digabung (menyusul pola
+ * overview) supaya series murni milik platform yang dipilih. */
 analyticsRoute.get("/timeseries", async (c) => {
   try {
     const ctx = await requireOrg(c);
     const days = Math.min(Math.max(Number(c.req.query("days") ?? 30) || 30, 1), 365);
+    const platform = c.req.query("platform") || undefined;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffDate = cutoff.toISOString().slice(0, 10);
@@ -304,27 +333,32 @@ analyticsRoute.get("/timeseries", async (c) => {
           and(
             eq(postAnalytics.organizationId, ctx.organization.id),
             gte(postAnalytics.date, cutoffDate),
+            // platform tersimpan di post_analytics sendiri — cukup eq, tanpa join post
+            platform ? eq(postAnalytics.platform, platform as never) : undefined,
           ),
         )
         .groupBy(postAnalytics.date)
         .orderBy(postAnalytics.date),
       // Page Insights Facebook (NPE): views Halaman per hari dari account_analytics
-      db
-        .select({
-          date: accountAnalytics.date,
-          views: sql<number>`coalesce(sum(${accountAnalytics.impressions}), 0)::bigint`,
-          impressions: sql<number>`coalesce(sum(${accountAnalytics.impressions}), 0)::bigint`,
-        })
-        .from(accountAnalytics)
-        .innerJoin(socialAccount, eq(socialAccount.id, accountAnalytics.socialAccountId))
-        .where(
-          and(
-            eq(accountAnalytics.organizationId, ctx.organization.id),
-            eq(socialAccount.platform, "facebook" as never),
-            gte(accountAnalytics.date, cutoffDate),
-          ),
-        )
-        .groupBy(accountAnalytics.date),
+      // Dilewati bila filter platform bukan facebook (sama seperti overview).
+      platform && platform !== "facebook"
+        ? Promise.resolve([] as { date: string; views: number; impressions: number }[])
+        : db
+            .select({
+              date: accountAnalytics.date,
+              views: sql<number>`coalesce(sum(${accountAnalytics.impressions}), 0)::bigint`,
+              impressions: sql<number>`coalesce(sum(${accountAnalytics.impressions}), 0)::bigint`,
+            })
+            .from(accountAnalytics)
+            .innerJoin(socialAccount, eq(socialAccount.id, accountAnalytics.socialAccountId))
+            .where(
+              and(
+                eq(accountAnalytics.organizationId, ctx.organization.id),
+                eq(socialAccount.platform, "facebook" as never),
+                gte(accountAnalytics.date, cutoffDate),
+              ),
+            )
+            .groupBy(accountAnalytics.date),
     ]);
 
     // Gabungkan Page Insights Facebook ke series berdasarkan tanggal
@@ -332,6 +366,7 @@ analyticsRoute.get("/timeseries", async (c) => {
 
     return c.json({
       days,
+      platform: platform ?? null,
       series: rows.map((r) => {
         const fb = fbByDate.get(r.date);
         return {
@@ -766,16 +801,19 @@ analyticsRoute.get("/demographics", async (c) => {
 // ---------------------------------------------------------------------------
 
 /**
- * GET /analytics/hashtags?days=30 — top hashtag berdasarkan total engagement.
+ * GET /analytics/hashtags?days=30&platform= — top hashtag berdasarkan total engagement.
  * Hashtag di-parse dari caption post (regex dukung karakter Indonesia
  * seperti é, ñ, dll) + kolom hashtags. Engagement = likes+comments+shares
  * dari snapshot metrik TERBARU per post (snapshot kumulatif, bukan sum).
  * Lookback dikunci maksimal 90 hari agar tidak meng-aggregate seluruh history.
+ * `platform` opsional: hanya hashtag dari post platform tersebut.
  */
 analyticsRoute.get("/hashtags", async (c) => {
   try {
     const ctx = await requireOrg(c);
     const days = Math.min(Math.max(Number(c.req.query("days") ?? 30) || 30, 1), 90);
+    const platform = c.req.query("platform") || undefined;
+    const platformFilter = platform ? sql` and p.platform = ${platform}` : sql``;
     const since = new Date();
     since.setDate(since.getDate() - days);
 
@@ -795,7 +833,7 @@ analyticsRoute.get("/hashtags", async (c) => {
           ) latest on true
           where p.organization_id = ${ctx.organization.id}
             and p.status = 'published'
-            and p.published_at >= ${since.toISOString()}`,
+            and p.published_at >= ${since.toISOString()}${platformFilter}`,
     );
 
     // Regex hashtag: dukung karakter unicode Latin termasuk karakter Indonesia
@@ -835,7 +873,7 @@ analyticsRoute.get("/hashtags", async (c) => {
       .sort((a, b) => b.totalEngagement - a.totalEngagement)
       .slice(0, 20);
 
-    return c.json({ days, hashtags });
+    return c.json({ days, platform: platform ?? null, hashtags });
   } catch (error) {
     return errorResponse(error);
   }
