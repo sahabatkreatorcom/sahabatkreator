@@ -77,6 +77,7 @@ export {
   type PlatformHealthStatus,
 } from "./platform-health";
 export {
+  externalPlatformSettingsPatch,
   POSTS_SYNC_PLATFORMS,
   type PostSyncResult,
   syncDueOrganizationsPosts,

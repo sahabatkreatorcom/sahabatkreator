@@ -10,7 +10,7 @@
 
 import { db } from "@sahabatkreator/db";
 import { post, socialAccount } from "@sahabatkreator/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { decrypt } from "./crypto";
 import {
   type ExternalPost,
@@ -331,6 +331,25 @@ async function fetchExternalPosts(
   }
 }
 
+/**
+ * Setelan platform yang disimpan untuk post eksternal.
+ *
+ * `mediaUrl` WAJIB ikut diperbarui setiap sync — bukan sekali saat insert.
+ * URL media CDN Meta (`scontent-*.cdninstagram.com`) bertanda tangan dan punya
+ * masa berlaku (`oe=` di query string, biasanya 24–72 jam). Kalau kolom ini
+ * dibiarkan dari sync pertama, kartu post tetap punya thumbnail (yang di-refresh
+ * terpisah) TAPI tombol play video akan gagal setelah URL-nya kedaluwarsa.
+ * Ini persis yang membuat demo "view post details … videos" gagal di mata reviewer.
+ */
+export function externalPlatformSettingsPatch(
+  ep: Pick<ExternalPost, "mediaType" | "mediaUrl">,
+): Record<string, unknown> {
+  return {
+    mediaType: ep.mediaType,
+    ...(ep.mediaUrl ? { mediaUrl: ep.mediaUrl } : {}),
+  };
+}
+
 /** Sync satu akun: fetch → dedupe → backfill native / upsert eksternal. */
 async function syncAccountPosts(account: SyncableAccount, since: Date): Promise<PostSyncResult> {
   const base: PostSyncResult = {
@@ -454,10 +473,7 @@ async function syncAccountPosts(account: SyncableAccount, since: Date): Promise<
               platformPostId: ep.externalId,
               platformPostUrl: ep.permalink || null,
               publishedAt: ep.publishedAt,
-              platformSettings: {
-                mediaType: ep.mediaType,
-                ...(ep.mediaUrl ? { mediaUrl: ep.mediaUrl } : {}),
-              },
+              platformSettings: externalPlatformSettingsPatch(ep),
             });
             imported++;
           } catch (upsertError) {
@@ -472,6 +488,11 @@ async function syncAccountPosts(account: SyncableAccount, since: Date): Promise<
                   content: ep.caption || null,
                   externalUrl: ep.permalink || null,
                   externalThumbnailUrl: ep.thumbnailUrl ?? null,
+                  // Merge (bukan timpa) supaya kunci lain tidak hilang, dan supaya
+                  // mediaUrl ikut disegarkan — URL CDN Meta kedaluwarsa.
+                  platformSettings: sql`coalesce(${post.platformSettings}, '{}'::jsonb) || ${JSON.stringify(
+                    externalPlatformSettingsPatch(ep),
+                  )}::jsonb`,
                   platformPostUrl: ep.permalink || null,
                   publishedAt: ep.publishedAt,
                   syncedAt: new Date(),
