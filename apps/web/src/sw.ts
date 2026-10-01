@@ -60,8 +60,20 @@ self.addEventListener("activate", (event) => {
 // components/docs/mdx-components.tsx memakainya untuk memilih <a> vs <Link>.
 const SERVER_OWNED =
   /^\/(api\/|v1(\/|$)|docs(\/|$)|openapi\.json$|health$|mcp($|\/)|sitemap-blog\.xml$)/;
+
+// Berkas statis juga bukan halaman SPA. NavigationRoute hanya cocok untuk
+// request ber-mode "navigate" — jadi ini soal pengguna yang MENGETIK alamat
+// berkas di address bar PWA ter-install (/sitemap.xml, /robots.txt,
+// /manifest.webmanifest, /pwa-192.png). Tanpa pengecualian ini jawabannya
+// index.html → React Router tidak punya route-nya → halaman 404 palsu.
+//
+// Daftar ekstensi sengaja dibatasi pada berkas yang benar-benar kita sajikan;
+// slug route di aplikasi ini tidak pernah berakhiran ekstensi berkas.
+const STATIC_FILE =
+  /\.(?:xml|txt|json|webmanifest|ico|png|jpe?g|webp|avif|svg|gif|css|js|map)$/i;
+
 const spaNavigation = new NavigationRoute(createHandlerBoundToURL("index.html"), {
-  denylist: [SERVER_OWNED],
+  denylist: [SERVER_OWNED, STATIC_FILE],
 });
 registerRoute(spaNavigation);
 

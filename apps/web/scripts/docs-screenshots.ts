@@ -16,9 +16,18 @@
  *   DOCS_SHOT_ONLY      filter nama shot, mis. "kalender" (opsional)
  *   DOCS_SHOT_ZOOM      default 1.3 — sama dengan zoom 130% di browser
  *   DOCS_SHOT_HEADFUL   "1" untuk melihat prosesnya
+ *   DOCS_SHOT_GAP       jeda antar-halaman dalam ms (default 900)
  *
  * ⚠️ Akun yang dipakai harus berisi DATA CONTOH, karena hasilnya dipublikasikan
  *    di situs. Jangan pakai akun pelanggan sungguhan.
+ *
+ * ⚠️ Skrip ini menghantam server produksi. Server membatasi /api/* ke
+ *    100 request / 60 detik per IP (apps/server/src/lib/rate-limit.ts). Bila
+ *    kuota itu lewat, /api/me balas 429 → RequireAuth (retry: false) langsung
+ *    melempar browser ke /login — dan tanpa penjagaan di bawah, halaman login
+ *    itu ikut tersimpan sebagai "tangkapan layar dashboard". Karena itu skrip
+ *    ini: (1) menahan laju sebelum kuota habis, (2) MENOLAK menyimpan gambar
+ *    yang ternyata halaman login, (3) login ulang lalu mengulang shot itu.
  */
 import { mkdir, stat } from "node:fs/promises";
 import path from "node:path";
@@ -32,6 +41,14 @@ const PASSWORD = process.env.DOCS_SHOT_PASSWORD ?? "";
 const ONLY = process.env.DOCS_SHOT_ONLY ?? "";
 const ZOOM = Number(process.env.DOCS_SHOT_ZOOM ?? "1.3");
 const HEADFUL = process.env.DOCS_SHOT_HEADFUL === "1";
+const GAP_MS = Number(process.env.DOCS_SHOT_GAP ?? "900");
+
+/** Batas kuota /api/* di server: 100 request / 60 detik per IP. Kita sisakan
+ *  margin karena halaman yang sedang terbuka masih memanggil API sendiri. */
+const RATE_WINDOW_MS = 60_000;
+const RATE_BUDGET = 60;
+/** Berapa kali shot diulang bila ternyata tertangkap halaman login. */
+const MAX_ATTEMPTS = 3;
 
 const OUT_DIR = path.resolve(import.meta.dirname, "..", "public", "docs");
 
@@ -244,6 +261,73 @@ async function settle(page: Page) {
   await page.waitForTimeout(600);
 }
 
+// ---------------------------------------------------------------------------
+// Penjaga kuota API
+// ---------------------------------------------------------------------------
+/** Timestamp setiap request /api/* selama proses berjalan (sliding window). */
+const apiHits: number[] = [];
+/** Jumlah respons 429 yang terlihat — indikator kita sempat menabrak limit. */
+let rateLimited = 0;
+
+function watchApiTraffic(page: Page) {
+  page.on("response", (res) => {
+    if (!res.url().includes("/api/")) return;
+    apiHits.push(Date.now());
+    if (res.status() === 429) rateLimited += 1;
+  });
+}
+
+/**
+ * Tunggu sampai kuota API punya ruang lagi. Dipanggil SEBELUM tiap halaman
+ * supaya kita tidak pernah menabrak limit di tengah render — menabrak limit
+ * bukan cuma bikin shot gagal, tapi juga melempar sesi ke halaman login.
+ */
+async function waitForRateHeadroom(page: Page) {
+  for (;;) {
+    const now = Date.now();
+    while (apiHits.length > 0 && now - (apiHits[0] as number) > RATE_WINDOW_MS) apiHits.shift();
+    if (apiHits.length < RATE_BUDGET) return;
+    const wait = RATE_WINDOW_MS - (now - (apiHits[0] as number)) + 400;
+    console.log(`    … jeda ${Math.ceil(wait / 1000)}s (kuota API ${apiHits.length}/menit terpakai)`);
+    await page.waitForTimeout(Math.min(wait, 20_000));
+  }
+}
+
+/** Halaman login = shot tidak sah. Dikenali dari URL dan form password. */
+async function isLoginPage(page: Page): Promise<boolean> {
+  if (new URL(page.url()).pathname.startsWith("/login")) return true;
+  return (await page.$("#password")) !== null;
+}
+
+/**
+ * Ambil satu shot. Melempar error bila halaman ber-auth justru mendarat di
+ * /login — lebih baik gagal terang-terangan daripada menaruh gambar halaman
+ * login ke dalam dokumentasi publik.
+ */
+async function capture(page: Page, shot: Shot, target: string) {
+  await page.goto(`${BASE}${shot.route}`, { waitUntil: "domcontentloaded" });
+  if (shot.waitFor) {
+    await page.waitForSelector(shot.waitFor, { timeout: 15_000 }).catch(() => {});
+  }
+  await settle(page);
+
+  if (shot.auth && (await isLoginPage(page))) {
+    throw new Error("terlempar ke halaman login (kuota API / sesi)");
+  }
+
+  await applyZoom(page);
+  await page.waitForTimeout(250);
+
+  // Tangkap ke memori lalu enkode ulang ke WebP. PNG dari layar 2× bisa
+  // 300–500 KB per gambar; WebP memangkasnya ~70% tanpa perbedaan yang
+  // terlihat, dan itu penting karena gambar ini diunduh pengunjung biasa.
+  const png = await page.screenshot({
+    fullPage: shot.fullPage ?? false,
+    animations: "disabled",
+  });
+  await sharp(png).webp({ quality: 82, effort: 5 }).toFile(target);
+}
+
 async function main() {
   const shots = ONLY
     ? SHOTS.filter((shot) => shot.name.includes(ONLY) || shot.label.toLowerCase().includes(ONLY))
@@ -280,6 +364,7 @@ async function main() {
     serviceWorkers: "block",
   });
   const page = await context.newPage();
+  watchApiTraffic(page);
 
   await mkdir(path.join(OUT_DIR, "panduan"), { recursive: true });
   await mkdir(path.join(OUT_DIR, "developers"), { recursive: true });
@@ -291,39 +376,52 @@ async function main() {
   }
 
   let ok = 0;
+  const failed: string[] = [];
+
   for (const shot of shots) {
     const target = path.join(OUT_DIR, shot.group, `${shot.name}.webp`);
-    try {
-      await page.goto(`${BASE}${shot.route}`, { waitUntil: "domcontentloaded" });
-      if (shot.waitFor) {
-        await page.waitForSelector(shot.waitFor, { timeout: 15_000 }).catch(() => {});
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      try {
+        await waitForRateHeadroom(page);
+        await capture(page, shot, target);
+
+        const { size } = await stat(target);
+        const kb = Math.round(size / 1024);
+        console.log(`  ✓ ${shot.group}/${shot.name}.webp (${kb} KB) — ${shot.label}`);
+        ok += 1;
+        break;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+
+        if (attempt === MAX_ATTEMPTS) {
+          console.error(`  ✗ ${shot.group}/${shot.name}.webp — ${shot.label}`);
+          console.error(`    ${message}`);
+          failed.push(`${shot.group}/${shot.name}`);
+          break;
+        }
+
+        console.log(
+          `    ⟳ ${shot.name}: ${message} — jeda, login ulang, ulangi (${attempt}/${MAX_ATTEMPTS - 1})`,
+        );
+        // Beri jendela rate-limit waktu untuk menggelinding, lalu pulihkan sesi.
+        await page.waitForTimeout(20_000);
+        if (needsAuth) await login(page);
       }
-      await settle(page);
-      await applyZoom(page);
-      await page.waitForTimeout(250);
-
-      // Tangkap ke memori lalu enkode ulang ke WebP. PNG dari layar 2× bisa
-      // 300–500 KB per gambar; WebP memangkasnya ~70% tanpa perbedaan yang
-      // terlihat, dan itu penting karena gambar ini diunduh pengunjung biasa.
-      const png = await page.screenshot({
-        fullPage: shot.fullPage ?? false,
-        animations: "disabled",
-      });
-      await sharp(png).webp({ quality: 82, effort: 5 }).toFile(target);
-
-      const { size } = await stat(target);
-      const kb = Math.round(size / 1024);
-      console.log(`  ✓ ${shot.group}/${shot.name}.webp (${kb} KB) — ${shot.label}`);
-      ok += 1;
-    } catch (error) {
-      console.error(`  ✗ ${shot.group}/${shot.name}.webp — ${shot.label}`);
-      console.error(`    ${error instanceof Error ? error.message : String(error)}`);
     }
+
+    await page.waitForTimeout(GAP_MS);
   }
 
   await browser.close();
   console.log(`\nSelesai: ${ok}/${shots.length} gambar tersimpan di public/docs/.`);
-  if (ok < shots.length) process.exitCode = 1;
+  if (rateLimited > 0) {
+    console.log(`Catatan: ${rateLimited} respons 429 terlihat selama proses.`);
+  }
+  if (failed.length > 0) {
+    console.error(`Gagal: ${failed.join(", ")}`);
+    process.exitCode = 1;
+  }
 }
 
 await main();

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Navigate, Outlet, useLocation, useSearchParams } from "react-router";
 import { PageLoader } from "@/components/ui/spinner";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { queryKeys } from "../lib/query-keys";
 
 export type MeResponse = {
@@ -41,7 +41,18 @@ export const meQueryOptions = {
   queryKey: queryKeys.me,
   queryFn: () => api.get<MeResponse>("/me"),
   staleTime: 60 * 1000,
-  retry: false,
+  // 401 tidak diulang — itu memang "belum login". Tapi 429/5xx hanya gangguan
+  // sesaat, dan tanpa pengecualian ini satu respons 429 (global rate limit
+  // /api/* = 100 request/menit per IP) langsung dibaca sebagai "belum login",
+  // sehingga pengguna yang sesinya sehat terlempar ke /login — dan itu bisa
+  // terjadi saat pengguna membuka beberapa tab sekaligus. Cukup tunggu sebentar
+  // lalu coba lagi sebelum menyimpulkan apa pun.
+  retry: (failureCount: number, error: unknown) => {
+    if (failureCount >= 2) return false;
+    const status = error instanceof ApiError ? error.status : 0;
+    return status === 429 || status >= 500;
+  },
+  retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 5000),
 } as const;
 
 /**
