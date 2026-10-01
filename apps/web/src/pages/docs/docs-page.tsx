@@ -6,7 +6,7 @@
 // diunduh saat dibuka).
 import { MDXProvider } from "@mdx-js/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { type ComponentType, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { type ComponentType, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { mdxComponents } from "@/components/docs/mdx-components";
 import { type DocsSection, docsHref, docsNeighbours, docsSectionForPath } from "@/lib/docs-nav";
@@ -15,6 +15,19 @@ import { cn } from "@/lib/utils";
 
 // Semua file .mdx di src/content, dikunci per path relatif.
 const MDX_MODULES = import.meta.glob<{ default: ComponentType }>("../../content/**/*.mdx");
+
+/**
+ * Komponen `lazy` dibuat SEKALI di module scope, bukan di dalam render.
+ *
+ * ⚠️ Kalau `lazy()` dipanggil saat render, setiap render ulang menghasilkan tipe
+ * komponen BARU. React melihat tipe yang berbeda, membuang hasil render
+ * sebelumnya, lalu mengimpor dari nol lagi — pohon komponen tersuspensi
+ * terus-menerus dan halaman tampil KOSONG tanpa satu pun error. Pemetaan ini
+ * dibangun sekali di sini supaya tipenya stabil.
+ */
+const LAZY_PAGES = new Map<string, ComponentType>(
+  Object.entries(MDX_MODULES).map(([key, loader]) => [key, lazy(loader)]),
+);
 
 function moduleKey(sectionId: string, slug: string): string {
   return `../../content/${sectionId}/${slug || "index"}.mdx`;
@@ -77,6 +90,22 @@ function useDocHeadings(containerRef: React.RefObject<HTMLElement | null>, conte
 
 // ---------- Halaman ----------
 
+// Rangka konten saat chunk .mdx masih diunduh. Sengaja menyerupai tata letak
+// judul + paragraf supaya tidak ada lompatan tata letak yang terasa.
+function DocsContentSkeleton() {
+  return (
+    <div aria-hidden className="max-w-3xl animate-pulse space-y-4">
+      <div className="h-8 w-2/3 rounded bg-[var(--bg-tertiary)]" />
+      <div className="h-4 w-full rounded bg-[var(--bg-tertiary)]" />
+      <div className="h-4 w-11/12 rounded bg-[var(--bg-tertiary)]" />
+      <div className="h-4 w-4/5 rounded bg-[var(--bg-tertiary)]" />
+      <div className="mt-8 h-6 w-1/3 rounded bg-[var(--bg-tertiary)]" />
+      <div className="h-4 w-full rounded bg-[var(--bg-tertiary)]" />
+      <div className="h-4 w-10/12 rounded bg-[var(--bg-tertiary)]" />
+    </div>
+  );
+}
+
 export function DocsPage() {
   const { pathname } = useLocation();
   const params = useParams();
@@ -98,11 +127,11 @@ export function DocsPage() {
     noIndex: !page,
   });
 
+  // Komponen sudah dibuat di module scope — di sini hanya mengambil referensi
+  // yang stabil, supaya React tidak menganggapnya tipe baru tiap render.
   const Content = useMemo(() => {
     if (!section || !page) return null;
-    const loader = MDX_MODULES[moduleKey(section.id, page.slug)];
-    if (!loader) return null;
-    return lazy(loader);
+    return LAZY_PAGES.get(moduleKey(section.id, page.slug)) ?? null;
   }, [section, page]);
 
   const { headings, activeId } = useDocHeadings(articleRef, `${section?.id}/${slug}`);
@@ -145,9 +174,15 @@ export function DocsPage() {
         </nav>
 
         <article ref={articleRef} className="max-w-3xl">
-          <MDXProvider components={mdxComponents}>
-            <Content />
-          </MDXProvider>
+          {/* Suspense WAJIB: konten .mdx diimpor sebagai chunk terpisah, jadi
+              render pertama pasti menunggu. Tanpa boundary di sini, penantian
+              itu merambat ke root dan seluruh halaman — termasuk sidebar dan
+              header — ikut kosong sampai chunk selesai diunduh. */}
+          <Suspense fallback={<DocsContentSkeleton />}>
+            <MDXProvider components={mdxComponents}>
+              <Content />
+            </MDXProvider>
+          </Suspense>
         </article>
 
         {(prev || next) && (

@@ -20,6 +20,25 @@ declare let self: ServiceWorkerGlobalScope & {
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
+// ---------------------------------------------------------------------------
+// Pembaruan service worker
+// ---------------------------------------------------------------------------
+// Mode injectManifest TIDAK menambahkan skipWaiting/clientsClaim sendiri —
+// berbeda dari generateSW dengan `skipWaiting: true`. Tanpa keduanya, service
+// worker baru hanya terpasang lalu MENUNGGU tanpa batas: ia baru mengambil alih
+// setelah SEMUA tab aplikasi ditutup. Akibatnya perbaikan apa pun di file ini
+// (termasuk denylist navigasi di bawah) tidak pernah sampai ke pengguna yang
+// membiarkan satu tab terbuka.
+//
+// registerType "autoUpdate" di vite.config.ts mengasumsikan keduanya ada.
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 // SPA navigation fallback — shell tetap render saat offline.
 //
 // ⚠️ Denylist ini WAJIB memuat semua path yang dilayani SERVER, bukan SPA.

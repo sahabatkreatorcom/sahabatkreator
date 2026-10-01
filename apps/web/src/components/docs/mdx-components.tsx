@@ -218,12 +218,17 @@ export function CardLink({
 }) {
   const className =
     "group rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--bg-secondary)] p-4 transition-colors hover:border-[var(--accent-gold)]/50";
+  // ⚠️ Deskripsi dibungkus <div>, bukan <p>: MDX membungkus isi JSX yang
+  // ditulis di baris terpisah menjadi paragraf sendiri, sehingga <p> di sini
+  // akan menghasilkan <p> bersarang (HTML tidak valid, React melempar warning).
   const body = (
     <>
       <p className="font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent-gold)]">
         {title}
       </p>
-      <p className="mt-1 text-[var(--text-secondary)] text-sm leading-relaxed">{children}</p>
+      <div className="mt-1 text-[var(--text-secondary)] text-sm leading-relaxed [&>p]:m-0">
+        {children}
+      </div>
     </>
   );
 

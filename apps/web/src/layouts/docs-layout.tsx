@@ -92,11 +92,13 @@ export function DocsLayout() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <Link to="/v1/docs" className="hidden xl:block">
+            {/* /v1/docs dilayani server (Scalar), bukan route SPA — pakai <a>,
+                kalau lewat react-router akan jatuh ke halaman 404. */}
+            <a href="/v1/docs" className="hidden xl:block">
               <Button variant="ghost" size="sm">
                 Referensi API
               </Button>
-            </Link>
+            </a>
             <Button variant="ghost" size="icon" onClick={toggle} aria-label="Ganti tema">
               {resolved === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
@@ -152,9 +154,9 @@ export function DocsLayout() {
             <Link to="/developers" className="hover:text-[var(--text-primary)]">
               API
             </Link>
-            <Link to="/v1/docs" className="hover:text-[var(--text-primary)]">
+            <a href="/v1/docs" className="hover:text-[var(--text-primary)]">
               Referensi API
-            </Link>
+            </a>
             <Link to="/faq" className="hover:text-[var(--text-primary)]">
               FAQ
             </Link>

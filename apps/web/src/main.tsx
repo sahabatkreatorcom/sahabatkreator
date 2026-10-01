@@ -24,6 +24,24 @@ const queryClient = new QueryClient({
 // Init theme sebelum render (hindari FOUC — script inline juga ada di index.html)
 useTheme.getState().init();
 
+// Service worker: sw.ts memakai skipWaiting + clientsClaim, jadi versi baru
+// mengambil alih segera setelah terpasang. Kalau itu terjadi di tengah sesi,
+// halaman yang sedang jalan memegang JS lama sementara precache sudah diganti
+// build baru — chunk yang di-lazy-load berikutnya bisa gagal. Muat ulang sekali
+// saat kendali berpindah supaya JS dan cache selalu seversi.
+//
+// `hadController` menjaga kunjungan pertama: saat itu belum ada controller,
+// jadi tidak perlu reload.
+if ("serviceWorker" in navigator) {
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloaded) return;
+    reloaded = true;
+    window.location.reload();
+  });
+}
+
 // GA4 hanya jika Measurement ID diset (produksi) — staging/dev biarkan kosong
 if (env.VITE_GA_MEASUREMENT_ID) {
   initializeGoogleAnalytics(env.VITE_GA_MEASUREMENT_ID);
