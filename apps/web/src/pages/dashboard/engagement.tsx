@@ -704,12 +704,19 @@ export function EngagementPage() {
             toast.warning(`Sync selesai — ${r.errors.length} akun gagal`, {
               description: r.errors[0],
             });
+          } else if (r.newItems > 0) {
+            toast.success(`Sync selesai — ${r.newItems} interaksi baru`);
           } else {
-            toast.success(
-              r.newItems > 0
-                ? `Sync selesai — ${r.newItems} interaksi baru`
-                : "Sync selesai — tidak ada interaksi baru",
-            );
+            // "Tidak ada interaksi baru" sering disalahartikan sebagai tombol
+            // rusak. Padahal paling sering penyebabnya ada di sisi platform:
+            // komentar/mention baru belum muncul di API-nya (Threads &
+            // Instagram punya jeda publikasi setelah sebuah item dibuat), atau
+            // item itu sudah pernah tersinkron sebelumnya. Jelaskan supaya
+            // pengguna tidak menekan Sinkron berulang-ulang tanpa hasil.
+            toast.success("Sync selesai — belum ada interaksi baru", {
+              description:
+                "Semua interaksi yang tersedia sudah masuk inbox. Interaksi yang baru dibuat di platform biasanya butuh beberapa menit sebelum muncul di sini.",
+            });
           }
           return;
         }

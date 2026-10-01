@@ -55,12 +55,18 @@ export default function InboxPage() {
             toast.error(`Sync DM gagal pada ${r.errors.length} akun`, {
               description: r.errors[0],
             });
+          } else if (r.newMessages > 0) {
+            toast.success(`Sync selesai — ${r.newMessages} pesan baru`);
           } else {
-            toast.success(
-              r.newMessages > 0
-                ? `Sync selesai — ${r.newMessages} pesan baru`
-                : "Sync selesai — tidak ada pesan baru",
-            );
+            // Sama seperti engagement: "tidak ada pesan baru" bukan tanda tombol
+            // rusak, melainkan semua DM yang tersedia sudah masuk. Pesan yang
+            // baru dikirim lawan bicara perlu waktu sebelum muncul di API DM
+            // (Threads & Instagram punya jeda, dan DM dari akun yang bukan
+            // pengikut bisa masuk folder terpisah di sisi platform).
+            toast.success("Sync DM selesai — belum ada pesan baru", {
+              description:
+                "Semua percakapan yang tersedia sudah masuk. Pesan yang baru dikirim biasanya butuh beberapa menit sebelum muncul di sini.",
+            });
           }
           return;
         }

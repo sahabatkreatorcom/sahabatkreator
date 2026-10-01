@@ -251,7 +251,17 @@ export function ListeningPage() {
     mutationFn: () => api.post<{ newItems: number }>("/listening/sync"),
     onSuccess: (res) => {
       invalidate();
-      toast.success(`Sinkronisasi selesai — ${res.newItems} pembicaraan baru`);
+      // `newItems: 0` bukan berarti sinkronisasi gagal — sumber (web/berita)
+      // memang belum memuat kata kunci baru sejak sinkronisasi terakhir.
+      // Jelaskan supaya pengguna tidak menekan tombol ini berkali-kali.
+      if (res.newItems > 0) {
+        toast.success(`Sinkronisasi selesai — ${res.newItems} pembicaraan baru`);
+      } else {
+        toast.success("Sinkronisasi selesai — belum ada pembicaraan baru", {
+          description:
+            "Semua hasil yang tersedia sudah masuk daftar. Sumber web biasanya bertambah beberapa saat setelah artikel barunya terbit.",
+        });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
