@@ -67,10 +67,35 @@ function heading(level: 1 | 2 | 3 | 4) {
   };
 }
 
+/**
+ * Path yang dilayani **server**, bukan route SPA. Tautan ke path ini wajib
+ * memakai <a> biasa: kalau dipaksa lewat react-router, router tidak menemukan
+ * route-nya dan pengguna melihat halaman 404 padahal servernya sehat.
+ *
+ * Daftar ini harus sejalan dengan dua tempat lain:
+ *   • proxy dev di apps/web/vite.config.ts (komentar "bukan route SPA")
+ *   • denylist service worker di apps/web/src/sw.ts
+ */
+const SERVER_OWNED_PATHS: RegExp[] = [
+  /^\/api\//,
+  /^\/v1(\/|$|\?)/,
+  /^\/docs(\/|$|\?)/,
+  /^\/openapi\.json($|\?)/,
+  /^\/health($|\?)/,
+  /^\/mcp($|\/|\?)/,
+  /^\/sitemap-blog\.xml($|\?)/,
+];
+
+function isSpaPath(href: string): boolean {
+  if (!href.startsWith("/")) return false;
+  return !SERVER_OWNED_PATHS.some((pattern) => pattern.test(href));
+}
+
 function Anchor({ href = "", children }: { href?: string; children?: ReactNode }) {
   const className =
     "font-medium text-[var(--accent-gold)] underline decoration-[var(--accent-gold)]/40 underline-offset-2 transition-colors hover:decoration-[var(--accent-gold)]";
-  if (href.startsWith("/") || href.startsWith("#")) {
+
+  if (isSpaPath(href) || href.startsWith("#")) {
     return (
       <Link to={href} className={className}>
         {children}
@@ -191,16 +216,28 @@ export function CardLink({
   title: string;
   children?: ReactNode;
 }) {
-  return (
-    <Link
-      to={href}
-      className="group rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--bg-secondary)] p-4 transition-colors hover:border-[var(--accent-gold)]/50"
-    >
+  const className =
+    "group rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--bg-secondary)] p-4 transition-colors hover:border-[var(--accent-gold)]/50";
+  const body = (
+    <>
       <p className="font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent-gold)]">
         {title}
       </p>
       <p className="mt-1 text-[var(--text-secondary)] text-sm leading-relaxed">{children}</p>
-    </Link>
+    </>
+  );
+
+  if (isSpaPath(href)) {
+    return (
+      <Link to={href} className={className}>
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+      {body}
+    </a>
   );
 }
 

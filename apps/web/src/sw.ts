@@ -21,13 +21,30 @@ cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
 // SPA navigation fallback — shell tetap render saat offline.
-// ⚠️ Deny navigasi ke /api/* (mis. link verifikasi email better-auth
-// /api/auth/verify-email?token=...&callbackURL=...) — biarkan sampai ke
-// server. Tanpa ini SW mencegat link dari email → SPA render 404 page.
-const denyNavigationApi = new NavigationRoute(createHandlerBoundToURL("index.html"), {
-  denylist: [/^\/api\//],
+//
+// ⚠️ Denylist ini WAJIB memuat semua path yang dilayani SERVER, bukan SPA.
+// Tanpa itu service worker menyajikan index.html untuk navigasi ke path
+// tersebut, React Router tidak menemukan route-nya, dan pengguna melihat
+// halaman 404 padahal servernya sehat.
+//
+//   • /api/*            — link verifikasi email better-auth
+//                         (/api/auth/verify-email?token=…&callbackURL=…)
+//   • /v1/*             — Public API v1, termasuk /v1/docs (Scalar) dan
+//                         /v1/openapi.json
+//   • /docs             — Scalar API reference internal
+//   • /openapi.json     — spesifikasi OpenAPI internal
+//   • /health           — health check
+//   • /mcp              — MCP remote (POST, tapi GET/DELETE punya respons sendiri)
+//   • /sitemap-blog.xml — sitemap blog yang dirender server
+//
+// Daftar yang sama dipakai proxy dev di vite.config.ts, dan
+// components/docs/mdx-components.tsx memakainya untuk memilih <a> vs <Link>.
+const SERVER_OWNED =
+  /^\/(api\/|v1(\/|$)|docs(\/|$)|openapi\.json$|health$|mcp($|\/)|sitemap-blog\.xml$)/;
+const spaNavigation = new NavigationRoute(createHandlerBoundToURL("index.html"), {
+  denylist: [SERVER_OWNED],
 });
-registerRoute(denyNavigationApi);
+registerRoute(spaNavigation);
 
 // ---------------------------------------------------------------------------
 // Web Push — tampilkan notifikasi dari payload server

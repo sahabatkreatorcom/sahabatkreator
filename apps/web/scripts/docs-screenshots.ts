@@ -245,20 +245,23 @@ async function settle(page: Page) {
 }
 
 async function main() {
-  if (!EMAIL || !PASSWORD) {
-    console.error(
-      "DOCS_SHOT_EMAIL dan DOCS_SHOT_PASSWORD wajib diisi.\n" +
-        "Contoh:\n  DOCS_SHOT_EMAIL=demo@example.com DOCS_SHOT_PASSWORD=... bun run docs:screenshots",
-    );
-    process.exit(1);
-  }
-
   const shots = ONLY
     ? SHOTS.filter((shot) => shot.name.includes(ONLY) || shot.label.toLowerCase().includes(ONLY))
     : SHOTS;
 
   if (shots.length === 0) {
     console.error(`Tidak ada shot yang cocok dengan filter "${ONLY}".`);
+    process.exit(1);
+  }
+
+  // Kredensial hanya wajib bila ada shot yang memang perlu masuk. Halaman
+  // publik (mis. /v1/docs) bisa ditangkap tanpa akun sama sekali.
+  const needsAuth = shots.some((shot) => shot.auth);
+  if (needsAuth && (!EMAIL || !PASSWORD)) {
+    console.error(
+      "DOCS_SHOT_EMAIL dan DOCS_SHOT_PASSWORD wajib diisi untuk shot yang butuh login.\n" +
+        "Contoh:\n  DOCS_SHOT_EMAIL=demo@example.com DOCS_SHOT_PASSWORD=... bun run docs:screenshots",
+    );
     process.exit(1);
   }
 
@@ -271,13 +274,17 @@ async function main() {
     timezoneId: "Asia/Jakarta",
     // Tema terang: paling aman untuk dibaca di semua perangkat.
     colorScheme: "light",
+    // Service worker menyajikan shell SPA untuk navigasi — kalau dibiarkan,
+    // halaman yang dilayani server (mis. /v1/docs milik Scalar) tertangkap
+    // sebagai halaman 404 milik React Router.
+    serviceWorkers: "block",
   });
   const page = await context.newPage();
 
   await mkdir(path.join(OUT_DIR, "panduan"), { recursive: true });
   await mkdir(path.join(OUT_DIR, "developers"), { recursive: true });
 
-  if (shots.some((shot) => shot.auth)) {
+  if (needsAuth) {
     process.stdout.write("Masuk sebagai akun demo… ");
     await login(page);
     console.log("berhasil.");
