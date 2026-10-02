@@ -12,7 +12,7 @@ import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
 import { fireActivity } from "../lib/activity-log";
-import { errorResponse, requireOrg } from "../lib/auth-guard";
+import { errorResponse, requirePermission } from "../lib/auth-guard";
 import { checkFeatureGate, checkPlanFeature } from "../lib/billing";
 import { decrypt } from "../lib/crypto";
 import { assertAllowedRedirect, resolveDeveloperApp } from "../lib/developer-app";
@@ -41,7 +41,7 @@ async function enforceApiWriteGate(c: Context): Promise<void> {
 /** GET /accounts — list akun sosmed org */
 accountsRoute.get("/", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "accounts.view");
     const accounts = await db
       .select({
         id: socialAccount.id,
@@ -87,7 +87,7 @@ const connectManualSchema = z.object({
  */
 accountsRoute.post("/connect-manual", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "accounts.connect");
     await checkFeatureGate(ctx.organization.id, "social_accounts");
 
     const input = connectManualSchema.parse(await c.req.json());
@@ -179,7 +179,7 @@ const connectBodySchema = z.object({ code: z.string().min(1) });
  */
 async function handleConnectWithCode(c: Context): Promise<Response> {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "accounts.connect");
     const platform = c.req.param("platform") as OAuthPlatform;
     const { code } = connectBodySchema.parse(await c.req.json());
 
@@ -219,7 +219,7 @@ accountsRoute.post("/:platform/exchange", handleConnectWithCode);
  */
 accountsRoute.get("/pending/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "accounts.view");
     await enforceApiWriteGate(c);
     const [row] = await db
       .select()
@@ -267,7 +267,7 @@ accountsRoute.get("/pending/:id", async (c) => {
  */
 accountsRoute.post("/pending/:id/select", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "accounts.connect");
     await checkFeatureGate(ctx.organization.id, "social_accounts");
 
     // `assetId` (bukan `pageId`): asetnya bisa board/channel/profil, bukan hanya
@@ -450,7 +450,7 @@ accountsRoute.post("/pending/:id/select", async (c) => {
  * YouTube channel) tidak support → return null. */
 accountsRoute.get("/:id/statistic", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "accounts.view");
     const [row] = await db
       .select({ metadata: socialAccount.metadata })
       .from(socialAccount)
@@ -490,7 +490,7 @@ accountsRoute.get("/:id/statistic", async (c) => {
 /** DELETE /accounts/:id — disconnect akun */
 accountsRoute.delete("/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "accounts.disconnect");
     const [row] = await db
       .select()
       .from(socialAccount)

@@ -9,7 +9,7 @@ import { GRAPH_FB_URL, GRAPH_IG_URL } from "@sahabatkreator/publishing";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { errorResponse, requireOrg } from "../lib/auth-guard";
+import { errorResponse, requirePermission } from "../lib/auth-guard";
 import { decrypt } from "../lib/crypto";
 
 export const collabsRoute = new Hono();
@@ -82,7 +82,7 @@ async function isCollabEnabled(): Promise<boolean> {
 /** GET /accounts/:id/collabs — list pending collab invites */
 collabsRoute.get("/:id/collabs", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "collab.view");
     if (!(await isCollabEnabled())) {
       return c.json({ message: "Fitur kolaborasi dinonaktifkan oleh admin" }, 403);
     }
@@ -127,7 +127,7 @@ collabsRoute.get("/:id/collabs", async (c) => {
 /** POST /accounts/:id/collabs — respond invite (accept/decline) */
 collabsRoute.post("/:id/collabs", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "collab.manage");
     if (!(await isCollabEnabled())) {
       return c.json({ message: "Fitur kolaborasi dinonaktifkan oleh admin" }, 403);
     }

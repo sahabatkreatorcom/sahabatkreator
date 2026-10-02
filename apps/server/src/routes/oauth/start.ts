@@ -11,7 +11,7 @@ import {
 } from "@sahabatkreator/publishing";
 import { lt } from "drizzle-orm";
 import type { Context } from "hono";
-import { errorResponse, requireOrg } from "../../lib/auth-guard";
+import { errorResponse, requirePermission } from "../../lib/auth-guard";
 import { checkFeatureGate } from "../../lib/billing";
 import { getReplizCredentials, isReplizRouted, toReplizPlatformKey } from "../../lib/bridge";
 import { generateId } from "../../lib/id";
@@ -43,7 +43,7 @@ export async function startOAuthFlow(
   developer?: { developerAppId: string; redirectUri: string },
 ): Promise<Response> {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "accounts.connect");
     const platform = c.req.param("platform") as OAuthPlatform;
     if (!isOAuthPlatformSupported(platform)) {
       return c.json({ message: `OAuth platform ${platform} tidak didukung.` }, 400);

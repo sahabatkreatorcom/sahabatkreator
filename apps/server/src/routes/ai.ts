@@ -6,7 +6,7 @@ import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { aiCreditCost, chatCompletion, consumeAiCredits, getAiConfig, getAiUsage } from "../lib/ai";
-import { errorResponse, HTTPError, requireOrg } from "../lib/auth-guard";
+import { errorResponse, HTTPError, requirePermission } from "../lib/auth-guard";
 import { getOrgLimits } from "../lib/billing";
 import { parseDateParam } from "../lib/date";
 import { aiRateLimit } from "../lib/rate-limit";
@@ -156,7 +156,7 @@ const PLATFORMS = [
 
 aiRoute.get("/usage", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const [limits, usage] = await Promise.all([
       getOrgLimits(ctx.organization.id),
       getAiUsage(ctx.organization.id),
@@ -183,7 +183,7 @@ aiRoute.get("/usage", async (c) => {
  */
 aiRoute.get("/usage/history", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const page = Math.max(Number(c.req.query("page") ?? 1), 1);
     const perPage = Math.min(Number(c.req.query("perPage") ?? 50), 200);
     const action = c.req.query("action")?.trim() ?? "";
@@ -252,7 +252,7 @@ const captionSchema = z.object({
 
 aiRoute.post("/caption", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const input = captionSchema.parse(await c.req.json());
 
     const config = await getAiConfig();
@@ -334,7 +334,7 @@ const hashtagSchema = z.object({
 
 aiRoute.post("/hashtag", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const input = hashtagSchema.parse(await c.req.json());
 
     const config = await getAiConfig();
@@ -402,7 +402,7 @@ const REWRITE_INSTRUCTIONS: Record<string, string> = {
 
 aiRoute.post("/rewrite", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const input = rewriteSchema.parse(await c.req.json());
 
     const config = await getAiConfig();
@@ -476,7 +476,7 @@ const REPURPOSE_GUIDE: Record<string, string> = {
 
 aiRoute.post("/repurpose", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const input = repurposeSchema.parse(await c.req.json());
 
     const config = await getAiConfig();
@@ -619,7 +619,7 @@ export async function generateCarouselOutline(opts: {
 
 aiRoute.post("/carousel", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const input = carouselSchema.parse(await c.req.json());
 
     const result = await generateCarouselOutline({
@@ -647,7 +647,7 @@ const replySchema = z.object({
 
 aiRoute.post("/reply", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const input = replySchema.parse(await c.req.json());
 
     const config = await getAiConfig();
@@ -690,7 +690,7 @@ const altTextSchema = z.object({
 
 aiRoute.post("/alt-text", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const input = altTextSchema.parse(await c.req.json());
 
     // Ambil media milik org (org-scoped — tidak boleh lintas org)
@@ -950,7 +950,7 @@ function computeScore(input: z.infer<typeof predictScoreSchema>): {
 aiRoute.post("/predict-score", async (c) => {
   try {
     // Wajib login + org (endpoint gratis, tapi tetap terproteksi)
-    await requireOrg(c);
+    await requirePermission(c, "ai.use");
     const input = predictScoreSchema.parse(await c.req.json());
     const result = computeScore(input);
     return c.json(result);

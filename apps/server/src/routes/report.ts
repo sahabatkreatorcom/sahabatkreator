@@ -7,7 +7,7 @@ import { reportSchedule, reportShare, socialAccount } from "@sahabatkreator/db/s
 import { and, desc, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { errorResponse, HTTPError, requireOrg } from "../lib/auth-guard";
+import { errorResponse, HTTPError, requirePermission } from "../lib/auth-guard";
 import { checkPlanFeature } from "../lib/billing";
 import { generateId } from "../lib/id";
 
@@ -25,7 +25,7 @@ function defaultRange(): { from: string; to: string } {
 /** GET /reports/summary?from=&to= — data ringkasan laporan */
 reportRoute.get("/summary", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.view");
     const query = c.req.query();
     const fallback = defaultRange();
     const from = isoDate.catch(fallback.from).parse(query.from ?? fallback.from);
@@ -40,7 +40,7 @@ reportRoute.get("/summary", async (c) => {
 /** GET /reports/export?from=&to= — CSV laporan (dipakai client untuk download) */
 reportRoute.get("/export", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.export");
     await checkPlanFeature(ctx.organization.id, "reports_export");
     const query = c.req.query();
     const fallback = defaultRange();
@@ -71,7 +71,7 @@ const scheduleSchema = z.object({
 /** GET /reports/schedules */
 reportRoute.get("/schedules", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.view");
     await checkPlanFeature(ctx.organization.id, "reports_export");
     const rows = await db
       .select()
@@ -87,7 +87,7 @@ reportRoute.get("/schedules", async (c) => {
 /** POST /reports/schedules — buat jadwal (max 5 per org) */
 reportRoute.post("/schedules", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.export");
     await checkPlanFeature(ctx.organization.id, "reports_export");
     const input = scheduleSchema.parse(await c.req.json());
 
@@ -127,7 +127,7 @@ reportRoute.post("/schedules", async (c) => {
 /** PATCH /reports/schedules/:id — toggle aktif */
 reportRoute.patch("/schedules/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.export");
     await checkPlanFeature(ctx.organization.id, "reports_export");
     const input = z.object({ isActive: z.boolean() }).parse(await c.req.json());
     const [row] = await db
@@ -150,7 +150,7 @@ reportRoute.patch("/schedules/:id", async (c) => {
 /** DELETE /reports/schedules/:id */
 reportRoute.delete("/schedules/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.export");
     await checkPlanFeature(ctx.organization.id, "reports_export");
     const rows = await db
       .delete(reportSchedule)
@@ -192,7 +192,7 @@ function generateShareToken(): string {
  */
 reportRoute.post("/share", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.export");
     await checkPlanFeature(ctx.organization.id, "reports_export");
     const input = createShareSchema.parse(await c.req.json());
 
@@ -257,7 +257,7 @@ reportRoute.post("/share", async (c) => {
 /** GET /reports/share — list link share milik org */
 reportRoute.get("/share", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.view");
     await checkPlanFeature(ctx.organization.id, "reports_export");
     const rows = await db
       .select()
@@ -273,7 +273,7 @@ reportRoute.get("/share", async (c) => {
 /** DELETE /reports/share/:id — revoke link (org-scoped) */
 reportRoute.delete("/share/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.export");
     await checkPlanFeature(ctx.organization.id, "reports_export");
     const rows = await db
       .delete(reportShare)

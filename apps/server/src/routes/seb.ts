@@ -28,8 +28,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   errorResponse,
-  requireOrg,
   requireOrgAdmin,
+  requirePermission,
   requirePlatformAdmin,
 } from "../lib/auth-guard";
 import { generateId } from "../lib/id";
@@ -46,7 +46,7 @@ const platformSchema = z.enum(platformValues as [string, ...string[]] as never);
 /** GET /seb/overview */
 sebRoute.get("/overview", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const orgId = ctx.organization.id;
 
     const [latestReport] = await db
@@ -105,7 +105,7 @@ sebRoute.get("/overview", async (c) => {
 /** GET /seb/reports */
 sebRoute.get("/reports", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const rows = await db
       .select()
       .from(sebReport)
@@ -121,7 +121,7 @@ sebRoute.get("/reports", async (c) => {
 /** GET /seb/reports/:id — detail + rekomendasi + experiment */
 sebRoute.get("/reports/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const [report] = await db
       .select()
       .from(sebReport)
@@ -151,7 +151,7 @@ sebRoute.get("/reports/:id", async (c) => {
 /** POST /seb/reports — generate report baru (manual trigger) */
 sebRoute.post("/reports", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const report = await generateSebReport({
       organizationId: ctx.organization.id,
       userId: ctx.user.id,
@@ -174,7 +174,7 @@ const recommendationStatusSchema = z.enum(
 /** GET /seb/recommendations */
 sebRoute.get("/recommendations", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const status = c.req.query("status");
     const priority = c.req.query("priority");
 
@@ -201,7 +201,7 @@ sebRoute.get("/recommendations", async (c) => {
 /** PATCH /seb/recommendations/:id — update status workflow */
 sebRoute.patch("/recommendations/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const input = z
       .object({
         status: recommendationStatusSchema.optional(),
@@ -233,7 +233,7 @@ sebRoute.patch("/recommendations/:id", async (c) => {
 /** POST /seb/recommendations/:id/impact-check — ukur dampak before/after */
 sebRoute.post("/recommendations/:id/impact-check", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const result = await checkSebRecommendationImpact(ctx.organization.id, c.req.param("id"));
     return c.json(result);
   } catch (error) {
@@ -258,7 +258,7 @@ const experimentSchema = z.object({
 /** GET /seb/experiments */
 sebRoute.get("/experiments", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const rows = await db
       .select()
       .from(sebExperiment)
@@ -273,7 +273,7 @@ sebRoute.get("/experiments", async (c) => {
 /** POST /seb/experiments — buat experiment manual */
 sebRoute.post("/experiments", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const input = experimentSchema.parse(await c.req.json());
     const [row] = await db
       .insert(sebExperiment)
@@ -296,7 +296,7 @@ sebRoute.post("/experiments", async (c) => {
 /** PATCH /seb/experiments/:id — update status / hasil */
 sebRoute.patch("/experiments/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const input = z
       .object({
         status: experimentStatusSchema.optional(),
@@ -333,7 +333,7 @@ sebRoute.patch("/experiments/:id", async (c) => {
 /** DELETE /seb/experiments/:id */
 sebRoute.delete("/experiments/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const rows = await db
       .delete(sebExperiment)
       .where(
@@ -357,7 +357,7 @@ sebRoute.delete("/experiments/:id", async (c) => {
 /** GET /seb/brand-knowledge */
 sebRoute.get("/brand-knowledge", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const [row] = await db
       .select()
       .from(sebBrandKnowledge)
@@ -372,7 +372,7 @@ sebRoute.get("/brand-knowledge", async (c) => {
 /** PUT /seb/brand-knowledge — upsert field manual */
 sebRoute.put("/brand-knowledge", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.configure");
     const input = z
       .object({
         websiteUrl: z.string().max(500).nullable().optional(),
@@ -493,7 +493,7 @@ sebRoute.post("/brand-knowledge/approve", async (c) => {
 /** GET /seb/chat/sessions */
 sebRoute.get("/chat/sessions", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const rows = await db
       .select()
       .from(sebChatSession)
@@ -509,7 +509,7 @@ sebRoute.get("/chat/sessions", async (c) => {
 /** POST /seb/chat/sessions — buat sesi baru */
 sebRoute.post("/chat/sessions", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const [row] = await db
       .insert(sebChatSession)
       .values({
@@ -528,7 +528,7 @@ sebRoute.post("/chat/sessions", async (c) => {
 /** GET /seb/chat/sessions/:id/messages */
 sebRoute.get("/chat/sessions/:id/messages", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const [session] = await db
       .select({ id: sebChatSession.id })
       .from(sebChatSession)
@@ -556,7 +556,7 @@ sebRoute.get("/chat/sessions/:id/messages", async (c) => {
 /** POST /seb/chat — kirim pesan ke SEB */
 sebRoute.post("/chat", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const input = z
       .object({
         sessionId: z.string().min(1).optional(),
@@ -579,7 +579,7 @@ sebRoute.post("/chat", async (c) => {
 /** DELETE /seb/chat/sessions/:id */
 sebRoute.delete("/chat/sessions/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "ai.use");
     const rows = await db
       .delete(sebChatSession)
       .where(

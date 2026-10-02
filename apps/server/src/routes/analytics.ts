@@ -19,7 +19,7 @@ import {
 } from "@sahabatkreator/publishing";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { Hono } from "hono";
-import { errorResponse, HTTPError, requireOrg } from "../lib/auth-guard";
+import { errorResponse, HTTPError, requirePermission } from "../lib/auth-guard";
 import { isBridgeAccount } from "../lib/bridge";
 import { decrypt } from "../lib/crypto";
 
@@ -199,7 +199,7 @@ async function accountsWithFollowers(orgId: string, platform?: string) {
  */
 analyticsRoute.get("/overview", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.view");
     const fromStr = c.req.query("from");
     const toStr = c.req.query("to");
     const platform = c.req.query("platform") || undefined;
@@ -311,7 +311,7 @@ analyticsRoute.get("/overview", async (c) => {
  * overview) supaya series murni milik platform yang dipilih. */
 analyticsRoute.get("/timeseries", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.view");
     const days = Math.min(Math.max(Number(c.req.query("days") ?? 30) || 30, 1), 365);
     const platform = c.req.query("platform") || undefined;
     const cutoff = new Date();
@@ -389,7 +389,7 @@ analyticsRoute.get("/timeseries", async (c) => {
  */
 analyticsRoute.get("/top-posts", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.view");
     // Cap dinaikkan 50 → 200: halaman /post-results menarik SEMUA post lalu
     // memfilter platform di sisi klien. Dengan cap 50, org yang punya >50 post
     // tayang kehilangan sebagian post — dan karena urutannya `views desc nulls
@@ -529,7 +529,7 @@ analyticsRoute.get("/top-posts", async (c) => {
 /** GET /analytics/optimal-times?platform=&limit=6 — slot waktu terbaik berdasarkan data historis */
 analyticsRoute.get("/optimal-times", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.view");
     const platform = c.req.query("platform") || undefined;
     const limit = Math.min(Number(c.req.query("limit") ?? 6), 24);
 
@@ -646,7 +646,7 @@ function pruneDemographicsCache(): void {
 /** GET /analytics/demographics?accountId= — demografi audiens (gender × usia) */
 analyticsRoute.get("/demographics", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.view");
     const accountId = c.req.query("accountId");
     if (!accountId) {
       throw new HTTPError(400, "Parameter accountId wajib diisi");
@@ -810,7 +810,7 @@ analyticsRoute.get("/demographics", async (c) => {
  */
 analyticsRoute.get("/hashtags", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.view");
     const days = Math.min(Math.max(Number(c.req.query("days") ?? 30) || 30, 1), 90);
     const platform = c.req.query("platform") || undefined;
     const platformFilter = platform ? sql` and p.platform = ${platform}` : sql``;
@@ -918,7 +918,7 @@ function pickPinterestImage(images?: Record<string, { url?: string }>): string |
  */
 analyticsRoute.get("/pinterest", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "analytics.view");
 
     // Cari akun Pinterest yang terhubung
     const accounts = await db

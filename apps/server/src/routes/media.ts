@@ -8,7 +8,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import sharp from "sharp";
 import { z } from "zod";
-import { errorResponse, requireOrg } from "../lib/auth-guard";
+import { errorResponse, requirePermission } from "../lib/auth-guard";
 import { checkFeatureGate } from "../lib/billing";
 import { generateId } from "../lib/id";
 import { deleteObject, isStorageConfigured, uploadObject } from "../lib/r2";
@@ -217,7 +217,7 @@ async function normalizeImage(
 /** GET /media — list media org (filter: folderId) */
 mediaRoute.get("/", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "media.view");
     const folderId = c.req.query("folderId");
 
     const conditions = [eq(media.organizationId, ctx.organization.id)];
@@ -242,7 +242,7 @@ mediaRoute.get("/", async (c) => {
 /** GET /media/folders — list folder org */
 mediaRoute.get("/folders", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "media.view");
     const folders = await db
       .select()
       .from(mediaFolder)
@@ -257,7 +257,7 @@ mediaRoute.get("/folders", async (c) => {
 /** POST /media/folders — buat folder baru */
 mediaRoute.post("/folders", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "media.upload");
     const input = z.object({ name: z.string().min(1).max(80) }).parse(await c.req.json());
 
     const id = generateId("mfolder");
@@ -276,7 +276,7 @@ mediaRoute.post("/folders", async (c) => {
 /** PATCH /media/folders/:id — rename folder */
 mediaRoute.patch("/folders/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "media.upload");
     const input = z.object({ name: z.string().min(1).max(80) }).parse(await c.req.json());
 
     await db
@@ -297,7 +297,7 @@ mediaRoute.patch("/folders/:id", async (c) => {
 /** DELETE /media/folders/:id — hapus folder (media di dalamnya dipindah ke root) */
 mediaRoute.delete("/folders/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "media.delete");
     const folderId = c.req.param("id");
 
     const [folder] = await db
@@ -322,7 +322,7 @@ mediaRoute.delete("/folders/:id", async (c) => {
 /** POST /media/move — pindah media ke folder */
 mediaRoute.post("/move", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "media.upload");
     const input = z
       .object({
         ids: z.array(z.string()).min(1),
@@ -358,7 +358,7 @@ mediaRoute.post("/move", async (c) => {
 /** POST /media/import — import media dari URL eksternal (download → R2) */
 mediaRoute.post("/import", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "media.upload");
     await checkFeatureGate(ctx.organization.id, "media_storage");
 
     if (!isStorageConfigured()) {
@@ -472,7 +472,7 @@ mediaRoute.post("/import", async (c) => {
  * thumbnail = JPEG frame video di-generate client-side (canvas) untuk video. */
 mediaRoute.post("/upload", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "media.upload");
     await checkFeatureGate(ctx.organization.id, "media_storage");
 
     if (!isStorageConfigured()) {
@@ -571,7 +571,7 @@ mediaRoute.post("/upload", async (c) => {
 /** POST /media/resize — auto-resize gambar ke dimensi platform via sharp */
 mediaRoute.post("/resize", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "media.upload");
     await checkFeatureGate(ctx.organization.id, "media_storage");
 
     if (!isStorageConfigured()) {
@@ -664,7 +664,7 @@ mediaRoute.post("/resize", async (c) => {
 /** PATCH /media/:id — update metadata (altText, name) */
 mediaRoute.patch("/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "media.upload");
     const input = z
       .object({
         name: z.string().min(1).optional(),
@@ -705,7 +705,7 @@ async function deleteThumbnailObject(url: string | null, organizationId: string)
 
 mediaRoute.delete("/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "media.delete");
     const [row] = await db
       .select()
       .from(media)
@@ -729,7 +729,7 @@ mediaRoute.delete("/:id", async (c) => {
 /** POST /media/batch-delete — hapus beberapa media sekaligus */
 mediaRoute.post("/batch-delete", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "media.delete");
     const input = z.object({ ids: z.array(z.string()).min(1) }).parse(await c.req.json());
 
     const rows = await db

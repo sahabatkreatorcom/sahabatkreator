@@ -41,13 +41,18 @@ vi.mock("./oauth/connect", () => ({ connectWithCode: mocks.connectWithCode }));
 // Konteks auth: organisasi & user datang dari sini, bukan dari request body.
 vi.mock("../lib/auth-guard", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/auth-guard")>();
+  // Route kini memakai requirePermission (bukan requireOrg). Tes ini fokus pada
+  // scoping org/API key, bukan otorisasi permission — jadi keduanya di-stub agar
+  // mengembalikan konteks yang sama.
+  const ctx = {
+    user: { id: "user_1", name: "Uji", email: "uji@example.com" },
+    sessionId: "sess_1",
+    organization: { id: "org_1", role: "member", name: "Org" },
+  };
   return {
     ...actual,
-    requireOrg: async () => ({
-      user: { id: "user_1", name: "Uji", email: "uji@example.com" },
-      sessionId: "sess_1",
-      organization: { id: "org_1", role: "member", name: "Org" },
-    }),
+    requireOrg: async () => ctx,
+    requirePermission: async () => ctx,
   };
 });
 

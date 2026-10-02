@@ -69,7 +69,8 @@ export function CustomRolesSection({ canManage, orgId }: { canManage: boolean; o
         <div>
           <h2 className="font-semibold">Custom Role</h2>
           <p className="text-[var(--text-secondary)] text-sm">
-            Role tambahan dengan permission granular untuk anggota tim
+            Role yang di-assign <strong>menggantikan</strong> permission bawaan anggota — centang
+            hanya yang boleh dipakai.
           </p>
         </div>
         {canManage && (
@@ -84,8 +85,9 @@ export function CustomRolesSection({ canManage, orgId }: { canManage: boolean; o
         <div className="card p-6 text-center text-[var(--text-muted)] text-sm">Memuat role…</div>
       ) : roles.length === 0 ? (
         <div className="card p-6 text-center text-[var(--text-muted)] text-sm">
-          Belum ada custom role. Buat role untuk memberi akses granular, mis. "Content Writer"
-          (hanya buat draft) atau "Analyst" (hanya lihat analitik).
+          Belum ada custom role. Buat role untuk <strong>membatasi</strong> akses anggota, mis.
+          "Content Writer" (hanya buat draft) atau "Analyst" (hanya lihat analitik). Anggota tanpa
+          role memakai permission bawaan.
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -292,6 +294,11 @@ function RoleEditorModal({
                 : "Pilih dasar (anggota)"}
             </button>
           </div>
+
+          <p className="text-[var(--text-muted)] text-xs">
+            Daftar ini menggantikan permission bawaan anggota, jadi yang tidak dicentang benar-benar
+            ditolak. Owner selalu punya akses penuh.
+          </p>
 
           <div className="max-h-72 space-y-3 overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border)] p-3">
             {PERMISSION_CATEGORIES.map((cat) => {

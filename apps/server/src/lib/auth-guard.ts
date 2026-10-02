@@ -212,17 +212,22 @@ export async function requirePlatformAdmin(c: Context): Promise<AuthContext> {
 
 /**
  * Resolusi effective permission user di org aktif.
- * owner → semua permission. admin/member → mapping built-in.
- * Custom role (jika di-assign) menambah permission di atas role built-in (union).
+ *
+ * - `owner` → SELALU semua permission; tidak bisa dibatasi (escape hatch agar
+ *   organisasi tidak pernah terkunci dari pengelolaannya sendiri).
+ * - Custom role yang di-assign → **MENGGANTIKAN** mapping built-in: yang
+ *   berlaku hanya daftar permission role itu. Jadi role bisa MEMBATASI, bukan
+ *   cuma menambah.
+ * - Tanpa custom role → mapping built-in (admin = semua, member = daftar tetap).
+ *
+ * Konsekuensi yang disengaja: memberi custom role terbatas kepada `admin` ikut
+ * memangkas admin tersebut. Kalau salah pasang, owner masih bisa memperbaiki.
  */
 export async function getOrgPermissions(ctx: AuthContextWithOrg): Promise<PermissionCode[]> {
   const role = ctx.organization.role;
 
   // Owner: semua permission, tanpa query custom role
   if (role === "owner") return ALL_PERMISSION_CODES;
-
-  const builtin =
-    role === "admin" ? BUILT_IN_ROLE_PERMISSIONS.admin : BUILT_IN_ROLE_PERMISSIONS.member;
 
   // Custom role member ini (satu member maksimal satu custom role)
   const [custom] = await db
@@ -237,13 +242,11 @@ export async function getOrgPermissions(ctx: AuthContextWithOrg): Promise<Permis
     )
     .limit(1);
 
-  if (!custom) return builtin;
+  // Custom role menggantikan built-in — BUKAN union. Union membuat role hanya
+  // bisa menambah sehingga batasannya tidak pernah terasa (dulu ini bug).
+  if (custom) return custom.permissions.filter(isPermissionCode);
 
-  const merged = new Set<PermissionCode>(builtin);
-  for (const p of custom.permissions) {
-    if (isPermissionCode(p)) merged.add(p);
-  }
-  return [...merged];
+  return role === "admin" ? BUILT_IN_ROLE_PERMISSIONS.admin : BUILT_IN_ROLE_PERMISSIONS.member;
 }
 
 /** ID baris member user di org aktif (dipakai join teamRoleAssignment) */
@@ -257,16 +260,28 @@ async function getMemberId(ctx: AuthContextWithOrg): Promise<string> {
   return row.id;
 }
 
+/**
+ * Pastikan ctx (yang org-nya sudah ter-resolve) punya permission — 403 jika tidak.
+ * Dipakai untuk cek permission BERSYARAT di tengah handler, mis. endpoint create
+ * yang butuh `posts.publish` tambahan hanya ketika body-nya menjadwalkan post.
+ */
+export async function assertPermission(
+  ctx: AuthContextWithOrg,
+  permission: PermissionCode,
+): Promise<void> {
+  const permissions = await getOrgPermissions(ctx);
+  if (!permissions.includes(permission)) {
+    throw new HTTPError(403, "Anda tidak punya izin untuk aksi ini");
+  }
+}
+
 /** Wajib punya permission tertentu di org aktif — 403 jika tidak */
 export async function requirePermission(
   c: Context,
   permission: PermissionCode,
 ): Promise<AuthContextWithOrg> {
   const ctx = await requireOrg(c);
-  const permissions = await getOrgPermissions(ctx);
-  if (!permissions.includes(permission)) {
-    throw new HTTPError(403, "Anda tidak punya izin untuk aksi ini");
-  }
+  await assertPermission(ctx, permission);
   return ctx;
 }
 

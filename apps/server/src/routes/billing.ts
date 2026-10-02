@@ -13,7 +13,7 @@ import { env } from "@sahabatkreator/env/server";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { errorResponse, requireOrg } from "../lib/auth-guard";
+import { errorResponse, requirePermission } from "../lib/auth-guard";
 import { generateOrderId } from "../lib/id";
 import { createPayment, isSumopodConfigured } from "../lib/sumopod";
 
@@ -57,7 +57,7 @@ billingRoute.get("/plans", async (c) => {
  */
 billingRoute.get("/status", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "billing.view");
     const [sub] = await db
       .select()
       .from(subscription)
@@ -104,7 +104,7 @@ const checkoutSchema = z.object({
 /** POST /billing/checkout — buat payment Sumopod untuk upgrade plan */
 billingRoute.post("/checkout", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "billing.manage");
     const body = await c.req.json();
     const input = checkoutSchema.parse(body);
 
@@ -179,7 +179,7 @@ billingRoute.post("/checkout", async (c) => {
 /** GET /billing/payments — riwayat pembayaran org */
 billingRoute.get("/payments", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "billing.view");
     const payments = await db
       .select()
       .from(payment)

@@ -42,13 +42,17 @@ vi.mock("@sahabatkreator/db", () => ({
 
 vi.mock("../lib/auth-guard", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/auth-guard")>();
+  // Route kini memakai requirePermission (bukan requireOrg). Tes ini fokus pada
+  // scoping org, bukan otorisasi permission — keduanya di-stub ke konteks sama.
+  const ctx = {
+    user: { id: ctxMock.userId, name: "Uji", email: "uji@example.com" },
+    sessionId: "sess_1",
+    organization: { id: ctxMock.organizationId, role: "member", name: "Org" },
+  };
   return {
     ...actual,
-    requireOrg: async () => ({
-      user: { id: ctxMock.userId, name: "Uji", email: "uji@example.com" },
-      sessionId: "sess_1",
-      organization: { id: ctxMock.organizationId, role: "member", name: "Org" },
-    }),
+    requireOrg: async () => ctx,
+    requirePermission: async () => ctx,
   };
 });
 

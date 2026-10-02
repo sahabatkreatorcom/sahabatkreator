@@ -5,7 +5,7 @@ import { automationLog, automationRule, socialAccount } from "@sahabatkreator/db
 import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { errorResponse, requireOrg } from "../lib/auth-guard";
+import { errorResponse, requirePermission } from "../lib/auth-guard";
 import { gateFeature } from "../lib/feature-gate";
 import { generateId } from "../lib/id";
 
@@ -45,7 +45,7 @@ const ruleSchema = z.object({
 /** GET /automation — list rule + akun org (untuk dropdown pilih akun) */
 automationRoute.get("/", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "automation.view");
     const [rules, accounts] = await Promise.all([
       db
         .select()
@@ -75,7 +75,7 @@ automationRoute.get("/", async (c) => {
 /** POST /automation — buat rule baru */
 automationRoute.post("/", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "automation.manage");
     const body = ruleSchema.parse(await c.req.json());
 
     // Validasi akun milik org bila ditentukan
@@ -118,7 +118,7 @@ automationRoute.post("/", async (c) => {
 /** PATCH /automation/:id — update rule (sebagian atau seluruh) */
 automationRoute.patch("/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "automation.manage");
     const patch = ruleSchema.partial().parse(await c.req.json());
 
     const values: Record<string, unknown> = {};
@@ -158,7 +158,7 @@ automationRoute.patch("/:id", async (c) => {
 /** DELETE /automation/:id — hapus rule (log ikut cascade) */
 automationRoute.delete("/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "automation.manage");
     const deleted = await db
       .delete(automationRule)
       .where(
@@ -178,7 +178,7 @@ automationRoute.delete("/:id", async (c) => {
 /** GET /automation/:id/logs — log eksekusi rule terbaru */
 automationRoute.get("/:id/logs", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "automation.view");
     const [rule] = await db
       .select({ id: automationRule.id })
       .from(automationRule)

@@ -24,7 +24,7 @@ import {
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { fireActivity } from "../lib/activity-log";
-import { errorResponse, requireOrg } from "../lib/auth-guard";
+import { assertPermission, errorResponse, requirePermission } from "../lib/auth-guard";
 import { checkFeatureGate } from "../lib/billing";
 import { generateId } from "../lib/id";
 
@@ -68,7 +68,7 @@ export const createPostSchema = z.object({
  * tapi hanya atas data halaman yang diminta. */
 postsRoute.get("/", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "posts.view");
     const from = c.req.query("from");
     const to = c.req.query("to");
     // Filter berdasarkan status post per-akun (mis. ?status=scheduled) —
@@ -233,7 +233,7 @@ type ScheduleConflictItem = {
  * memindai seluruh history post. */
 postsRoute.get("/conflicts", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "posts.view");
     const from = c.req.query("from");
     const to = c.req.query("to");
     const candidateAtRaw = c.req.query("candidateAt");
@@ -365,7 +365,7 @@ postsRoute.get("/conflicts", async (c) => {
 /** POST /posts — buat draft/scheduled post multi-platform */
 postsRoute.post("/", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "posts.create");
     const body = await c.req.json();
     const input = createPostSchema.parse(body);
 
@@ -386,6 +386,8 @@ postsRoute.post("/", async (c) => {
 
     const isScheduled = Boolean(input.scheduledAt);
     if (isScheduled) {
+      // Menjadwalkan = aksi publish → butuh posts.publish, bukan sekadar posts.create
+      await assertPermission(ctx, "posts.publish");
       // Feature gate hanya saat scheduling
       await checkFeatureGate(ctx.organization.id, "scheduled_posts");
     }
@@ -558,7 +560,7 @@ postsRoute.post("/", async (c) => {
  * user yang ingin melihat konten terbarunya segera. */
 postsRoute.post("/sync", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "posts.create");
     const input = z
       .object({ days: z.number().int().min(1).max(180).default(90) })
       .parse((await c.req.json().catch(() => ({}))) ?? {});
@@ -584,7 +586,7 @@ postsRoute.post("/sync", async (c) => {
 /** GET /posts/:id — detail post group */
 postsRoute.get("/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "posts.view");
     const [group] = await db
       .select()
       .from(postGroup)
@@ -611,9 +613,11 @@ const updatePostSchema = z.object({
 /** PATCH /posts/:id — update post group (reschedule/edit draft) */
 postsRoute.patch("/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "posts.edit");
     const body = await c.req.json();
     const input = updatePostSchema.parse(body);
+    // Menjadwalkan (scheduledAt diisi) = aksi publish → butuh posts.publish
+    if (input.scheduledAt) await assertPermission(ctx, "posts.publish");
 
     const [group] = await db
       .select()
@@ -691,7 +695,7 @@ async function cancelReplizScheduleIfAny(platformPostId: string): Promise<void> 
 
 postsRoute.delete("/item/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "posts.delete");
     const postId = c.req.param("id");
 
     // Post harus milik org aktif (join group)
@@ -736,7 +740,7 @@ postsRoute.delete("/item/:id", async (c) => {
 /** DELETE /posts/:id — hapus post group */
 postsRoute.delete("/:id", async (c) => {
   try {
-    const ctx = await requireOrg(c);
+    const ctx = await requirePermission(c, "posts.delete");
     const [group] = await db
       .select()
       .from(postGroup)
