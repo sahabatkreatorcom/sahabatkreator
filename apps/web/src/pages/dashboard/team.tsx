@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Mail, Shield, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router";
 import { toast } from "sonner";
 import { type CustomRole, CustomRolesSection } from "@/components/team/custom-roles-section";
 import {
@@ -65,7 +66,12 @@ export function TeamPage() {
   const { data, isLoading } = useQuery({
     queryKey: [...queryKeys.orgMembers, org?.id],
     queryFn: async () => {
-      const res = await authClient.organization.listMembers();
+      // organizationId WAJIB dikirim eksplisit. Tanpa ini better-auth memakai
+      // session.activeOrganizationId yang bisa NULL (baris session dibuat ulang
+      // tiap login) → 400 "No active organization" dan daftar anggota tampak kosong.
+      const res = await authClient.organization.listMembers({
+        query: { organizationId: org?.id },
+      });
       if (res.error) throw new Error(res.error.message ?? "Gagal memuat anggota");
       return res.data;
     },
@@ -73,9 +79,11 @@ export function TeamPage() {
   });
 
   const { data: invitesData } = useQuery({
-    queryKey: queryKeys.orgInvitations,
+    queryKey: [...queryKeys.orgInvitations, org?.id],
     queryFn: async () => {
-      const res = await authClient.organization.listInvitations();
+      const res = await authClient.organization.listInvitations({
+        query: { organizationId: org?.id },
+      });
       if (res.error) throw new Error(res.error.message ?? "Gagal memuat undangan");
       return res.data;
     },
@@ -83,11 +91,14 @@ export function TeamPage() {
   });
 
   const invite = useMutation({
-    mutationFn: () =>
-      authClient.organization.inviteMember({
+    mutationFn: () => {
+      if (!org?.id) throw new Error("Organisasi aktif belum dipilih");
+      return authClient.organization.inviteMember({
         email: inviteEmail,
         role: inviteRole as "member" | "admin",
-      }),
+        organizationId: org.id,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orgInvitations });
       setInviteModal(false);
@@ -98,8 +109,13 @@ export function TeamPage() {
   });
 
   const removeMember = useMutation({
-    mutationFn: (memberId: string) =>
-      authClient.organization.removeMember({ memberIdOrEmail: memberId }),
+    mutationFn: (memberId: string) => {
+      if (!org?.id) throw new Error("Organisasi aktif belum dipilih");
+      return authClient.organization.removeMember({
+        memberIdOrEmail: memberId,
+        organizationId: org.id,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orgMembers });
       toast.success("Anggota dikeluarkan");
@@ -133,14 +149,31 @@ export function TeamPage() {
     (i) => i.status === "pending",
   );
 
+  // Kuota anggota tim dari /me — ditampilkan supaya batas plan terlihat SEBELUM
+  // undangan ditolak server. Plan free hanya punya 1 kursi (terisi owner), jadi
+  // undangan apa pun akan dijawab 403 oleh gate kuota di packages/auth.
+  const seatLimit = me?.limits?.maxTeamMembers ?? null;
+  const seatsFull = seatLimit !== null && members.length >= seatLimit;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-bold text-2xl">Tim</h1>
           <p className="mt-1 text-[var(--text-secondary)] text-sm">
-            {members.length} anggota di {org?.name}
+            {seatLimit !== null
+              ? `${members.length} dari ${seatLimit} anggota di ${org?.name}`
+              : `${members.length} anggota di ${org?.name}`}
           </p>
+          {seatsFull && (
+            <p className="mt-1 text-[var(--text-muted)] text-xs">
+              Kuota anggota plan Anda sudah penuh.{" "}
+              <Link to="/settings/billing" className="text-[var(--accent-gold)] hover:underline">
+                Upgrade plan
+              </Link>{" "}
+              untuk mengundang anggota baru.
+            </p>
+          )}
         </div>
         {isOwnerOrAdmin && (
           <Button onClick={() => setInviteModal(true)}>

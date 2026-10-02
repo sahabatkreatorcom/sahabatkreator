@@ -11,6 +11,7 @@ import {
 import {
   member,
   organization as organizationTable,
+  session as sessionTable,
   teamRole,
   teamRoleAssignment,
   user as userTable,
@@ -133,6 +134,27 @@ export async function getAuthContext(c: Context): Promise<AuthContext | null> {
       .where(eq(userTable.id, user.id))
       .catch(() => {
         // best-effort; request tetap jalan dengan org yang sudah diresolusi
+      });
+  }
+
+  // Sinkronkan org aktif ke SESSION juga — bukan hanya ke kolom user di atas.
+  //
+  // Endpoint milik better-auth (organization.list-members / list-invitations /
+  // invite-member / remove-member) TIDAK memakai resolusi di fungsi ini; mereka
+  // membaca session.activeOrganizationId langsung. Baris session dibuat ulang
+  // setiap login sehingga kolom itu NULL, dan endpoint tersebut membalas
+  // 400 "No active organization" — halaman Tim tampak kosong dan undangan
+  // gagal tanpa jejak meski /me sudah melaporkan org aktif.
+  //
+  // Sengaja di-await (bukan fire-and-forget): request BERIKUTNYA dari client
+  // bergantung pada nilai ini, jadi menulis "nanti" berisiko balapan.
+  if (session.session.activeOrganizationId !== row.orgId) {
+    await db
+      .update(sessionTable)
+      .set({ activeOrganizationId: row.orgId })
+      .where(eq(sessionTable.id, session.session.id))
+      .catch(() => {
+        // best-effort; org aktif tetap benar untuk request ini
       });
   }
 
