@@ -271,6 +271,12 @@ type IgComment = {
   text?: string;
   username?: string;
   timestamp?: string;
+  /**
+   * Identitas penulis. Untuk Instagram hanya muncul bila `from{id,username}`
+   * diminta eksplisit di `fields` — meminta `username` saja TIDAK cukup.
+   * Jalur Facebook Graph mengirim bentuk yang sama.
+   */
+  from?: { id?: string; username?: string };
   // mention webhook: media terpisah; polling: comment punya media
   media?: { id?: string; media_url?: string; media_product_type?: string };
   replies?: { data?: IgComment[] };
@@ -301,22 +307,38 @@ async function syncInstagram(ctx: SyncContext, base: string): Promise<SyncResult
 
   const items: EngagementUpsert[] = [];
   for (const media of mediaList) {
-    // ⚠️ `from` TIDAK tersedia di IG Graph API — permintaan nama/foto penulis
-    // akan ditolak. Jadi yang bisa diisi hanyalah username; `authorName` dan
-    // `authorAvatarUrl` memang null untuk Instagram. UI harus tahan terhadap
-    // ini (lihat pemakaian `authorName ?? authorUsername` di inbox).
+    // ⚠️ JEBAKAN IG GRAPH: `username` BUKAN field yang berdiri sendiri di
+    // endpoint komentar. Meminta `fields=id,text,username,timestamp` dijawab
+    // HTTP 200 tetapi `username` TIDAK dikirim sama sekali (tanpa error) —
+    // akibatnya authorUsername selalu null dan komen tampil "Penulis tidak
+    // tersedia". Identitas penulis hanya keluar lewat blok `from{id,username}`.
+    // `media{id}` juga harus diminta; tanpa itu `parentId` tak bisa diisi dan
+    // komen tidak pernah cocok dengan post di Hasil Post / Analitik.
     const commentsRes = await httpRequest<{ data?: IgComment[] }>(`${base}/${media.id}/comments`, {
-      query: { fields: "id,text,username,timestamp", limit: 50, access_token: token },
+      query: {
+        fields: "id,text,from{id,username},media{id},timestamp",
+        limit: 50,
+        access_token: token,
+      },
     });
     if (!commentsRes.ok) continue; // post tertentu gagal → lanjut post lain
     const comments = (await commentsRes.json()).data ?? [];
     for (const comment of comments) {
+      // `username` (field datar) dipertahankan sebagai fallback untuk jalur
+      // Facebook Graph yang masih mengirimnya; IG mengirim via `from`.
+      const handle = normalizeHandle(comment.from?.username ?? comment.username);
       items.push({
         socialAccountId: ctx.account.id,
         organizationId: ctx.account.organizationId,
         type: "comment",
         platformItemId: comment.id,
-        authorUsername: normalizeHandle(comment.username),
+        // Tautkan komen ke post pemiliknya supaya muncul di Hasil Post dan
+        // ikut terhitung di Analitik. Pakai `media.id` dari komentar bila ada,
+        // kalau tidak jatuh ke media yang sedang diiterasi.
+        parentId: String(comment.media?.id ?? media.id),
+        platformAuthorId: comment.from?.id ? String(comment.from.id) : null,
+        authorUsername: handle,
+        authorName: handle,
         content: comment.text ?? null,
         mediaUrl: media.media_url ?? null,
         occurredAt: comment.timestamp ? new Date(comment.timestamp) : null,
