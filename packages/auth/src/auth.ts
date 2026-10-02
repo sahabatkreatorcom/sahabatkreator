@@ -1,4 +1,11 @@
-import { db, getPoolLimits, getPoolUsage, resolvePoolOrgIds } from "@sahabatkreator/db";
+import {
+  db,
+  dismissNotificationsByLink,
+  getPoolLimits,
+  getPoolUsage,
+  notifyUser,
+  resolvePoolOrgIds,
+} from "@sahabatkreator/db";
 import { platformSettings } from "@sahabatkreator/db/schema";
 import * as authSchema from "@sahabatkreator/db/schema/auth";
 import { user as userTable } from "@sahabatkreator/db/schema/auth";
@@ -33,6 +40,14 @@ async function assertTeamMemberQuota(organizationId: string): Promise<void> {
       message: `Limit anggota tim tercapai (${limits.maxTeamMembers} untuk plan ${limits.tier}). Upgrade untuk menambah anggota.`,
     });
   }
+}
+
+/**
+ * Tautan undangan tim — dipakai notifikasi in-app DAN halaman penerimaan
+ * (`/team/invite/:id`). Satu sumber supaya keduanya tidak pernah beda rute.
+ */
+function teamInviteLink(invitationId: string): string {
+  return `/team/invite/${invitationId}`;
 }
 
 export const auth = betterAuth({
@@ -169,8 +184,62 @@ export const auth = betterAuth({
         beforeCreateInvitation: async ({ invitation, organization: org }) => {
           await assertTeamMemberQuota(invitation.organizationId ?? org.id);
         },
+        // Notifikasi in-app untuk yang diundang (bell di dashboard), di samping
+        // email yang sudah dikirim sendInvitationEmail.
+        //
+        // organizationId SENGAJA null: penerima belum jadi anggota org pengundang,
+        // jadi notifikasi bertanda org itu tidak akan pernah lolos filter
+        // "org aktif" di GET /notifications. Notifikasi personal (null) tampil
+        // di org mana pun user berada.
+        //
+        // Hanya dikirim bila penerima SUDAH punya akun. Bila belum, email
+        // undangan tetap berlaku — dia bisa mendaftar lewat tautan di email.
+        afterCreateInvitation: async ({ invitation, inviter, organization: org }) => {
+          const [invitee] = await db
+            .select({ id: userTable.id })
+            .from(userTable)
+            .where(eq(userTable.email, invitation.email))
+            .limit(1);
+          if (!invitee) return;
+
+          await notifyUser({
+            organizationId: null,
+            userId: invitee.id,
+            type: "team",
+            title: `Undangan bergabung ke ${org.name}`,
+            body: `${inviter.name} mengundang Anda sebagai ${invitation.role}. Buka untuk menerima.`,
+            linkUrl: teamInviteLink(invitation.id),
+          });
+        },
         beforeAcceptInvitation: async ({ invitation }) => {
           await assertTeamMemberQuota(invitation.organizationId);
+        },
+        // Undangan selesai → tutup notifikasinya supaya tidak menyisakan
+        // ajakan basi (tautannya sudah tidak bisa dipakai lagi).
+        afterAcceptInvitation: async ({ invitation, user }) => {
+          await dismissNotificationsByLink({
+            userId: user.id,
+            linkUrl: teamInviteLink(invitation.id),
+          });
+        },
+        afterRejectInvitation: async ({ invitation, user }) => {
+          await dismissNotificationsByLink({
+            userId: user.id,
+            linkUrl: teamInviteLink(invitation.id),
+          });
+        },
+        // Dibatalkan pengundang → penerima tidak perlu lagi melihat ajakannya.
+        afterCancelInvitation: async ({ invitation }) => {
+          const [invitee] = await db
+            .select({ id: userTable.id })
+            .from(userTable)
+            .where(eq(userTable.email, invitation.email))
+            .limit(1);
+          if (!invitee) return;
+          await dismissNotificationsByLink({
+            userId: invitee.id,
+            linkUrl: teamInviteLink(invitation.id),
+          });
         },
       },
     }),

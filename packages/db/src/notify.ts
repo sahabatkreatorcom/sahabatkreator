@@ -1,6 +1,6 @@
 // Helper notifikasi — kirim notifikasi ke anggota org (fan-out per member)
 // Tabel: notification (schema/admin.ts) — userId, organizationId, type, title, body, linkUrl, isRead
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "./index";
 import { member, notification } from "./schema";
 
@@ -79,5 +79,27 @@ export async function notifyUser(input: {
     });
   } catch (error) {
     console.error("[notify] gagal kirim notifikasi user:", error);
+  }
+}
+
+/**
+ * Tutup (dismiss) notifikasi milik satu user berdasarkan `linkUrl`.
+ *
+ * Dipakai untuk membersihkan notifikasi undangan tim setelah undangan
+ * diterima/ditolak/dibatalkan — tanpa ini ajakan yang sudah selesai tetap
+ * nangkring di panel notifikasi dan tautannya jadi buntu.
+ * Best-effort: error tidak dilempar.
+ */
+export async function dismissNotificationsByLink(input: {
+  userId: string;
+  linkUrl: string;
+}): Promise<void> {
+  try {
+    await db
+      .update(notification)
+      .set({ dismissedAt: new Date(), isRead: true, readAt: new Date() })
+      .where(and(eq(notification.userId, input.userId), eq(notification.linkUrl, input.linkUrl)));
+  } catch (error) {
+    console.error("[notify] gagal menutup notifikasi:", error);
   }
 }
