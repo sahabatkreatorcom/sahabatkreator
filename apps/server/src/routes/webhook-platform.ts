@@ -211,6 +211,13 @@ type MetaWebhookValue = {
   created_time?: number;
   from?: { id?: string | number; username?: string };
   media?: { id?: string | number };
+  // --- Mentions Page (Facebook), struktur berbeda dari Instagram ---
+  item?: string;
+  verb?: string;
+  post_id?: string;
+  sender_id?: string;
+  sender_name?: string;
+  message?: string;
 };
 
 type MetaWebhookPayload = {
@@ -234,6 +241,27 @@ type TikTokWebhookPayload = {
 };
 
 /**
+ * Ambil id Page dari prefix `post_id` mention Page. Format Meta:
+ * `"<page_id>_<post_id>"` — prefix sebelum "_" pertama adalah id Page.
+ * Dipakai sebagai fallback lookup akun saat `entry[].id` bukan id Page asli
+ * (mis. payload uji dashboard Meta yang mengirim `"id": "0"`).
+ * Return null bila tidak ada / tidak berbentuk prefix yang masuk akal.
+ */
+function pageIdFromPostId(
+  changes: { field?: string; value?: MetaWebhookValue }[] | undefined,
+): string | null {
+  for (const change of changes ?? []) {
+    if (change?.field !== "mention") continue;
+    const postId = change?.value?.post_id;
+    if (typeof postId !== "string") continue;
+    const prefix = postId.split("_")[0];
+    // id Page & id post selalu digit; tolak prefix aneh (payload uji / malformed)
+    if (prefix && /^\d+$/.test(prefix) && prefix !== "0") return prefix;
+  }
+  return null;
+}
+
+/**
  * Proses payload webhook format Meta Graph (IG/FB/Threads share struktur
  * entry[].changes[]). Platform list membatasi akun mana yang dianggap.
  * Returns jumlah item baru, atau null bila payload invalid.
@@ -251,7 +279,20 @@ async function processMetaPayload(raw: string, platformsCsv: string): Promise<nu
   for (const entry of payload?.entry ?? []) {
     const entryId = String(entry?.id ?? "");
     if (!entryId) continue;
-    const account = await findAccount([entryId], platformsCsv);
+    const matched = await findAccount([entryId], platformsCsv);
+
+    // Fallback khusus mention Page: `entry.id` TIDAK selalu id Page asli.
+    // Tombol "Test" di dashboard Meta mengirim entry.id = "0" (payload contoh),
+    // padahal `value.post_id` berformat "<page_id>_<post_id>" — prefix-nya adalah
+    // id Page sebenarnya. Kalau entry.id tidak ketemu, coba prefix post_id dulu
+    // sebelum menyerah, supaya payload uji dari dashboard tetap bisa diverifikasi.
+    let account = matched;
+    if (!account) {
+      const prefix = pageIdFromPostId(entry?.changes);
+      if (prefix && prefix !== entryId) {
+        account = await findAccount([prefix], platformsCsv);
+      }
+    }
     if (!account) continue;
 
     for (const change of entry?.changes ?? []) {
@@ -271,6 +312,8 @@ async function processMetaPayload(raw: string, platformsCsv: string): Promise<nu
           occurredAt: value?.created_time ? new Date(value.created_time * 1000) : null,
         });
       } else if (change?.field === "mentions" && value?.comment_id) {
+        // Mentions Instagram: akun kita disebut di post/reply orang.
+        // { comment_id, media_id, text, username }
         items.push({
           socialAccountId: account.id,
           organizationId: account.organizationId,
@@ -280,6 +323,28 @@ async function processMetaPayload(raw: string, platformsCsv: string): Promise<nu
           authorUsername: normalizeHandle(value?.username),
           content: value?.text ?? null,
           mediaUrl: value?.media_url ?? null,
+          occurredAt: null,
+        });
+      } else if (change?.field === "mention" && value?.post_id) {
+        // Mentions Page (Facebook) — field TUNGGAL, struktur BEDA dari Instagram:
+        // { item: "post"|"comment", verb: "add"|"remove", post_id, sender_id,
+        //   sender_name, message? }. Tidak ada `username`; identitas penulis
+        // hanya lewat `sender_name`.
+        //
+        // `verb=remove` = mention dicabut oleh penulis. Jangan dibuatkan item
+        // baru: kalau diteruskan, mention yang sudah dihapus akan muncul kembali
+        // di inbox sebagai percakapan hantu yang tidak bisa dibalas.
+        if (value?.verb === "remove") continue;
+        const senderName = value?.sender_name?.trim() || null;
+        items.push({
+          socialAccountId: account.id,
+          organizationId: account.organizationId,
+          type: "mention",
+          platformItemId: String(value.post_id),
+          platformAuthorId: value?.sender_id ? String(value.sender_id) : null,
+          authorUsername: normalizeHandle(senderName),
+          authorName: senderName,
+          content: value?.message ?? null,
           occurredAt: null,
         });
       }
