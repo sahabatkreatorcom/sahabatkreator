@@ -53,7 +53,17 @@ adminBillingRoute.get("/logs", async (c) => {
   }
 });
 
-/** GET /admin/webhook-logs — log webhook Sumopod */
+/**
+ * GET /admin/webhook-logs — 100 log webhook terbaru.
+ *
+ * Isi tabel `webhook_log` berasal dari dua sumber dengan `eventType` berbeda:
+ * - `payment.*` / `unknown` — webhook Sumopod Pay (routes/webhook.ts)
+ * - `meta` / `instagram-standalone` / `threads` / `tiktok` — webhook platform
+ *   sosial (routes/webhook-platform.ts)
+ *
+ * Tidak difilter di sini supaya halaman admin bisa menampilkan keduanya;
+ * penyaringan dilakukan di UI bila perlu.
+ */
 adminBillingRoute.get("/webhook-logs", async (c) => {
   try {
     await requirePlatformAdmin(c);

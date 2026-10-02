@@ -13,7 +13,7 @@
 // - /webhooks/tiktok  → POST verify X-Signature (sha256(rawBody + client_secret)) + X-Timestamp
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { db } from "@sahabatkreator/db";
-import { platformCredential, socialAccount } from "@sahabatkreator/db/schema";
+import { platformCredential, socialAccount, webhookLog } from "@sahabatkreator/db/schema";
 import { env } from "@sahabatkreator/env/server";
 import {
   type EngagementUpsert,
@@ -25,6 +25,47 @@ import { Hono } from "hono";
 import { decrypt } from "../lib/crypto";
 
 export const platformWebhookRoute = new Hono();
+
+/**
+ * Parse body mentah untuk disimpan sebagai payload log. Body bisa bukan JSON
+ * (mis. halaman error proxy) — jangan sampai melempar dan menggagalkan log.
+ */
+function safeJson(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return typeof parsed === "object" && parsed !== null
+      ? (parsed as Record<string, unknown>)
+      : { _raw: raw.slice(0, 2000) };
+  } catch {
+    return { _raw: raw.slice(0, 2000) };
+  }
+}
+
+/**
+ * Catat payload webhook platform ke `webhook_log` untuk audit di /admin/logs.
+ * Berbeda dari tabel yang sama yang dipakai webhook Sumopod: di sini
+ * `event_type` diisi nama endpoint ("meta" / "instagram-standalone" / dst)
+ * supaya bisa dibedakan saat dibaca.
+ *
+ * Sengaja best-effort: kegagalan menulis log TIDAK boleh menggagalkan
+ * pemrosesan webhook — payload tetap harus masuk ke inbox.
+ */
+async function logPlatformWebhook(
+  eventType: string,
+  payload: unknown,
+  result: string,
+): Promise<void> {
+  try {
+    await db.insert(webhookLog).values({
+      id: crypto.randomUUID(),
+      eventType,
+      payload: payload as Record<string, unknown>,
+      result,
+    });
+  } catch (error) {
+    console.error(`[webhook] gagal menulis log ${eventType}:`, error);
+  }
+}
 
 /** Ambil app secret platform: platform_credential DB → fallback env */
 async function getAppSecret(platform: string): Promise<string | null> {
@@ -311,11 +352,16 @@ platformWebhookRoute.post("/webhooks/meta", async (c) => {
   const secret = (await getAppSecret("instagram")) ?? env.META_APP_SECRET;
   if (!secret) return webhookSecretMissing("meta");
   if (!verifySignature(raw, signature, secret)) {
+    await logPlatformWebhook("meta", safeJson(raw), "invalid_signature");
     return c.json({ message: "Invalid signature" }, 401);
   }
 
   const newItems = await processMetaPayload(raw, "instagram,facebook");
-  if (newItems === null) return c.json({ message: "Invalid JSON" }, 400);
+  if (newItems === null) {
+    await logPlatformWebhook("meta", safeJson(raw), "invalid_json");
+    return c.json({ message: "Invalid JSON" }, 400);
+  }
+  await logPlatformWebhook("meta", safeJson(raw), `verified:new=${newItems}`);
   return c.json({ received: true, newItems });
 });
 
@@ -345,13 +391,25 @@ platformWebhookRoute.post("/webhooks/instagram-standalone", async (c) => {
   // secret aplikasi IG Login, bukan aplikasi Meta.
   const signature = c.req.header("x-hub-signature-256") ?? "";
   const secret = await getAppSecret("instagram_standalone");
-  if (!secret) return webhookSecretMissing("instagram-standalone");
+  if (!secret) {
+    await logPlatformWebhook("instagram-standalone", safeJson(raw), "secret_missing");
+    return webhookSecretMissing("instagram-standalone");
+  }
   if (!verifySignature(raw, signature, secret)) {
+    await logPlatformWebhook("instagram-standalone", safeJson(raw), "invalid_signature");
     return c.json({ message: "Invalid signature" }, 401);
   }
 
   const newItems = await processMetaPayload(raw, "instagram_standalone");
-  if (newItems === null) return c.json({ message: "Invalid JSON" }, 400);
+  if (newItems === null) {
+    await logPlatformWebhook("instagram-standalone", safeJson(raw), "invalid_json");
+    return c.json({ message: "Invalid JSON" }, 400);
+  }
+  await logPlatformWebhook(
+    "instagram-standalone",
+    safeJson(raw),
+    `verified:new=${newItems}`,
+  );
   return c.json({ received: true, newItems });
 });
 
