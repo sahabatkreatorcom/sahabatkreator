@@ -411,13 +411,18 @@ export function metricValue(
   return typeof v === "number" ? v : null;
 }
 
-// Metric media insights Instagram berbeda antar host:
+// Metric media insights Instagram — daftar metric VALID per tipe media.
 // - graph.facebook.com (FB Login): `saved` (singular); `impressions`/`plays` sudah
 //   deprecated → digantikan `views`
-// - graph.instagram.com (IG Login): `saves` (plural); tidak mengenal `impressions`/`plays`
-// `reach` valid untuk semua tipe media → dipakai sebagai fallback bila metric lengkap ditolak.
+// - graph.instagram.com (IG Login): JUGA memakai `saved` (singular). Memakai
+//   `saves` (plural) dijawab HTTP 400 — daftar nilai yang diterima Meta adalah
+//   "impressions, shares, comments, likes, saved, replies, total_interactions,
+//   navigation, follow". Karena itu jangan pernah memakai `saves` di sini.
+// - `views` TIDAK valid untuk media bertipe reel → jangan disertakan di daftar
+//   utama. `impressions` juga tidak didukung sebagian tipe media.
+// `reach` valid untuk semua tipe media → dipakai sebagai fallback terakhir.
 const IG_MEDIA_METRICS_FB = "reach,likes,comments,shares,saved,views";
-const IG_MEDIA_METRICS_IG = "reach,likes,comments,shares,saves,views";
+const IG_MEDIA_METRICS_IG = "reach,likes,comments,shares,saved";
 const IG_MEDIA_METRICS_FALLBACK = "reach";
 
 /** Satu request media insights — kembalikan data atau pesan error (tanpa throw) */
@@ -445,7 +450,16 @@ async function igPostMetrics(
   token: string,
   metrics: string,
 ): Promise<PostMetrics> {
-  const attempts = [metrics, metrics.replace(",views", ""), IG_MEDIA_METRICS_FALLBACK];
+  // Urutan percobaan: daftar penuh → tanpa `saved`/`views` (reel menolak keduanya)
+  // → `view,` tanpa `views` → fallback tersempit. Jangan lompat langsung ke
+  // `reach` saja: kombinasi sempit membuat likes/comments hilang dan dashboard
+  // hanya terisi reach.
+  const attempts = [
+    metrics,
+    metrics.replace(",views", ""),
+    "reach,likes,comments,shares",
+    IG_MEDIA_METRICS_FALLBACK,
+  ];
   let result: { data?: MetaInsight[]; error?: string } = { error: "tidak ada percobaan" };
   for (const metric of attempts) {
     result = await requestIgMediaInsights(base, mediaId, token, metric);

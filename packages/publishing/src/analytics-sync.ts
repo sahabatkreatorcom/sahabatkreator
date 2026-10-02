@@ -107,7 +107,9 @@ export async function upsertPostAnalytics(
     })
     .onConflictDoUpdate({
       target: [postAnalytics.postId, postAnalytics.date],
-      set: values,
+      // updatedAt wajib di-set manual: dipakai syncAccountAnalytics untuk menilai
+      // apakah snapshot hari ini masih segar atau sudah stale (metriknya nol).
+      set: { ...values, updatedAt: new Date() },
     });
 }
 
@@ -164,12 +166,27 @@ export async function syncAccountAnalytics(
     return result;
   }
 
-  // Post terbaru yang belum punya snapshot hari ini disinkron (10 terakhir cukup)
+  // Post terbaru yang belum punya snapshot hari ini disinkron.
   const today = new Date().toISOString().slice(0, 10);
+  // Snapshot hari ini yang metriknya MASIH NOL ikut disink ulang (stale), supaya
+  // post yang tersink sebelum interaksi datang tidak tersangkut 0 seharian.
+  // Dibatasi umur minimum agar tidak memanggil API berulang tiap siklus.
+  const STALE_AFTER_MINUTES = 45;
+  const staleBefore = new Date(Date.now() - STALE_AFTER_MINUTES * 60 * 1000);
   let alreadySynced: Set<string>;
   try {
     const existing = await db
-      .select({ postId: postAnalytics.postId })
+      .select({
+        postId: postAnalytics.postId,
+        updatedAt: postAnalytics.updatedAt,
+        likes: postAnalytics.likes,
+        comments: postAnalytics.comments,
+        shares: postAnalytics.shares,
+        saves: postAnalytics.saves,
+        views: postAnalytics.views,
+        impressions: postAnalytics.impressions,
+        reach: postAnalytics.reach,
+      })
       .from(postAnalytics)
       .where(
         and(
@@ -183,7 +200,24 @@ export async function syncAccountAnalytics(
             : undefined,
         ),
       );
-    alreadySynced = new Set(existing.map((r) => r.postId));
+    // Anggap "sudah sinkron" hanya bila ada metrik non-nol ATAU snapshot masih
+    // segar. Sisanya dianggap stale → disink ulang.
+    alreadySynced = new Set(
+      existing
+        .filter((r) => {
+          const hasEngagement =
+            (r.likes ?? 0) > 0 ||
+            (r.comments ?? 0) > 0 ||
+            (r.shares ?? 0) > 0 ||
+            (r.saves ?? 0) > 0 ||
+            (r.views ?? 0) > 0 ||
+            (r.impressions ?? 0) > 0 ||
+            (r.reach ?? 0) > 0;
+          if (hasEngagement) return true;
+          return Boolean(r.updatedAt && r.updatedAt > staleBefore);
+        })
+        .map((r) => r.postId),
+    );
   } catch {
     alreadySynced = new Set();
   }
