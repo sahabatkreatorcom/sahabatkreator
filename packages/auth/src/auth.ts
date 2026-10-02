@@ -194,22 +194,29 @@ export const auth = betterAuth({
         //
         // Hanya dikirim bila penerima SUDAH punya akun. Bila belum, email
         // undangan tetap berlaku — dia bisa mendaftar lewat tautan di email.
+        //
+        // Seluruhnya dibungkus try/catch: notifikasi bersifat pelengkap, jadi
+        // kegagalan di sini TIDAK BOLEH menggagalkan pembuatan undangan.
         afterCreateInvitation: async ({ invitation, inviter, organization: org }) => {
-          const [invitee] = await db
-            .select({ id: userTable.id })
-            .from(userTable)
-            .where(eq(userTable.email, invitation.email))
-            .limit(1);
-          if (!invitee) return;
+          try {
+            const [invitee] = await db
+              .select({ id: userTable.id })
+              .from(userTable)
+              .where(eq(userTable.email, invitation.email))
+              .limit(1);
+            if (!invitee) return;
 
-          await notifyUser({
-            organizationId: null,
-            userId: invitee.id,
-            type: "team",
-            title: `Undangan bergabung ke ${org.name}`,
-            body: `${inviter.name} mengundang Anda sebagai ${invitation.role}. Buka untuk menerima.`,
-            linkUrl: teamInviteLink(invitation.id),
-          });
+            await notifyUser({
+              organizationId: null,
+              userId: invitee.id,
+              type: "team",
+              title: `Undangan bergabung ke ${org.name}`,
+              body: `${inviter.name} mengundang Anda sebagai ${invitation.role}. Buka untuk menerima.`,
+              linkUrl: teamInviteLink(invitation.id),
+            });
+          } catch (error) {
+            console.error("[auth] gagal mengirim notifikasi undangan tim:", error);
+          }
         },
         beforeAcceptInvitation: async ({ invitation }) => {
           await assertTeamMemberQuota(invitation.organizationId);
@@ -230,16 +237,20 @@ export const auth = betterAuth({
         },
         // Dibatalkan pengundang → penerima tidak perlu lagi melihat ajakannya.
         afterCancelInvitation: async ({ invitation }) => {
-          const [invitee] = await db
-            .select({ id: userTable.id })
-            .from(userTable)
-            .where(eq(userTable.email, invitation.email))
-            .limit(1);
-          if (!invitee) return;
-          await dismissNotificationsByLink({
-            userId: invitee.id,
-            linkUrl: teamInviteLink(invitation.id),
-          });
+          try {
+            const [invitee] = await db
+              .select({ id: userTable.id })
+              .from(userTable)
+              .where(eq(userTable.email, invitation.email))
+              .limit(1);
+            if (!invitee) return;
+            await dismissNotificationsByLink({
+              userId: invitee.id,
+              linkUrl: teamInviteLink(invitation.id),
+            });
+          } catch (error) {
+            console.error("[auth] gagal menutup notifikasi undangan tim:", error);
+          }
         },
       },
     }),
