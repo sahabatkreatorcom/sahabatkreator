@@ -6,7 +6,7 @@ import {
   type PendingPageData,
   socialAccount,
 } from "@sahabatkreator/db/schema";
-import type { OAuthPlatform } from "@sahabatkreator/publishing";
+import { clearAccessLostPatch, type OAuthPlatform } from "@sahabatkreator/publishing";
 import { and, eq, isNotNull } from "drizzle-orm";
 import type { Context } from "hono";
 import { Hono } from "hono";
@@ -375,7 +375,7 @@ accountsRoute.post("/pending/:id/select", async (c) => {
         refreshTokenEnc: null,
         tokenExpiresAt: null,
         isConnected: true,
-        needsReconnect: false,
+        ...clearAccessLostPatch(),
         lastError: null,
         metadata: {
           replizAccountId: accountId,

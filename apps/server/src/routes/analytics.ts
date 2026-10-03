@@ -12,6 +12,7 @@ import {
   GRAPH_FB_URL,
   GRAPH_IG_URL,
   httpRequest,
+  markAccessLost,
   nextOccurrence,
   PINTEREST_API_BASE_URL,
   PINTEREST_SANDBOX,
@@ -1008,10 +1009,7 @@ analyticsRoute.get("/pinterest", async (c) => {
       console.warn(`[pinterest-analytics] Account fetch failed: ${text.slice(0, 150)}`);
       const authFailed = accountRes.status === 401 || accountRes.status === 403;
       if (authFailed) {
-        await db
-          .update(socialAccount)
-          .set({ needsReconnect: true })
-          .where(eq(socialAccount.id, account.id));
+        await markAccessLost(account.id);
       }
       return c.json({
         account: null,

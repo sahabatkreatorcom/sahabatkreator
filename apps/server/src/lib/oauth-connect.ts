@@ -8,6 +8,7 @@ import {
   socialAccount,
 } from "@sahabatkreator/db/schema";
 import {
+  clearAccessLostPatch,
   type OAuthPlatform,
   type PlatformProfile,
   type ReplizAccount,
@@ -309,6 +310,10 @@ export async function connectFromProfile(params: {
         tokenExpiresAt: token.expiresAt ?? null,
         scopes: token.scopes,
         isConnected: true,
+        // Sebelumnya flag `needsReconnect` TIDAK dibersihkan di sini, sehingga akun
+        // yang berhasil dihubungkan ulang tetap tampil "Needs reconnection" di UI.
+        // Patch ini sekaligus menghentikan jam retensi (accessLostAt → null).
+        ...clearAccessLostPatch(),
         lastError: null,
         metadata: profile.extra ?? null,
         lastSyncedAt: new Date(),
@@ -590,7 +595,7 @@ export async function upsertSocialAccount(params: {
         tokenExpiresAt: effectiveExpiresAt,
         scopes: effectiveScopes,
         isConnected: true,
-        needsReconnect: false,
+        ...clearAccessLostPatch(),
         lastError: null,
         metadata,
         lastSyncedAt: new Date(),
@@ -687,7 +692,7 @@ async function upsertReplizFromInfo(params: {
     refreshTokenEnc: null,
     tokenExpiresAt: null,
     isConnected: true,
-    needsReconnect: false,
+    ...clearAccessLostPatch(),
     lastError: null,
     metadata: {
       replizAccountId,

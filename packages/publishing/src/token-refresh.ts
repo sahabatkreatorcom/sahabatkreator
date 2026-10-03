@@ -2,11 +2,15 @@
 // Akun dengan tokenExpiresAt mendekati expired (< 2 hari) di-refresh proaktif
 // agar publish tidak gagal massal. Akun expired tanpa refresh token ditandai
 // needsReconnect untuk ditampilkan di UI.
+//
+// Penandaan lewat `markAccessLost` (bukan `.set({ needsReconnect: true })` langsung)
+// supaya jam retensi ikut tercatat — lihat account-access.ts & retention.ts.
 
 import { db } from "@sahabatkreator/db";
 import { decrypt, encrypt } from "@sahabatkreator/db/crypto";
 import { platformCredential, socialAccount } from "@sahabatkreator/db/schema";
 import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
+import { clearAccessLostPatch, markAccessLost } from "./account-access";
 import { type AppCredential, type OAuthPlatform, refreshAccessToken } from "./oauth";
 
 /** Refresh window: 2 hari sebelum expired */
@@ -116,10 +120,7 @@ export async function refreshDueTokens(limit = 20): Promise<TokenRefreshResult> 
       // Sudah expired dan tidak ada refresh token → tandai perlu hubungkan ulang
       if (!account.refreshTokenEnc) {
         if (account.tokenExpiresAt && account.tokenExpiresAt < now) {
-          await db
-            .update(socialAccount)
-            .set({ needsReconnect: true })
-            .where(eq(socialAccount.id, account.id));
+          await markAccessLost(account.id);
           result.expired++;
         }
         continue;
@@ -145,7 +146,7 @@ export async function refreshDueTokens(limit = 20): Promise<TokenRefreshResult> 
           accessTokenEnc: encrypt(token.accessToken),
           refreshTokenEnc: newRefreshEnc,
           tokenExpiresAt: token.expiresAt ?? null,
-          needsReconnect: false,
+          ...clearAccessLostPatch(),
         })
         .where(eq(socialAccount.id, account.id));
       result.refreshed++;
@@ -156,10 +157,7 @@ export async function refreshDueTokens(limit = 20): Promise<TokenRefreshResult> 
       );
       // Refresh gagal & token sudah lewat → tandai perlu hubungkan ulang
       if (account.tokenExpiresAt && account.tokenExpiresAt < now) {
-        await db
-          .update(socialAccount)
-          .set({ needsReconnect: true })
-          .where(eq(socialAccount.id, account.id));
+        await markAccessLost(account.id);
       }
     }
   }
@@ -198,7 +196,7 @@ export async function refreshAccountToken(account: {
         accessTokenEnc: encrypt(token.accessToken),
         ...(token.refreshToken ? { refreshTokenEnc: encrypt(token.refreshToken) } : {}),
         tokenExpiresAt: token.expiresAt ?? null,
-        needsReconnect: false,
+        ...clearAccessLostPatch(),
         lastError: null,
       })
       .where(

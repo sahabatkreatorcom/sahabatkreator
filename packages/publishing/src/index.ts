@@ -1,5 +1,6 @@
 // @sahabatkreator/publishing — adapter platform + pipeline publish post
 
+export { clearAccessLostPatch, markAccessLost } from "./account-access";
 export { getAdapter, supportedPlatforms } from "./adapters";
 export {
   type AiConfig,
@@ -226,6 +227,20 @@ export {
   replizUpdateTemplate,
 } from "./repliz";
 export * from "./reply";
+export {
+  ACCESS_LOST_RETENTION_DAYS,
+  isAccessLost,
+  isRetentionExpired,
+  type RetentionCandidate,
+  resolveAccessLostAt,
+  retentionDeadline,
+} from "./retention";
+export {
+  type PurgedAccount,
+  type PurgedAccountCounts,
+  purgeExpiredAccounts,
+  type RetentionPurgeResult,
+} from "./retention-job";
 export {
   deleteThreadsPost,
   getThreadsMentions,

@@ -60,6 +60,12 @@ export const socialAccount = pgTable(
     lastDmSyncedAt: timestamp("last_dm_synced_at"),
     // Token expired & refresh gagal → user harus hubungkan ulang (dipasang worker token-refresh)
     needsReconnect: boolean("needs_reconnect").notNull().default(false),
+    // Kapan akses platform terbukti hilang (token ditolak/dicabut) — jam mulai
+    // untuk job retensi: data akun yang tidak bisa lagi dijaga kesegarannya
+    // dihapus setelah masa tenggang (lihat packages/publishing/src/retention.ts).
+    // SENGAJA terpisah dari updatedAt: kolom itu ikut berubah pada update apa pun
+    // (lastSyncedAt, lastError), jadi jam retensinya bisa mundur tanpa sengaja.
+    accessLostAt: timestamp("access_lost_at"),
     lastError: text("last_error"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),

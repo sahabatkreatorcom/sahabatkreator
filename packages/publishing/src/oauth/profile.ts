@@ -386,12 +386,16 @@ export async function fetchPlatformProfile(
           "Profil LinkedIn tidak mengembalikan sub",
           false,
         );
+      // `email` SENGAJA tidak disimpan: LinkedIn API Terms §4.1 melarang menyimpan
+      // Content kecuali yang diizinkan eksplisit (§4.2 token, §4.3 Profile Data =
+      // nama + foto profil). Email di luar daftar itu, dan produk kita tidak
+      // memakainya sama sekali — jadi tidak ada alasan sah untuk menahannya.
       const profile: PlatformProfile = {
         platformAccountId: `urn:li:person:${me.sub}`,
         username: me.name ?? me.sub,
         displayName: me.name ?? null,
         avatarUrl: me.picture ?? null,
-        extra: { email: me.email },
+        extra: {},
       };
 
       // Multi-company (#15): bila scope akses organization di-grant (product LinkedIn
@@ -401,7 +405,6 @@ export async function fetchPlatformProfile(
         const organizations = await fetchLinkedInAdminOrganizations(at);
         if (organizations.length > 0) {
           profile.extra = {
-            email: me.email,
             person: { sub: me.sub, name: me.name ?? me.sub },
             organizations,
           };

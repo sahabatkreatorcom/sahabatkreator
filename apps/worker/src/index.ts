@@ -22,6 +22,7 @@ import {
 import {
   backfillTikTokPostUrls,
   checkAllPlatformHealth,
+  purgeExpiredAccounts,
   recoverStalePosts,
   refreshDueTokens,
   registerAutoReplyEnqueue,
@@ -238,6 +239,20 @@ app.post("/refresh-tokens", async (c) => {
   return c.json({ ok: true, ...result });
 });
 
+// Trigger manual retensi data (cron eksternal / debugging).
+// `?days=N` menimpa masa tenggang (mis. `?days=0` untuk memaksa hapus sekarang —
+// berguna saat memverifikasi job ini tanpa menunggu 30 hari).
+app.post("/run-retention", async (c) => {
+  const rejected = requireCronSecret(c);
+  if (rejected) return rejected;
+  const rawDays = c.req.query("days");
+  const days = rawDays === undefined ? undefined : Number(rawDays);
+  const result = await purgeExpiredAccounts({
+    days: Number.isFinite(days) ? days : undefined,
+  });
+  return c.json({ ok: true, mode, days: days ?? null, ...result, errors: result.errors.length });
+});
+
 const port = Number(process.env.WORKER_PORT ?? 3001);
 const POLL_INTERVAL_MS = 30_000;
 
@@ -392,6 +407,47 @@ setInterval(() => {
 }, ANALYTICS_TICK_MS);
 // Sync pertama 2 menit setelah start (setelah engagement sync startup)
 setTimeout(() => runAnalyticsSync().catch(() => {}), 2 * 60 * 1000);
+
+// ---- Retensi data (kedua mode) ----
+// Tiap hari: hapus data akun yang aksesnya hilang dan sudah melewati masa tenggang.
+// Ini kewajiban platform, bukan sekadar bersih-bersih — lihat retention.ts untuk
+// kutipan Meta/YouTube/LinkedIn/TikTok. Dijalankan harian (bukan per jam) karena
+// masa tenggangnya 30 hari; mengeceknya lebih sering hanya membuang kueri.
+async function runRetentionCycle(): Promise<void> {
+  const result = await purgeExpiredAccounts();
+  if (result.purged.length > 0) {
+    console.log(
+      `[retention] ${result.purged.length} akun dihapus (akses hilang > masa tenggang); ` +
+        `${result.retained} akun masih ditahan`,
+    );
+    for (const a of result.purged) {
+      console.log(
+        `[retention] hapus ${a.platform} @${a.username ?? a.id} — akses hilang sejak ` +
+          `${a.accessLostAt.toISOString()} (batas ${a.deadline.toISOString()}): ` +
+          `post=${a.counts.posts} post_analytics=${a.counts.postAnalytics} ` +
+          `account_analytics=${a.counts.accountAnalytics} ` +
+          `dm=${a.counts.dmConversations} engagement=${a.counts.engagementItems}`,
+      );
+    }
+  }
+  for (const err of result.errors) {
+    console.warn(`[retention] ${err}`);
+  }
+}
+const RETENTION_TICK_MS = 24 * 60 * 60 * 1000;
+let retentionRunning = false;
+setInterval(() => {
+  if (retentionRunning) return;
+  retentionRunning = true;
+  runRetentionCycle()
+    .catch((error) => console.error("[retention] error:", error))
+    .finally(() => {
+      retentionRunning = false;
+    });
+}, RETENTION_TICK_MS);
+// Pemeriksaan pertama 10 menit setelah start — cukup jauh dari siklus sync lain
+// yang padat di menit-menit awal, dan tidak perlu menunggu 24 jam untuk pertama kali.
+setTimeout(() => runRetentionCycle().catch(() => {}), 10 * 60 * 1000);
 
 // ---- Token refresh loop (kedua mode) ----
 // Tiap jam: refresh proaktif akun yang token-nya expired ≤2 hari lagi.

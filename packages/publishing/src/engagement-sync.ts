@@ -15,6 +15,7 @@
 import { db } from "@sahabatkreator/db";
 import { engagementItem, socialAccount } from "@sahabatkreator/db/schema";
 import { and, eq, or } from "drizzle-orm";
+import { clearAccessLostPatch, markAccessLost } from "./account-access";
 import { processAutomation } from "./automation";
 import {
   GBP_API_URL,
@@ -746,19 +747,13 @@ async function syncRepliz(ctx: SyncContext): Promise<SyncResult> {
   try {
     const info = await replizGetAccount(cred, accountId);
     if (!info.isConnected) {
-      await db
-        .update(socialAccount)
-        .set({
-          needsReconnect: true,
-          lastError: "Token kedaluwarsa di bridge — hubungkan ulang.",
-        })
-        .where(eq(socialAccount.id, ctx.account.id));
+      await markAccessLost(ctx.account.id, "Token kedaluwarsa di bridge — hubungkan ulang.");
       return { platform: ctx.account.platform, newItems: 0, error: "needs_reconnect" };
     }
-    // Sehat kembali (reconnect sukses di Repliz) → reset flag
+    // Sehat kembali (reconnect sukses di Repliz) → reset flag + hentikan jam retensi
     await db
       .update(socialAccount)
-      .set({ needsReconnect: false, lastError: null })
+      .set({ ...clearAccessLostPatch(), lastError: null })
       .where(eq(socialAccount.id, ctx.account.id));
   } catch {
     // GET account gagal (network/429) → jangan blokir sync komentar
