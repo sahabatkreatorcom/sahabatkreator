@@ -219,11 +219,15 @@ app.post("/sync-auto-reply", async (c) => {
 });
 
 // Trigger manual analytics sync (cron eksternal / debugging)
+// `?force=1` melewati jendela retry 45 menit untuk snapshot yang metriknya masih
+// nol — dipakai saat pengguna melaporkan angkanya tetap 0 dan kita ingin
+// memaksa pengambilan ulang tanpa menunggu siklus worker berikutnya.
 app.post("/sync-analytics", async (c) => {
   const rejected = requireCronSecret(c);
   if (rejected) return rejected;
-  const result = await syncDueAnalyticsAccounts(10);
-  return c.json({ ok: true, mode, ...result, errors: result.errors.length });
+  const force = ["1", "true"].includes((c.req.query("force") ?? "").toLowerCase());
+  const result = await syncDueAnalyticsAccounts(10, force ? { emptyRetryAfterMinutes: 0 } : {});
+  return c.json({ ok: true, mode, force, ...result, errors: result.errors.length });
 });
 
 // Trigger manual token refresh (cron eksternal / debugging)

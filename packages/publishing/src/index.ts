@@ -10,9 +10,17 @@ export {
 } from "./ai";
 export { type PostMetricKey, supportedPostMetrics } from "./analytics-metrics";
 export {
+  hasEngagement,
+  isSnapshotFresh,
+  MANUAL_EMPTY_RETRY_MINUTES,
+  type PostAnalyticsSnapshot,
+  STALE_AFTER_MINUTES,
+} from "./analytics-staleness";
+export {
   type AccountMetrics,
   type AnalyticsAccount,
   type AnalyticsBatchResult,
+  type AnalyticsSyncOptions,
   type AnalyticsSyncResult,
   fetchAccountMetrics,
   fetchPostMetrics,

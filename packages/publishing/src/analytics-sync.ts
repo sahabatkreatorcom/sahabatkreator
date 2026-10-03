@@ -14,6 +14,11 @@
 // - `syncWorkspaceAnalytics`   → tombol "Sinkron Platform", SATU organisasi.
 //   Ada karena antrean global membuat akun/post yang baru masuk menampilkan
 //   metrik 0 sampai ~1 jam — pengguna menyangka sinkronisasinya gagal.
+//
+// Keduanya berbeda juga di JENDELA RETRY untuk snapshot yang masih nol:
+// worker menahan 45 menit (`STALE_AFTER_MINUTES`), manual hanya 2 menit
+// (`MANUAL_EMPTY_RETRY_MINUTES`). Pengguna yang menekan tombol tidak boleh
+// diminta menunggu jendela worker.
 
 import { db } from "@sahabatkreator/db";
 import { accountAnalytics, post, postAnalytics, socialAccount } from "@sahabatkreator/db/schema";
@@ -24,6 +29,11 @@ import {
   fetchPostMetrics,
   type PostMetrics,
 } from "./analytics-metrics";
+import {
+  isSnapshotFresh,
+  MANUAL_EMPTY_RETRY_MINUTES,
+  STALE_AFTER_MINUTES,
+} from "./analytics-staleness";
 import { decrypt } from "./crypto";
 import { isThrottleError } from "./rate-limits";
 
@@ -59,11 +69,6 @@ const ANALYTICS_BATCH_SIZE = 3;
  *  puluhan post sekaligus; 25 post/akun sudah cukup untuk mengisi angka post
  *  terbaru lebih dulu tanpa menembus rate limit Meta (200 call/jam). */
 const POSTS_PER_CYCLE = 25;
-
-/** Snapshot hari ini yang metriknya MASIH NOL dianggap stale dan disink ulang
- *  (lihat `syncAccountAnalytics`). Batas umur minimum mencegah pemanggilan API
- *  berulang tiap siklus. */
-const STALE_AFTER_MINUTES = 45;
 
 /** Konteks akun untuk analytics sync (dipakai worker & route manual) */
 export type AnalyticsAccount = {
@@ -166,6 +171,17 @@ export async function upsertPostAnalytics(
 // ---------------------------------------------------------------------------
 
 /**
+ * Opsi `syncAccountAnalytics`.
+ *
+ * `emptyRetryAfterMinutes` — berapa lama snapshot hari ini yang MASIH NOL
+ * ditahan sebelum boleh diambil ulang. `0` = boleh langsung.
+ * Post yang sudah punya metrik non-nol TIDAK terpengaruh opsi ini.
+ */
+export type AnalyticsSyncOptions = {
+  emptyRetryAfterMinutes?: number;
+};
+
+/**
  * Sync analytics satu akun: metrik akun + metrik max 25 post published terbaru
  * yang punya platformPostId.
  *
@@ -176,6 +192,7 @@ export async function upsertPostAnalytics(
 export async function syncAccountAnalytics(
   account: AnalyticsAccount,
   accessToken: string,
+  opts: AnalyticsSyncOptions = {},
 ): Promise<AnalyticsSyncResult> {
   const result: AnalyticsSyncResult = {
     platform: account.platform,
@@ -227,8 +244,11 @@ export async function syncAccountAnalytics(
   const today = new Date().toISOString().slice(0, 10);
   // Snapshot hari ini yang metriknya MASIH NOL ikut disink ulang (stale), supaya
   // post yang tersink sebelum interaksi datang tidak tersangkut 0 seharian.
-  // Dibatasi umur minimum agar tidak memanggil API berulang tiap siklus.
-  const staleBefore = new Date(Date.now() - STALE_AFTER_MINUTES * 60 * 1000);
+  // Lama penahanan berbeda per jalur: worker 45 menit, manual 2 menit (lihat
+  // `MANUAL_EMPTY_RETRY_MINUTES`) — pengguna yang menekan tombol harus bisa
+  // langsung memperbaiki angkanya, bukan menunggu jendela worker.
+  const emptyRetryAfterMinutes = opts.emptyRetryAfterMinutes ?? STALE_AFTER_MINUTES;
+  const now = new Date();
   let alreadySynced: Set<string>;
   try {
     const existing = await db
@@ -256,23 +276,11 @@ export async function syncAccountAnalytics(
             : undefined,
         ),
       );
-    // Anggap "sudah sinkron" hanya bila ada metrik non-nol ATAU snapshot masih
-    // segar. Sisanya dianggap stale → disink ulang.
+    // Aturan penilaian ada di `analytics-staleness.ts` (murni, ada tesnya):
+    // ada interaksi → selalu dilewati; semua nol → hanya ditahan selama
+    // `emptyRetryAfterMinutes`. Sisanya dianggap stale → disink ulang.
     alreadySynced = new Set(
-      existing
-        .filter((r) => {
-          const hasEngagement =
-            (r.likes ?? 0) > 0 ||
-            (r.comments ?? 0) > 0 ||
-            (r.shares ?? 0) > 0 ||
-            (r.saves ?? 0) > 0 ||
-            (r.views ?? 0) > 0 ||
-            (r.impressions ?? 0) > 0 ||
-            (r.reach ?? 0) > 0;
-          if (hasEngagement) return true;
-          return Boolean(r.updatedAt && r.updatedAt > staleBefore);
-        })
-        .map((r) => r.postId),
+      existing.filter((r) => isSnapshotFresh(r, now, emptyRetryAfterMinutes)).map((r) => r.postId),
     );
   } catch {
     alreadySynced = new Set();
@@ -345,9 +353,13 @@ export type AnalyticsBatchResult = {
  * Jalankan `syncAccountAnalytics` untuk sekumpulan akun, paralel per batch kecil.
  * Satu akun gagal (token ditolak, decrypt gagal, API error) tidak menghentikan
  * akun lain — errornya dikumpulkan supaya pemanggil bisa melaporkannya.
+ *
+ * `opts` diteruskan apa adanya ke `syncAccountAnalytics` — dipakai jalur manual
+ * untuk memakai jendela retry yang lebih pendek.
  */
 async function runAnalyticsForAccounts(
   accounts: AnalyticsAccount[],
+  opts: AnalyticsSyncOptions = {},
 ): Promise<AnalyticsBatchResult> {
   let synced = 0;
   let postsSynced = 0;
@@ -369,7 +381,7 @@ async function runAnalyticsForAccounts(
           };
         }
         const accessToken = account.accessTokenEnc ? decrypt(account.accessTokenEnc) : "";
-        return syncAccountAnalytics(account, accessToken);
+        return syncAccountAnalytics(account, accessToken, opts);
       }),
     );
 
@@ -437,8 +449,15 @@ function analyticsCandidates(accounts: AnalyticsAccount[]): AnalyticsAccount[] {
  * Interval 1 jam (metrik berubah lambat, hemat rate limit).
  * Akun diproses paralel dalam batch kecil — satu akun gagal tidak
  * menghentikan batch lainnya (Promise.allSettled).
+ *
+ * `opts` sengaja diteruskan ke `syncAccountAnalytics`: trigger manual operator
+ * (POST /sync-analytics?force=1) memakainya untuk mengulang snapshot yang
+ * metriknya masih nol TANPA menunggu jendela 45 menit. Default tidak berubah.
  */
-export async function syncDueAnalyticsAccounts(maxAccounts = 10): Promise<AnalyticsBatchResult> {
+export async function syncDueAnalyticsAccounts(
+  maxAccounts = 10,
+  opts: AnalyticsSyncOptions = {},
+): Promise<AnalyticsBatchResult> {
   // Akun connected non-manual
   const accounts = await db
     .select({
@@ -455,7 +474,7 @@ export async function syncDueAnalyticsAccounts(maxAccounts = 10): Promise<Analyt
     .limit(maxAccounts * 3);
 
   const due = await filterDueAccounts(analyticsCandidates(accounts), maxAccounts);
-  return runAnalyticsForAccounts(due);
+  return runAnalyticsForAccounts(due, opts);
 }
 
 /**
@@ -469,9 +488,13 @@ export async function syncDueAnalyticsAccounts(maxAccounts = 10): Promise<Analyt
  * tidak berubah sama sekali dan menyangka sinkronisasi gagal.
  *
  * Dipanggil setelah `syncWorkspacePosts` supaya konten DAN metriknya segar
- * dalam satu tindakan. Snapshot per-post tetap punya pengaman sendiri di
- * `syncAccountAnalytics` (post dengan metrik non-nol atau snapshot < 45 menit
- * tidak ditembak ulang), jadi `force` tidak membanjiri API platform.
+ * dalam satu tindakan.
+ *
+ * PENGAMAN KUOTA: post yang sudah punya metrik non-nol SELALU dilewati (tidak
+ * pernah ditembak ulang di hari yang sama). Yang dilonggarkan hanya penantian
+ * untuk snapshot yang MASIH NOL — dari 45 menit (jalur worker) jadi 2 menit,
+ * supaya menekan tombol bisa langsung memperbaiki hari yang angkanya 0 tanpa
+ * menunggu siklus worker berikutnya.
  */
 export async function syncWorkspaceAnalytics(
   organizationId: string,
@@ -497,7 +520,10 @@ export async function syncWorkspaceAnalytics(
     opts.maxAccounts ?? 25,
     opts.force ?? false,
   );
-  return runAnalyticsForAccounts(due);
+  // Jendela retry pendek: ini jalur MANUAL — pengguna menunggu di depan layar.
+  return runAnalyticsForAccounts(due, {
+    emptyRetryAfterMinutes: MANUAL_EMPTY_RETRY_MINUTES,
+  });
 }
 
 /** ID generator — pola sama dengan apps/server/src/lib/id.ts (prefix sk_) */
