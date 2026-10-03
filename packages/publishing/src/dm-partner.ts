@@ -18,6 +18,37 @@ export type MetaDMPartner = {
   avatarUrl: string | null;
 };
 
+/** Normalisasi username: buang awalan @, rapikan spasi, lowercase. */
+function normalizeUsername(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim().replace(/^@+/, "").toLowerCase();
+  return trimmed || null;
+}
+
+/**
+ * Perluas daftar id "diri sendiri" dengan participant yang username-nya sama
+ * dengan akun kita.
+ *
+ * Instagram Login (`instagram_standalone`) menyimpan id app-scoped dari
+ * `GET /me`, sedangkan daftar participant memakai id IG Business Account yang
+ * BERBEDA untuk akun yang sama. Tanpa perluasan ini, entri "diri sendiri" tidak
+ * dikenali sebagai diri sendiri sehingga partner_id menjadi id sendiri — dan
+ * balasan terkirim ke diri sendiri.
+ */
+export function resolveSelfIds(input: {
+  participants: MetaDMParticipant[];
+  selfIds: Set<string>;
+  selfUsername?: string | null;
+}): Set<string> {
+  const ids = new Set(input.selfIds);
+  const selfUsername = normalizeUsername(input.selfUsername);
+  if (!selfUsername) return ids;
+  for (const p of input.participants) {
+    if (normalizeUsername(p.username) === selfUsername) ids.add(p.id);
+  }
+  return ids;
+}
+
 /**
  * Tentukan partner dari satu conversation Meta.
  *

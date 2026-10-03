@@ -56,6 +56,7 @@ async function runDmSync(
     organizationId: string;
     platform: string;
     platformAccountId: string;
+    username: string | null;
     accessTokenEnc: string | null;
     metadata: Record<string, unknown> | null;
   }>,
@@ -78,6 +79,7 @@ async function runDmSync(
             organizationId: account.organizationId,
             platform: account.platform,
             platformAccountId: account.platformAccountId,
+            username: account.username,
             metadata: account.metadata,
           },
           accessToken,
@@ -145,6 +147,7 @@ dmRoute.post("/sync-now", async (c) => {
         organizationId: socialAccount.organizationId,
         platform: socialAccount.platform,
         platformAccountId: socialAccount.platformAccountId,
+        username: socialAccount.username,
         accessTokenEnc: socialAccount.accessTokenEnc,
         metadata: socialAccount.metadata,
       })

@@ -21,7 +21,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { processAutomation } from "./automation";
 import { GRAPH_FB_URL, GRAPH_IG_URL, LINKEDIN_API_VERSION, LINKEDIN_REST_URL } from "./config";
 import { decrypt } from "./crypto";
-import { resolveMetaDMPartner } from "./dm-partner";
+import { resolveMetaDMPartner, resolveSelfIds } from "./dm-partner";
 import type { SyncResult } from "./engagement-sync";
 import { httpRequest } from "./http";
 import {
@@ -250,6 +250,8 @@ export async function syncAccountDMs(ctx: {
     organizationId: string;
     platform: string;
     platformAccountId: string;
+    /** Username akun — dipakai mengenali entri "diri sendiri" di participants. */
+    username?: string | null;
     metadata: Record<string, unknown> | null;
   };
   accessToken: string;
@@ -338,11 +340,21 @@ export async function syncAccountDMs(ctx: {
     const messages = conv.messages?.data ?? [];
     if (messages.length === 0) continue;
 
+    const participants = conv.participants?.data ?? [];
+    // "Diri sendiri" bisa muncul dengan id yang BERBEDA dari platform_account_id
+    // (Instagram Login: id app-scoped vs id IG Business Account). Kenali lewat
+    // username akun agar klasifikasi arah pesan & pemilihan partner tetap benar.
+    const convSelfIds = resolveSelfIds({
+      participants,
+      selfIds,
+      selfUsername: ctx.account.username,
+    });
+
     const mapped = messages.map((msg) => {
       const att = msg.attachments?.data?.[0];
       return {
         platformMessageId: msg.id,
-        direction: (msg.from?.id && selfIds.has(msg.from.id) ? "outbound" : "inbound") as
+        direction: (msg.from?.id && convSelfIds.has(msg.from.id) ? "outbound" : "inbound") as
           | "inbound"
           | "outbound",
         senderId: msg.from?.id ?? null,
@@ -357,9 +369,9 @@ export async function syncAccountDMs(ctx: {
     // Partner = pihak lawan bicara (bukan akun kita). Lihat resolveMetaDMPartner
     // untuk alasan fallback-nya bukan participants[0].
     const partner = resolveMetaDMPartner({
-      participants: conv.participants?.data ?? [],
+      participants,
       messages: mapped,
-      selfIds,
+      selfIds: convSelfIds,
     });
     if (!partner) continue;
 
@@ -878,6 +890,7 @@ export async function syncDueDMAccounts(
             organizationId: account.organizationId,
             platform: account.platform,
             platformAccountId: account.platformAccountId,
+            username: account.username,
             metadata: account.metadata,
           },
           accessToken,
