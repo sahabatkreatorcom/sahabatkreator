@@ -479,12 +479,41 @@ export function metricValue(
 //   `saves` (plural) dijawab HTTP 400 — daftar nilai yang diterima Meta adalah
 //   "impressions, shares, comments, likes, saved, replies, total_interactions,
 //   navigation, follow". Karena itu jangan pernah memakai `saves` di sini.
-// - `views` TIDAK valid untuk media bertipe reel → jangan disertakan di daftar
-//   utama. `impressions` juga tidak didukung sebagian tipe media.
+// - `views` VALID untuk FEED (image), REELS, maupun STORY di KEDUA host.
+//   Sebelumnya `views` dikeluarkan dari IG_MEDIA_METRICS_IG dengan asumsi
+//   "tidak valid untuk reel" — TERBUKTI SALAH oleh probe langsung ke API
+//   (media IMAGE 18222074944337521 → views=115, REEL 18438168793198359 →
+//   views=49). Akibatnya kartu Views IG selalu 0 di /post-results dan
+//   /performance/analitik selama bertahun-tahun.
+// - `impressions` memang DITOLAK untuk media setelah 2 Juli 2024 ("does not
+//   support the impressions metric for this media product type"), jadi TIDAK
+//   boleh masuk daftar — bila satu metric ditolak, SELURUH request gagal dan
+//   semua metrik lain ikut hilang. `impressions` diisi lewat fallback ke
+//   `views` di pengembalian (lihat bawah).
 // `reach` valid untuk semua tipe media → dipakai sebagai fallback terakhir.
 const IG_MEDIA_METRICS_FB = "reach,likes,comments,shares,saved,views";
-const IG_MEDIA_METRICS_IG = "reach,likes,comments,shares,saved";
+const IG_MEDIA_METRICS_IG = "reach,likes,comments,shares,saved,views";
 const IG_MEDIA_METRICS_FALLBACK = "reach";
+
+/**
+ * Daftar metric yang diminta ke Instagram per host — DIEKSPOR supaya bug
+ * "views IG selalu 0" tidak bisa kembali tanpa terdeteksi tes.
+ *
+ * `views` WAJIB ada di kedua host: ia valid untuk FEED, REELS, dan STORY.
+ * Sebelumnya `views` dikeluarkan dari IG_MEDIA_METRICS_IG dengan asumsi
+ * "tidak valid untuk reel" — asumsi itu salah (dibuktikan probe API langsung),
+ * dan akibatnya kartu Views IG selalu menampilkan 0 di /post-results dan
+ * /performance/analitik.
+ *
+ * `impressions` sengaja TIDAK ada: untuk media setelah 2 Juli 2024 metric ini
+ * ditolak, dan satu metric yang ditolak membatalkan SELURUH request. Angka
+ * impressions diisi lewat fallback ke `views` di `igPostMetrics()`.
+ */
+export const IG_MEDIA_METRIC_LISTS = {
+  facebook: IG_MEDIA_METRICS_FB,
+  instagram: IG_MEDIA_METRICS_FB,
+  instagram_standalone: IG_MEDIA_METRICS_IG,
+} as const;
 
 /** Satu request media insights — kembalikan data atau pesan error (tanpa throw) */
 async function requestIgMediaInsights(
