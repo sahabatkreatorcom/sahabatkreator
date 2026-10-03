@@ -6,6 +6,8 @@ import { PLATFORMS } from "@/lib/platforms";
 
 export type DmConversation = {
   id: string;
+  /** social_account.id pemilik percakapan — dipakai filter per akun */
+  accountId: string;
   platform: string;
   accountUsername: string;
   partnerId: string;
@@ -109,7 +111,7 @@ export function ConversationList({
   );
 }
 
-/** Header list: search, filter unread, mark all read */
+/** Header list: filter akun, search, filter unread, mark all read */
 export function ConversationListHeader({
   q,
   onQChange,
@@ -118,6 +120,9 @@ export function ConversationListHeader({
   onMarkAllRead,
   unreadTotal,
   canMarkAll,
+  accountId,
+  onAccountChange,
+  accounts,
 }: {
   q: string;
   onQChange: (v: string) => void;
@@ -126,9 +131,30 @@ export function ConversationListHeader({
   onMarkAllRead: () => void;
   unreadTotal: number;
   canMarkAll: boolean;
+  /** Akun DM terhubung yang bisa difilter ("all" = semua akun) */
+  accountId: string;
+  onAccountChange: (v: string) => void;
+  accounts: { id: string; label: string }[];
 }) {
   return (
     <div className="space-y-2 border-[var(--border-light)] border-b p-3">
+      {/* Filter akun — penting saat satu platform punya >1 akun terhubung,
+          supaya jelas percakapan ini masuk ke akun yang mana. */}
+      {accounts.length > 0 && (
+        <select
+          value={accountId}
+          onChange={(e) => onAccountChange(e.target.value)}
+          aria-label="Filter akun"
+          className="h-9 w-full rounded-[var(--radius-md)] border border-[var(--border-light)] bg-[var(--bg-primary)] px-3 text-sm outline-none focus:border-[var(--accent-gold)]"
+        >
+          <option value="all">Semua akun</option>
+          {accounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.label}
+            </option>
+          ))}
+        </select>
+      )}
       <input
         type="search"
         value={q}

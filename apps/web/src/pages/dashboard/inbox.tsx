@@ -2,7 +2,7 @@
 // List kiri: percakapan dengan badge unread. Thread kanan: bubble + composer.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   ConversationList,
@@ -12,13 +12,27 @@ import {
 import { InboxHeader } from "@/components/inbox/inbox-header";
 import { MessageThread } from "@/components/inbox/message-thread";
 import { api } from "@/lib/api";
+import { PLATFORMS } from "@/lib/platforms";
 import { queryKeys } from "../../lib/query-keys";
+
+/** Platform yang mendukung DM di aplikasi ini (lihat syncAccountDMs). */
+const DM_PLATFORMS = new Set(["instagram", "instagram_standalone", "facebook"]);
+
+type DmAccount = {
+  id: string;
+  platform: string;
+  username: string | null;
+  displayName: string | null;
+  isConnected: boolean;
+};
 
 export default function InboxPage() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
+  /** Filter akun ("all" = semua akun) — agar jelas DM masuk ke akun yang mana. */
+  const [accountId, setAccountId] = useState("all");
   const [page, setPage] = useState(1);
   const [lastManualSyncAt, setLastManualSyncAt] = useState<Date | null>(null);
 
@@ -81,13 +95,35 @@ export default function InboxPage() {
   });
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
-    queryKey: [...queryKeys.dmConversations, unreadOnly, q, page],
+    queryKey: [...queryKeys.dmConversations, unreadOnly, q, page, accountId],
     queryFn: () =>
       api.get<{ conversations: DmConversation[]; page: number }>(
-        `/dm?unread=${unreadOnly}&page=${page}&perPage=20${q ? `&q=${encodeURIComponent(q)}` : ""}`,
+        `/dm?unread=${unreadOnly}&page=${page}&perPage=20${q ? `&q=${encodeURIComponent(q)}` : ""}${
+          accountId !== "all" ? `&accountId=${encodeURIComponent(accountId)}` : ""
+        }`,
       ),
     refetchInterval: 30_000,
   });
+
+  // Akun DM terhubung — opsi filter akun. Daftar tetap lengkap (tidak mengikuti
+  // hasil filter) supaya pilihan akun lain tidak hilang setelah dipilih.
+  const { data: accountsData } = useQuery({
+    queryKey: queryKeys.accounts,
+    queryFn: () => api.get<{ accounts: DmAccount[] }>("/accounts"),
+    staleTime: 5 * 60 * 1000,
+  });
+  const dmAccounts = useMemo(
+    () =>
+      (accountsData?.accounts ?? [])
+        .filter((a) => a.isConnected && DM_PLATFORMS.has(a.platform))
+        .map((a) => ({
+          id: a.id,
+          label: `${PLATFORMS[a.platform as keyof typeof PLATFORMS]?.label ?? a.platform} — @${
+            a.username ?? a.displayName ?? a.id
+          }`,
+        })),
+    [accountsData],
+  );
 
   const { data: unread } = useQuery({
     queryKey: queryKeys.dmUnreadCount,
@@ -134,6 +170,13 @@ export default function InboxPage() {
             onMarkAllRead={() => markAllRead.mutate()}
             unreadTotal={unreadMessages}
             canMarkAll={unreadMessages > 0 && !markAllRead.isPending}
+            accountId={accountId}
+            onAccountChange={(value) => {
+              setAccountId(value);
+              setPage(1);
+              setSelectedId(null);
+            }}
+            accounts={dmAccounts}
           />
           {isLoading ? (
             <div className="flex flex-1 items-center justify-center p-8">

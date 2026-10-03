@@ -218,6 +218,9 @@ dmRoute.get("/", async (c) => {
       });
     const { page, perPage } = pagination;
     const platform = c.req.query("platform");
+    // Filter per akun sosial (social_account.id) — reviewer perlu tahu persis
+    // percakapan ini milik akun yang mana saat satu platform punya >1 akun.
+    const accountId = c.req.query("accountId");
     const unreadOnly = c.req.query("unread") === "true";
     const q = c.req.query("q");
     const assignedTo = c.req.query("assignedTo");
@@ -227,6 +230,7 @@ dmRoute.get("/", async (c) => {
       eq(socialAccount.isConnected, true),
     ];
     if (platform) conditions.push(eq(socialAccount.platform, platform as "instagram"));
+    if (accountId) conditions.push(eq(dmConversation.socialAccountId, accountId));
     if (unreadOnly) conditions.push(gt(dmConversation.unreadCount, 0));
     if (q) {
       const searchCondition = or(
@@ -244,6 +248,7 @@ dmRoute.get("/", async (c) => {
     const rows = await db
       .select({
         id: dmConversation.id,
+        accountId: dmConversation.socialAccountId,
         platform: socialAccount.platform,
         accountUsername: socialAccount.username,
         partnerId: dmConversation.partnerId,
