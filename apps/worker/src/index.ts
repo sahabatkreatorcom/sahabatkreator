@@ -45,6 +45,7 @@ import {
   emitWebhookEvent,
   enqueueAutoReply,
   getRedisConnection,
+  reconcileMediaObjects,
   runAutoClipCycle,
   runAutoReplyCycle,
   runCarouselRenderCycle,
@@ -253,6 +254,26 @@ app.post("/run-retention", async (c) => {
   return c.json({ ok: true, mode, days: days ?? null, ...result, errors: result.errors.length });
 });
 
+// Trigger manual rekonsiliasi media R2 (cron eksternal / debugging).
+//
+// Default DRY-RUN: panggilan tanpa parameter hanya MELAPORKAN, tidak menghapus.
+// Untuk benar-benar menghapus kirim `?dryRun=0`. Disengaja: endpoint ini menghapus
+// file milik user, jadi jalur yang tidak sengaja dipanggil harus aman.
+// `?graceDays=N` menimpa masa tenggang 14 hari.
+app.post("/run-media-reconciliation", async (c) => {
+  const rejected = requireCronSecret(c);
+  if (rejected) return rejected;
+  const rawDryRun = c.req.query("dryRun");
+  const dryRun = rawDryRun === undefined ? true : !(rawDryRun === "0" || rawDryRun === "false");
+  const rawGrace = c.req.query("graceDays");
+  const graceDays = rawGrace === undefined ? undefined : Number(rawGrace);
+  const result = await reconcileMediaObjects({
+    dryRun,
+    graceDays: Number.isFinite(graceDays) ? graceDays : undefined,
+  });
+  return c.json({ ok: true, ...result });
+});
+
 const port = Number(process.env.WORKER_PORT ?? 3001);
 const POLL_INTERVAL_MS = 30_000;
 
@@ -448,6 +469,54 @@ setInterval(() => {
 // Pemeriksaan pertama 10 menit setelah start — cukup jauh dari siklus sync lain
 // yang padat di menit-menit awal, dan tidak perlu menunggu 24 jam untuk pertama kali.
 setTimeout(() => runRetentionCycle().catch(() => {}), 10 * 60 * 1000);
+
+// ---- Rekonsiliasi media R2 (kedua mode) ----
+// Tiap hari: sapu objek R2 yang tidak punya baris `media` (yatim) dan sudah
+// melewati masa tenggang 14 hari. Ini jaring pengaman untuk kegagalan hapus
+// object — lihat media-reconciliation.ts. Objek non-pustaka (subtitle, PDF
+// carousel, hasil render) hanya DILAPORKAN, tidak pernah dihapus.
+//
+// Objek yatim juga bisa berasal dari organisasi yang sudah dihapus, jadi prefix
+// R2 yang tidak lagi ada di tabel `organization` ikut diperiksa.
+async function runMediaReconciliationCycle(): Promise<void> {
+  const result = await reconcileMediaObjects();
+  if (result.deleted.length > 0) {
+    const mb = (result.orphanBytes / (1024 * 1024)).toFixed(1);
+    console.log(
+      `[media-recon] ${result.deleted.length} objek yatim dihapus (~${mb} MB) dari ` +
+        `${result.orgsScanned} organisasi; ${result.heldCount} masih ditahan, ` +
+        `${result.unknownCount} objek non-pustaka dilewati`,
+    );
+  }
+  if (result.deleteSkippedByLimit > 0) {
+    console.warn(
+      `[media-recon] ${result.deleteSkippedByLimit} objek yatim TIDAK dihapus karena ` +
+        "batas per putaran — sisanya diproses putaran berikutnya",
+    );
+  }
+  if (result.prefixesSkipped.length > 0) {
+    console.log(
+      `[media-recon] prefix non-organisasi dilewati: ${result.prefixesSkipped.join(", ")}`,
+    );
+  }
+  for (const err of result.errors) {
+    console.warn(`[media-recon] ${err}`);
+  }
+}
+const MEDIA_RECON_TICK_MS = 24 * 60 * 60 * 1000;
+let mediaReconRunning = false;
+setInterval(() => {
+  if (mediaReconRunning) return;
+  mediaReconRunning = true;
+  runMediaReconciliationCycle()
+    .catch((error) => console.error("[media-recon] error:", error))
+    .finally(() => {
+      mediaReconRunning = false;
+    });
+}, MEDIA_RECON_TICK_MS);
+// Pemeriksaan pertama 20 menit setelah start — digeser dari retensi (10 menit)
+// supaya kedua sapuan tidak menumpuk di menit yang sama.
+setTimeout(() => runMediaReconciliationCycle().catch(() => {}), 20 * 60 * 1000);
 
 // ---- Token refresh loop (kedua mode) ----
 // Tiap jam: refresh proaktif akun yang token-nya expired ≤2 hari lagi.

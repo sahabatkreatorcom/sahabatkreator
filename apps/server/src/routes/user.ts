@@ -260,14 +260,27 @@ userRoute.post("/delete-account", async (c) => {
       }
     }
 
-    // Cleanup media R2 milik org yang dihapus
+    // Cleanup media R2 milik org yang dihapus.
+    //
+    // Object dihapus SEBELUM organisasi (dan karena itu sebelum baris `media`)
+    // supaya `storage_key` masih ada bila ada yang gagal. Berbeda dari
+    // DELETE /media/:id, error di sini sengaja TIDAK membatalkan apa pun: user
+    // harus tetap bisa menutup akunnya walau storage sedang bermasalah. Karena
+    // itu error dicatat, bukan ditelan diam-diam — sisa objeknya akan disapu
+    // job rekonsiliasi (packages/queue/src/media-reconciliation.ts) setelah
+    // masa tenggang, karena prefix org-nya masih ada di R2.
     if (orgsToDelete.length > 0 && isStorageConfigured()) {
       const mediaRows = await db
         .select({ storageKey: mediaTable.storageKey })
         .from(mediaTable)
         .where(inArray(mediaTable.organizationId, orgsToDelete));
       for (const m of mediaRows) {
-        await deleteObject(m.storageKey).catch(() => undefined);
+        await deleteObject(m.storageKey).catch((err: unknown) => {
+          console.error(
+            `[user] gagal hapus object R2 ${m.storageKey} (rekonsiliasi akan menyapu):`,
+            err,
+          );
+        });
       }
     }
 

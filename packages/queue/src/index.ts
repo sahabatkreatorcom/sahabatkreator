@@ -48,11 +48,33 @@ export {
 } from "./layout-director";
 export { markPostFailed } from "./mark-failed";
 export {
+  type MediaReconciliationResult,
+  type ReconciledObject,
+  type ReconcileMediaOptions,
+  reconcileMediaObjects,
+} from "./media-reconciliation";
+export {
+  basenameOf,
+  classifyMediaObject,
+  isMediaLibraryKey,
+  isOrganizationPrefix,
+  MEDIA_ORPHAN_GRACE_DAYS,
+  type MediaObjectVerdict,
+} from "./media-retention";
+export {
   cancelPublishJob,
   createPublishWorker,
   enqueuePoll,
   enqueuePublish,
 } from "./processor";
+export {
+  deleteObjectByKey,
+  getR2,
+  isR2Configured,
+  listObjectsUnderPrefix,
+  listTopLevelPrefixes,
+  type R2ObjectInfo,
+} from "./r2";
 export {
   cancelPostReminder,
   createReminderWorker,

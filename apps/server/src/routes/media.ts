@@ -694,13 +694,30 @@ function storageKeyFromUrl(url: string | null, organizationId: string): string |
   return idx >= 0 ? url.slice(idx + 1) : null;
 }
 
-/** Hapus object thumbnail R2 milik media (best-effort, log-only) */
-async function deleteThumbnailObject(url: string | null, organizationId: string): Promise<void> {
-  const key = storageKeyFromUrl(url, organizationId);
-  if (!key) return;
-  await deleteObject(key).catch((err: unknown) =>
-    console.error("[media] gagal hapus thumbnail R2:", err),
-  );
+/**
+ * Hapus object R2 milik satu media: file utama + thumbnail.
+ *
+ * URUTAN ADALAH INTI FUNGSI INI. Sebelumnya baris DB dihapus LEBIH DULU, lalu
+ * `deleteObject()` dipanggil dengan `.catch()` yang menelan error. Akibatnya
+ * setiap kegagalan R2 (jaringan, 5xx, kredensial) meninggalkan objek yatim
+ * PERMANEN: baris DB — satu-satunya tempat `storage_key` disimpan — sudah
+ * hilang, jadi tidak ada lagi yang bisa mengulang penghapusan. Sekarang object
+ * dihapus lebih dulu dan error DILEMPAR ke pemanggil, supaya baris DB hanya
+ * hilang setelah object-nya benar-benar hilang.
+ *
+ * `DeleteObject` di R2/S3 bersifat idempoten: menghapus key yang sudah tidak
+ * ada tetap sukses, jadi objek yang sudah terlanjur hilang tidak membuat ini
+ * gagal.
+ */
+async function deleteMediaObjects(row: {
+  storageKey: string;
+  thumbnailUrl: string | null;
+  organizationId: string;
+}): Promise<void> {
+  if (!isStorageConfigured()) return;
+  await deleteObject(row.storageKey);
+  const thumbKey = storageKeyFromUrl(row.thumbnailUrl, row.organizationId);
+  if (thumbKey) await deleteObject(thumbKey);
 }
 
 mediaRoute.delete("/:id", async (c) => {
@@ -713,13 +730,18 @@ mediaRoute.delete("/:id", async (c) => {
       .limit(1);
     if (!row) return c.json({ message: "Media tidak ditemukan" }, 404);
 
-    await db.delete(media).where(eq(media.id, row.id));
-    if (isStorageConfigured()) {
-      await deleteObject(row.storageKey).catch((err: unknown) =>
-        console.error("[media] gagal hapus object R2:", err),
+    // Object dulu, baris DB belakangan — lihat deleteMediaObjects().
+    try {
+      await deleteMediaObjects(row);
+    } catch (err) {
+      console.error("[media] gagal hapus object R2, baris DB dipertahankan:", err);
+      return c.json(
+        { message: "Gagal menghapus file dari storage. Media tidak jadi dihapus, coba lagi." },
+        502,
       );
-      await deleteThumbnailObject(row.thumbnailUrl, row.organizationId);
     }
+
+    await db.delete(media).where(eq(media.id, row.id));
     return c.json({ ok: true });
   } catch (error) {
     return errorResponse(error);
@@ -737,14 +759,25 @@ mediaRoute.post("/batch-delete", async (c) => {
       .from(media)
       .where(and(eq(media.organizationId, ctx.organization.id), inArray(media.id, input.ids)));
 
+    // Object dulu, baru baris DB — dan hanya untuk baris yang object-nya sudah
+    // benar-benar hilang. Satu baris gagal tidak membatalkan sisanya, tapi
+    // barisnya tetap tersimpan supaya penghapusan bisa diulang (tidak yatim).
+    const removed: string[] = [];
+    const failed: string[] = [];
     for (const row of rows) {
-      await db.delete(media).where(eq(media.id, row.id));
-      if (isStorageConfigured()) {
-        await deleteObject(row.storageKey).catch(() => {});
-        await deleteThumbnailObject(row.thumbnailUrl, row.organizationId);
+      try {
+        await deleteMediaObjects(row);
+        removed.push(row.id);
+      } catch (err) {
+        console.error(`[media] gagal hapus object R2 untuk ${row.id}:`, err);
+        failed.push(row.id);
       }
     }
-    return c.json({ deleted: rows.length });
+
+    if (removed.length > 0) {
+      await db.delete(media).where(inArray(media.id, removed));
+    }
+    return c.json({ deleted: removed.length, failed });
   } catch (error) {
     return errorResponse(error);
   }
