@@ -1,5 +1,13 @@
-// Panel Demografi Audiens — data gender × usia dari IG Insights / FB Page Insights
+// Panel Demografi Audiens — data gender × usia dari IG Insights
 // (murni CSS bar)
+//
+// Hanya platform yang benar-benar menyediakan metrik demografi lewat API yang
+// ditampilkan (lihat `demographics` di lib/platforms). Saat ini Instagram saja:
+// Meta sudah menonaktifkan `page_fans_gender_age` untuk Halaman Facebook, dan
+// platform lain (Threads/TikTok/YouTube/Bluesky) tidak mengeksposnya.
+// Kalau tidak ada akun yang didukung dalam scope filter, panel disembunyikan
+// seluruhnya — lebih baik tidak muncul daripada menampilkan pilihan akun yang
+// ujungnya selalu kosong.
 import { useQuery } from "@tanstack/react-query";
 import { Users } from "lucide-react";
 import { useState } from "react";
@@ -41,18 +49,12 @@ const GENDER_LABEL: Record<string, string> = {
 
 export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] }) {
   const supportedAccounts = accounts.filter(
-    (a) =>
-      a.platform === "instagram" ||
-      a.platform === "instagram_standalone" ||
-      a.platform === "facebook",
+    (a) => PLATFORMS[a.platform as keyof typeof PLATFORMS]?.demographics === true,
   );
   const [accountId, setAccountId] = useState<string>("");
-  // Default: utamakan Instagram (data lebih lengkap); Facebook hanya bila tak ada IG.
-  // Dihitung efektif agar tetap benar saat daftar akun baru selesai dimuat async.
-  const selected =
-    supportedAccounts.find((a) => a.id === accountId) ??
-    supportedAccounts.find((a) => a.platform !== "facebook") ??
-    supportedAccounts[0];
+  // Default: akun pertama yang didukung. Dihitung efektif agar tetap benar saat
+  // daftar akun baru selesai dimuat async.
+  const selected = supportedAccounts.find((a) => a.id === accountId) ?? supportedAccounts[0];
   const effectiveId = selected?.id ?? "";
 
   const { data, isLoading, isError, error } = useQuery({
@@ -61,6 +63,11 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
     enabled: !!effectiveId,
     retry: false,
   });
+
+  // Tidak ada akun yang mendukung demografi dalam scope filter → panel tidak
+  // ditampilkan sama sekali (mis. filter diarahkan ke Threads atau Facebook).
+  // Diletakkan SETELAH semua hook agar urutan hook tetap sama antar render.
+  if (supportedAccounts.length === 0) return null;
 
   // Agregasi per kelompok usia (gabung F+M per range usia untuk bar horizontal)
   const ageGroups = new Map<string, { F: number; M: number }>();
@@ -88,31 +95,24 @@ export function AudienceDemographicsPanel({ accounts }: { accounts: Account[] })
           <Users className="h-4 w-4 text-[var(--accent-gold)]" />
           <h2 className="font-semibold">Demografi Audiens</h2>
         </div>
-        {supportedAccounts.length > 0 && (
-          <select
-            value={effectiveId}
-            onChange={(e) => setAccountId(e.target.value)}
-            className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-2 text-xs"
-            aria-label="Pilih akun"
-          >
-            {supportedAccounts.map((a) => {
-              const cfg = PLATFORMS[a.platform as keyof typeof PLATFORMS];
-              return (
-                <option key={a.id} value={a.id}>
-                  @{a.username} · {cfg?.label ?? a.platform}
-                </option>
-              );
-            })}
-          </select>
-        )}
+        <select
+          value={effectiveId}
+          onChange={(e) => setAccountId(e.target.value)}
+          className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] px-2 text-xs"
+          aria-label="Pilih akun"
+        >
+          {supportedAccounts.map((a) => {
+            const cfg = PLATFORMS[a.platform as keyof typeof PLATFORMS];
+            return (
+              <option key={a.id} value={a.id}>
+                @{a.username} · {cfg?.label ?? a.platform}
+              </option>
+            );
+          })}
+        </select>
       </div>
 
-      {supportedAccounts.length === 0 ? (
-        <EmptyState
-          title="Belum ada akun Instagram/Facebook"
-          description="Demografi audiens tersedia untuk akun Instagram Bisnis atau Halaman Facebook yang terhubung."
-        />
-      ) : isLoading ? (
+      {isLoading ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
             <Skeleton key={i} className="h-8 w-full" />

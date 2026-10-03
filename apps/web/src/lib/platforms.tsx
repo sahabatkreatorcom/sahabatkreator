@@ -66,6 +66,15 @@ export type PlatformConfig = {
   color: string;
   /** Status kesiapan integrasi (untuk pengajuan API) */
   status: "ready" | "pending" | "manual";
+  /**
+   * Demografi audiens (gender/usia) tersedia lewat API platform ini.
+   * Hanya Instagram yang masih menyediakannya: Meta sudah menonaktifkan
+   * `page_fans_gender_age` untuk Halaman Facebook (probe v26.0 →
+   * "(#100) not a valid insights metric"), dan platform lain tidak
+   * mengeksposnya sama sekali. Panel Demografi Audiens menyembunyikan akun
+   * yang flag-nya bukan true.
+   */
+  demographics?: boolean;
 };
 
 export const PLATFORMS: Record<Platform, PlatformConfig> = {
@@ -74,6 +83,7 @@ export const PLATFORMS: Record<Platform, PlatformConfig> = {
     icon: InstagramIcon,
     color: "#E4405F",
     status: "ready",
+    demographics: true,
   },
   instagram_standalone: {
     // Jalur IG Login (tanpa FB Page) — label dibedakan agar user paham dua mode koneksi
@@ -81,6 +91,7 @@ export const PLATFORMS: Record<Platform, PlatformConfig> = {
     icon: InstagramIcon,
     color: "#E4405F",
     status: "ready",
+    demographics: true,
   },
   facebook: {
     label: "Facebook",
