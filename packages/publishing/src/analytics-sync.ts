@@ -25,6 +25,7 @@ import {
   type PostMetrics,
 } from "./analytics-metrics";
 import { decrypt } from "./crypto";
+import { isThrottleError } from "./rate-limits";
 
 // Re-export agar konsumsi lama (packages/publishing/src/index.ts) tidak putus —
 // tipe & fetcher sekarang tinggal di analytics-metrics.
@@ -81,6 +82,12 @@ export type AnalyticsSyncResult = {
   accountSaved: boolean;
   postsSynced: number;
   error?: string;
+  /**
+   * True bila platform membatasi permintaan (kuota habis). Sync dihentikan lebih
+   * awal — meneruskan panggilan hanya memperpanjang blokir menurut dokumentasi
+   * Meta sendiri — dan pemanggil bisa memberi pesan yang jelas ke pengguna.
+   */
+  throttled?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -159,8 +166,12 @@ export async function upsertPostAnalytics(
 // ---------------------------------------------------------------------------
 
 /**
- * Sync analytics satu akun: metrik akun + metrik max 10 post published terbaru
- * yang punya platformPostId. Snapshot per-post error tidak menghentikan lainnya.
+ * Sync analytics satu akun: metrik akun + metrik max 25 post published terbaru
+ * yang punya platformPostId.
+ *
+ * Error per post tidak menghentikan post lain — KECUALI saat platform membatasi
+ * permintaan (throttle). Saat itu sync dihentikan: sisa post akan gagal dengan
+ * sebab yang sama, dan meneruskan panggilan justru memperpanjang blokir.
  */
 export async function syncAccountAnalytics(
   account: AnalyticsAccount,
@@ -187,6 +198,11 @@ export async function syncAccountAnalytics(
     }
   } catch (error) {
     result.error = error instanceof Error ? error.message.slice(0, 200) : String(error);
+    // Kuota habis → jangan lanjut ke post; semuanya akan gagal dengan sebab sama.
+    if (isThrottleError(result.error)) {
+      result.throttled = true;
+      return result;
+    }
   }
 
   // Post published terbaru milik akun ini (punya platformPostId). Diurutkan
@@ -291,7 +307,18 @@ export async function syncAccountAnalytics(
         metrics,
       );
       result.postsSynced++;
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message.slice(0, 200) : String(error);
+      // Kuota habis → STOP, jangan lanjut ke post berikutnya. Dua alasan:
+      // (1) sisa post akan gagal dengan sebab yang sama, dan (2) dokumentasi Meta
+      // menyatakan panggilan yang terus dilakukan justru memperpanjang blokir.
+      // Sebelumnya error ini ditelan `catch {}` kosong sehingga metrik tampak 0
+      // tanpa penjelasan apa pun — persis kebingungan yang sulit dilacak.
+      if (isThrottleError(message)) {
+        result.throttled = true;
+        result.error = message;
+        break;
+      }
       // Post tertentu gagal (deleted di platform, API error) — lanjut post lain
     }
   }
@@ -302,6 +329,18 @@ export async function syncAccountAnalytics(
 // Sinkronisasi massal — worker (antrean global) & tombol "Sinkron Platform" (per org)
 // ---------------------------------------------------------------------------
 
+/** Ringkasan satu putaran sync analytics (worker maupun manual per organisasi). */
+export type AnalyticsBatchResult = {
+  /** Jumlah akun yang diproses. */
+  synced: number;
+  /** Jumlah snapshot metrik post yang berhasil ditulis. */
+  postsSynced: number;
+  /** Jumlah akun yang dibatasi platform (kuota habis) pada putaran ini. */
+  throttled: number;
+  /** Pesan error yang perlu dilaporkan (sudah dipotong 200 karakter). */
+  errors: string[];
+};
+
 /**
  * Jalankan `syncAccountAnalytics` untuk sekumpulan akun, paralel per batch kecil.
  * Satu akun gagal (token ditolak, decrypt gagal, API error) tidak menghentikan
@@ -309,9 +348,10 @@ export async function syncAccountAnalytics(
  */
 async function runAnalyticsForAccounts(
   accounts: AnalyticsAccount[],
-): Promise<{ synced: number; postsSynced: number; errors: string[] }> {
+): Promise<AnalyticsBatchResult> {
   let synced = 0;
   let postsSynced = 0;
+  let throttled = 0;
   const errors: string[] = [];
 
   for (let i = 0; i < accounts.length; i += ANALYTICS_BATCH_SIZE) {
@@ -345,11 +385,12 @@ async function runAnalyticsForAccounts(
       }
       synced++;
       postsSynced += outcome.value.postsSynced;
+      if (outcome.value.throttled) throttled++;
       if (outcome.value.error) errors.push(`${outcome.value.platform}: ${outcome.value.error}`);
     }
   }
 
-  return { synced, postsSynced, errors };
+  return { synced, postsSynced, throttled, errors };
 }
 
 /**
@@ -397,9 +438,7 @@ function analyticsCandidates(accounts: AnalyticsAccount[]): AnalyticsAccount[] {
  * Akun diproses paralel dalam batch kecil — satu akun gagal tidak
  * menghentikan batch lainnya (Promise.allSettled).
  */
-export async function syncDueAnalyticsAccounts(
-  maxAccounts = 10,
-): Promise<{ synced: number; postsSynced: number; errors: string[] }> {
+export async function syncDueAnalyticsAccounts(maxAccounts = 10): Promise<AnalyticsBatchResult> {
   // Akun connected non-manual
   const accounts = await db
     .select({
@@ -437,7 +476,7 @@ export async function syncDueAnalyticsAccounts(
 export async function syncWorkspaceAnalytics(
   organizationId: string,
   opts: { force?: boolean; maxAccounts?: number } = {},
-): Promise<{ synced: number; postsSynced: number; errors: string[] }> {
+): Promise<AnalyticsBatchResult> {
   const accounts = await db
     .select({
       id: socialAccount.id,

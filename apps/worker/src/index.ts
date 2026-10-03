@@ -132,6 +132,15 @@ async function runAnalyticsSync(): Promise<void> {
       `[analytics-sync] accounts=${result.synced} posts=${result.postsSynced}` +
         (result.errors.length > 0 ? ` errors=${result.errors.length}` : ""),
     );
+    // Throttle dilaporkan terpisah dan lebih keras: ini bukan kesalahan data,
+    // tapi kuota API platform habis — siklus berikutnya akan ikut gagal sampai
+    // kuota pulih, jadi operator perlu tahu (dan tidak menyalahkan kode).
+    if (result.throttled > 0) {
+      console.warn(
+        `[analytics-sync] ${result.throttled} akun DIBATASI platform (kuota API) — ` +
+          "metrik tidak lengkap sampai kuota pulih",
+      );
+    }
     for (const err of result.errors) {
       console.warn(`[analytics-sync] ${err}`);
     }

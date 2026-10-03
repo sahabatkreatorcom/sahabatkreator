@@ -39,7 +39,7 @@ import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { PLATFORMS } from "@/lib/platforms";
 import { queryKeys } from "../../lib/query-keys";
-import { type SyncResponse, syncContentNote, syncMetricsNote } from "./posts-sync-types";
+import { buildSyncToast, type SyncResponse } from "./posts-sync-types";
 
 type ViewMode = "month" | "week" | "day";
 
@@ -185,15 +185,14 @@ export function CalendarPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.analyticsTopPosts });
       queryClient.invalidateQueries({ queryKey: queryKeys.analyticsHashtags });
 
-      const content = syncContentNote(data.summary);
-      if (data.metrics?.status === "error") {
-        toast.warning(`${content} — metrik gagal disegarkan`, {
-          description: data.metrics.message,
-        });
-        return;
+      // Pesan disusun `buildSyncToast` (dipakai juga oleh Hasil Post) supaya
+      // kalimatnya tidak menyimpang antar halaman.
+      const notice = buildSyncToast(data);
+      if (notice.kind === "warning") {
+        toast.warning(notice.message, { description: notice.description });
+      } else {
+        toast.success(notice.message);
       }
-      const metricsNote = syncMetricsNote(data.metrics);
-      toast.success(metricsNote ? `${content} · ${metricsNote}` : content);
     },
     onError: (e: Error) => toast.error(e.message),
   });

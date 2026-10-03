@@ -12,6 +12,7 @@ export { type PostMetricKey, supportedPostMetrics } from "./analytics-metrics";
 export {
   type AccountMetrics,
   type AnalyticsAccount,
+  type AnalyticsBatchResult,
   type AnalyticsSyncResult,
   fetchAccountMetrics,
   fetchPostMetrics,
@@ -102,10 +103,17 @@ export {
 } from "./queue-hook";
 export {
   getLatestQuota,
-  parseMetaBucHeader,
   recordQuotaFromHeaders,
   recordQuotaSnapshot,
 } from "./quota";
+export {
+  isThrottleError,
+  type MetaAppUsage,
+  type MetaBucUsage,
+  metaAppKeyForUrl,
+  parseMetaAppUsage,
+  parseMetaBucUsage,
+} from "./rate-limits";
 export {
   REPLIZ_PLATFORMS,
   REPLIZ_SUPPORTED,

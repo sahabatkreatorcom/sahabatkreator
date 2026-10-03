@@ -568,6 +568,24 @@ postsRoute.post("/", async (c) => {
  */
 const SYNC_TOTAL_DEADLINE_MS = 75_000;
 
+/** Bentuk laporan penyegaran metrik pada respons `/posts/sync`. */
+type SyncMetricsPayload = {
+  /**
+   * done      — selesai
+   * throttled — platform membatasi permintaan (kuota API habis); sebagian metrik
+   *             belum tersegarkan dan siklus berikutnya pun akan gagal sampai
+   *             kuota pulih
+   * pending   — anggaran waktu habis, sync lanjut di latar belakang
+   * error     — gagal karena sebab lain
+   */
+  status: "done" | "throttled" | "pending" | "error";
+  accounts: number;
+  posts: number;
+  /** Jumlah akun yang dibatasi platform (hanya saat `throttled`). */
+  throttled?: number;
+  message?: string;
+};
+
 /** POST /posts/sync — trigger manual import post eksternal dari platform.
  * Fetch konten terbit langsung di platform (90 hari default) → upsert ke DB.
  * Worker juga menjalankan siklus yang sama tiap 4 jam; endpoint ini untuk
@@ -596,12 +614,25 @@ postsRoute.post("/sync", async (c) => {
     // Error ditangkap di sini (bukan di race) supaya kegagalan metrik tidak
     // pernah menggagalkan respons padahal kontennya sudah tersimpan — dan
     // supaya frontend bisa membedakan "gagal" dari "masih jalan".
-    const metricsPromise = syncWorkspaceAnalytics(ctx.organization.id, { force: true })
-      .then((r) => ({ status: "done" as const, accounts: r.synced, posts: r.postsSynced }))
-      .catch((err) => {
+    const metricsPromise: Promise<SyncMetricsPayload> = syncWorkspaceAnalytics(
+      ctx.organization.id,
+      { force: true },
+    )
+      .then(
+        (r): SyncMetricsPayload => ({
+          // Throttle dilaporkan sebagai status tersendiri: angkanya memang belum
+          // lengkap, dan pengguna berhak tahu sebabnya (kuota API) alih-alih
+          // menyimpulkan aplikasinya rusak.
+          status: r.throttled > 0 ? "throttled" : "done",
+          accounts: r.synced,
+          posts: r.postsSynced,
+          throttled: r.throttled,
+        }),
+      )
+      .catch((err): SyncMetricsPayload => {
         console.error("[posts] gagal menyegarkan metrik:", err);
         return {
-          status: "error" as const,
+          status: "error",
           accounts: 0,
           posts: 0,
           message: err instanceof Error ? err.message : String(err),
@@ -609,7 +640,7 @@ postsRoute.post("/sync", async (c) => {
       });
     const budget = Math.max(0, SYNC_TOTAL_DEADLINE_MS - (Date.now() - startedAt));
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const raced = await Promise.race([
+    const raced = await Promise.race<SyncMetricsPayload | null>([
       metricsPromise,
       new Promise<null>((resolve) => {
         timer = setTimeout(() => resolve(null), budget);
@@ -617,7 +648,11 @@ postsRoute.post("/sync", async (c) => {
     ]);
     if (timer) clearTimeout(timer);
     // `pending` = anggaran waktu habis, sync lanjut di latar belakang.
-    const metrics = raced ?? { status: "pending" as const, accounts: 0, posts: 0 };
+    const metrics: SyncMetricsPayload = raced ?? {
+      status: "pending",
+      accounts: 0,
+      posts: 0,
+    };
 
     fireActivity({
       orgId: ctx.organization.id,
@@ -631,6 +666,7 @@ postsRoute.post("/sync", async (c) => {
         accounts: summary.attemptedAccounts,
         metricsStatus: metrics.status,
         metricsPosts: metrics.posts,
+        metricsThrottled: metrics.throttled ?? 0,
       },
     });
     return c.json({ summary, metrics });

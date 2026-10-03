@@ -1,24 +1,25 @@
 // Perekam kuota rate-limit API dari response header platform (data riil, bukan input manual)
-// - Meta (FB/IG/Threads): X-Business-Use-Case-Usage (BUC) — JSON per call_count/total_cputime/total_time
+// - Meta app-wide: `x-app-usage` — sinyal yang benar-benar memblokir kita
+//   (batas `200 × daily active user` per jam, berlaku untuk SELURUH app)
+// - Meta per use case: `x-business-use-case-usage` (BUC) — JSON per entitas
 // - X-RateLimit-Remaining / X-RateLimit-Limit: pola umum LinkedIn/Pinterest
+//   (Bluesky memakai nama tanpa prefix X-)
 // Snapshot di-upsert per (entityId, quotaType, date) — idempotent.
+//
+// SATUAN: semua snapshot disimpan sebagai PERSEN dengan `total = 100`.
+// MENGAPA: header Meta berisi persentase pemakaian, bukan jumlah call absolut.
+// Kode lama memperlakukannya sebagai jumlah dan menghitung `200 - used`, sehingga
+// kuota selalu terlihat "200/200 aman" (terbukti di DB produksi: 3 baris seumur
+// hidup, semuanya remaining = total). Persen membuat arti kolom tidak ambigu dan
+// cocok dengan perhitungan `usedPct` di halaman admin.
 import { db } from "@sahabatkreator/db";
 import { apiQuotaSnapshot } from "@sahabatkreator/db/schema";
 import { and, desc, eq } from "drizzle-orm";
+import { setAppUsageRecorder } from "./http";
+import { metaAppKeyForUrl, parseMetaAppUsage, parseMetaBucUsage } from "./rate-limits";
 
-interface BucEntry {
-  call_count?: {
-    total?: number;
-    total_time?: number;
-    estimated_time_to_regain_full_access?: number;
-  };
-  total_cputime?: { total?: number };
-  total_time?: { total?: number };
-}
-
-interface BucPayload {
-  [appIdOrEntity: string]: string | BucEntry;
-}
+/** Semua snapshot kuota disimpan sebagai persen — lihat catatan satuan di atas. */
+const PCT_TOTAL = 100;
 
 /** ID generator lokal — hindari dependency ke apps/server */
 function quotaId(): string {
@@ -32,6 +33,11 @@ function quotaId(): string {
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** Persen pemakaian → sisa kuota dalam skala 0–100 (dibulatkan, tidak negatif). */
+function remainingPct(usedPct: number): number {
+  return Math.max(0, PCT_TOTAL - Math.round(usedPct));
 }
 
 /** Upsert snapshot kuota (unique: entityId+quotaType+date) */
@@ -66,33 +72,9 @@ export async function recordQuotaSnapshot(input: {
 }
 
 /**
- * Parse header X-Business-Use-Case-Usage Meta.
- * Format: {"<app_id>":[{"call_count":{"total":12,"total_time":60,"estimated_time_to_regain_full_access":350},"total_cputime":{...},"total_time":{...}}]}
- * Kita pakai call_count sebagai kuota utama (paling sering jadi bottleneck publish).
+ * Ambil snapshot kuota terbaru per platform+entity (untuk preflight check).
+ * Nilai `remaining`/`total` dalam PERSEN (total selalu 100).
  */
-export function parseMetaBucHeader(headerValue: string): {
-  entityId: string;
-  usedCalls: number;
-} | null {
-  try {
-    const data = JSON.parse(headerValue) as BucPayload;
-    for (const [entityId, value] of Object.entries(data)) {
-      if (typeof value === "object" && value !== null) {
-        // Bisa array of entry (format Graph API) atau object langsung
-        const entries = Array.isArray(value) ? value : [value];
-        const entry = entries[0] as BucEntry;
-        if (entry?.call_count) {
-          return { entityId, usedCalls: entry.call_count.total ?? 0 };
-        }
-      }
-    }
-  } catch {
-    // header corrupt / format berubah — abaikan
-  }
-  return null;
-}
-
-/** Ambil snapshot kuota terbaru per platform+entity (untuk preflight check) */
 export async function getLatestQuota(
   platform: string,
   entityId: string,
@@ -113,6 +95,9 @@ export async function getLatestQuota(
 /**
  * Rekam kuota dari response header platform.
  * Best-effort: error tidak boleh gagalkan publish — cukup log.
+ *
+ * `platform` dipakai untuk kuota per-akun/BUC; kuota app-wide punya jalur
+ * sendiri (`recordAppUsage`) karena header-nya tidak menyebut platform mana pun.
  */
 export async function recordQuotaFromHeaders(
   platform: string,
@@ -120,26 +105,23 @@ export async function recordQuotaFromHeaders(
   headers: Headers,
 ): Promise<void> {
   try {
-    // 1. Meta BUC header
-    const buc = headers.get("x-business-use-case-usage");
-    if (buc) {
-      const parsed = parseMetaBucHeader(buc);
-      if (parsed) {
-        // Meta BUC: 100% = 200 calls/24 jam per app (Tier B). total = 200, remaining = 200 - used.
-        const META_BUC_TOTAL = 200;
-        const remaining = Math.max(META_BUC_TOTAL - parsed.usedCalls, 0);
-        await recordQuotaSnapshot({
-          platform,
-          entityId: parsed.entityId,
-          quotaType: "meta_buc",
-          remaining,
-          total: META_BUC_TOTAL,
-        });
-      }
+    // 1. Meta BUC — bisa memuat beberapa entitas dalam satu header. `type`
+    //    (instagram/pages/messenger/…) dimasukkan ke quotaType karena tiap
+    //    use case punya anggaran terpisah: menggabungkannya jadi satu baris
+    //    "meta_buc" menyembunyikan bucket mana yang sebenarnya habis.
+    for (const buc of parseMetaBucUsage(headers.get("x-business-use-case-usage"))) {
+      await recordQuotaSnapshot({
+        platform,
+        entityId: buc.entityId,
+        quotaType: buc.type ? `meta_buc_${buc.type}` : "meta_buc",
+        remaining: remainingPct(buc.callCountPct),
+        total: PCT_TOTAL,
+      });
     }
 
     // 2. Pola X-RateLimit-* (LinkedIn: x-ratelimit-remaining, Pinterest: x-ratelimit-limit)
     //    Bluesky pakai nama tanpa prefix X- (ratelimit-remaining/ratelimit-limit).
+    //    Bentuk ini SUDAH sisa/limit (bukan persen) → disimpan apa adanya.
     const remainingHeader =
       headers.get("x-ratelimit-remaining") ?? headers.get("ratelimit-remaining");
     const limitHeader = headers.get("x-ratelimit-limit") ?? headers.get("ratelimit-limit");
@@ -161,3 +143,35 @@ export async function recordQuotaFromHeaders(
     console.warn(`[quota] Gagal rekam kuota ${platform}/${entityId}:`, error);
   }
 }
+
+/**
+ * Rekam kuota app-wide Meta dari header `x-app-usage`.
+ *
+ * Dipanggil `httpRequest` untuk SETIAP respons, jadi jalur sync (analytics,
+ * posts, engagement, DM) ikut tercatat — sebelumnya hanya publish yang merekam,
+ * padahal sync jauh lebih banyak memanggil API.
+ *
+ * `x-app-usage` tidak menyebut app mana; `metaAppKeyForUrl` memetakannya dari
+ * host endpoint supaya anggaran tiap app (Facebook / Instagram Login / Threads)
+ * tidak tercampur.
+ */
+function recordAppUsage(url: string, headers: Headers): void {
+  const usage = parseMetaAppUsage(headers.get("x-app-usage"));
+  if (!usage) return;
+  // Fire-and-forget: pencatatan tidak boleh menahan/menggagalkan request.
+  void recordQuotaSnapshot({
+    platform: "meta",
+    entityId: metaAppKeyForUrl(url),
+    quotaType: "app_usage",
+    remaining: remainingPct(usage.callCountPct),
+    total: PCT_TOTAL,
+  }).catch((error) => {
+    console.warn("[quota] Gagal rekam x-app-usage:", error);
+  });
+}
+
+// Pasang perekam ke lapisan HTTP. Modul ini dimuat lewat `index.ts` package
+// publishing — worker dan server sama-sama mengimpornya, jadi keduanya otomatis
+// merekam. Test yang mengimpor `http.ts`/`rate-limits.ts` langsung tidak
+// memuat modul ini, sehingga tidak ada akses DB di dalam test.
+setAppUsageRecorder(recordAppUsage);

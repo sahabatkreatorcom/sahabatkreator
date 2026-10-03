@@ -36,7 +36,7 @@ import { PLATFORMS } from "@/lib/platforms";
 import { useSeo } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { queryKeys } from "../../lib/query-keys";
-import { type SyncResponse, syncContentNote, syncMetricsNote } from "./posts-sync-types";
+import { buildSyncToast, type SyncResponse } from "./posts-sync-types";
 
 type PostMedia = {
   url: string;
@@ -532,19 +532,15 @@ export function PostResultsPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.analyticsTopPosts });
       queryClient.invalidateQueries({ queryKey: queryKeys.analyticsHashtags });
 
-      const content = syncContentNote(res.summary);
-
-      // Metrik dilaporkan terpisah: pengguna harus tahu apakah angkanya benar
-      // benar sudah ditarik, masih berjalan, atau gagal — supaya tidak lagi
-      // menyangka tombolnya tidak bekerja saat semua metrik masih 0.
-      if (res.metrics?.status === "error") {
-        toast.warning(`${content} — metrik gagal disegarkan`, {
-          description: res.metrics.message,
-        });
-        return;
+      // Pesan disusun `buildSyncToast` (dipakai juga oleh Kalender): konten dan
+      // metrik dilaporkan terpisah, dan kuota API yang habis punya nada
+      // peringatan sendiri supaya tidak disangka aplikasinya rusak.
+      const notice = buildSyncToast(res);
+      if (notice.kind === "warning") {
+        toast.warning(notice.message, { description: notice.description });
+      } else {
+        toast.success(notice.message);
       }
-      const metricsNote = syncMetricsNote(res.metrics);
-      toast.success(metricsNote ? `${content} · ${metricsNote}` : content);
     },
     onError: (e: Error) => toast.error(e.message),
   });
