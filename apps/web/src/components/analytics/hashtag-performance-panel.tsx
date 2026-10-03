@@ -23,16 +23,21 @@ type HashtagsResponse = {
 export function HashtagPerformancePanel({
   days,
   platform = null,
+  accountId = null,
 }: {
   days: number;
   /** Platform terpilih di filter Analitik (null = semua platform) */
   platform?: string | null;
+  /** Akun terpilih di filter Analitik (null = semua akun) */
+  accountId?: string | null;
 }) {
   const { data, isLoading } = useQuery({
-    queryKey: [...queryKeys.analyticsHashtags, days, platform ?? "all"],
+    queryKey: [...queryKeys.analyticsHashtags, days, platform ?? "all", accountId ?? "all"],
     queryFn: () =>
       api.get<HashtagsResponse>(
-        `/analytics/hashtags?days=${days}${platform ? `&platform=${platform}` : ""}`,
+        `/analytics/hashtags?days=${days}${platform ? `&platform=${platform}` : ""}${
+          accountId ? `&accountId=${accountId}` : ""
+        }`,
       ),
   });
 
@@ -47,8 +52,9 @@ export function HashtagPerformancePanel({
       </div>
       <p className="mb-4 text-[var(--text-secondary)] text-xs">
         Top 20 hashtag dari konten tayang {days} hari terakhir
-        {platform ? ` di ${PLATFORMS[platform as keyof typeof PLATFORMS]?.label ?? platform}` : ""},
-        diurutkan berdasarkan total engagement (likes + komentar + share).
+        {platform ? ` di ${PLATFORMS[platform as keyof typeof PLATFORMS]?.label ?? platform}` : ""}
+        {accountId ? " (akun terpilih)" : ""}, diurutkan berdasarkan total engagement (likes +
+        komentar + share).
       </p>
 
       {isLoading ? (

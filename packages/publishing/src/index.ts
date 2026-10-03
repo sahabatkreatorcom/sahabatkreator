@@ -8,6 +8,7 @@ export {
   consumeAiCredits,
   getAiConfig,
 } from "./ai";
+export { type PostMetricKey, supportedPostMetrics } from "./analytics-metrics";
 export {
   type AccountMetrics,
   type AnalyticsAccount,

@@ -16,6 +16,7 @@ import {
   PINTEREST_API_BASE_URL,
   PINTEREST_SANDBOX,
   slotLabel,
+  supportedPostMetrics,
 } from "@sahabatkreator/publishing";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { Hono } from "hono";
@@ -53,8 +54,10 @@ async function sumPostTotals(
   from: Date,
   to: Date,
   platform?: string,
+  accountId?: string,
 ): Promise<PostTotals> {
   const platformFilter = platform ? sql` and p.platform = ${platform}` : sql``;
+  const accountFilter = accountId ? sql` and p.social_account_id = ${accountId}` : sql``;
   const res = await db.execute(
     sql`select
           coalesce(sum(pa.likes), 0)::int as likes,
@@ -68,7 +71,7 @@ async function sumPostTotals(
           join post p on p.id = pa.post_id
           where pa.organization_id = ${orgId}
             and p.published_at >= ${from.toISOString()}
-            and p.published_at <= ${to.toISOString()}${platformFilter}
+            and p.published_at <= ${to.toISOString()}${platformFilter}${accountFilter}
           order by pa.post_id, pa.date desc
         ) pa`,
   );
@@ -105,10 +108,12 @@ async function sumFacebookPageInsights(
   from: Date,
   to: Date,
   platform?: string,
+  accountId?: string,
 ): Promise<{ views: number; impressions: number; engagements: number }> {
   if (platform && platform !== "facebook") {
     return { views: 0, impressions: 0, engagements: 0 };
   }
+  const accountFilter = accountId ? sql` and aa.social_account_id = ${accountId}` : sql``;
   const res = await db.execute(
     sql`select coalesce(sum(aa.impressions), 0)::bigint as views,
                coalesce(sum(aa.impressions), 0)::bigint as impressions,
@@ -118,7 +123,7 @@ async function sumFacebookPageInsights(
         where aa.organization_id = ${orgId}
           and sa.platform = 'facebook'
           and aa.date >= ${from.toISOString().slice(0, 10)}
-          and aa.date <= ${to.toISOString().slice(0, 10)}`,
+          and aa.date <= ${to.toISOString().slice(0, 10)}${accountFilter}`,
   );
   const row = (res.rows[0] ?? {}) as {
     views?: string | number;
@@ -134,15 +139,21 @@ async function sumFacebookPageInsights(
 
 /** Total followers org pada snapshot terakhir per akun dengan date <= batas.
  * `platform` opsional: hanya akun platform tersebut yang dihitung. */
-async function followersAt(orgId: string, onOrBefore: Date, platform?: string): Promise<number> {
+async function followersAt(
+  orgId: string,
+  onOrBefore: Date,
+  platform?: string,
+  accountId?: string,
+): Promise<number> {
   const platformFilter = platform ? sql` and aa.platform = ${platform}` : sql``;
+  const accountFilter = accountId ? sql` and aa.social_account_id = ${accountId}` : sql``;
   const res = await db.execute(
     sql`select coalesce(sum(latest.followers), 0)::int as followers
         from (
           select distinct on (aa.social_account_id) aa.*
           from account_analytics aa
           where aa.organization_id = ${orgId}
-            and aa.date <= ${onOrBefore.toISOString().slice(0, 10)}${platformFilter}
+            and aa.date <= ${onOrBefore.toISOString().slice(0, 10)}${platformFilter}${accountFilter}
           order by aa.social_account_id, aa.date desc
         ) latest`,
   );
@@ -160,8 +171,9 @@ function percentDelta(current: number, previous: number): number | null {
  * Satu query raw dengan DISTINCT ON (pola followersAt / route share report) —
  * menghindari N+1 query followers per akun. `platform` opsional: hanya akun
  * platform tersebut yang dikembalikan (dipakai filter platform di Analitik). */
-async function accountsWithFollowers(orgId: string, platform?: string) {
+async function accountsWithFollowers(orgId: string, platform?: string, accountId?: string) {
   const platformFilter = platform ? sql` and sa.platform = ${platform}` : sql``;
+  const accountFilter = accountId ? sql` and sa.id = ${accountId}` : sql``;
   const rows = await db.execute(
     sql`select sa.id,
                sa.platform,
@@ -177,7 +189,7 @@ async function accountsWithFollowers(orgId: string, platform?: string) {
             order by aa.date desc
             limit 1
           ) latest on true
-          where sa.organization_id = ${orgId}${platformFilter}
+          where sa.organization_id = ${orgId}${platformFilter}${accountFilter}
           order by sa.created_at`,
   );
   return (rows.rows as Record<string, unknown>[]).map((r) => ({
@@ -203,6 +215,10 @@ analyticsRoute.get("/overview", async (c) => {
     const fromStr = c.req.query("from");
     const toStr = c.req.query("to");
     const platform = c.req.query("platform") || undefined;
+    // Filter per akun (social_account.id) — satu platform bisa punya >1 akun
+    // (mis. 2 Facebook Page), jadi filter platform saja menggabungkan angka
+    // dua akun yang berbeda.
+    const accountId = c.req.query("accountId") || undefined;
 
     // ===== Mode rentang kustom: from..to + comparison vs periode sebelumnya =====
     if (fromStr || toStr) {
@@ -222,11 +238,11 @@ analyticsRoute.get("/overview", async (c) => {
       const prevFrom = new Date(prevTo.getTime() - spanMs + 1);
 
       const [current, previous, fbNow, fbPrev] = await Promise.all([
-        sumPostTotals(ctx.organization.id, from, to, platform),
-        sumPostTotals(ctx.organization.id, prevFrom, prevTo, platform),
+        sumPostTotals(ctx.organization.id, from, to, platform, accountId),
+        sumPostTotals(ctx.organization.id, prevFrom, prevTo, platform, accountId),
         // Page Insights Facebook (NPE): views/impressions hanya ada level akun
-        sumFacebookPageInsights(ctx.organization.id, from, to, platform),
-        sumFacebookPageInsights(ctx.organization.id, prevFrom, prevTo, platform),
+        sumFacebookPageInsights(ctx.organization.id, from, to, platform, accountId),
+        sumFacebookPageInsights(ctx.organization.id, prevFrom, prevTo, platform, accountId),
       ]);
 
       const currentTotals = {
@@ -242,9 +258,13 @@ analyticsRoute.get("/overview", async (c) => {
 
       // Followers: snapshot terakhir di dalam/tepat sebelum akhir periode
       const [currentFollowers, previousFollowers] = await Promise.all([
-        followersAt(ctx.organization.id, to, platform),
-        followersAt(ctx.organization.id, prevTo, platform),
+        followersAt(ctx.organization.id, to, platform, accountId),
+        followersAt(ctx.organization.id, prevTo, platform, accountId),
       ]);
+
+      // Akun dalam scope — sekaligus sumber flag metrik yang didukung platform
+      // (kartu metrik yang tidak disediakan platform ditampilkan "—" di UI).
+      const rangeAccounts = await accountsWithFollowers(ctx.organization.id, platform, accountId);
 
       return c.json({
         range: {
@@ -252,8 +272,10 @@ analyticsRoute.get("/overview", async (c) => {
           to: to.toISOString().slice(0, 10),
         },
         platform: platform ?? null,
+        accountId: accountId ?? null,
         totals: { followers: currentFollowers, ...currentTotals },
-        accounts: await accountsWithFollowers(ctx.organization.id, platform),
+        accounts: rangeAccounts,
+        metricSupport: supportedPostMetrics(rangeAccounts.map((a) => a.platform)),
         comparison: {
           previous: { followers: previousFollowers, ...previousTotals },
           deltas: {
@@ -279,9 +301,10 @@ analyticsRoute.get("/overview", async (c) => {
         since,
         new Date(), // sampai sekarang
         platform,
+        accountId,
       ),
       // Page Insights Facebook (NPE): views/impressions hanya ada level akun
-      sumFacebookPageInsights(ctx.organization.id, since, new Date(), platform),
+      sumFacebookPageInsights(ctx.organization.id, since, new Date(), platform, accountId),
     ]);
 
     const mergedTotals = {
@@ -290,14 +313,20 @@ analyticsRoute.get("/overview", async (c) => {
       impressions: totals.impressions + fbInsights.impressions,
     };
 
-    const followersByAccount = await accountsWithFollowers(ctx.organization.id, platform);
+    const followersByAccount = await accountsWithFollowers(
+      ctx.organization.id,
+      platform,
+      accountId,
+    );
     const totalFollowers = followersByAccount.reduce((sum, a) => sum + (a.followers ?? 0), 0);
 
     return c.json({
       range: { days, since: since.toISOString() },
       platform: platform ?? null,
+      accountId: accountId ?? null,
       totals: { followers: totalFollowers, ...mergedTotals },
       accounts: followersByAccount,
+      metricSupport: supportedPostMetrics(followersByAccount.map((a) => a.platform)),
     });
   } catch (error) {
     return errorResponse(error);
@@ -314,6 +343,7 @@ analyticsRoute.get("/timeseries", async (c) => {
     const ctx = await requirePermission(c, "analytics.view");
     const days = Math.min(Math.max(Number(c.req.query("days") ?? 30) || 30, 1), 365);
     const platform = c.req.query("platform") || undefined;
+    const accountId = c.req.query("accountId") || undefined;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffDate = cutoff.toISOString().slice(0, 10);
@@ -335,6 +365,7 @@ analyticsRoute.get("/timeseries", async (c) => {
             gte(postAnalytics.date, cutoffDate),
             // platform tersimpan di post_analytics sendiri — cukup eq, tanpa join post
             platform ? eq(postAnalytics.platform, platform as never) : undefined,
+            accountId ? eq(postAnalytics.socialAccountId, accountId) : undefined,
           ),
         )
         .groupBy(postAnalytics.date)
@@ -356,6 +387,7 @@ analyticsRoute.get("/timeseries", async (c) => {
                 eq(accountAnalytics.organizationId, ctx.organization.id),
                 eq(socialAccount.platform, "facebook" as never),
                 gte(accountAnalytics.date, cutoffDate),
+                accountId ? eq(accountAnalytics.socialAccountId, accountId) : undefined,
               ),
             )
             .groupBy(accountAnalytics.date),
@@ -397,7 +429,9 @@ analyticsRoute.get("/top-posts", async (c) => {
     // terpotong, sehingga tombol "Sinkron Platform" tampak tidak berefek.
     const limit = Math.min(Number(c.req.query("limit") ?? 10), 200);
     const platform = c.req.query("platform");
+    const accountId = c.req.query("accountId");
     const platformFilter = platform ? sql` and p.platform = ${platform}` : sql``;
+    const accountFilter = accountId ? sql` and p.social_account_id = ${accountId}` : sql``;
 
     const rows = await db.execute(
       sql`select p.id as post_id,
@@ -444,7 +478,7 @@ analyticsRoute.get("/top-posts", async (c) => {
             limit 1
           ) media on true
           where p.organization_id = ${ctx.organization.id}
-            and p.status = 'published'${platformFilter}
+            and p.status = 'published'${platformFilter}${accountFilter}
           order by latest.views desc nulls last,
                    latest.likes desc nulls last,
                    -- Tiebreaker: di antara post ber-metric sama (atau sama-sama
@@ -531,9 +565,10 @@ analyticsRoute.get("/optimal-times", async (c) => {
   try {
     const ctx = await requirePermission(c, "analytics.view");
     const platform = c.req.query("platform") || undefined;
+    const accountId = c.req.query("accountId") || undefined;
     const limit = Math.min(Number(c.req.query("limit") ?? 6), 24);
 
-    const slots = await computeOptimalTimes(ctx.organization.id, platform);
+    const slots = await computeOptimalTimes(ctx.organization.id, platform, accountId);
     const top = slots.slice(0, limit);
     return c.json({
       slots: top.map((s) => ({
@@ -813,7 +848,9 @@ analyticsRoute.get("/hashtags", async (c) => {
     const ctx = await requirePermission(c, "analytics.view");
     const days = Math.min(Math.max(Number(c.req.query("days") ?? 30) || 30, 1), 90);
     const platform = c.req.query("platform") || undefined;
+    const accountId = c.req.query("accountId") || undefined;
     const platformFilter = platform ? sql` and p.platform = ${platform}` : sql``;
+    const accountFilter = accountId ? sql` and p.social_account_id = ${accountId}` : sql``;
     const since = new Date();
     since.setDate(since.getDate() - days);
 
@@ -833,7 +870,7 @@ analyticsRoute.get("/hashtags", async (c) => {
           ) latest on true
           where p.organization_id = ${ctx.organization.id}
             and p.status = 'published'
-            and p.published_at >= ${since.toISOString()}${platformFilter}`,
+            and p.published_at >= ${since.toISOString()}${platformFilter}${accountFilter}`,
     );
 
     // Regex hashtag: dukung karakter unicode Latin termasuk karakter Indonesia

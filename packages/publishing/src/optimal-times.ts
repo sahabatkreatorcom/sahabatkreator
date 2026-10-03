@@ -88,12 +88,13 @@ type EngagementRow = {
 };
 
 /**
- * Hitung slot waktu optimal org (opsional filter platform).
+ * Hitung slot waktu optimal org (opsional filter platform / akun).
  * Return SEMUA slot dengan skor, sorted score desc — pemanggil ambil top-N.
  */
 export async function computeOptimalTimes(
   organizationId: string,
   platform?: string,
+  accountId?: string,
 ): Promise<OptimalTimeSlot[]> {
   // Snapshot analytics terbaru per post (bukan sum lintas hari — kumulatif lifetime)
   const rows = await db.execute(
@@ -110,7 +111,8 @@ export async function computeOptimalTimes(
         ) latest on true
         where p.organization_id = ${organizationId}
           and p.published_at is not null
-          ${platform ? sql`and p.platform = ${platform}` : sql``}`,
+          ${platform ? sql`and p.platform = ${platform}` : sql``}
+          ${accountId ? sql`and p.social_account_id = ${accountId}` : sql``}`,
   );
 
   const data = (rows.rows as EngagementRow[]).filter((r) => r.engagement !== null);

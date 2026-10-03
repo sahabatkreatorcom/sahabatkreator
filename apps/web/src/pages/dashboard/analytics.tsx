@@ -11,7 +11,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -53,6 +53,13 @@ type Overview = {
     username: string;
     followers: number | null;
   }[];
+  /**
+   * Metrik yang benar-benar disediakan platform dalam scope. Kartu yang nilainya
+   * `false` ditampilkan "—" (bukan 0), karena platformnya memang tidak
+   * melaporkan metrik itu — mis. Threads/TikTok/YouTube/Bluesky tanpa
+   * impressions, YouTube tanpa shares, Bluesky tanpa views.
+   */
+  metricSupport?: Partial<Record<StatKey, boolean>>;
   /** Hanya ada saat mode custom date range (from/to) */
   comparison?: {
     previous: OverviewTotals;
@@ -177,8 +184,11 @@ export function AnalyticsPage() {
   const [rangeError, setRangeError] = useState<string | null>(null);
   // Rentang terpasang (null = mode preset days)
   const [appliedRange, setAppliedRange] = useState<{ from: string; to: string } | null>(null);
-  // Filter platform ("all" = lintas platform)
-  const [platform, setPlatform] = useState<string>("all");
+  // Filter akun ("all" = semua akun). Nilainya adalah social_account.id —
+  // lebih tepat daripada filter platform karena satu platform bisa punya >1 akun
+  // (di org ini: 2 Facebook Page), sehingga filter platform menggabungkan angka
+  // dua akun yang berbeda.
+  const [account, setAccount] = useState<string>("all");
 
   // Rentang aktif (mode from/to): custom range ATAU preset "Bulan ini"
   // (awal bulan → hari ini). Preset 7/30/90 tetap mode days (kompatibel).
@@ -195,10 +205,42 @@ export function AnalyticsPage() {
       )
     : Number(preset);
 
-  // Suffix query platform — dipakai semua endpoint analitik yang mendukungnya
-  // (overview, timeseries, top-posts, optimal-times, hashtags).
-  const platformParam = platform !== "all" ? platform : null;
-  const platformQuery = platformParam ? `&platform=${platformParam}` : "";
+  /**
+   * Daftar akun (tanpa filter) — sumber opsi dropdown filter.
+   * Diambil terpisah dari overview karena overview.accounts ikut terfilter:
+   * kalau opsi di-derive dari situ, memilih satu akun akan mengecilkan pilihan
+   * dan user tidak bisa kembali ke "Semua akun".
+   */
+  const { data: accountsData } = useQuery({
+    queryKey: queryKeys.accounts,
+    queryFn: () =>
+      api.get<{ accounts: { id: string; platform: string; username: string | null }[] }>(
+        "/accounts",
+      ),
+    staleTime: 5 * 60 * 1000,
+  });
+  // Opsi filter per AKUN, bukan per platform — satu platform bisa punya >1 akun
+  // (mis. 2 Facebook Page), jadi label menyertakan @username.
+  const accountOptions = useMemo(
+    () =>
+      (accountsData?.accounts ?? []).map((a) => ({
+        id: a.id,
+        platform: a.platform,
+        label: `${PLATFORMS[a.platform as keyof typeof PLATFORMS]?.label ?? a.platform} — @${
+          a.username ?? a.id
+        }`,
+      })),
+    [accountsData],
+  );
+  const selectedAccount = accountOptions.find((o) => o.id === account) ?? null;
+
+  // Suffix query akun — dipakai semua endpoint analitik yang mendukungnya
+  // (overview, timeseries, top-posts, optimal-times, hashtags). `platform` ikut
+  // dikirim karena sebagian agregasi khusus platform (mis. Page Insights FB).
+  const platformParam = selectedAccount?.platform ?? null;
+  const platformQuery = selectedAccount
+    ? `&platform=${selectedAccount.platform}&accountId=${selectedAccount.id}`
+    : "";
 
   const overviewQuery = activeRange
     ? `/analytics/overview?from=${activeRange.from}&to=${activeRange.to}${platformQuery}`
@@ -212,36 +254,18 @@ export function AnalyticsPage() {
     queryFn: () => api.get<Overview>(overviewQuery),
   });
   const { data: timeseries } = useQuery({
-    queryKey: [...queryKeys.analyticsTimeseries, effectiveDays, platform],
+    queryKey: [...queryKeys.analyticsTimeseries, effectiveDays, account],
     queryFn: () => api.get<Timeseries>(timeseriesQuery),
   });
   const { data: topPosts, isLoading: topLoading } = useQuery({
-    queryKey: [...queryKeys.analyticsTopPosts, platform],
+    queryKey: [...queryKeys.analyticsTopPosts, account],
     queryFn: () => api.get<TopPosts>(topPostsQuery),
   });
   const { data: optimalTimes } = useQuery({
-    queryKey: [...queryKeys.analyticsOptimalTimes, platform],
+    queryKey: [...queryKeys.analyticsOptimalTimes, account],
     queryFn: () => api.get<OptimalTimes>(optimalTimesQuery),
     staleTime: 10 * 60 * 1000,
   });
-
-  /**
-   * Daftar akun (tanpa filter platform) — sumber opsi dropdown platform.
-   * Diambil terpisah dari overview karena overview.accounts ikut terfilter:
-   * kalau opsi di-derive dari situ, memilih satu platform akan mengecilkan
-   * pilihan dan user tidak bisa kembali ke "Semua platform".
-   */
-  const { data: accountsData } = useQuery({
-    queryKey: queryKeys.accounts,
-    queryFn: () => api.get<{ accounts: { id: string; platform: string }[] }>("/accounts"),
-    staleTime: 5 * 60 * 1000,
-  });
-  const platformOptions = [
-    { key: "all", label: "Semua platform" },
-    ...Object.keys(PLATFORMS)
-      .filter((p) => (accountsData?.accounts ?? []).some((a) => a.platform === p))
-      .map((p) => ({ key: p, label: PLATFORMS[p as keyof typeof PLATFORMS].label })),
-  ];
 
   /** Terapkan preset — matikan custom range */
   function applyPreset(id: string) {
@@ -296,25 +320,28 @@ export function AnalyticsPage() {
         <div>
           <h1 className="font-bold text-2xl">Analitik</h1>
           <p className="mt-1 text-[var(--text-secondary)] text-sm">
-            {platformParam
-              ? `Performa konten ${PLATFORMS[platform as keyof typeof PLATFORMS]?.label ?? platform}`
-              : "Performa konten lintas platform"}
+            {selectedAccount
+              ? `Performa konten ${selectedAccount.label}`
+              : "Performa konten lintas akun"}
           </p>
         </div>
 
         <div className="flex flex-col items-end gap-2">
-          {/* Filter platform — membatasi semua panel di halaman ini ke satu
-              platform (overview, tren, konten terbaik, hashtag, waktu terbaik) */}
+          {/* Filter akun — membatasi semua panel di halaman ini ke satu akun
+              (overview, tren, konten terbaik, hashtag, waktu terbaik). Lebih
+              tepat daripada filter platform karena satu platform bisa punya
+              lebih dari satu akun. */}
           <div className="flex items-center gap-2">
-            <span className="font-medium text-[var(--text-muted)] text-xs">Platform</span>
+            <span className="font-medium text-[var(--text-muted)] text-xs">Akun</span>
             <select
-              value={platform}
-              onChange={(e) => setPlatform(e.target.value)}
-              className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-primary)] px-2 text-xs"
-              aria-label="Filter platform"
+              value={account}
+              onChange={(e) => setAccount(e.target.value)}
+              className="h-8 max-w-64 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-primary)] px-2 text-xs"
+              aria-label="Filter akun"
             >
-              {platformOptions.map((o) => (
-                <option key={o.key} value={o.key}>
+              <option value="all">Semua akun</option>
+              {accountOptions.map((o) => (
+                <option key={o.id} value={o.id}>
                   {o.label}
                 </option>
               ))}
@@ -389,6 +416,9 @@ export function AnalyticsPage() {
             ))
           : STAT_CARDS.map((card) => {
               const value = overview.totals[card.key];
+              // Platform dalam filter mungkin tidak menyediakan metrik ini
+              // (mis. impressions di Threads) → tampilkan "—", bukan 0.
+              const supported = overview.metricSupport?.[card.key] ?? true;
               const delta =
                 overview.comparison?.deltas[card.key as keyof typeof overview.comparison.deltas];
               return (
@@ -398,9 +428,23 @@ export function AnalyticsPage() {
                     <span className="text-xs">{card.label}</span>
                   </div>
                   <div className="mt-2 flex items-baseline gap-2">
-                    <p className="font-bold text-2xl">{formatCompact(value)}</p>
-                    {overview.comparison && <DeltaBadge delta={delta} />}
+                    <p
+                      className="font-bold text-2xl"
+                      title={
+                        supported
+                          ? undefined
+                          : `Platform dalam filter tidak menyediakan metrik ${card.label}`
+                      }
+                    >
+                      {supported ? formatCompact(value) : "—"}
+                    </p>
+                    {supported && overview.comparison && <DeltaBadge delta={delta} />}
                   </div>
+                  {!supported && (
+                    <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+                      tidak disediakan platform
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -420,6 +464,7 @@ export function AnalyticsPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {STAT_CARDS.map((card) => {
               const prev = overview.comparison?.previous[card.key as StatKey] ?? 0;
+              const supported = overview.metricSupport?.[card.key] ?? true;
               const delta =
                 overview.comparison?.deltas[card.key as keyof typeof overview.comparison.deltas];
               return (
@@ -430,13 +475,13 @@ export function AnalyticsPage() {
                   <div className="min-w-0">
                     <p className="truncate text-[var(--text-muted)] text-xs">{card.label}</p>
                     <p className="font-semibold text-sm">
-                      {formatCompact(prev)}
+                      {supported ? formatCompact(prev) : "—"}
                       <span className="ml-1 font-normal text-[10px] text-[var(--text-muted)]">
                         sebelumnya
                       </span>
                     </p>
                   </div>
-                  <DeltaBadge delta={delta} />
+                  {supported && <DeltaBadge delta={delta} />}
                 </div>
               );
             })}
@@ -449,10 +494,10 @@ export function AnalyticsPage() {
         <h2 className="mb-4 font-semibold">Tren Engagement</h2>
         {chartData.length === 0 ? (
           <EmptyState
-            title={platformParam ? "Belum ada data di platform ini" : "Belum ada data"}
+            title={selectedAccount ? "Belum ada data di akun ini" : "Belum ada data"}
             description={
-              platformParam
-                ? "Belum ada post platform ini yang punya snapshot metrik pada rentang terpilih. Coba ganti platform atau rentang tanggal."
+              selectedAccount
+                ? "Belum ada post akun ini yang punya snapshot metrik pada rentang terpilih. Coba ganti akun atau rentang tanggal."
                 : "Data akan muncul setelah konten Anda tayang dan terkumpul statistik."
             }
           />
@@ -521,7 +566,7 @@ export function AnalyticsPage() {
           <h2 className="mb-4 font-semibold">Followers per Akun</h2>
           {(overview?.accounts ?? []).length === 0 ? (
             <EmptyState
-              title={platformParam ? "Tidak ada akun platform ini" : "Belum ada akun terhubung"}
+              title={selectedAccount ? "Tidak ada akun ini" : "Belum ada akun terhubung"}
             />
           ) : (
             <ul className="space-y-3">
@@ -609,9 +654,7 @@ export function AnalyticsPage() {
           ) : (topPosts?.posts ?? []).length === 0 ? (
             <EmptyState
               title={
-                platformParam
-                  ? "Belum ada konten tayang di platform ini"
-                  : "Belum ada konten tayang"
+                selectedAccount ? "Belum ada konten tayang di akun ini" : "Belum ada konten tayang"
               }
             />
           ) : (
@@ -676,7 +719,11 @@ export function AnalyticsPage() {
         {/* Performa hashtag — diletakkan di grid agar sejajar dengan "Konten
             Terbaik" (tidak ada kolom kosong di sampingnya). Demografi Audiens
             tetap full-width di bawah grid. */}
-        <HashtagPerformancePanel days={effectiveDays} platform={platformParam} />
+        <HashtagPerformancePanel
+          days={effectiveDays}
+          platform={platformParam}
+          accountId={selectedAccount?.id ?? null}
+        />
       </div>
 
       {/* Demografi audiens (IG) — gender × usia */}
@@ -689,10 +736,12 @@ export function AnalyticsPage() {
       />
 
       {/* Analytics Pinterest — fetch on-demand (compliance: tidak disimpan).
-          Panel ini khusus Pinterest, jadi disembunyikan saat filter platform
-          diarahkan ke platform lain — kalau tidak, ia tampak seolah bagian dari
-          data platform yang sedang dipilih. */}
-      {(platform === "all" || platform === "pinterest") && <PinterestAnalyticsPanel />}
+          Panel ini khusus Pinterest, jadi disembunyikan saat filter akun
+          diarahkan ke akun non-Pinterest — kalau tidak, ia tampak seolah bagian
+          dari data akun yang sedang dipilih. */}
+      {(!selectedAccount || selectedAccount.platform === "pinterest") && (
+        <PinterestAnalyticsPanel />
+      )}
     </div>
   );
 }

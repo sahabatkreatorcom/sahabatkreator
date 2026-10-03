@@ -65,6 +65,67 @@ export type PostMetrics = {
   websiteClicks?: number | null;
 };
 
+/** Metrik level-post yang bisa ditampilkan di kartu ringkasan Analitik */
+export type PostMetricKey = "views" | "likes" | "comments" | "shares" | "impressions";
+
+/**
+ * Metrik yang BENAR-BENAR disediakan tiap platform (level post).
+ *
+ * Dipakai halaman Analitik untuk menampilkan "—" (bukan 0) pada kartu metrik
+ * yang tidak disediakan platform — supaya 0 tidak dibaca sebagai
+ * "konten tidak dapat interaksi". Contoh: Threads/TikTok/YouTube/Bluesky tidak
+ * punya `impressions` per-post; YouTube tidak punya `shares`; Bluesky tidak
+ * punya `views`.
+ *
+ * Sumber: riset docs/social-platforms + probe API (lihat komentar tiap adapter).
+ */
+const POST_METRIC_SUPPORT: Record<string, readonly PostMetricKey[]> = {
+  // IG: `impressions` deprecated → adapter fallback ke `views` (angka tetap terisi)
+  instagram: ["views", "likes", "comments", "shares", "impressions"],
+  instagram_standalone: ["views", "likes", "comments", "shares", "impressions"],
+  // FB: views/impressions level POST tidak tersedia → diisi Page Insights (level akun)
+  facebook: ["views", "likes", "comments", "shares", "impressions"],
+  // Threads: hanya views/likes/replies/reposts/quotes/shares — tanpa impressions
+  threads: ["views", "likes", "comments", "shares"],
+  tiktok: ["views", "likes", "comments", "shares"],
+  youtube: ["views", "likes", "comments"],
+  bluesky: ["likes", "comments", "shares"],
+  linkedin: ["likes", "comments"],
+  linkedin_org: ["views", "likes", "comments", "shares", "impressions"],
+};
+
+const ALL_POST_METRIC_KEYS: readonly PostMetricKey[] = [
+  "views",
+  "likes",
+  "comments",
+  "shares",
+  "impressions",
+];
+
+/**
+ * Gabungan metrik yang tersedia untuk sekumpulan platform (dipakai saat filter
+ * "semua akun" aktif). Platform yang belum terdaftar dianggap menyediakan semua
+ * metrik — lebih baik menampilkan angka apa adanya daripada menyembunyikan data.
+ */
+export function supportedPostMetrics(platforms: string[]): Record<PostMetricKey, boolean> {
+  if (platforms.length === 0) {
+    return Object.fromEntries(ALL_POST_METRIC_KEYS.map((k) => [k, true])) as Record<
+      PostMetricKey,
+      boolean
+    >;
+  }
+  const supported = new Set<PostMetricKey>();
+  for (const platform of platforms) {
+    for (const key of POST_METRIC_SUPPORT[platform] ?? ALL_POST_METRIC_KEYS) {
+      supported.add(key);
+    }
+  }
+  return Object.fromEntries(ALL_POST_METRIC_KEYS.map((k) => [k, supported.has(k)])) as Record<
+    PostMetricKey,
+    boolean
+  >;
+}
+
 function pageTokenOf(metadata: Record<string, unknown> | null): string | null {
   return typeof metadata?.pageAccessToken === "string" ? metadata.pageAccessToken : null;
 }
@@ -527,22 +588,47 @@ async function facebookPostMetrics(postId: string, token: string): Promise<PostM
   };
 }
 
-/** Threads media insights — views, likes, reposts, quotes */
+// Metric media insights Threads — daftar VALID (docs Threads API, Sep 2026):
+// `views`, `likes`, `replies`, `reposts`, `quotes`, `shares`.
+// - TIDAK ada `impressions` per-post di Threads (hanya `views`).
+// - `replies` = komentar, `reposts` (+ `shares`) = share. Sebelumnya `replies`
+//   tidak diminta sama sekali → kartu Komentar & Shares selalu 0.
+// Urutan percobaan: daftar penuh → tanpa `quotes`/`shares` (versi API lama) →
+// inti → `likes` saja. Jangan langsung ke daftar tersempit: kombinasi sempit
+// membuat metrik lain hilang.
+const THREADS_MEDIA_METRICS_ATTEMPTS = [
+  "views,likes,replies,reposts,quotes,shares",
+  "views,likes,replies,reposts",
+  "views,likes,replies",
+  "likes",
+];
+
+/** Threads media insights — views, likes, replies, reposts, quotes, shares */
 async function threadsPostMetrics(mediaId: string, token: string): Promise<PostMetrics> {
-  const res = await httpRequest<{
-    data?: Array<{ name?: string; values?: Array<{ value: number }> }>;
-  }>(`${GRAPH_THREADS}/${mediaId}/insights`, {
-    query: { metric: "views,likes,reposts,quotes", access_token: token },
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Threads media insights: ${text.slice(0, 150)}`);
+  let data: MetaInsight[] = [];
+  let lastError = "";
+  for (const metric of THREADS_MEDIA_METRICS_ATTEMPTS) {
+    const res = await httpRequest<{ data?: MetaInsight[] }>(
+      `${GRAPH_THREADS}/${mediaId}/insights`,
+      { query: { metric, access_token: token } },
+    );
+    if (res.ok) {
+      data = (await res.json()).data ?? [];
+      lastError = "";
+      break;
+    }
+    lastError = (await res.text().catch(() => "")).slice(0, 150);
   }
-  const data = (await res.json()).data ?? [];
+  if (lastError) throw new Error(`Threads media insights: ${lastError}`);
+
+  const reposts = metricValue(data, "reposts");
+  const shares = metricValue(data, "shares");
   return {
     views: metricValue(data, "views"),
     likes: metricValue(data, "likes"),
-    shares: metricValue(data, "reposts"),
+    comments: metricValue(data, "replies"),
+    // `reposts` dan `shares` sama-sama "dibagikan" → dijumlahkan bila ada dua-duanya
+    shares: reposts === null && shares === null ? null : (reposts ?? 0) + (shares ?? 0),
   };
 }
 
