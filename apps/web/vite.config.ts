@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import mdx from "@mdx-js/rollup";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import remarkGfm from "remark-gfm";
 import { defineConfig, type Plugin } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
@@ -62,8 +63,14 @@ export default defineConfig({
     // `providerImportSource` membuat seluruh file .mdx otomatis menerima
     // komponen dari <MDXProvider> (lihat components/docs/mdx-components.tsx),
     // jadi penulis dokumen bisa memakai <Callout> / <Screenshot> tanpa import.
+    //
+    // `remarkPlugins: [remarkGfm]` WAJIB: tanpa ini tabel markdown GFM
+    // (`| kolom | kolom |` + baris pemisah `|---|`) TIDAK diparse dan tampil
+    // sebagai teks mentah di halaman. GFM juga mengaktifkan strikethrough,
+    // task list, dan autolink. Pemetaan komponen `table/th/td` sudah ada di
+    // mdx-components.tsx — tinggal butuh parser-nya.
     {
-      ...mdx({ providerImportSource: "@mdx-js/react" }),
+      ...mdx({ providerImportSource: "@mdx-js/react", remarkPlugins: [remarkGfm] }),
       enforce: "pre",
     },
     tailwindcss(),
