@@ -18,6 +18,7 @@ import {
   PINTEREST_SANDBOX,
   slotLabel,
   supportedPostMetrics,
+  supportedPostMetricsPerPost,
 } from "@sahabatkreator/publishing";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { Hono } from "hono";
@@ -547,6 +548,11 @@ analyticsRoute.get("/top-posts", async (c) => {
           reach,
           engagement,
           engagementRate: denom > 0 ? Number(((engagement / denom) * 100).toFixed(2)) : null,
+          // Dukungan metrik PER-POST (beda dari ringkasan level akun): Facebook
+          // tidak menyediakan views/impressions level post (New Pages Experience),
+          // jadi kartunya menampilkan "—" alih-alih 0 yang menyesatkan. Akun bridge
+          // Repliz dianggap menyediakan semua metrik (Repliz menormalkannya).
+          metricSupport: supportedPostMetricsPerPost([String(r.platform)], bridge),
           media: mediaUrl
             ? {
                 url: mediaUrl,

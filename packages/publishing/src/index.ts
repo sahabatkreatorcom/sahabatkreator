@@ -9,7 +9,11 @@ export {
   consumeAiCredits,
   getAiConfig,
 } from "./ai";
-export { type PostMetricKey, supportedPostMetrics } from "./analytics-metrics";
+export {
+  type PostMetricKey,
+  supportedPostMetrics,
+  supportedPostMetricsPerPost,
+} from "./analytics-metrics";
 export {
   hasEngagement,
   isSnapshotFresh,

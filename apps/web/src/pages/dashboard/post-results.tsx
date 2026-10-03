@@ -68,6 +68,10 @@ type TopPost = {
   reach: number;
   engagement: number;
   engagementRate: number | null;
+  /** Metrik yang BENAR-BENAR disediakan platform untuk post ini (level post).
+   *  Dihitung server — Facebook tidak menyediakan views/impressions per-post
+   *  (New Pages Experience), jadi kartunya menampilkan "—" bukan 0. */
+  metricSupport: Record<"views" | "likes" | "comments" | "shares" | "impressions", boolean>;
   media: PostMedia | null;
 };
 
@@ -259,10 +263,10 @@ function PostCard({
         <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-[var(--border-light)] border-t pt-2.5">
           <span
             className="inline-flex items-center gap-1 text-[11px] text-[var(--text-secondary)]"
-            title="Views"
+            title={post.metricSupport.views ? "Views" : "Views tidak disediakan platform"}
           >
             <Eye className="h-3 w-3" />
-            {formatCompact(post.views)}
+            {post.metricSupport.views ? formatCompact(post.views) : "—"}
           </span>
           <span
             className="inline-flex items-center gap-1 text-[11px] text-[var(--text-secondary)]"
@@ -462,8 +466,12 @@ function PostDetailModal({ post, onClose }: { post: TopPost; onClose: () => void
           )}
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-[var(--border-light)] border-t pt-3 text-[var(--text-secondary)] text-xs">
-            <span className="inline-flex items-center gap-1">
-              <Eye className="h-3.5 w-3.5" /> {formatCompact(post.views)} views
+            <span
+              className="inline-flex items-center gap-1"
+              title={post.metricSupport.views ? undefined : "Views tidak disediakan platform"}
+            >
+              <Eye className="h-3.5 w-3.5" />{" "}
+              {post.metricSupport.views ? `${formatCompact(post.views)} views` : "—"}
             </span>
             <span className="inline-flex items-center gap-1">
               <Heart className="h-3.5 w-3.5" /> {formatCompact(post.likes)} likes
@@ -629,6 +637,10 @@ export function PostResultsPage() {
       ? posts.reduce((sum, p) => sum + (p.engagementRate ?? 0), 0) / posts.length
       : null;
   const withMedia = posts.filter((p) => p.media !== null).length;
+  // Views hanya bermakna bila ADA post yang platformnya menyediakan views.
+  // Filter "facebook" saja → semua post tanpa views → kartu Total Views "—",
+  // bukan 0 yang menyesatkan (FB tidak punya views level post).
+  const anyViewsSupported = posts.some((p) => p.metricSupport.views);
 
   return (
     <div className="space-y-6">
@@ -666,7 +678,9 @@ export function PostResultsPage() {
             <div className="flex items-center gap-2 text-[var(--text-muted)] text-xs">
               <Eye className="h-3.5 w-3.5" /> Total Views
             </div>
-            <p className="mt-1.5 font-bold text-xl">{formatCompact(totals.views)}</p>
+            <p className="mt-1.5 font-bold text-xl">
+              {anyViewsSupported ? formatCompact(totals.views) : "—"}
+            </p>
           </div>
           <div className="card p-4">
             <div className="flex items-center gap-2 text-[var(--text-muted)] text-xs">

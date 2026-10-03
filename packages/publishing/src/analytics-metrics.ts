@@ -98,6 +98,31 @@ const POST_METRIC_SUPPORT: Record<string, readonly PostMetricKey[]> = {
   linkedin_org: ["views", "likes", "comments", "shares", "impressions"],
 };
 
+/**
+ * Metrik yang disediakan platform untuk SATU POST (level post) — dipakai kartu
+ * per-post di /post-results.
+ *
+ * BERBEDA dari POST_METRIC_SUPPORT: di sana `facebook` mencantumkan
+ * views/impressions karena halaman Analitik menggabungkannya dari Page Insights
+ * level AKUN (`page_media_view`). Angka itu milik HALAMAN, bukan per-post —
+ * Facebook (New Pages Experience) menolak SEMUA metric insights level post
+ * ("(#100) not a valid insights metric", dibuktikan probe). Jadi di sini
+ * views/impressions Facebook TIDAK dicantumkan, dan kartunya menampilkan "—"
+ * alih-alih 0 yang menyesatkan.
+ */
+const POST_METRIC_SUPPORT_PER_POST: Record<string, readonly PostMetricKey[]> = {
+  instagram: ["views", "likes", "comments", "shares"],
+  instagram_standalone: ["views", "likes", "comments", "shares"],
+  // Tanpa views/impressions: FB tidak menyediakannya per-post.
+  facebook: ["likes", "comments", "shares"],
+  threads: ["views", "likes", "comments", "shares"],
+  tiktok: ["views", "likes", "comments", "shares"],
+  youtube: ["views", "likes", "comments"],
+  bluesky: ["likes", "comments", "shares"],
+  linkedin: ["likes", "comments"],
+  linkedin_org: ["views", "likes", "comments", "shares"],
+};
+
 const ALL_POST_METRIC_KEYS: readonly PostMetricKey[] = [
   "views",
   "likes",
@@ -106,21 +131,27 @@ const ALL_POST_METRIC_KEYS: readonly PostMetricKey[] = [
   "impressions",
 ];
 
+/** Semua metrik dianggap tersedia — dipakai saat platform tidak diketahui. */
+function allPostMetricsTrue(): Record<PostMetricKey, boolean> {
+  return Object.fromEntries(ALL_POST_METRIC_KEYS.map((k) => [k, true])) as Record<
+    PostMetricKey,
+    boolean
+  >;
+}
+
 /**
- * Gabungan metrik yang tersedia untuk sekumpulan platform (dipakai saat filter
- * "semua akun" aktif). Platform yang belum terdaftar dianggap menyediakan semua
- * metrik — lebih baik menampilkan angka apa adanya daripada menyembunyikan data.
+ * Gabungan (union) metrik dari beberapa platform: sebuah metrik dianggap
+ * tersedia bila SALAH SATU platform menyediakannya. Platform tak dikenal →
+ * semua tersedia (lebih baik menampilkan angka apa adanya daripada menyembunyikan).
  */
-export function supportedPostMetrics(platforms: string[]): Record<PostMetricKey, boolean> {
-  if (platforms.length === 0) {
-    return Object.fromEntries(ALL_POST_METRIC_KEYS.map((k) => [k, true])) as Record<
-      PostMetricKey,
-      boolean
-    >;
-  }
+function supportUnion(
+  table: Record<string, readonly PostMetricKey[]>,
+  platforms: string[],
+): Record<PostMetricKey, boolean> {
+  if (platforms.length === 0) return allPostMetricsTrue();
   const supported = new Set<PostMetricKey>();
   for (const platform of platforms) {
-    for (const key of POST_METRIC_SUPPORT[platform] ?? ALL_POST_METRIC_KEYS) {
+    for (const key of table[platform] ?? ALL_POST_METRIC_KEYS) {
       supported.add(key);
     }
   }
@@ -128,6 +159,31 @@ export function supportedPostMetrics(platforms: string[]): Record<PostMetricKey,
     PostMetricKey,
     boolean
   >;
+}
+
+/**
+ * Gabungan metrik level AKUN (dipakai kartu ringkasan halaman Analitik). Di sini
+ * Facebook dianggap menyediakan views/impressions karena angkanya diambil dari
+ * Page Insights level akun (`page_media_view`).
+ */
+export function supportedPostMetrics(platforms: string[]): Record<PostMetricKey, boolean> {
+  return supportUnion(POST_METRIC_SUPPORT, platforms);
+}
+
+/**
+ * Gabungan metrik untuk kartu PER-POST (/post-results). Beda dari versi level
+ * akun: Facebook TIDAK menyediakan views/impressions per-post.
+ *
+ * `bridge` = akun Repliz: Repliz menormalkan metrik lintas platform (views/reach/
+ * impressions dari Content statistic API), jadi metriknya dianggap tersedia —
+ * jangan sembunyikan angka yang Repliz memang kirim.
+ */
+export function supportedPostMetricsPerPost(
+  platforms: string[],
+  bridge = false,
+): Record<PostMetricKey, boolean> {
+  if (bridge) return allPostMetricsTrue();
+  return supportUnion(POST_METRIC_SUPPORT_PER_POST, platforms);
 }
 
 function pageTokenOf(metadata: Record<string, unknown> | null): string | null {

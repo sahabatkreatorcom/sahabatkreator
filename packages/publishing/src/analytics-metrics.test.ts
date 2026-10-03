@@ -4,6 +4,7 @@ import {
   IG_MEDIA_METRIC_LISTS,
   metricValue,
   supportedPostMetrics,
+  supportedPostMetricsPerPost,
 } from "./analytics-metrics";
 
 describe("supportedPostMetrics", () => {
@@ -145,5 +146,44 @@ describe("FB_PAGE_INSIGHT_METRICS — views Halaman wajib page_media_view", () =
 
   it("fallback tetap membawa engagements", () => {
     expect(FB_PAGE_INSIGHT_METRICS.fallback.split(",")).toContain("page_post_engagements");
+  });
+});
+
+// Regresi: kartu PER-POST (/post-results) Facebook selalu menampilkan "0 views"
+// padahal FB tidak menyediakan views/impressions level post (New Pages
+// Experience menolak SEMUA metric insights level post). Angka Halaman hanya ada
+// di level AKUN (`page_media_view`) — itu sebabnya ringkasan level akun dan
+// kartu per-post butuh daftar dukungan yang BERBEDA.
+describe("supportedPostMetricsPerPost — kartu per-post", () => {
+  it("Facebook: TANPA views & impressions per-post, likes/comments/shares ada", () => {
+    const s = supportedPostMetricsPerPost(["facebook"]);
+    expect(s.views).toBe(false);
+    expect(s.impressions).toBe(false);
+    expect(s.likes).toBe(true);
+    expect(s.comments).toBe(true);
+    expect(s.shares).toBe(true);
+  });
+
+  it("Facebook level AKUN tetap punya views (Page Insights) — beda dari per-post", () => {
+    // Regression guard: jangan sampai memperbaiki kartu per-post malah
+    // mematikan kartu ringkasan level akun yang kini terisi page_media_view.
+    expect(supportedPostMetrics(["facebook"]).views).toBe(true);
+    expect(supportedPostMetricsPerPost(["facebook"]).views).toBe(false);
+  });
+
+  it("platform lain tetap punya views per-post", () => {
+    for (const p of ["instagram", "instagram_standalone", "threads", "tiktok", "youtube"]) {
+      expect(supportedPostMetricsPerPost([p]).views, `${p} harus punya views`).toBe(true);
+    }
+  });
+
+  it("akun bridge Repliz: semua metrik dianggap tersedia", () => {
+    const s = supportedPostMetricsPerPost(["facebook"], true);
+    expect(s.views).toBe(true);
+    expect(s.impressions).toBe(true);
+  });
+
+  it("gabungan platform: views ada bila SALAH SATU menyediakannya", () => {
+    expect(supportedPostMetricsPerPost(["facebook", "instagram"]).views).toBe(true);
   });
 });
