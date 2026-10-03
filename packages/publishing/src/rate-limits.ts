@@ -164,3 +164,56 @@ export function isThrottleError(message: string | null | undefined): boolean {
   if (!message) return false;
   return THROTTLE_CODE_RE.test(message) || THROTTLE_TEXT_RE.test(message);
 }
+
+/** Satu baris snapshot kuota siap disimpan. `remaining`/`total` dalam persen. */
+export type QuotaSnapshot = {
+  platform: string;
+  entityId: string;
+  quotaType: string;
+  remaining: number;
+  total: number;
+};
+
+/** Semua snapshot kuota Meta disimpan sebagai persen. */
+const PCT_TOTAL = 100;
+
+/** Persen pemakaian → sisa kuota 0–100 (dibulatkan, tidak pernah negatif). */
+function remainingPct(usedPct: number): number {
+  return Math.max(0, PCT_TOTAL - Math.round(usedPct));
+}
+
+/**
+ * Terjemahkan header kuota Meta pada SATU respons menjadi snapshot siap simpan.
+ *
+ * Dipisah dari penulisan DB supaya aturannya bisa diuji sebagai fungsi murni —
+ * dan supaya `quota.ts` tinggal menulis, bukan mengolah.
+ */
+export function metaQuotaSnapshots(url: string, headers: Headers): QuotaSnapshot[] {
+  const out: QuotaSnapshot[] = [];
+
+  const appUsage = parseMetaAppUsage(headers.get("x-app-usage"));
+  if (appUsage) {
+    out.push({
+      platform: "meta",
+      entityId: metaAppKeyForUrl(url),
+      quotaType: "app_usage",
+      remaining: remainingPct(appUsage.callCountPct),
+      total: PCT_TOTAL,
+    });
+  }
+
+  for (const buc of parseMetaBucUsage(headers.get("x-business-use-case-usage"))) {
+    // `type` jadi platform sekaligus bagian quotaType: tiap use case punya
+    // anggaran terpisah, dan menggabungkannya jadi satu baris "meta_buc"
+    // menyembunyikan bucket mana yang sebenarnya habis.
+    out.push({
+      platform: buc.type ?? "meta",
+      entityId: buc.entityId,
+      quotaType: buc.type ? `meta_buc_${buc.type}` : "meta_buc",
+      remaining: remainingPct(buc.callCountPct),
+      total: PCT_TOTAL,
+    });
+  }
+
+  return out;
+}

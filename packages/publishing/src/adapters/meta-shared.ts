@@ -6,7 +6,16 @@ import { httpRequest, throwFromResponse } from "../http";
 import { recordQuotaFromHeaders } from "../quota";
 import { PublishError, type PublishInput, type PublishResult } from "../types";
 
-/** Rekam kuota BUC Meta dari response header (entity = platformAccountId akun) */
+/**
+ * Hook per-response adapter Meta — merekam pola kuota umum (`X-RateLimit-*`)
+ * memakai platform + platformAccountId milik akun yang sedang publish.
+ *
+ * Kuota Meta sendiri (`x-app-usage`, `x-business-use-case-usage`) TIDAK di sini:
+ * kedua header itu mendeskripsikan dirinya sendiri (entity + use case), jadi
+ * direkam terpusat oleh `quota.ts` di lapisan `httpRequest` — sehingga jalur
+ * sync (analytics/posts/engagement/DM) yang jauh lebih banyak memanggil API
+ * juga ikut tercatat, tanpa perlu konteks pemanggil.
+ */
 export function quotaHook(platform: string, input: Pick<PublishInput, "platformAccountId">) {
   return (res: { headers: Headers }) =>
     void recordQuotaFromHeaders(platform, input.platformAccountId, res.headers);

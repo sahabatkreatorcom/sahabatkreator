@@ -111,8 +111,10 @@ export {
   type MetaAppUsage,
   type MetaBucUsage,
   metaAppKeyForUrl,
+  metaQuotaSnapshots,
   parseMetaAppUsage,
   parseMetaBucUsage,
+  type QuotaSnapshot,
 } from "./rate-limits";
 export {
   REPLIZ_PLATFORMS,

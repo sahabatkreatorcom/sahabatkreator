@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isThrottleError,
   metaAppKeyForUrl,
+  metaQuotaSnapshots,
   parseMetaAppUsage,
   parseMetaBucUsage,
 } from "./rate-limits";
@@ -99,6 +100,73 @@ describe("metaAppKeyForUrl", () => {
   it("host lain / URL tidak valid → kunci umum, bukan error", () => {
     expect(metaAppKeyForUrl("https://example.com/x")).toBe("meta_app");
     expect(metaAppKeyForUrl("bukan-url")).toBe("meta_app");
+  });
+});
+
+describe("metaQuotaSnapshots", () => {
+  it("x-app-usage → satu baris app-wide dalam PERSEN (total 100)", () => {
+    const headers = new Headers({
+      "x-app-usage": '{"call_count":15,"total_cputime":0,"total_time":0}',
+    });
+    const rows = metaQuotaSnapshots("https://graph.facebook.com/v26.0/123", headers);
+    expect(rows).toEqual([
+      {
+        platform: "meta",
+        entityId: "meta_app_facebook",
+        quotaType: "app_usage",
+        remaining: 85,
+        total: 100,
+      },
+    ]);
+  });
+
+  it("BUC Threads → platform & quotaType dari `type`, entity dari kunci header", () => {
+    // Header riil dari graph.threads.net — host ini TIDAK mengirim x-app-usage,
+    // jadi cabang BUC inilah satu-satunya cara pemakaian Threads terlihat.
+    const headers = new Headers({
+      "x-business-use-case-usage":
+        '{"28532476826389799":[{"type":"threads","call_count":4,"total_cputime":2,"total_time":1,"estimated_time_to_regain_access":0}]}',
+    });
+    const rows = metaQuotaSnapshots("https://graph.threads.net/v1.0/me", headers);
+    expect(rows).toEqual([
+      {
+        platform: "threads",
+        entityId: "28532476826389799",
+        quotaType: "meta_buc_threads",
+        remaining: 96,
+        total: 100,
+      },
+    ]);
+  });
+
+  it("kedua header sekaligus → dua baris terpisah", () => {
+    const headers = new Headers({
+      "x-app-usage": '{"call_count":50,"total_cputime":0,"total_time":0}',
+      "x-business-use-case-usage": '{"app":[{"type":"pages","call_count":80}]}',
+    });
+    const rows = metaQuotaSnapshots("https://graph.facebook.com/v26.0/x", headers);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.remaining).toBe(50);
+    expect(rows[1]).toMatchObject({
+      platform: "pages",
+      quotaType: "meta_buc_pages",
+      remaining: 20,
+    });
+  });
+
+  it("pemakaian di atas 100% tidak menghasilkan sisa negatif", () => {
+    const headers = new Headers({ "x-app-usage": '{"call_count":130}' });
+    expect(metaQuotaSnapshots("https://graph.facebook.com/x", headers)[0]?.remaining).toBe(0);
+  });
+
+  it("tanpa header kuota → tidak ada baris (jangan menulis data kosong)", () => {
+    expect(metaQuotaSnapshots("https://graph.facebook.com/x", new Headers())).toEqual([]);
+    expect(
+      metaQuotaSnapshots(
+        "https://api.tiktokv.com/x",
+        new Headers({ "content-type": "text/plain" }),
+      ),
+    ).toEqual([]);
   });
 });
 

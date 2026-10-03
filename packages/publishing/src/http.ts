@@ -26,7 +26,8 @@ export type HttpResponse<T = unknown> = {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Perekam kuota app-wide (`x-app-usage`) untuk SEMUA panggilan HTTP platform.
+ * Perekam kuota Meta (`x-app-usage`, `x-business-use-case-usage`) untuk SEMUA
+ * panggilan HTTP platform.
  *
  * MENGAPA di lapisan ini: kuota adalah properti request HTTP, bukan properti
  * satu adapter. Sebelumnya hanya adapter publish yang merekam kuota, sementara
@@ -37,12 +38,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * `@sahabatkreator/publishing`, jadi otomatis aktif). Test yang mengimpor
  * `http.ts` langsung tidak mendapat perekam → tidak menyentuh DB.
  */
-export type AppUsageRecorder = (url: string, headers: Headers) => void;
-let appUsageRecorder: AppUsageRecorder | null = null;
+export type MetaQuotaRecorder = (url: string, headers: Headers) => void;
+let metaQuotaRecorder: MetaQuotaRecorder | null = null;
 
-/** Pasang/lepas perekam kuota app-wide. `null` = matikan. */
-export function setAppUsageRecorder(recorder: AppUsageRecorder | null): void {
-  appUsageRecorder = recorder;
+/** Pasang/lepas perekam kuota Meta. `null` = matikan. */
+export function setMetaQuotaRecorder(recorder: MetaQuotaRecorder | null): void {
+  metaQuotaRecorder = recorder;
 }
 
 /** Batas aman bilangan bulat JavaScript: 9.007.199.254.740.991 (16 digit). */
@@ -189,13 +190,13 @@ export async function httpRequest<T = unknown>(
         }
       }
 
-      // Kuota app-wide (`x-app-usage`) direkam untuk SEMUA panggilan — publish
-      // maupun sync. Best-effort: kegagalan mencatat tidak pernah menggagalkan
-      // request. `target` dipakai karena host-nya menandai app Meta mana yang
-      // dipakai (lihat metaAppKeyForUrl).
-      if (appUsageRecorder) {
+      // Kuota Meta direkam untuk SEMUA panggilan — publish maupun sync.
+      // Best-effort: kegagalan mencatat tidak pernah menggagalkan request.
+      // `target` dipakai karena host-nya menandai app Meta mana yang dipakai
+      // (lihat metaAppKeyForUrl).
+      if (metaQuotaRecorder) {
         try {
-          appUsageRecorder(target, res.headers);
+          metaQuotaRecorder(target, res.headers);
         } catch {
           // pencatatan kuota tidak boleh menggagalkan request
         }
