@@ -102,6 +102,9 @@ type TopPosts = {
     reach: number;
     engagement: number;
     engagementRate: number | null;
+    /** Metrik yang disediakan platform untuk post ini (level post). Facebook
+     *  tidak menyediakan views/impressions per-post → tampil "—", bukan 0. */
+    metricSupport?: Record<"views" | "likes" | "comments" | "shares" | "impressions", boolean>;
   }[];
 };
 
@@ -672,8 +675,11 @@ export function AnalyticsPage() {
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-2 text-sm">{p.content || "(media saja)"}</p>
                       <p className="mt-1 text-[var(--text-muted)] text-xs">
-                        @{p.username} · {formatCompact(p.views)} views · {formatCompact(p.likes)}{" "}
-                        likes
+                        @{p.username} ·{" "}
+                        {p.metricSupport?.views === false
+                          ? "— views"
+                          : `${formatCompact(p.views)} views`}{" "}
+                        · {formatCompact(p.likes)} likes
                       </p>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         {p.impressions > 0 && (
