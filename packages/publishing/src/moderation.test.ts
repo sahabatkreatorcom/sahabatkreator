@@ -17,7 +17,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GRAPH_FB_URL, GRAPH_THREADS_URL } from "./config";
 import { httpRequest } from "./http";
-import { moderateComment } from "./moderation";
+import { likeComment, moderateComment } from "./moderation";
 
 vi.mock("./http", async () => {
   const actual = await vi.importActual<typeof import("./http")>("./http");
@@ -162,5 +162,100 @@ describe("moderateComment — Instagram & Facebook (regression)", () => {
     await expect(
       moderateComment({ platform: "tiktok", accessToken: "T", platformItemId: "1" }, "hide"),
     ).rejects.toMatchObject({ code: "comment_moderation_unsupported" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Like/unlike komentar — wajib untuk Meta App Review `pages_manage_engagement`.
+//
+// Latar: pengajuan `pages_manage_engagement` DITOLAK karena demo tidak
+// memperlihatkan "like komentar" (permintaan Meta: satu permission mencakup
+// reply / hide / like). Endpoint yang terbukti jalan diuji langsung pada Page
+// Facebook (SHD Store): `POST|DELETE /{comment-id}/likes`. `POST
+// /{comment-id}/reactions?type=LIKE` TIDAK dipakai (dijawab #3 "Application
+// does not have the capability").
+//
+// Yang dikunci di sini:
+//  - like   → POST   /{comment-id}/likes
+//  - unlike → DELETE /{comment-id}/likes
+//  - pakai pageAccessToken bila ada (fallback accessToken)
+//  - platform non-Facebook & akun bridge Repliz ditolak dengan pesan jelas
+// ---------------------------------------------------------------------------
+
+describe("likeComment — Facebook Page", () => {
+  it("like memakai POST /{comment-id}/likes dengan page token", async () => {
+    mockedRequest.mockResolvedValue(fakeResponse({}) as never);
+
+    await likeComment(
+      {
+        platform: "facebook",
+        accessToken: "USER_TOKEN",
+        platformItemId: "122189525186907803_1400450162253131",
+        accountMetadata: { pageAccessToken: "PAGE_TOKEN" },
+      },
+      true,
+    );
+
+    expect(mockedRequest).toHaveBeenCalledTimes(1);
+    const [url, options] = mockedRequest.mock.calls[0] as [string, Record<string, unknown>];
+    expect(url).toBe(`${GRAPH_FB_URL}/122189525186907803_1400450162253131/likes`);
+    expect(options.method).toBe("POST");
+    expect((options.query as Record<string, unknown>).access_token).toBe("PAGE_TOKEN");
+  });
+
+  it("unlike memakai DELETE /{comment-id}/likes", async () => {
+    mockedRequest.mockResolvedValue(fakeResponse({}) as never);
+
+    await likeComment({ platform: "facebook", accessToken: "TOKEN", platformItemId: "999" }, false);
+
+    const [url, options] = mockedRequest.mock.calls[0] as [string, Record<string, unknown>];
+    expect(url).toBe(`${GRAPH_FB_URL}/999/likes`);
+    expect(options.method).toBe("DELETE");
+    // tanpa pageAccessToken → jatuh ke accessToken biasa
+    expect((options.query as Record<string, unknown>).access_token).toBe("TOKEN");
+  });
+
+  it("platformItemId kosong ditolak sebelum memanggil API", async () => {
+    await expect(
+      likeComment({ platform: "facebook", accessToken: "T", platformItemId: null }, true),
+    ).rejects.toMatchObject({ code: "no_platform_item" });
+
+    expect(mockedRequest).not.toHaveBeenCalled();
+  });
+
+  it("response non-2xx dilempar sebagai PublishError", async () => {
+    mockedRequest.mockResolvedValue(
+      fakeResponse({ ok: false, status: 400, body: '{"error":{"message":"bad"}}' }) as never,
+    );
+
+    await expect(
+      likeComment({ platform: "facebook", accessToken: "T", platformItemId: "123" }, true),
+    ).rejects.toMatchObject({ code: "http_400" });
+  });
+});
+
+describe("likeComment — platform tak didukung", () => {
+  it("Instagram ditolak dengan pesan jelas tanpa memanggil API", async () => {
+    await expect(
+      likeComment({ platform: "instagram", accessToken: "T", platformItemId: "1" }, true),
+    ).rejects.toMatchObject({ code: "comment_like_unsupported" });
+
+    expect(mockedRequest).not.toHaveBeenCalled();
+  });
+
+  it("akun bridge Repliz ditolak dengan pesan jelas", async () => {
+    await expect(
+      likeComment(
+        {
+          platform: "facebook",
+          accessToken: "T",
+          platformItemId: "1",
+          accountMetadata: { replizAccountId: "abc" },
+        },
+        true,
+      ),
+    ).rejects.toMatchObject({ code: "comment_like_unsupported" });
+
+    expect(mockedRequest).not.toHaveBeenCalled();
   });
 });

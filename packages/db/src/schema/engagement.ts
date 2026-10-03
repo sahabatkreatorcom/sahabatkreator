@@ -47,6 +47,11 @@ export const engagementItem = pgTable(
     sentiment: text("sentiment"),
     // Moderasi: item disembunyikan dari inbox default (bisa di-unhide)
     hidden: boolean("hidden").notNull().default(false),
+    // Moderasi: Page sudah menyukai komentar ini (like/unlike).
+    // Dipakai Meta App Review `pages_manage_engagement` — permintaan Meta
+    // eksplisit menyebut "reply / hide / like" pada satu permission, jadi
+    // like harus punya tombol + state tersimpan seperti hide.
+    liked: boolean("liked").notNull().default(false),
     occurredAt: timestamp("occurred_at").notNull().defaultNow(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

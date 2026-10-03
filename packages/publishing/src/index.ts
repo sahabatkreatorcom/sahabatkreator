@@ -66,7 +66,7 @@ export {
 export { clearWebhookEmit, emitWebhook, registerWebhookEmit } from "./event-hook";
 export { normalizeHandle } from "./handle";
 export * from "./http";
-export { type CommentModerationInput, moderateComment } from "./moderation";
+export { type CommentModerationInput, likeComment, moderateComment } from "./moderation";
 export * from "./oauth";
 export {
   computeOptimalTimes,

@@ -3,6 +3,7 @@
 import { db } from "@sahabatkreator/db";
 import { engagementItem, savedResponse, socialAccount } from "@sahabatkreator/db/schema";
 import {
+  likeComment,
   moderateComment,
   PublishError,
   type ReplizCommentStatus,
@@ -62,6 +63,8 @@ engagementRoute.get("/", async (c) => {
         type: engagementItem.type,
         status: engagementItem.status,
         hidden: engagementItem.hidden,
+        // Moderasi like (pages_manage_engagement) — state tombol suka/batal suka
+        liked: engagementItem.liked,
         platform: socialAccount.platform,
         accountUsername: socialAccount.username,
         parentId: engagementItem.parentId,
@@ -202,6 +205,84 @@ engagementRoute.patch("/comments/:id", async (c) => {
       .where(eq(engagementItem.id, row.id));
 
     return c.json({ ok: true, hidden: input.hidden, platformSynced: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+/** POST /engagement/comments/:id/like — like/unlike komentar { liked: boolean } */
+engagementRoute.post("/comments/:id/like", async (c) => {
+  try {
+    const ctx = await requirePermission(c, "engagement.moderate");
+    const input = z.object({ liked: z.boolean() }).parse(await c.req.json());
+
+    // Org-scope: pastikan item milik org (join socialAccount)
+    const [row] = await db
+      .select({
+        id: engagementItem.id,
+        platform: socialAccount.platform,
+        platformItemId: engagementItem.platformItemId,
+        accessTokenEnc: socialAccount.accessTokenEnc,
+        metadata: socialAccount.metadata,
+        isConnected: socialAccount.isConnected,
+      })
+      .from(engagementItem)
+      .innerJoin(socialAccount, eq(engagementItem.socialAccountId, socialAccount.id))
+      .where(
+        and(
+          eq(engagementItem.id, c.req.param("id")),
+          eq(engagementItem.organizationId, ctx.organization.id),
+          eq(engagementItem.type, "comment"),
+        ),
+      )
+      .limit(1);
+    if (!row) throw new HTTPError(404, "Komentar tidak ditemukan");
+
+    if (!row.isConnected) {
+      throw new PublishError(
+        "account_not_connected",
+        "Akun platform tidak terhubung — hubungkan ulang akun.",
+        false,
+      );
+    }
+    // Akun bridge Repliz: token platform disimpan Repliz; like lewat Comment API
+    // Repliz yang butuh contentId — tidak tersedia dari inbox. likeComment
+    // memberi pesan jelas untuk kasus bridge (tidak menembak endpoint salah).
+    if (!row.accessTokenEnc && !isBridgeAccount(row.metadata)) {
+      throw new PublishError(
+        "account_not_connected",
+        "Token akun tidak tersedia — hubungkan ulang akun.",
+        false,
+      );
+    }
+
+    let accessToken: string;
+    try {
+      accessToken = row.accessTokenEnc ? decrypt(row.accessTokenEnc) : "";
+    } catch {
+      throw new PublishError(
+        "token_decrypt_failed",
+        "Token akun tidak bisa dibaca — hubungkan ulang akun.",
+        false,
+      );
+    }
+
+    await likeComment(
+      {
+        platform: row.platform,
+        accessToken,
+        platformItemId: row.platformItemId,
+        accountMetadata: row.metadata,
+      },
+      input.liked,
+    );
+
+    await db
+      .update(engagementItem)
+      .set({ liked: input.liked })
+      .where(eq(engagementItem.id, row.id));
+
+    return c.json({ ok: true, liked: input.liked, platformSynced: true });
   } catch (error) {
     return errorResponse(error);
   }

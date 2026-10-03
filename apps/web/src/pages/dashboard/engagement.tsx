@@ -15,6 +15,7 @@ import {
   Search,
   Sparkles,
   Star,
+  ThumbsUp,
   Trash2,
   Users,
 } from "lucide-react";
@@ -37,6 +38,8 @@ type Item = {
   type: "comment" | "mention" | "dm" | "review";
   status: "unread" | "read" | "replied" | "archived";
   hidden: boolean;
+  // Moderasi like (pages_manage_engagement) — Page sudah menyukai komentar ini
+  liked: boolean;
   platform: string;
   accountUsername: string;
   authorName: string | null;
@@ -200,6 +203,18 @@ function EngagementCard({ item }: { item: Item }) {
     onSuccess: () => {
       invalidate();
       toast.success("Komentar dihapus");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Moderasi: like/unlike komentar sebagai Page (pages_manage_engagement).
+  // Meta meminta satu permission ini mencakup "reply / hide / like" — App Review
+  // menolak bila demo tidak memperlihatkan like, jadi tombol ini wajib ada.
+  const toggleLike = useMutation({
+    mutationFn: () => api.post(`/engagement/comments/${item.id}/like`, { liked: !item.liked }),
+    onSuccess: () => {
+      invalidate();
+      toast.success(item.liked ? "Batal suka komentar" : "Komentar disukai");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -424,6 +439,28 @@ function EngagementCard({ item }: { item: Item }) {
               {/* Moderasi (M12): hide/unhide & delete komentar */}
               {item.type === "comment" && (
                 <>
+                  {/* Like/unlike komentar — hanya Facebook Page (edge /likes
+                      terverifikasi di sana). Bridge Repliz & IG belum didukung. */}
+                  {item.platform === "facebook" && !item.isBridge && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleLike.mutate()}
+                      disabled={toggleLike.isPending}
+                      className={item.liked ? "text-[var(--accent-gold)]" : undefined}
+                      title={item.liked ? "Batal suka komentar" : "Sukai komentar"}
+                    >
+                      {toggleLike.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <ThumbsUp
+                          className="h-3.5 w-3.5"
+                          fill={item.liked ? "currentColor" : "none"}
+                        />
+                      )}
+                      {item.liked ? "Disukai" : "Suka"}
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"
