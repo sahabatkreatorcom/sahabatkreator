@@ -4,13 +4,14 @@
 // 2. User klik link di email → server verifikasi + auto-sign-in + redirect ke web
 // 3. RequireAuth mendeteksi user tanpa org → wizard /create-organization
 import { useQuery } from "@tanstack/react-query";
-import { Ban, Eye, EyeOff, Loader2, MailCheck, RefreshCw, UserPlus } from "lucide-react";
+import { Ban, Loader2, MailCheck, RefreshCw, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { meQueryOptions, useSyncSession } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { useSeo } from "@/lib/seo";
@@ -37,7 +38,6 @@ export function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   // Setelah signUp sukses → tampilkan layar "cek email" (belum bisa login)
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
@@ -225,26 +225,14 @@ export function RegisterPage() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              required
-              autoComplete="new-password"
-              placeholder="Minimal 8 karakter"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute top-1/2 right-3 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
+          <PasswordInput
+            id="password"
+            required
+            autoComplete="new-password"
+            placeholder="Minimal 8 karakter"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
           {password && (
             <div className="flex items-center gap-2">
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--border)]">

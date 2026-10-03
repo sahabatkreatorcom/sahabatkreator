@@ -1,11 +1,12 @@
 // Halaman Login — email/password dengan dukungan 2FA OTP
-import { Eye, EyeOff, Loader2, LogIn, MailCheck } from "lucide-react";
+import { Loader2, LogIn, MailCheck } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useSyncSession } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { useSeo } from "@/lib/seo";
@@ -25,7 +26,6 @@ export function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   // Email belum terverifikasi → tampilkan panel kirim ulang link verifikasi
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
@@ -112,26 +112,14 @@ export function LoginPage() {
               Lupa password?
             </Link>
           </div>
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              required
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute top-1/2 right-3 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
+          <PasswordInput
+            id="password"
+            required
+            autoComplete="current-password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
         </div>
 
         <Button type="submit" className="w-full" disabled={loading}>

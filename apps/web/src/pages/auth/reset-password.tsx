@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useSyncSession } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { useSeo } from "@/lib/seo";
@@ -76,9 +76,8 @@ export function ResetPasswordPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="password">Password baru</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             required
             autoComplete="new-password"
             placeholder="Minimal 8 karakter"
@@ -88,9 +87,8 @@ export function ResetPasswordPage() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirm">Konfirmasi password</Label>
-          <Input
+          <PasswordInput
             id="confirm"
-            type="password"
             required
             autoComplete="new-password"
             placeholder="Ulangi password"

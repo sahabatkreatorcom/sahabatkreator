@@ -2,8 +2,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bot,
-  Eye,
-  EyeOff,
   ImagePlus,
   KeyRound,
   Loader2,
@@ -31,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { meQueryOptions } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
@@ -90,9 +89,6 @@ export function SettingsPage() {
   const [name, setName] = useState(me?.user.name ?? "");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showTwoFAPassword, setShowTwoFAPassword] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
@@ -351,48 +347,24 @@ export function SettingsPage() {
             <h2 className="font-semibold">Ubah Password</h2>
             <div className="space-y-2">
               <Label htmlFor="current-password">Password Saat Ini</Label>
-              <div className="relative">
-                <Input
-                  id="current-password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute top-1/2 right-3 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                  aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+              <PasswordInput
+                id="current-password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="new-password">Password Baru</Label>
-              <div className="relative">
-                <Input
-                  id="new-password"
-                  type={showNewPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  placeholder="Minimal 8 karakter"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPassword((v) => !v)}
-                  className="absolute top-1/2 right-3 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                  aria-label={showNewPassword ? "Sembunyikan password" : "Tampilkan password"}
-                >
-                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+              <PasswordInput
+                id="new-password"
+                autoComplete="new-password"
+                placeholder="Minimal 8 karakter"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
             </div>
             <Button type="submit">Ubah Password</Button>
           </form>
@@ -420,26 +392,14 @@ export function SettingsPage() {
                 Konfirmasi Password{" "}
                 {me?.user.twoFactorEnabled ? "(untuk menonaktifkan)" : "(untuk mengaktifkan)"}
               </Label>
-              <div className="relative">
-                <Input
-                  id="twofa-password"
-                  type={showTwoFAPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  placeholder="Password akun Anda"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowTwoFAPassword((v) => !v)}
-                  className="absolute top-1/2 right-3 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                  aria-label={showTwoFAPassword ? "Sembunyikan password" : "Tampilkan password"}
-                >
-                  {showTwoFAPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+              <PasswordInput
+                id="twofa-password"
+                autoComplete="current-password"
+                placeholder="Password akun Anda"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
             </div>
             <Button
               type="submit"
