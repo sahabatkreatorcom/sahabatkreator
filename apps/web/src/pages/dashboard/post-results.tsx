@@ -36,6 +36,7 @@ import { PLATFORMS } from "@/lib/platforms";
 import { useSeo } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { queryKeys } from "../../lib/query-keys";
+import { type SyncResponse, syncContentNote, syncMetricsNote } from "./posts-sync-types";
 
 type PostMedia = {
   url: string;
@@ -517,32 +518,33 @@ export function PostResultsPage() {
   const queryClient = useQueryClient();
 
   // Import manual konten yang dipublikasikan langsung di platform (termasuk
-  // Threads) → muncul di grid ini. Worker juga sinkron otomatis tiap 4 jam;
-  // tombol ini untuk yang ingin segera melihat post terbarunya.
+  // Threads) → muncul di grid ini. Server sekaligus menyegarkan METRIK
+  // (views/likes/komentar/share) untuk org ini, jadi satu klik menuntaskan
+  // konten + angka. Worker juga sinkron otomatis; tombol ini untuk yang ingin
+  // segera tanpa menunggu siklus berikutnya.
   const syncPosts = useMutation({
-    mutationFn: () =>
-      api.post<{ summary: { totalPostsImported: number; totalPostsUpdated: number } }>(
-        "/posts/sync",
-        {},
-      ),
+    mutationFn: () => api.post<SyncResponse>("/posts/sync", {}),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.postResults });
-      const imported = res.summary?.totalPostsImported ?? 0;
-      const updated = res.summary?.totalPostsUpdated ?? 0;
-      // `imported` = post baru; `updated` = post lama yang metrik/media-nya
-      // disegarkan. Keduanya hasil nyata — jangan bilang "sudah terbaru" kalau
-      // sebenarnya ada puluhan baris yang baru saja diperbarui.
-      if (imported > 0) {
-        toast.success(
-          updated > 0
-            ? `${imported} konten baru diimpor, ${updated} konten diperbarui`
-            : `${imported} konten platform berhasil diimpor`,
-        );
-      } else if (updated > 0) {
-        toast.success(`${updated} konten platform diperbarui`);
-      } else {
-        toast.success("Konten platform sudah terbaru");
+      // Angka metrik ikut berubah → halaman Analitik juga harus refetch.
+      queryClient.invalidateQueries({ queryKey: queryKeys.analyticsOverview });
+      queryClient.invalidateQueries({ queryKey: queryKeys.analyticsTimeseries });
+      queryClient.invalidateQueries({ queryKey: queryKeys.analyticsTopPosts });
+      queryClient.invalidateQueries({ queryKey: queryKeys.analyticsHashtags });
+
+      const content = syncContentNote(res.summary);
+
+      // Metrik dilaporkan terpisah: pengguna harus tahu apakah angkanya benar
+      // benar sudah ditarik, masih berjalan, atau gagal — supaya tidak lagi
+      // menyangka tombolnya tidak bekerja saat semua metrik masih 0.
+      if (res.metrics?.status === "error") {
+        toast.warning(`${content} — metrik gagal disegarkan`, {
+          description: res.metrics.message,
+        });
+        return;
       }
+      const metricsNote = syncMetricsNote(res.metrics);
+      toast.success(metricsNote ? `${content} · ${metricsNote}` : content);
     },
     onError: (e: Error) => toast.error(e.message),
   });

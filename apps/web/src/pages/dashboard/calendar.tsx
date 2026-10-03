@@ -39,6 +39,7 @@ import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { PLATFORMS } from "@/lib/platforms";
 import { queryKeys } from "../../lib/query-keys";
+import { type SyncResponse, syncContentNote, syncMetricsNote } from "./posts-sync-types";
 
 type ViewMode = "month" | "week" | "day";
 
@@ -171,30 +172,28 @@ export function CalendarPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Import manual post eksternal: fetch konten terbit langsung di platform → DB.
-  // Worker juga sinkron otomatis tiap 4 jam; tombol ini untuk yang ingin segera.
+  // Import manual post eksternal: fetch konten terbit langsung di platform → DB,
+  // sekaligus menyegarkan METRIK org ini (server melakukan keduanya dalam satu
+  // request). Worker juga sinkron otomatis; tombol ini untuk yang ingin segera.
   const syncPosts = useMutation({
-    mutationFn: () =>
-      api.post<{ summary: { totalPostsImported: number; totalPostsUpdated: number } }>(
-        "/posts/sync",
-        {},
-      ),
+    mutationFn: () => api.post<SyncResponse>("/posts/sync", {}),
     onSuccess: (data) => {
       invalidate();
-      const imported = data.summary?.totalPostsImported ?? 0;
-      const updated = data.summary?.totalPostsUpdated ?? 0;
-      // `updated` juga hasil nyata (metrik/media disegarkan) — lihat post-results.tsx.
-      if (imported > 0) {
-        toast.success(
-          updated > 0
-            ? `${imported} konten baru diimpor, ${updated} konten diperbarui`
-            : `${imported} konten platform berhasil diimpor`,
-        );
-      } else if (updated > 0) {
-        toast.success(`${updated} konten platform diperbarui`);
-      } else {
-        toast.success("Konten platform sudah terbaru");
+      // Angka metrik ikut berubah → halaman Analitik juga harus refetch.
+      queryClient.invalidateQueries({ queryKey: queryKeys.analyticsOverview });
+      queryClient.invalidateQueries({ queryKey: queryKeys.analyticsTimeseries });
+      queryClient.invalidateQueries({ queryKey: queryKeys.analyticsTopPosts });
+      queryClient.invalidateQueries({ queryKey: queryKeys.analyticsHashtags });
+
+      const content = syncContentNote(data.summary);
+      if (data.metrics?.status === "error") {
+        toast.warning(`${content} — metrik gagal disegarkan`, {
+          description: data.metrics.message,
+        });
+        return;
       }
+      const metricsNote = syncMetricsNote(data.metrics);
+      toast.success(metricsNote ? `${content} · ${metricsNote}` : content);
     },
     onError: (e: Error) => toast.error(e.message),
   });

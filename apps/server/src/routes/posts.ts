@@ -13,6 +13,7 @@ import {
 import {
   replizActiveCredentials,
   replizRemoveSchedule,
+  syncWorkspaceAnalytics,
   syncWorkspacePosts,
 } from "@sahabatkreator/publishing";
 import {
@@ -554,17 +555,70 @@ postsRoute.post("/", async (c) => {
   }
 });
 
+/**
+ * Batas total waktu satu request `/posts/sync` — dipakai untuk menghitung sisa
+ * anggaran penyegaran metrik SETELAH impor konten selesai.
+ *
+ * MENGAPA: nginx memutus koneksi di 120s dan Cloudflare (free) di ~100s. Impor
+ * konten sendiri bisa memakan puluhan detik (5 akun × paginasi platform), jadi
+ * anggaran metrik tidak boleh konstanta — kalau tidak, org besar akan menembus
+ * batas Cloudflare dan pengguna melihat 502 padahal datanya sudah tersimpan.
+ * Sisa waktu habis → sync metrik lanjut di latar belakang; halaman
+ * /post-results sudah polling sendiri tiap 60s sehingga angkanya tetap masuk.
+ */
+const SYNC_TOTAL_DEADLINE_MS = 75_000;
+
 /** POST /posts/sync — trigger manual import post eksternal dari platform.
  * Fetch konten terbit langsung di platform (90 hari default) → upsert ke DB.
  * Worker juga menjalankan siklus yang sama tiap 4 jam; endpoint ini untuk
- * user yang ingin melihat konten terbarunya segera. */
+ * user yang ingin melihat konten terbarunya segera.
+ *
+ * Setelah konten diimpor, metrik engagement (views/likes/komentar/share)
+ * ikut disegarkan untuk org ini. MENGAPA: `syncWorkspacePosts` hanya mengisi
+ * KONTEN — angka engagement datang dari jalur analytics terpisah yang di
+ * worker berjalan tiap 1 jam dengan antrean global (maks 10 akun/siklus).
+ * Tanpa langkah ini pengguna menekan "Sinkron Platform", kontennya masuk,
+ * tapi semua angka tetap 0 dan tombolnya terlihat tidak bekerja. */
 postsRoute.post("/sync", async (c) => {
+  const startedAt = Date.now();
   try {
     const ctx = await requirePermission(c, "posts.create");
     const input = z
       .object({ days: z.number().int().min(1).max(180).default(90) })
       .parse((await c.req.json().catch(() => ({}))) ?? {});
     const summary = await syncWorkspacePosts(ctx.organization.id, input.days);
+
+    // `force: true` → jangan lewati akun yang sudah punya snapshot hari ini;
+    // akun yang tersink pagi tadi tetap harus bisa disegarkan setelah post
+    // barunya diimpor. Snapshot per-post tetap punya pengaman sendiri
+    // (metrik non-nol / snapshot < 45 menit tidak ditembak ulang).
+    //
+    // Error ditangkap di sini (bukan di race) supaya kegagalan metrik tidak
+    // pernah menggagalkan respons padahal kontennya sudah tersimpan — dan
+    // supaya frontend bisa membedakan "gagal" dari "masih jalan".
+    const metricsPromise = syncWorkspaceAnalytics(ctx.organization.id, { force: true })
+      .then((r) => ({ status: "done" as const, accounts: r.synced, posts: r.postsSynced }))
+      .catch((err) => {
+        console.error("[posts] gagal menyegarkan metrik:", err);
+        return {
+          status: "error" as const,
+          accounts: 0,
+          posts: 0,
+          message: err instanceof Error ? err.message : String(err),
+        };
+      });
+    const budget = Math.max(0, SYNC_TOTAL_DEADLINE_MS - (Date.now() - startedAt));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const raced = await Promise.race([
+      metricsPromise,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), budget);
+      }),
+    ]);
+    if (timer) clearTimeout(timer);
+    // `pending` = anggaran waktu habis, sync lanjut di latar belakang.
+    const metrics = raced ?? { status: "pending" as const, accounts: 0, posts: 0 };
+
     fireActivity({
       orgId: ctx.organization.id,
       userId: ctx.user.id,
@@ -575,9 +629,11 @@ postsRoute.post("/sync", async (c) => {
         imported: summary.totalPostsImported,
         updated: summary.totalPostsUpdated,
         accounts: summary.attemptedAccounts,
+        metricsStatus: metrics.status,
+        metricsPosts: metrics.posts,
       },
     });
-    return c.json({ summary });
+    return c.json({ summary, metrics });
   } catch (error) {
     return errorResponse(error);
   }

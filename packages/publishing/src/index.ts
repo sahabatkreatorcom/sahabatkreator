@@ -18,6 +18,7 @@ export {
   type PostMetrics,
   syncAccountAnalytics,
   syncDueAnalyticsAccounts,
+  syncWorkspaceAnalytics,
   upsertAccountAnalytics,
   upsertPostAnalytics,
 } from "./analytics-sync";

@@ -7,6 +7,13 @@
 //
 // Bagian fetch per platform (adapter HTTP) dipecah ke analytics-metrics.ts;
 // file ini hanya orchestrasi DB + penjadwalan batch.
+//
+// DUA pintu masuk (keduanya lewat `runAnalyticsForAccounts` yang sama):
+// - `syncDueAnalyticsAccounts` → worker, antrean GLOBAL: maks 10 akun/siklus,
+//   tiap 1 jam, hanya akun yang belum punya snapshot hari ini.
+// - `syncWorkspaceAnalytics`   → tombol "Sinkron Platform", SATU organisasi.
+//   Ada karena antrean global membuat akun/post yang baru masuk menampilkan
+//   metrik 0 sampai ~1 jam — pengguna menyangka sinkronisasinya gagal.
 
 import { db } from "@sahabatkreator/db";
 import { accountAnalytics, post, postAnalytics, socialAccount } from "@sahabatkreator/db/schema";
@@ -22,6 +29,40 @@ import { decrypt } from "./crypto";
 // Re-export agar konsumsi lama (packages/publishing/src/index.ts) tidak putus —
 // tipe & fetcher sekarang tinggal di analytics-metrics.
 export { type AccountMetrics, fetchAccountMetrics, fetchPostMetrics, type PostMetrics };
+
+/**
+ * Platform yang punya adapter metrik (akun + post).
+ *
+ * Pinterest sengaja TIDAK ikut: Developer Guidelines melarang menyimpan data
+ * apa pun dari API-nya — analitik Pinterest diambil on-demand lewat
+ * `GET /analytics/pinterest`. Daftar ini dipakai dua jalur (worker global dan
+ * sync manual per organisasi) supaya keduanya tidak pernah berbeda.
+ */
+const ANALYTICS_PLATFORMS = new Set<string>([
+  "instagram",
+  "instagram_standalone",
+  "facebook",
+  "threads",
+  "tiktok",
+  "youtube",
+  "bluesky",
+  "linkedin",
+  "linkedin_org",
+]);
+
+/** Akun diproses paralel dalam batch kecil — satu akun gagal tidak menghentikan
+ *  batch lainnya (Promise.allSettled), tapi API platform tetap tidak dibanjiri. */
+const ANALYTICS_BATCH_SIZE = 3;
+
+/** Cap post per akun per siklus. Window posts-sync 90 hari bisa mengimpor
+ *  puluhan post sekaligus; 25 post/akun sudah cukup untuk mengisi angka post
+ *  terbaru lebih dulu tanpa menembus rate limit Meta (200 call/jam). */
+const POSTS_PER_CYCLE = 25;
+
+/** Snapshot hari ini yang metriknya MASIH NOL dianggap stale dan disink ulang
+ *  (lihat `syncAccountAnalytics`). Batas umur minimum mencegah pemanggilan API
+ *  berulang tiap siklus. */
+const STALE_AFTER_MINUTES = 45;
 
 /** Konteks akun untuk analytics sync (dipakai worker & route manual) */
 export type AnalyticsAccount = {
@@ -171,7 +212,6 @@ export async function syncAccountAnalytics(
   // Snapshot hari ini yang metriknya MASIH NOL ikut disink ulang (stale), supaya
   // post yang tersink sebelum interaksi datang tidak tersangkut 0 seharian.
   // Dibatasi umur minimum agar tidak memanggil API berulang tiap siklus.
-  const STALE_AFTER_MINUTES = 45;
   const staleBefore = new Date(Date.now() - STALE_AFTER_MINUTES * 60 * 1000);
   let alreadySynced: Set<string>;
   try {
@@ -224,10 +264,8 @@ export async function syncAccountAnalytics(
 
   // Sinkronkan post terbaru yang belum punya snapshot hari ini.
   // Cap 25/siklus (naik dari 10): window posts-sync 90 hari bisa impor puluhan
-  // post baru sekaligus — cap lama membuat post yang baru diimprobut menunggu
-  // berhari-hari sampai metriknya terisi. 25 × siklus 6 jam = hingga
-  // 100 post/akun/hari, masih aman untuk rate limit Meta (200 call/jam).
-  const POSTS_PER_CYCLE = 25;
+  // post baru sekaligus — cap lama membuat post yang baru diimpor menunggu
+  // berhari-hari sampai metriknya terisi.
   const targets = posts
     .slice(0, POSTS_PER_CYCLE + alreadySynced.size)
     .filter((p) => !alreadySynced.has(p.id))
@@ -261,79 +299,23 @@ export async function syncAccountAnalytics(
 }
 
 // ---------------------------------------------------------------------------
-// Sinkronisasi massal — dipakai worker
+// Sinkronisasi massal — worker (antrean global) & tombol "Sinkron Platform" (per org)
 // ---------------------------------------------------------------------------
 
 /**
- * Sync analytics akun yang due (lastAnalyticsAt tidak ada di schema — pakai
- * snapshot terakhir account_analytics: akun tanpa snapshot hari ini = due).
- * Interval 6 jam (metrik berubah lambat, hemat rate limit).
- * Akun diproses paralel dalam batch kecil — satu akun gagal tidak
- * menghentikan batch lainnya (Promise.allSettled).
+ * Jalankan `syncAccountAnalytics` untuk sekumpulan akun, paralel per batch kecil.
+ * Satu akun gagal (token ditolak, decrypt gagal, API error) tidak menghentikan
+ * akun lain — errornya dikumpulkan supaya pemanggil bisa melaporkannya.
  */
-export async function syncDueAnalyticsAccounts(
-  maxAccounts = 10,
+async function runAnalyticsForAccounts(
+  accounts: AnalyticsAccount[],
 ): Promise<{ synced: number; postsSynced: number; errors: string[] }> {
-  const BATCH_SIZE = 3;
-  const today = new Date().toISOString().slice(0, 10);
-
-  // Akun connected non-manual
-  const accounts = await db
-    .select({
-      id: socialAccount.id,
-      organizationId: socialAccount.organizationId,
-      platform: socialAccount.platform,
-      platformAccountId: socialAccount.platformAccountId,
-      username: socialAccount.username,
-      accessTokenEnc: socialAccount.accessTokenEnc,
-      metadata: socialAccount.metadata,
-    })
-    .from(socialAccount)
-    .where(eq(socialAccount.isConnected, true))
-    .limit(maxAccounts * 3);
-
-  // Filter: platform dengan dukungan analytics + belum ada snapshot hari ini
-  // Pinterest dikecualikan — Developer Guidelines melarang penyimpanan data analytics.
-  // Pinterest analytics di-fetch on-demand via endpoint /analytics/pinterest.
-  // Akun bridge Repliz tidak punya token lokal (disimpan Repliz) — tetap disync.
-  const supported = new Set([
-    "instagram",
-    "instagram_standalone",
-    "facebook",
-    "threads",
-    "tiktok",
-    "youtube",
-    "bluesky",
-    "linkedin",
-    "linkedin_org",
-  ]);
-  const candidates = accounts.filter(
-    (a) => (a.accessTokenEnc || a.metadata?.replizAccountId) && supported.has(a.platform),
-  );
-
-  const syncedToday = await db
-    .selectDistinct({ socialAccountId: accountAnalytics.socialAccountId })
-    .from(accountAnalytics)
-    .where(
-      candidates.length > 0
-        ? and(
-            eq(accountAnalytics.date, today),
-            inArray(
-              accountAnalytics.socialAccountId,
-              candidates.map((a) => a.id),
-            ),
-          )
-        : eq(accountAnalytics.date, today),
-    );
-  const syncedIds = new Set(syncedToday.map((r) => r.socialAccountId));
-  const due = candidates.filter((a) => !syncedIds.has(a.id)).slice(0, maxAccounts);
-
   let synced = 0;
   let postsSynced = 0;
   const errors: string[] = [];
 
-  for (let i = 0; i < due.length; i += BATCH_SIZE) {
-    const batch = due.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < accounts.length; i += ANALYTICS_BATCH_SIZE) {
+    const batch = accounts.slice(i, i + ANALYTICS_BATCH_SIZE);
     const settled = await Promise.allSettled(
       batch.map(async (account) => {
         // Akun bridge: token platform disimpan Repliz — syncAccountAnalytics
@@ -368,6 +350,115 @@ export async function syncDueAnalyticsAccounts(
   }
 
   return { synced, postsSynced, errors };
+}
+
+/**
+ * Saring akun yang belum punya snapshot `account_analytics` hari ini.
+ *
+ * `force` melewati filter ini — dipakai sync manual: akun yang sudah tersink
+ * pagi tadi tetap harus bisa disegarkan setelah post barunya diimpor, kalau
+ * tidak metrik post baru itu tersangkut 0 sampai hari berikutnya.
+ */
+async function filterDueAccounts(
+  candidates: AnalyticsAccount[],
+  maxAccounts: number,
+  force = false,
+): Promise<AnalyticsAccount[]> {
+  if (force || candidates.length === 0) return candidates.slice(0, maxAccounts);
+  const today = new Date().toISOString().slice(0, 10);
+  const syncedToday = await db
+    .selectDistinct({ socialAccountId: accountAnalytics.socialAccountId })
+    .from(accountAnalytics)
+    .where(
+      and(
+        eq(accountAnalytics.date, today),
+        inArray(
+          accountAnalytics.socialAccountId,
+          candidates.map((a) => a.id),
+        ),
+      ),
+    );
+  const done = new Set(syncedToday.map((r) => r.socialAccountId));
+  return candidates.filter((a) => !done.has(a.id)).slice(0, maxAccounts);
+}
+
+/** Akun yang punya adapter metrik & kredensial yang bisa dipakai. */
+function analyticsCandidates(accounts: AnalyticsAccount[]): AnalyticsAccount[] {
+  // Akun bridge Repliz tidak punya token lokal (disimpan Repliz) — tetap disync.
+  return accounts.filter(
+    (a) => (a.accessTokenEnc || a.metadata?.replizAccountId) && ANALYTICS_PLATFORMS.has(a.platform),
+  );
+}
+
+/**
+ * Sync analytics akun yang due (lastAnalyticsAt tidak ada di schema — pakai
+ * snapshot terakhir account_analytics: akun tanpa snapshot hari ini = due).
+ * Interval 1 jam (metrik berubah lambat, hemat rate limit).
+ * Akun diproses paralel dalam batch kecil — satu akun gagal tidak
+ * menghentikan batch lainnya (Promise.allSettled).
+ */
+export async function syncDueAnalyticsAccounts(
+  maxAccounts = 10,
+): Promise<{ synced: number; postsSynced: number; errors: string[] }> {
+  // Akun connected non-manual
+  const accounts = await db
+    .select({
+      id: socialAccount.id,
+      organizationId: socialAccount.organizationId,
+      platform: socialAccount.platform,
+      platformAccountId: socialAccount.platformAccountId,
+      username: socialAccount.username,
+      accessTokenEnc: socialAccount.accessTokenEnc,
+      metadata: socialAccount.metadata,
+    })
+    .from(socialAccount)
+    .where(eq(socialAccount.isConnected, true))
+    .limit(maxAccounts * 3);
+
+  const due = await filterDueAccounts(analyticsCandidates(accounts), maxAccounts);
+  return runAnalyticsForAccounts(due);
+}
+
+/**
+ * Sync analytics SEMUA akun terhubung milik satu organisasi.
+ *
+ * MENGAPA ADA: `syncDueAnalyticsAccounts` (worker) memakai antrean GLOBAL —
+ * maks 10 akun per siklus, interval 1 jam, dan akun yang sudah punya snapshot
+ * hari ini tidak diambil lagi. Akibatnya akun yang baru dihubungkan, atau post
+ * yang baru diimpor `posts-sync`, menampilkan metrik 0 sampai ~1 jam. Karena
+ * tombol "Sinkron Platform" hanya mengimpor KONTEN, pengguna melihat angkanya
+ * tidak berubah sama sekali dan menyangka sinkronisasi gagal.
+ *
+ * Dipanggil setelah `syncWorkspacePosts` supaya konten DAN metriknya segar
+ * dalam satu tindakan. Snapshot per-post tetap punya pengaman sendiri di
+ * `syncAccountAnalytics` (post dengan metrik non-nol atau snapshot < 45 menit
+ * tidak ditembak ulang), jadi `force` tidak membanjiri API platform.
+ */
+export async function syncWorkspaceAnalytics(
+  organizationId: string,
+  opts: { force?: boolean; maxAccounts?: number } = {},
+): Promise<{ synced: number; postsSynced: number; errors: string[] }> {
+  const accounts = await db
+    .select({
+      id: socialAccount.id,
+      organizationId: socialAccount.organizationId,
+      platform: socialAccount.platform,
+      platformAccountId: socialAccount.platformAccountId,
+      username: socialAccount.username,
+      accessTokenEnc: socialAccount.accessTokenEnc,
+      metadata: socialAccount.metadata,
+    })
+    .from(socialAccount)
+    .where(
+      and(eq(socialAccount.organizationId, organizationId), eq(socialAccount.isConnected, true)),
+    );
+
+  const due = await filterDueAccounts(
+    analyticsCandidates(accounts),
+    opts.maxAccounts ?? 25,
+    opts.force ?? false,
+  );
+  return runAnalyticsForAccounts(due);
 }
 
 /** ID generator — pola sama dengan apps/server/src/lib/id.ts (prefix sk_) */
