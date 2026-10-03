@@ -727,6 +727,15 @@ export function PostResultsPage() {
                 type="button"
                 key={a.username}
                 onClick={() => setAccount(a.username)}
+                // Label = @username, SAMA seperti /accounts. Jangan pakai
+                // displayName: dua akun beda platform bisa punya nama tampilan
+                // identik (IG @syahidsyahdansaja & FB "SHD Store" dua-duanya
+                // displayName "SHD Store") → chip kembar & tak bisa dibedakan.
+                title={
+                  a.displayName && a.displayName !== a.username
+                    ? `${a.displayName} · @${a.username}`
+                    : `@${a.username}`
+                }
                 className={cn(
                   "flex shrink-0 items-center gap-1.5 rounded-full border py-1 pr-3 pl-1 font-medium text-sm transition-colors",
                   account === a.username
@@ -749,7 +758,7 @@ export function PostResultsPage() {
                     {(a.displayName || a.username).slice(0, 1).toUpperCase()}
                   </span>
                 )}
-                {a.displayName || a.username}
+                @{a.username}
               </button>
             );
           })}
