@@ -2,7 +2,9 @@
 // Dipakai route engagement POST /:id/reply.
 //
 // Cakupan (riset docs/social-platforms):
-// - IG kedua jalur: POST /{media-id}/comments (manage_comments)
+// - IG kedua jalur: POST /{ig-comment-id}/replies (manage_comments) — satu-satunya
+//   edge create pada node IG Comment; POST /{id}/comments pada comment node
+//   dijawab HTTP 400 "does not support this operation"
 // - FB Page: POST /{comment-id}/comments (pages_manage_posts)
 // - Threads: reply via container + reply_to_id (threads_manage_replies)
 // - TikTok: POST /comment/reply/create/ (comment.list + comment.list.manage scope — moderasi terbatas API listing; reply perlu ID komentar dari webhook)
@@ -57,8 +59,24 @@ export type ReplyResult = {
   replyId: string;
 };
 
+/**
+ * Edge create reply Instagram.
+ *
+ * Node IG Comment TIDAK punya edge `/comments` — `POST /{ig-comment-id}/comments`
+ * dijawab HTTP 400 "Unsupported post request … does not support this operation"
+ * (error_subcode 33). Satu-satunya cara membalas komentar/mention IG adalah
+ * `POST /{ig-comment-id}/replies?message=…` (berlaku di kedua host).
+ *
+ * Sinkronisasi (polling & webhook) menyimpan `platformItemId` = ID KOMENTAR untuk
+ * item type "comment" maupun "mention" IG — jadi keduanya harus pakai `/replies`.
+ * Edge `/comments` (top-level comment pada media) tetap disediakan untuk item
+ * level media bila nanti ada tipe seperti itu.
+ */
+function igReplyEdge(input: Pick<ReplyInput, "itemType">): "replies" | "comments" {
+  return input.itemType === "media" ? "comments" : "replies";
+}
+
 async function replyInstagram(input: ReplyInput): Promise<ReplyResult> {
-  // platformItemId = media id IG; reply → POST /{media-id}/comments
   if (!input.platformItemId) {
     throw new PublishError("no_platform_item", "Item tidak punya ID media platform.", false);
   }
@@ -67,10 +85,13 @@ async function replyInstagram(input: ReplyInput): Promise<ReplyResult> {
     (typeof input.accountMetadata?.pageAccessToken === "string"
       ? input.accountMetadata.pageAccessToken
       : null) ?? input.accessToken;
-  const res = await httpRequest<{ id?: string }>(`${GRAPH_FB}/${input.platformItemId}/comments`, {
-    method: "POST",
-    query: { message: input.content, access_token: token },
-  });
+  const res = await httpRequest<{ id?: string }>(
+    `${GRAPH_FB}/${input.platformItemId}/${igReplyEdge(input)}`,
+    {
+      method: "POST",
+      query: { message: input.content, access_token: token },
+    },
+  );
   if (!res.ok) await throwFromResponse(res, "IG reply");
   const id = (await res.json()).id;
   if (!id) throw new PublishError("reply_no_id", "IG tidak mengembalikan comment ID", true);
@@ -81,10 +102,13 @@ async function replyInstagramStandalone(input: ReplyInput): Promise<ReplyResult>
   if (!input.platformItemId) {
     throw new PublishError("no_platform_item", "Item tidak punya ID media platform.", false);
   }
-  const res = await httpRequest<{ id?: string }>(`${GRAPH_IG}/${input.platformItemId}/comments`, {
-    method: "POST",
-    query: { message: input.content, access_token: input.accessToken },
-  });
+  const res = await httpRequest<{ id?: string }>(
+    `${GRAPH_IG}/${input.platformItemId}/${igReplyEdge(input)}`,
+    {
+      method: "POST",
+      query: { message: input.content, access_token: input.accessToken },
+    },
+  );
   if (!res.ok) await throwFromResponse(res, "IG standalone reply");
   const id = (await res.json()).id;
   if (!id) throw new PublishError("reply_no_id", "IG tidak mengembalikan comment ID", true);
