@@ -80,9 +80,11 @@ export type PostMetricKey = "views" | "likes" | "comments" | "shares" | "impress
  * Sumber: riset docs/social-platforms + probe API (lihat komentar tiap adapter).
  */
 const POST_METRIC_SUPPORT: Record<string, readonly PostMetricKey[]> = {
-  // IG: `impressions` deprecated → adapter fallback ke `views` (angka tetap terisi)
-  instagram: ["views", "likes", "comments", "shares", "impressions"],
-  instagram_standalone: ["views", "likes", "comments", "shares", "impressions"],
+  // IG: `impressions` per-post TIDAK tersedia (ditolak API untuk media setelah
+  // 2 Juli 2024) → jangan dipalsukan dari `views`; kartunya tampil "—" seperti
+  // Threads. `views`, `likes`, `comments`, `shares`, `saves` tersedia.
+  instagram: ["views", "likes", "comments", "shares"],
+  instagram_standalone: ["views", "likes", "comments", "shares"],
   // FB: views/impressions level POST tidak tersedia → diisi Page Insights (level akun)
   facebook: ["views", "likes", "comments", "shares", "impressions"],
   // Threads: hanya views/likes/replies/reposts/quotes/shares — tanpa impressions
@@ -488,8 +490,9 @@ export function metricValue(
 // - `impressions` memang DITOLAK untuk media setelah 2 Juli 2024 ("does not
 //   support the impressions metric for this media product type"), jadi TIDAK
 //   boleh masuk daftar — bila satu metric ditolak, SELURUH request gagal dan
-//   semua metrik lain ikut hilang. `impressions` diisi lewat fallback ke
-//   `views` di pengembalian (lihat bawah).
+//   semua metrik lain ikut hilang. `impressions` pun TIDAK dipalsukan dari
+//   `views` (dulu begitu, menyesatkan); dibiarkan null dan kartunya tampil
+//   "tidak diseddikan platform" — lihat POST_METRIC_SUPPORT.
 // `reach` valid untuk semua tipe media → dipakai sebagai fallback terakhir.
 const IG_MEDIA_METRICS_FB = "reach,likes,comments,shares,saved,views";
 const IG_MEDIA_METRICS_IG = "reach,likes,comments,shares,saved,views";
@@ -506,8 +509,8 @@ const IG_MEDIA_METRICS_FALLBACK = "reach";
  * /performance/analitik.
  *
  * `impressions` sengaja TIDAK ada: untuk media setelah 2 Juli 2024 metric ini
- * ditolak, dan satu metric yang ditolak membatalkan SELURUH request. Angka
- * impressions diisi lewat fallback ke `views` di `igPostMetrics()`.
+ * ditolak, dan satu metric yang ditolak membatalkan SELURUH request. Angkanya
+ * juga tidak dipalsukan dari `views` (lihat igPostMetrics).
  */
 export const IG_MEDIA_METRIC_LISTS = {
   facebook: IG_MEDIA_METRICS_FB,
@@ -559,8 +562,15 @@ async function igPostMetrics(
 
   const data = result.data ?? [];
   return {
-    // `impressions` deprecated di kedua host → fallback ke `views` agar dashboard tetap terisi
-    impressions: metricValue(data, "impressions") ?? metricValue(data, "views"),
+    // `impressions` TIDAK diisi. Untuk media setelah 2 Juli 2024 metric ini
+    // ditolak API ("does not support the impressions metric for this media
+    // product type") dan tidak boleh masuk daftar request (satu metric yang
+    // ditolak membatalkan seluruh request). Sebelumnya angkanya dipalsukan
+    // dengan menyalin `views` — itu menyesatkan: pengguna melihat "impressions"
+    // yang isinya persis = views, padahal platform tidak melaporkan impressions
+    // per-post sama sekali. Sekarang dibiarkan null dan kartunya ditampilkan
+    // "tidak disediakan platform" (lihat POST_METRIC_SUPPORT + metricSupport).
+    impressions: metricValue(data, "impressions"),
     reach: metricValue(data, "reach"),
     saves: metricValue(data, "saved") ?? metricValue(data, "saves"),
     likes: metricValue(data, "likes"),
