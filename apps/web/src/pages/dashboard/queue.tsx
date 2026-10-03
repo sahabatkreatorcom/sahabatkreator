@@ -73,8 +73,10 @@ const STATUS_BADGE: Record<
   processing: { label: "Diproses", variant: "warning" },
   published: { label: "Terbit", variant: "success" },
   failed: { label: "Gagal", variant: "danger" },
-  // Post yang dihapus dari platform (status DB "canceled") — bukan draf.
-  canceled: { label: "Dibatalkan", variant: "secondary" },
+  // Status DB "canceled" HANYA diisi saat post dihapus dari platform
+  // (DELETE /posts/item/:id/published). Bedakan dari "hapus jadwal"
+  // (DELETE /posts/item/:id) yang menghapus barisnya sampai tidak tersisa.
+  canceled: { label: "Dihapus di platform", variant: "secondary" },
 };
 
 // Post yang boleh dihapus dari antrian. "canceled" ikut disertakan supaya baris
