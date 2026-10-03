@@ -12,6 +12,8 @@
 //   + /{ig-id}/insights (reach,profile_views,website_clicks)
 //   + /{media-id}/insights (reach,likes,comments,shares,saves,views)
 // - facebook: /{page-id}?fields=fan_count + /{post-id}?fields=reactions.summary,comments.summary,shares
+//   + /{page-id}/insights (page_media_view = "Tayangan"/views, page_post_engagements;
+//     `page_impressions` sudah di-deprecate 15 Nov 2025)
 // - threads: /{user-id}/threads_insights?metric=views,likes,replies,reposts,quotes,followers_count
 // - tiktok: /v2/user/info/?fields=follower_count,likes_count,video_count + video/list (like/comment/share/view_count)
 // - youtube: /youtube/v3/channels?part=statistics + /videos?part=statistics (batch id)
@@ -213,63 +215,87 @@ async function facebookAccountMetrics(pageId: string, token: string): Promise<Ac
   }
   const data = await res.json();
 
-  // Page Insights — satu-satunya permission sah untuk metrik Page Insights
-  // (read_insights). New Pages Experience hanya menerima metric terbatas:
-  // page_views_total, page_post_engagements, page_daily_follows. Metric klasik
-  // (page_impressions, page_fans_gender_age) ditolak "(#100) not a valid insights
-  // metric". Insights bersifat opsional — bila gagal, snapshot followers tetap
-  // tersimpan; error ditelan supaya sync akun tidak terhambat.
+  // Page Insights — permission `read_insights`. New Pages Experience hanya
+  // menerima metric terbatas; metric klasik (page_impressions, page_fans,
+  // page_fans_gender_age) ditolak "(#100) not a valid insights metric" setelah
+  // deprecation Meta 15 Nov 2025. Insights opsional — bila gagal, snapshot
+  // followers tetap tersimpan; error ditelan supaya sync akun tidak terhambat.
   const insights = await facebookPageInsights(pageId, token);
 
   return {
     followers: data.followers_count ?? data.fan_count,
-    impressions: insights.views,
-    profileViews: insights.views,
+    // Views/Impressions Halaman = `page_media_view` ("Tayangan Facebook").
+    // JANGAN `page_views_total` — itu kunjungan ke PROFIL Halaman, hampir
+    // selalu 0 untuk halaman yang trafiknya lewat feed (itu sebabnya kartu
+    // Views Facebook dulu selalu 0).
+    impressions: insights.mediaViews,
+    // `page_views_total` tetap disimpan sebagai profileViews (kunjungan profil).
+    profileViews: insights.pageViews,
     engagementCount: insights.engagements,
   };
 }
 
 /**
+ * Daftar metric Page Insights Facebook — DIEKSPOR supaya bug "views FB selalu 0"
+ * tidak bisa kembali tanpa terdeteksi tes.
+ *
+ * `page_media_view` ("Tayangan Facebook") = berapa kali konten Halaman
+ * ditampilkan di layar orang. Ini metric Views/Impressions yang BENAR; ia
+ * menggantikan `page_impressions` yang di-deprecate Meta (15 Nov 2025).
+ *
+ * `page_views_total` = kunjungan ke PROFIL Halaman (bukan tayangan konten) —
+ * hampir selalu 0, jadi hanya dipakai sebagai cadangan bila API versi lama
+ * belum mengenal `page_media_view`.
+ */
+export const FB_PAGE_INSIGHT_METRICS = {
+  primary: "page_media_view,page_post_engagements,page_views_total",
+  fallback: "page_views_total,page_post_engagements",
+} as const;
+
+/**
  * Page Insights Facebook — baca metric yang diterima New Pages Experience.
- * `page_views_total` = jumlah tampilan Halaman (dipakai untuk impressions &
- * profileViews), `page_post_engagements` = engagement. Kembalikan null bila
- * metric tidak tersedia / ditolak, agar tidak menghapus snapshot sebelumnya.
+ * Kembalikan null bila metric tidak tersedia / ditolak, agar tidak menghapus
+ * snapshot sebelumnya.
  */
 async function facebookPageInsights(
   pageId: string,
   token: string,
-): Promise<{ views: number | null; engagements: number | null }> {
-  try {
-    const res = await httpRequest<{
-      data?: Array<{
-        name?: string;
-        values?: Array<{ value?: number }>;
-        total_value?: { value?: number };
-      }>;
-    }>(`${GRAPH_FB}/${pageId}/insights`, {
-      query: {
-        metric: "page_views_total,page_post_engagements",
-        period: "day",
-        access_token: token,
-      },
-      retries: 1,
-    });
-    if (!res.ok) return { views: null, engagements: null };
-    const payload = await res.json();
-    const byName = new Map(
-      (payload.data ?? []).map((m) => [
-        m.name ?? "",
-        m.values?.[m.values.length - 1]?.value ?? m.total_value?.value ?? null,
-      ]),
-    );
-    return {
-      views: byName.get("page_views_total") ?? null,
-      engagements: byName.get("page_post_engagements") ?? null,
-    };
-  } catch {
-    // Insights opsional — jangan gagalkan snapshot followers
-    return { views: null, engagements: null };
+): Promise<{ mediaViews: number | null; pageViews: number | null; engagements: number | null }> {
+  // Urutan percobaan: daftar baru (page_media_view) → daftar lama. Kalau API
+  // versi lama tidak mengenal `page_media_view`, SELURUH request dijawab 400;
+  // daftar lama memastikan engagements tetap terambil.
+  const attempts = [FB_PAGE_INSIGHT_METRICS.primary, FB_PAGE_INSIGHT_METRICS.fallback];
+  for (const metric of attempts) {
+    try {
+      const res = await httpRequest<{
+        data?: Array<{
+          name?: string;
+          values?: Array<{ value?: number }>;
+          total_value?: { value?: number };
+        }>;
+      }>(`${GRAPH_FB}/${pageId}/insights`, {
+        query: { metric, period: "day", access_token: token },
+        retries: 1,
+      });
+      if (!res.ok) continue;
+      const payload = await res.json();
+      const byName = new Map(
+        (payload.data ?? []).map((m) => [
+          m.name ?? "",
+          m.values?.[m.values.length - 1]?.value ?? m.total_value?.value ?? null,
+        ]),
+      );
+      return {
+        mediaViews: byName.get("page_media_view") ?? null,
+        pageViews: byName.get("page_views_total") ?? null,
+        engagements: byName.get("page_post_engagements") ?? null,
+      };
+    } catch {
+      // coba daftar berikutnya
+    }
   }
+  // Insights opsional — jangan gagalkan snapshot followers
+  return { mediaViews: null, pageViews: null, engagements: null };
 }
 
 /** Threads — threads_insights (butuh ≥1 post; followers_count tersedia) */

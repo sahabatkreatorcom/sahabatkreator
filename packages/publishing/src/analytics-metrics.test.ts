@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { IG_MEDIA_METRIC_LISTS, metricValue, supportedPostMetrics } from "./analytics-metrics";
+import {
+  FB_PAGE_INSIGHT_METRICS,
+  IG_MEDIA_METRIC_LISTS,
+  metricValue,
+  supportedPostMetrics,
+} from "./analytics-metrics";
 
 describe("supportedPostMetrics", () => {
   it("Threads: tanpa impressions, tapi ada views/likes/comments/shares", () => {
@@ -112,5 +117,33 @@ describe("IG_MEDIA_METRIC_LISTS — views wajib diminta", () => {
     >) {
       expect(IG_MEDIA_METRIC_LISTS[key].split(",")).not.toContain("saves");
     }
+  });
+});
+
+// Regresi: kartu Views/Impressions Facebook selalu 0 karena memakai
+// `page_views_total` (kunjungan ke PROFIL Halaman) alih-alih `page_media_view`
+// ("Tayangan Facebook" — pengganti `page_impressions` yang di-deprecate Meta
+// 15 Nov 2025). Diverifikasi lewat probe langsung ke graph.facebook.com pada
+// Page SHD Store: page_media_view = 4 & 2 (non-nol), page_views_total = 0 & 0.
+describe("FB_PAGE_INSIGHT_METRICS — views Halaman wajib page_media_view", () => {
+  it("daftar utama meminta page_media_view (metrik Tayangan yang benar)", () => {
+    expect(FB_PAGE_INSIGHT_METRICS.primary.split(",")).toContain("page_media_view");
+  });
+
+  it("page_views_total BUKAN satu-satunya sumber views", () => {
+    // Bila page_media_view hilang dari daftar, views Facebook kembali selalu 0.
+    const list = FB_PAGE_INSIGHT_METRICS.primary.split(",");
+    expect(list).not.toEqual(["page_views_total"]);
+    expect(list).not.toEqual(["page_views_total", "page_post_engagements"]);
+  });
+
+  it("page_impressions (deprecated) tidak pernah diminta", () => {
+    for (const list of [FB_PAGE_INSIGHT_METRICS.primary, FB_PAGE_INSIGHT_METRICS.fallback]) {
+      expect(list.split(",")).not.toContain("page_impressions");
+    }
+  });
+
+  it("fallback tetap membawa engagements", () => {
+    expect(FB_PAGE_INSIGHT_METRICS.fallback.split(",")).toContain("page_post_engagements");
   });
 });

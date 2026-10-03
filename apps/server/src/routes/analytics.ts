@@ -97,7 +97,8 @@ async function sumPostTotals(
  * [from, to] (tanggal snapshot). Berbeda dengan post totals: FB New Pages
  * Experience tidak menyediakan insights level post, jadi views/impressions
  * Halaman diambil dari snapshot harian account_analytics (metric
- * `page_views_total`/`page_post_engagements` — satu-satunya yang diterima NPE).
+ * `page_media_view` = "Tayangan" + `page_post_engagements` — pengganti
+ * `page_impressions` yang di-deprecate Meta 15 Nov 2025).
  * Snapshot kumulatif-harian → sum langsung per tanggal dalam rentang.
  *
  * `platform` opsional: FB Page Insights hanya relevan untuk platform facebook —
