@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { PageLoader } from "@/components/ui/spinner";
-import { meQueryOptions } from "@/layouts/require-auth";
+import { meQueryOptions, usePermissions } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { formatDate } from "@/lib/format";
 import { queryKeys } from "../../lib/query-keys";
@@ -55,6 +55,7 @@ const ROLE_COLORS: Record<string, "primary" | "secondary" | "destructive"> = {
 export function TeamPage() {
   const queryClient = useQueryClient();
   const { data: me } = useQuery(meQueryOptions);
+  const { has } = usePermissions();
   const [inviteModal, setInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
@@ -168,10 +169,19 @@ export function TeamPage() {
           {seatsFull && (
             <p className="mt-1 text-[var(--text-muted)] text-xs">
               Kuota anggota plan Anda sudah penuh.{" "}
-              <Link to="/settings/billing" className="text-[var(--accent-gold)] hover:underline">
-                Upgrade plan
-              </Link>{" "}
-              untuk mengundang anggota baru.
+              {has("billing.view") ? (
+                <>
+                  <Link
+                    to="/settings/billing"
+                    className="text-[var(--accent-gold)] hover:underline"
+                  >
+                    Upgrade plan
+                  </Link>{" "}
+                  untuk mengundang anggota baru.
+                </>
+              ) : (
+                "Minta owner/admin meng-upgrade plan untuk mengundang anggota baru."
+              )}
             </p>
           )}
         </div>

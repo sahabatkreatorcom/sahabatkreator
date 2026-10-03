@@ -54,7 +54,7 @@ import { authClient } from "@/lib/auth-client";
 import { useCommandPalette } from "@/lib/command-palette-store";
 import { useSeo } from "@/lib/seo";
 import { useTheme } from "@/lib/theme";
-import { meQueryOptions } from "./require-auth";
+import { meQueryOptions, usePermissions } from "./require-auth";
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
@@ -229,6 +229,9 @@ function UserMenu() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = data?.user;
+  // Sembunyikan pintasan Billing bila user tidak punya billing.view (sebelum
+  // data /me siap, anggap boleh agar menu tidak berkedip).
+  const canViewBilling = data?.permissions ? data.permissions.includes("billing.view") : true;
 
   async function handleSignOut() {
     await authClient.signOut();
@@ -255,10 +258,12 @@ function UserMenu() {
         <Settings className="h-4 w-4" />
         Pengaturan
       </DropdownItem>
-      <DropdownItem onClick={() => navigate("/settings/billing")}>
-        <CreditCard className="h-4 w-4" />
-        Billing
-      </DropdownItem>
+      {canViewBilling && (
+        <DropdownItem onClick={() => navigate("/settings/billing")}>
+          <CreditCard className="h-4 w-4" />
+          Billing
+        </DropdownItem>
+      )}
       {user?.role === "admin" && (
         <DropdownItem onClick={() => navigate("/admin")}>
           <ShieldCheck className="h-4 w-4" />
@@ -276,6 +281,8 @@ function UserMenu() {
 
 export function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { has } = usePermissions();
+  const canViewBilling = has("billing.view");
   // Banner impersonasi aktif → geser seluruh layout ke bawah agar topbar
   // (sticky) tidak tertutup banner fixed
   const { data: impersonation } = useQuery(impersonationStatusOptions);
@@ -335,19 +342,21 @@ export function DashboardLayout() {
         ))}
       </nav>
 
-      {/* Upgrade card */}
-      <div className="p-3">
-        <div className="rounded-[var(--radius-lg)] bg-gradient p-4 text-white">
-          <p className="font-semibold text-sm">Upgrade ke Pro</p>
-          <p className="mt-1 text-white/80 text-xs">Buka akun tanpa batas & analitik lanjutan</p>
-          <Link to="/settings/billing">
-            <Button variant="secondary" size="sm" className="mt-3 w-full">
-              <CreditCard className="h-3.5 w-3.5" />
-              Lihat Paket
-            </Button>
-          </Link>
+      {/* Upgrade card — disembunyikan bila user tidak bisa membuka billing */}
+      {canViewBilling && (
+        <div className="p-3">
+          <div className="rounded-[var(--radius-lg)] bg-gradient p-4 text-white">
+            <p className="font-semibold text-sm">Upgrade ke Pro</p>
+            <p className="mt-1 text-white/80 text-xs">Buka akun tanpa batas & analitik lanjutan</p>
+            <Link to="/settings/billing">
+              <Button variant="secondary" size="sm" className="mt-3 w-full">
+                <CreditCard className="h-3.5 w-3.5" />
+                Lihat Paket
+              </Button>
+            </Link>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 

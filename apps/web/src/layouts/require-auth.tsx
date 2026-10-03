@@ -32,6 +32,8 @@ export type MeResponse = {
     role: string;
   }[];
   limits: Record<string, number> | null;
+  /** Effective permission user di org aktif (kode dari katalog custom role). */
+  permissions: string[];
   /** Flag "Registrasi Terbuka" dari /admin/settings (untuk halaman register) */
   registrationEnabled: boolean;
 };
@@ -98,6 +100,24 @@ export function RequireAuth({ children }: { children?: ReactNode }) {
   }
 
   return <>{children ?? <Outlet />}</>;
+}
+
+/**
+ * Effective permission user di org aktif (dari /me). Dipakai untuk
+ * menyembunyikan menu/halaman yang tidak bisa diakses, mis. Billing untuk
+ * anggota tanpa `billing.view`. Owner selalu punya semua.
+ *
+ * Sebelum data /me siap, `has()` mengembalikan true agar menu tidak
+ * berkedip-kedip; server tetap penentu akhir (403).
+ */
+export function usePermissions(): {
+  permissions: Set<string>;
+  has: (code: string) => boolean;
+} {
+  const { data } = useQuery(meQueryOptions);
+  const list = data?.permissions;
+  const permissions = new Set(list ?? []);
+  return { permissions, has: (code) => (list ? permissions.has(code) : true) };
 }
 
 /**

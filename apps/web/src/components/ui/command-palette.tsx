@@ -1,7 +1,7 @@
 // Command Palette (Ctrl+K / Cmd+K) — pencarian cepat navigasi & aksi dashboard.
 // Filter fuzzy sederhana: semua kata query harus ada di label (case-insensitive).
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
   CalendarDays,
@@ -295,7 +295,18 @@ export function CommandPalette() {
     [resolved, toggle, signingOut, queryClient],
   );
 
-  const allCommands = useMemo(() => [...actionCommands, ...NAVIGATION_COMMANDS], [actionCommands]);
+  // Pintasan Billing disembunyikan bila user tidak punya billing.view.
+  // Sebelum /me siap, anggap boleh agar daftar tidak berkedip.
+  const { data: me } = useQuery(meQueryOptions);
+  const canViewBilling = me?.permissions ? me.permissions.includes("billing.view") : true;
+
+  const allCommands = useMemo(
+    () =>
+      [...actionCommands, ...NAVIGATION_COMMANDS].filter(
+        (c) => c.id !== "nav-billing" || canViewBilling,
+      ),
+    [actionCommands, canViewBilling],
+  );
 
   const results = useMemo(() => {
     const q = query.trim();

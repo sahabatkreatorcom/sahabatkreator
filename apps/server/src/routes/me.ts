@@ -9,7 +9,7 @@ import {
 } from "@sahabatkreator/db/schema";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { errorResponse, getAuthContext } from "../lib/auth-guard";
+import { errorResponse, getAuthContext, getOrgPermissions } from "../lib/auth-guard";
 import { getOrgLimits } from "../lib/billing";
 
 export const meRoute = new Hono();
@@ -36,6 +36,7 @@ meRoute.get("/", async (c) => {
         organization: null,
         organizations: [],
         limits: null,
+        permissions: [],
         registrationEnabled,
       });
 
@@ -61,6 +62,13 @@ meRoute.get("/", async (c) => {
 
     const limits = ctx.organization ? await getOrgLimits(ctx.organization.id) : null;
 
+    // Effective permission user di org aktif — dipakai shell web untuk
+    // menyembunyikan menu/halaman yang tidak bisa diakses (mis. Billing untuk
+    // anggota tanpa billing.view). Kosong bila user belum punya org aktif.
+    const permissions = ctx.organization
+      ? await getOrgPermissions({ ...ctx, organization: ctx.organization })
+      : [];
+
     return c.json({
       authenticated: true,
       user: {
@@ -75,6 +83,7 @@ meRoute.get("/", async (c) => {
       organization: ctx.organization,
       organizations: memberships,
       limits,
+      permissions,
       registrationEnabled,
     });
   } catch (error) {
