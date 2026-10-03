@@ -21,6 +21,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { processAutomation } from "./automation";
 import { GRAPH_FB_URL, GRAPH_IG_URL, LINKEDIN_API_VERSION, LINKEDIN_REST_URL } from "./config";
 import { decrypt } from "./crypto";
+import { resolveMetaDMPartner } from "./dm-partner";
 import type { SyncResult } from "./engagement-sync";
 import { httpRequest } from "./http";
 import {
@@ -337,11 +338,6 @@ export async function syncAccountDMs(ctx: {
     const messages = conv.messages?.data ?? [];
     if (messages.length === 0) continue;
 
-    // Partner = participant yang bukan akun kita (IG id maupun Page id)
-    const participants = conv.participants?.data ?? [];
-    const partner = participants.find((p) => !selfIds.has(p.id)) ?? participants[0];
-    if (!partner) continue;
-
     const mapped = messages.map((msg) => {
       const att = msg.attachments?.data?.[0];
       return {
@@ -358,16 +354,20 @@ export async function syncAccountDMs(ctx: {
       };
     });
 
+    // Partner = pihak lawan bicara (bukan akun kita). Lihat resolveMetaDMPartner
+    // untuk alasan fallback-nya bukan participants[0].
+    const partner = resolveMetaDMPartner({
+      participants: conv.participants?.data ?? [],
+      messages: mapped,
+      selfIds,
+    });
+    if (!partner) continue;
+
     newItems += await upsertDMConversation({
       organizationId: ctx.account.organizationId,
       socialAccountId: ctx.account.id,
       platformConversationId: conv.id,
-      partner: {
-        id: partner.id,
-        username: partner.username ?? null,
-        name: partner.name ?? null,
-        avatarUrl: partner.profile_pic ?? null,
-      },
+      partner,
       messages: mapped,
     });
   }
@@ -589,9 +589,29 @@ export async function sendDMReply(input: {
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    // Meta mengembalikan alasan yang bisa ditindaklanjuti user — terjemahkan
+    // kode yang umum muncul agar pesan tidak berupa JSON mentah.
+    let friendly: string | null = null;
+    try {
+      const parsed = JSON.parse(body) as {
+        error?: { code?: number; error_subcode?: number; message?: string };
+      };
+      const metaErr = parsed.error;
+      if (metaErr?.code === 10 || metaErr?.error_subcode === 2018278) {
+        friendly =
+          "Jendela balasan 24 jam sudah lewat. Balasan hanya bisa dikirim dalam 24 jam sejak pesan terakhir dari pengguna (kebijakan Messenger).";
+      } else if (metaErr?.code === 100 && metaErr.error_subcode === 2534014) {
+        friendly =
+          "Akun lawan bicara tidak dikenali platform. Jalankan Sinkron Kotak Masuk agar kontak diperbarui, lalu coba lagi.";
+      } else if (metaErr?.message) {
+        friendly = metaErr.message;
+      }
+    } catch {
+      // body bukan JSON — pakai teks mentah di bawah
+    }
     throw new PublishError(
       "dm_send_failed",
-      `Gagal kirim DM ${input.platform} (${res.status}): ${body.slice(0, 300)}`,
+      friendly ?? `Gagal kirim DM ${input.platform} (${res.status}): ${body.slice(0, 300)}`,
       res.status === 429 || res.status >= 500,
     );
   }

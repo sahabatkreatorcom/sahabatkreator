@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
+  Ban,
   CalendarClock,
   CheckCircle2,
   ChevronDown,
@@ -33,7 +34,7 @@ type QueuePost = {
   id: string;
   postGroupId: string;
   platform: string;
-  status: "draft" | "scheduled" | "publishing" | "published" | "failed" | "processing";
+  status: "draft" | "scheduled" | "publishing" | "published" | "failed" | "processing" | "canceled";
   content: string | null;
   platformPostId: string | null;
   platformPostUrl: string | null;
@@ -72,16 +73,27 @@ const STATUS_BADGE: Record<
   processing: { label: "Diproses", variant: "warning" },
   published: { label: "Terbit", variant: "success" },
   failed: { label: "Gagal", variant: "danger" },
+  // Post yang dihapus dari platform (status DB "canceled") — bukan draf.
+  canceled: { label: "Dibatalkan", variant: "secondary" },
 };
+
+// Post yang boleh dihapus dari antrian. "canceled" ikut disertakan supaya baris
+// sisa setelah post dihapus dari platform bisa dibersihkan dari daftar.
+const DELETABLE_STATUSES: string[] = ["draft", "scheduled", "failed", "canceled"];
 
 function groupStatus(
   posts: QueuePost[],
-): "failed" | "published" | "scheduled" | "draft" | "processing" {
+): "failed" | "published" | "scheduled" | "draft" | "processing" | "canceled" {
   if (posts.some((p) => p.status === "failed")) return "failed";
   if (posts.some((p) => p.status === "publishing" || p.status === "processing"))
     return "processing";
-  if (posts.every((p) => p.status === "published")) return "published";
-  if (posts.some((p) => p.status === "scheduled")) return "scheduled";
+  // Post "canceled" sudah tidak tayang (dihapus dari platform) — tidak ikut
+  // menentukan status grup. Tanpa penyaringan ini, grup berisi satu post
+  // canceled jatuh ke "draft" dan salah tampil sebagai "Draf".
+  const active = posts.filter((p) => p.status !== "canceled");
+  if (active.length === 0) return "canceled";
+  if (active.every((p) => p.status === "published")) return "published";
+  if (active.some((p) => p.status === "scheduled")) return "scheduled";
   return "draft";
 }
 
@@ -347,6 +359,8 @@ export function QueuePage() {
                       <CheckCircle2 className="h-5 w-5 text-[var(--success)]" />
                     ) : status === "processing" ? (
                       <Loader2 className="h-5 w-5 animate-spin text-[var(--warning)]" />
+                    ) : status === "canceled" ? (
+                      <Ban className="h-5 w-5 text-[var(--text-muted)]" />
                     ) : (
                       <Clock className="h-5 w-5 text-[var(--info)]" />
                     )}
@@ -486,7 +500,7 @@ export function QueuePage() {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 {/* Checkbox bulk-select — hanya jadwal yang bisa dihapus */}
-                                {["draft", "scheduled", "failed"].includes(p.status) && (
+                                {DELETABLE_STATUSES.includes(p.status) && (
                                   <input
                                     type="checkbox"
                                     checked={checkedIds.has(p.id)}
@@ -514,7 +528,7 @@ export function QueuePage() {
                                     {badge.label}
                                   </Badge>
                                 )}
-                                {["draft", "scheduled", "failed"].includes(p.status) && (
+                                {DELETABLE_STATUSES.includes(p.status) && (
                                   <button
                                     type="button"
                                     title={`Hapus jadwal ${cfg?.label ?? p.platform}`}

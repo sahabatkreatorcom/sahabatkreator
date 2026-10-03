@@ -688,8 +688,11 @@ export function AnalyticsPage() {
         }))}
       />
 
-      {/* Analytics Pinterest — fetch on-demand (compliance: tidak disimpan) */}
-      <PinterestAnalyticsPanel />
+      {/* Analytics Pinterest — fetch on-demand (compliance: tidak disimpan).
+          Panel ini khusus Pinterest, jadi disembunyikan saat filter platform
+          diarahkan ke platform lain — kalau tidak, ia tampak seolah bagian dari
+          data platform yang sedang dipilih. */}
+      {(platform === "all" || platform === "pinterest") && <PinterestAnalyticsPanel />}
     </div>
   );
 }
