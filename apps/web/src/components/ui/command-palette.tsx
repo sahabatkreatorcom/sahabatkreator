@@ -4,6 +4,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
+  BookOpen,
   CalendarDays,
   Clapperboard,
   Command as CommandIcon,
@@ -38,6 +39,7 @@ import { useNavigate } from "react-router";
 import { meQueryOptions } from "@/layouts/require-auth";
 import { authClient } from "@/lib/auth-client";
 import { useCommandPalette } from "@/lib/command-palette-store";
+import { searchDocs } from "@/lib/docs-nav";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -46,8 +48,10 @@ type PaletteCommand = {
   label: string;
   /** Kata kunci tambahan untuk pencarian (sinonim) */
   keywords?: string[];
+  /** Baris kecil di bawah label (dipakai hasil bantuan dokumentasi) */
+  hint?: string;
   icon: LucideIcon;
-  group: "Navigasi" | "Aksi";
+  group: "Navigasi" | "Aksi" | "Bantuan";
   /** Jalankan aksi — palette otomatis ditutup setelahnya */
   run: (navigate: ReturnType<typeof useNavigate>) => void | Promise<void>;
 };
@@ -308,10 +312,28 @@ export function CommandPalette() {
     [actionCommands, canViewBilling],
   );
 
-  const results = useMemo(() => {
+  const commandResults = useMemo(() => {
     const q = query.trim();
     return q ? allCommands.filter((c) => matchesCommand(c, q)) : allCommands;
   }, [allCommands, query]);
+
+  // Hasil dari dokumentasi/bantuan — memakai indeks yang sama dengan pencarian
+  // di /panduan (lib/docs-nav). Sudah difilter searchDocs, jadi sengaja TIDAK
+  // dilewatkan matchesCommand lagi: kalau ikut, hasil yang cocok lewat
+  // deskripsi/isi halaman (bukan judul) akan terbuang.
+  const docResults = useMemo<PaletteCommand[]>(() => {
+    if (!query.trim()) return [];
+    return searchDocs(query, 4).map((entry) => ({
+      id: `doc-${entry.href}`,
+      label: entry.title,
+      hint: entry.sectionLabel,
+      icon: BookOpen,
+      group: "Bantuan",
+      run: (navigate) => navigate(entry.href),
+    }));
+  }, [query]);
+
+  const results = useMemo(() => [...commandResults, ...docResults], [commandResults, docResults]);
 
   // Reset state saat palette dibuka/tutup + kunci scroll body
   useEffect(() => {
@@ -426,7 +448,7 @@ export function CommandPalette() {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Cari halaman atau aksi…"
+            placeholder="Cari halaman, aksi, atau bantuan…"
             className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-[var(--text-muted)]"
             aria-label="Ketik untuk mencari perintah"
           />
@@ -472,7 +494,14 @@ export function CommandPalette() {
                           command.id === "action-logout" && active && "text-[var(--error)]",
                         )}
                       />
-                      <span className="flex-1 truncate">{command.label}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{command.label}</span>
+                        {command.hint ? (
+                          <span className="block truncate text-[11px] text-[var(--text-muted)]">
+                            {command.hint}
+                          </span>
+                        ) : null}
+                      </span>
                       {active && (
                         <kbd className="rounded border border-[var(--border)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 font-medium text-[10px] text-[var(--text-muted)]">
                           ↵
