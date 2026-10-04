@@ -12,8 +12,9 @@
 //   + /{ig-id}/insights (reach,profile_views,website_clicks)
 //   + /{media-id}/insights (reach,likes,comments,shares,saves,views)
 // - facebook: /{page-id}?fields=fan_count + /{post-id}?fields=reactions.summary,comments.summary,shares
-//   + /{page-id}/insights (page_media_view = "Tayangan"/views, page_post_engagements;
-//     `page_impressions` sudah di-deprecate 15 Nov 2025)
+//   + /{page-id}/insights (page_media_view = "Tayangan" level HALAMAN, page_post_engagements)
+//   + /{post-id}/insights (post_media_view = "Tayangan" level POST)
+//     `page_impressions`/`post_impressions` sudah di-deprecate 15 Nov 2025
 // - threads: /{user-id}/threads_insights?metric=views,likes,replies,reposts,quotes,followers_count
 // - tiktok: /v2/user/info/?fields=follower_count,likes_count,video_count + video/list (like/comment/share/view_count)
 // - youtube: /youtube/v3/channels?part=statistics + /videos?part=statistics (batch id)
@@ -102,19 +103,22 @@ const POST_METRIC_SUPPORT: Record<string, readonly PostMetricKey[]> = {
  * Metrik yang disediakan platform untuk SATU POST (level post) — dipakai kartu
  * per-post di /post-results.
  *
- * BERBEDA dari POST_METRIC_SUPPORT: di sana `facebook` mencantumkan
- * views/impressions karena halaman Analitik menggabungkannya dari Page Insights
- * level AKUN (`page_media_view`). Angka itu milik HALAMAN, bukan per-post —
- * Facebook (New Pages Experience) menolak SEMUA metric insights level post
- * ("(#100) not a valid insights metric", dibuktikan probe). Jadi di sini
- * views/impressions Facebook TIDAK dicantumkan, dan kartunya menampilkan "—"
- * alih-alih 0 yang menyesatkan.
+ * BERBEDA dari POST_METRIC_SUPPORT pada satu hal: `impressions`. Di sana
+ * `facebook` mencantumkan impressions karena halaman Analitik menggabungkannya
+ * dari Page Insights level AKUN (`page_media_view`). Angka itu milik HALAMAN,
+ * bukan per-post (`post_impressions` → 400), jadi di kartu per-post impressions
+ * Facebook tidak dicantumkan dan tampil "—".
+ *
+ * `views` Facebook per-post ADA — metrik `post_media_view` (kembaran
+ * `page_media_view` level Halaman), terverifikasi tersedia untuk 24/24 post
+ * Page SHD Store (4 Okt 2026). Jangan pakai `post_impressions`/`post_reach`
+ * (keduanya 400).
  */
 const POST_METRIC_SUPPORT_PER_POST: Record<string, readonly PostMetricKey[]> = {
   instagram: ["views", "likes", "comments", "shares"],
   instagram_standalone: ["views", "likes", "comments", "shares"],
-  // Tanpa views/impressions: FB tidak menyediakannya per-post.
-  facebook: ["likes", "comments", "shares"],
+  // views ADA (post_media_view); impressions per-post TIDAK ada.
+  facebook: ["views", "likes", "comments", "shares"],
   threads: ["views", "likes", "comments", "shares"],
   tiktok: ["views", "likes", "comments", "shares"],
   youtube: ["views", "likes", "comments"],
@@ -706,7 +710,50 @@ async function facebookPostMetrics(postId: string, token: string): Promise<PostM
     likes: data.reactions?.summary?.total_count ?? null,
     comments: data.comments?.summary?.total_count ?? null,
     shares: data.shares?.count ?? null,
+    // Views per-post — insights OPSIONAL: bila gagal, jangan gagalkan
+    // likes/komentar/share yang sudah didapat.
+    views: await facebookPostViews(postId, token),
   };
+}
+
+/**
+ * Metric views per-post Facebook — DIEKSPOR supaya bug "views FB per-post 0"
+ * tidak bisa kembali tanpa terdeteksi tes.
+ *
+ * `post_media_view` = "Tayangan" level POST, kembaran `page_media_view` level
+ * Halaman. Terverifikasi tersedia untuk **24/24** post Page SHD Store
+ * (4 Okt 2026), termasuk post gambar/teks (bukan hanya video).
+ *
+ * JEBAKAN: nama metric level-post TIDAK sama dengan level Halaman.
+ * `post_impressions`, `post_reach`, `post_media_view_unique` semuanya dijawab
+ * 400 "(#100) not a valid insights metric". `post_video_views` hanya ada untuk
+ * video → dipakai sebagai cadangan.
+ */
+export const FB_POST_VIEW_METRICS = {
+  primary: "post_media_view",
+  fallback: "post_video_views",
+} as const;
+
+/** Views per-post Facebook: `post_media_view` → fallback `post_video_views`. */
+async function facebookPostViews(postId: string, token: string): Promise<number | null> {
+  const primary = FB_POST_VIEW_METRICS.primary;
+  const fallback = FB_POST_VIEW_METRICS.fallback;
+  const attempts = [primary, `${primary},${fallback}`, fallback];
+  for (const metric of attempts) {
+    try {
+      const res = await httpRequest<{ data?: MetaInsight[] }>(`${GRAPH_FB}/${postId}/insights`, {
+        query: { metric, access_token: token },
+        retries: 1,
+      });
+      if (!res.ok) continue;
+      const payload = await res.json();
+      const value = metricValue(payload.data, primary) ?? metricValue(payload.data, fallback);
+      if (value !== null) return value;
+    } catch {
+      // coba daftar berikutnya
+    }
+  }
+  return null;
 }
 
 // Metric media insights Threads — daftar VALID (docs Threads API, Sep 2026):

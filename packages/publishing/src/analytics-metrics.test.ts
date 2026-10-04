@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FB_PAGE_INSIGHT_METRICS,
+  FB_POST_VIEW_METRICS,
   IG_MEDIA_METRIC_LISTS,
   metricValue,
   supportedPostMetrics,
@@ -149,26 +150,28 @@ describe("FB_PAGE_INSIGHT_METRICS — views Halaman wajib page_media_view", () =
   });
 });
 
-// Regresi: kartu PER-POST (/post-results) Facebook selalu menampilkan "0 views"
-// padahal FB tidak menyediakan views/impressions level post (New Pages
-// Experience menolak SEMUA metric insights level post). Angka Halaman hanya ada
-// di level AKUN (`page_media_view`) — itu sebabnya ringkasan level akun dan
-// kartu per-post butuh daftar dukungan yang BERBEDA.
+// Regresi: kartu PER-POST (/post-results) Facebook dulu menampilkan "0 views"
+// karena adapter tidak mengambil metrik views level post. Ternyata FB PUNYA:
+// `post_media_view` (kembaran `page_media_view` level Halaman) — terverifikasi
+// 24/24 post Page SHD Store. Yang tetap tidak ada per-post hanyalah
+// `impressions` (`post_impressions` → 400).
 describe("supportedPostMetricsPerPost — kartu per-post", () => {
-  it("Facebook: TANPA views & impressions per-post, likes/comments/shares ada", () => {
+  it("Facebook: views ADA (post_media_view), impressions per-post TIDAK ada", () => {
     const s = supportedPostMetricsPerPost(["facebook"]);
-    expect(s.views).toBe(false);
+    expect(s.views).toBe(true);
     expect(s.impressions).toBe(false);
     expect(s.likes).toBe(true);
     expect(s.comments).toBe(true);
     expect(s.shares).toBe(true);
   });
 
-  it("Facebook level AKUN tetap punya views (Page Insights) — beda dari per-post", () => {
-    // Regression guard: jangan sampai memperbaiki kartu per-post malah
-    // mematikan kartu ringkasan level akun yang kini terisi page_media_view.
+  it("Facebook per-post hanya beda di `impressions` dari level akun", () => {
+    // views: dua-duanya ada (post_media_view vs page_media_view).
     expect(supportedPostMetrics(["facebook"]).views).toBe(true);
-    expect(supportedPostMetricsPerPost(["facebook"]).views).toBe(false);
+    expect(supportedPostMetricsPerPost(["facebook"]).views).toBe(true);
+    // impressions: level akun ada (Page Insights), per-post tidak.
+    expect(supportedPostMetrics(["facebook"]).impressions).toBe(true);
+    expect(supportedPostMetricsPerPost(["facebook"]).impressions).toBe(false);
   });
 
   it("platform lain tetap punya views per-post", () => {
@@ -185,5 +188,22 @@ describe("supportedPostMetricsPerPost — kartu per-post", () => {
 
   it("gabungan platform: views ada bila SALAH SATU menyediakannya", () => {
     expect(supportedPostMetricsPerPost(["facebook", "instagram"]).views).toBe(true);
+  });
+});
+
+// Regresi: nama metric views level-POST Facebook beda dari level Halaman.
+// `page_media_view` (Halaman) TIDAK berlaku per-post, dan `post_impressions`
+// dijawab 400 — memakai nama yang salah membuat views FB per-post selalu 0.
+describe("FB_POST_VIEW_METRICS — views per-post Facebook", () => {
+  it("memakai post_media_view, bukan post_impressions/post_reach (keduanya 400)", () => {
+    expect(FB_POST_VIEW_METRICS.primary).toBe("post_media_view");
+    expect(FB_POST_VIEW_METRICS.primary).not.toContain("impressions");
+    expect(FB_POST_VIEW_METRICS.primary).not.toContain("reach");
+    // jangan tertukar dengan nama level Halaman
+    expect(FB_POST_VIEW_METRICS.primary).not.toBe(FB_PAGE_INSIGHT_METRICS.primary);
+  });
+
+  it("cadangan = post_video_views (hanya ada untuk video)", () => {
+    expect(FB_POST_VIEW_METRICS.fallback).toBe("post_video_views");
   });
 });
